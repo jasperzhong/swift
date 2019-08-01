@@ -3210,6 +3210,7 @@ std::vector<Function*> CompilationUnit::define(
 }
 
 void runCleanupPasses(std::shared_ptr<Graph>& to_clean, bool convert_ssa) {
+  to_clean->dump();
   // the graph including closures is converted to ssa in the first pass,
   // so subsequent cleanups do not need reconvert it
   if (convert_ssa) {

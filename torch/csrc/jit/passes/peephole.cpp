@@ -341,6 +341,9 @@ void PeepholeOptimize(Block* block, bool addmm_fusion_enabled) {
 void PeepholeOptimize(
     const std::shared_ptr<Graph>& graph,
     bool addmm_fusion_enabled) {
+  graph->dump();
+  EliminateDeadCode(graph);
+  graph->dump();
   PeepholeOptimize(graph->block(), addmm_fusion_enabled);
 }
 } // namespace jit
