@@ -17476,6 +17476,26 @@ class TestDict(JitTestCase):
         self.checkScript(update, (self.dict(), self.dict()))
         self.checkScript(update, (self.dict(), self.dict2()))
 
+    def test_aug_assign(self):
+        def aug_assign_dict_tensor(a):
+            # type: (Dict[str, Tensor]) -> Dict[str, Tensor]
+            a['a'] += 1
+            a['b'] -= 12
+            a['c'] *= 122
+            a['c'] /= 2
+            return a
+
+        def aug_assign_dict_prim(a):
+            # type: (Dict[str, float]) -> Dict[str, float]
+            a['a'] += 3.4
+            a['b'] -= 2.4
+            a['c'] *= 3.0
+            a['c'] /= 2.0
+            return a
+
+        self.checkScript(aug_assign_dict_tensor, (self.dict(),))
+        self.checkScript(aug_assign_dict_prim, ({'a': 3.0, 'b': 2.0, 'c': 4.0},))
+
     def test_popitem(self):
         @torch.jit.script
         def popitem(x):
