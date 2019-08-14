@@ -11,9 +11,10 @@ from torch.nn.quantized.modules import Conv2d
 from torch.nn._intrinsic.quantized import ConvReLU2d
 import torch.quantization
 from common_utils import run_tests, tempfile
-from common_quantization import QuantizationTestCase
+from common_quantization import QuantizationTestCase, no_deadline
 from hypothesis import given
 from hypothesis import strategies as st
+import unittest
 
 
 '''
@@ -35,7 +36,11 @@ class FunctionalAPITest(QuantizationTestCase):
         self.assertEqual(qY, qY_hat)
 
 
+@unittest.skipIf(not torch.fbgemm_is_cpu_supported(),
+                 'Quantized RNN requires FBGEMM. FBGEMM is only optimized for CPUs'
+                 ' with instruction set support avx2 or newer.')
 class ModuleAPITest(QuantizationTestCase):
+    @no_deadline
     @given(
         batch_size=st.integers(1, 5),
         in_features=st.integers(16, 32),
@@ -138,6 +143,7 @@ class ModuleAPITest(QuantizationTestCase):
         rqr2 = dequant_m(qr2)
         self.assertEqual(rqr, rqr2)
 
+    @no_deadline
     @given(
         use_bias=st.booleans(),
         use_fused=st.booleans(),
