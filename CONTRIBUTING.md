@@ -570,6 +570,77 @@ You'll need to install an appropriately configured flake8; see
 [Lint as you type](https://github.com/pytorch/pytorch/wiki/Lint-as-you-type)
 for documentation on how to do this.
 
+### How to build PyTorch with ASAN
+
+First, install LLVM 8. The easiest way is to get [prebuilt binaries](http://releases.llvm.org/download.html#8.0.0) and extract them to folder (later called `$LLVM_ROOT`).
+
+Then set up the appropriate scripts. You can put this in your `.bashrc`:
+
+```
+LLVM_ROOT=<wherever your llvm install is>
+PYTORCH_ROOT=<wherever your pytorch checkout is>
+
+LIBASAN_RT="$LLVM_ROOT/lib/clang/8.0.0/lib/linux/libclang_rt.asan-x86_64.so"
+build_with_asan()
+{
+  LD_PRELOAD=${LIBASAN_RT} \
+  CC="$LLVM_ROOT/bin/clang" \
+  CXX="$LLVM_ROOT/bin/clang++" \
+  LDSHARED="clang --shared" \
+  LDFLAGS="-stdlib=libstdc++" \
+  CFLAGS="-fsanitize=address -fno-sanitize-recover=all -shared-libasan -pthread" \
+  CXX_FLAGS="-pthread" \
+  NO_CUDA=1 USE_OPENMP=0 BUILD_CAFFE2_OPS=0 NO_DISTRIBUTED=1 DEBUG=1 \
+  python setup.py develop
+}
+
+run_with_asan()
+{
+  LD_PRELOAD=${LIBASAN_RT} $@
+}
+
+export ASAN_OPTIONS=detect_leaks=0:symbolize=1:strict_init_order=true
+export UBSAN_OPTIONS=print_stacktrace=1:suppressions=$PYTORCH_ROOT/ubsan.supp
+export ASAN_SYMBOLIZER_PATH=$LLVM_ROOT/bin/llvm-symbolizer
+```
+
+Then you can use the scripts like:
+
+```
+suo-devfair ~/pytorch ❯ build_with_asan
+suo-devfair ~/pytorch ❯ run_with_asan python test/test_jit.py
+```
+
+#### Getting ccache to work
+
+1. Make sure the ccache symlinks for `clang` and `clang++` are set up (see CONTRIBUTING.md)
+2. Make sure `$LLVM_ROOT/bin` is available on your `$PATH`. 
+3. Change the `CC` and `CXX` variables in `build_with_asan()` to point directly to `clang` and `clang++`.
+
+#### Why this stuff with LD_PRELOAD and LIBASAN_RT?
+
+The “standard” workflow for ASAN assumes you have a standalone binary:
+
+1. Recompile your binary with `-fsanitize=address`. 
+2. Run the binary, and ASAN will report whatever errors it find.
+
+Unfortunately, PyTorch is a distributed as a shared library that is loaded by a third-party executable (Python). It’s too much of a hassle to recompile all of Python every time we want to use ASAN. Luckily, the ASAN folks have a workaround for cases like this:
+
+1. Recompile your library with `-fsanitize=address -shared-libasan`. The extra `-shared-libasan` tells the compiler to ask for the shared ASAN runtime library.
+2. Use `LD_PRELOAD` to tell the dynamic linker to load the ASAN runtime library before anything else.
+
+More information can be found [here](https://github.com/google/sanitizers/wiki/AddressSanitizerAsDso).
+
+#### Why LD_PRELOAD in the build function?
+
+We need `LD_PRELOAD` because there is a cmake check that ensures that a simple program builds and runs. If we are building with ASAN as a shared library, we need to `LD_PRELOAD` the runtime library, otherwise there will dynamic linker errors and the check will fail.
+
+We don’t actually need either of these if we fix the cmake checks.
+
+#### Why no Leak detection?
+
+Python leaks a lot of memory. Possibly we could configure a suppression file, but we haven’t gotten around to it.
+
 ## Caffe2 notes
 
 In 2018, we merged Caffe2 into the PyTorch source repository. While the
