@@ -32,6 +32,67 @@
 namespace torch {
 namespace jit {
 
+void writeArchive(const std::string& archive_name, const IValue& value,
+                  caffe2::serialize::PyTorchStreamWriter& writer) {
+  std::vector<char> data;
+  Pickler data_pickle(
+      [&](const char* buf, size_t size) {
+        data.insert(data.end(), buf, buf + size);
+      },
+      nullptr);
+  data_pickle.protocol();
+  data_pickle.pushIValue(value);
+  data_pickle.stop();
+  size_t i = 0;
+  for (const auto& td : data_pickle.tensorData()) {
+    std::stringstream fname;
+    fname << archive_name << "/" << i++;
+    writer.writeRecord(fname.str(), td.data(), td.sizeInBytes());
+  }
+  std::stringstream fname;
+  fname << archive_name << ".pkl";
+  writer.writeRecord(fname.str(), data.data(), data.size());
+}
+
+// write the content of the tensor to the file/stream, and save the
+// offset in the storageMap_
+void convertAndWriteTensor(
+    size_t tensor_id,
+    const at::Tensor& tensor,
+    torch::TensorDef* tensor_proto,
+    std::unordered_map<const void*, std::string>& storageMap,
+    caffe2::serialize::PyTorchStreamWriter& writer) {
+  for (auto d : tensor.sizes()) {
+    tensor_proto->add_dims(d);
+  }
+  for (auto s : tensor.strides()) {
+    tensor_proto->add_strides(s);
+  }
+  tensor_proto->set_data_type(caffe2::TypeMetaToDataType(
+      at::scalarTypeToTypeMeta(tensor.scalar_type())));
+  tensor_proto->set_offset(tensor.storage_offset());
+  tensor_proto->set_requires_grad(tensor.requires_grad());
+  tensor_proto->set_is_quantized(tensor.is_quantized());
+  if (tensor.is_quantized()) {
+    tensor_proto->set_scale(tensor.q_scale());
+    tensor_proto->set_zero_point(tensor.q_zero_point());
+  }
+  auto* key = tensor.storage().unsafeGetStorageImpl();
+  auto storage_it = storageMap.find(key);
+  if (storage_it == storageMap.end()) {
+    WriteableTensorData data = getWriteableTensorData(tensor);
+    std::string name = "tensors/" + std::to_string(tensor_id);
+    writer.writeRecord(name, data.data(), data.sizeInBytes());
+    storage_it = storageMap.insert({key, name}).first;
+  }
+  auto* data = tensor_proto->mutable_data();
+  data->set_key(storage_it->second);
+  // handle device case, set the device_detail and load to CUDA device
+  std::stringstream ss;
+  ss << tensor.device();
+  tensor_proto->set_device(ss.str());
+}
+
 namespace {
 namespace onnx_torch = ::torch::onnx;
 namespace onnx = ::ONNX_NAMESPACE;
@@ -563,14 +624,6 @@ class ScriptModuleSerializer {
   // returns the offset into the tensor table
   size_t addTensor(const at::Tensor& tensor);
 
-  // write the content of the tensor to the file/stream, and save the
-  // offset in the storageMap_
-  void convertAndWriteTensor(
-      size_t tensor_id,
-      const at::Tensor& tensor,
-      torch::TensorDef* tensor_proto,
-      std::unordered_map<const void*, std::string>& storageMap);
-
   // dump all the tensors in the tensorTable_ to a ModelDef (metadata) and
   // the file/stream (the content), assuming all the information of the
   // tensors has been collected. the method calls convertAndWriteTensor
@@ -635,33 +688,12 @@ class ScriptModuleSerializer2 {
     // so loading the code does not depend on loading the data
     std::vector<IValue> ivalue_constants(
         constant_table_.begin(), constant_table_.end());
-    writeArchive("constants", c10::ivalue::Tuple::create(ivalue_constants));
+    writeArchive("constants", c10::ivalue::Tuple::create(ivalue_constants), writer_);
     // finally we serialize the model
-    writeArchive("data", module.module_object());
+    writeArchive("data", module.module_object(), writer_);
   }
 
  private:
-  void writeArchive(const std::string& archive_name, const IValue& value) {
-    std::vector<char> data;
-    Pickler data_pickle(
-        [&](const char* buf, size_t size) {
-          data.insert(data.end(), buf, buf + size);
-        },
-        nullptr);
-    data_pickle.protocol();
-    data_pickle.pushIValue(value);
-    data_pickle.stop();
-    size_t i = 0;
-    for (const auto& td : data_pickle.tensorData()) {
-      std::stringstream fname;
-      fname << archive_name << "/" << i++;
-      writer_.writeRecord(fname.str(), td.data(), td.sizeInBytes());
-    }
-    std::stringstream fname;
-    fname << archive_name << ".pkl";
-    writer_.writeRecord(fname.str(), data.data(), data.size());
-  }
-
   void writeExtraFiles(
       const script::Module& module,
       const script::ExtraFilesMap& extra_files) {
@@ -951,53 +983,12 @@ size_t ScriptModuleSerializer::addTensor(const at::Tensor& tensor) {
   return tensor_table_.size() - 1;
 }
 
-void ScriptModuleSerializer::convertAndWriteTensor(
-    size_t tensor_id,
-    const at::Tensor& tensor,
-    torch::TensorDef* tensor_proto,
-    std::unordered_map<const void*, std::string>& storageMap) {
-  for (auto d : tensor.sizes()) {
-    tensor_proto->add_dims(d);
-  }
-  for (auto s : tensor.strides()) {
-    tensor_proto->add_strides(s);
-  }
-  tensor_proto->set_data_type(caffe2::TypeMetaToDataType(
-      at::scalarTypeToTypeMeta(tensor.scalar_type())));
-  tensor_proto->set_offset(tensor.storage_offset());
-
-  tensor_proto->set_requires_grad(tensor.requires_grad());
-
-  tensor_proto->set_is_quantized(tensor.is_quantized());
-  if (tensor.is_quantized()) {
-    tensor_proto->set_scale(tensor.q_scale());
-    tensor_proto->set_zero_point(tensor.q_zero_point());
-  }
-
-  auto* key = tensor.storage().unsafeGetStorageImpl();
-  auto storage_it = storageMap.find(key);
-  if (storage_it == storageMap.end()) {
-    WriteableTensorData data = getWriteableTensorData(tensor);
-    std::string name = "tensors/" + std::to_string(tensor_id);
-    writer_.writeRecord(name, data.data(), data.sizeInBytes());
-    storage_it = storageMap.insert({key, name}).first;
-  }
-
-  auto* data = tensor_proto->mutable_data();
-  data->set_key(storage_it->second);
-
-  // handle device case, set the device_detail and load to CUDA device
-  std::stringstream ss;
-  ss << tensor.device();
-  tensor_proto->set_device(ss.str());
-}
-
 void ScriptModuleSerializer::writeTensorTable(torch::ModelDef* model_def) {
   std::unordered_map<const void*, std::string> storageMap;
   size_t tensor_id = 0;
   for (const at::Tensor& t : tensor_table_) {
     auto* tensor_proto = model_def->add_tensors();
-    convertAndWriteTensor(tensor_id++, t, tensor_proto, storageMap);
+    convertAndWriteTensor(tensor_id++, t, tensor_proto, storageMap, writer_);
   }
 }
 
