@@ -1,4 +1,6 @@
 apply plugin: 'com.android.library'
+apply plugin: 'maven'
+apply plugin: 'com.jfrog.artifactory'
 
 android {
     compileSdkVersion rootProject.compileSdkVersion
@@ -7,8 +9,8 @@ android {
     defaultConfig {
         minSdkVersion rootProject.minSdkVersion
         targetSdkVersion rootProject.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 0
+        versionName "0.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
@@ -53,3 +55,8 @@ dependencies {
     androidTestImplementation 'androidx.test:rules:' + rootProject.rulesVersion
     androidTestImplementation 'androidx.test:runner:' + rootProject.runnerVersion
 }
+
+apply from: rootProject.file('gradle/release.gradle')
+
+apply from: rootProject.file('gradle/snapshot_artifactory.gradle')
+

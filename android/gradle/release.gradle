@@ -1,0 +1,3 @@
+// Here will be all tasks to prepare bundles with javadoc, sources etc.
+
+apply from: rootProject.file('gradle/release_bintray.gradle')
