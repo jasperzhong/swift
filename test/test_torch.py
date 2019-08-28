@@ -1912,24 +1912,27 @@ class _TestTorchMixin(torchtest):
 
     @staticmethod
     def _test_logical_xor(self, device):
-        for dtype in (torch.bool,):  # Will add more dtypes in the future
+        for dtype in torch.testing.get_all_dtypes():
             expected_res = torch.tensor([0, 0, 1, 1], dtype=dtype, device=device)
-            a = torch.tensor([10, 0, 1, 0], dtype=dtype, device=device)
-            b = torch.tensor([1, 0, 0, 10], dtype=dtype, device=device)
-            # new tensor
-            self.assertEqual(expected_res, a.logical_xor(b))
-            # out
-            c = torch.empty(0, dtype=dtype, device=device)
-            torch.logical_xor(a, b, out=c)
-            self.assertEqual(expected_res, c)
-            # out is not bool
-            c = torch.empty(0, dtype=torch.uint8, device=device)
-            with self.assertRaisesRegex(RuntimeError,
-                                        r"The output tensor of logical_xor must be a bool tensor\."):
-                torch.logical_xor(a, b, out=c)
-            # in-place
-            a.logical_xor_(b)
-            self.assertEqual(expected_res, a)
+            for other_dtype in torch.testing.get_all_dtypes():
+                a = torch.tensor([10, 0, 1, 0], dtype=dtype, device=device)
+                b = torch.tensor([1, 0, 0, 10], dtype=other_dtype, device=device)
+                if torch.bfloat16 in (dtype, other_dtype):
+                    self.assertRaises(RuntimeError, lambda: a.logical_xor(b))
+                    continue
+                # new tensor
+                self.assertEqual(expected_res.bool(), a.logical_xor(b))
+                # out
+                for out_dtype in torch.testing.get_all_dtypes():
+                    c = torch.empty(0, dtype=out_dtype, device=device)
+                    if out_dtype == torch.bfloat16:
+                        self.assertRaises(RuntimeError, lambda: torch.logical_xor(a, b, out=c))
+                        continue
+                    torch.logical_xor(a, b, out=c)
+                    self.assertEqual(expected_res.bool(), c.bool())
+                # in-place
+                a.logical_xor_(b)
+                self.assertEqual(expected_res, a)
 
     def test_logical_xor(self):
         self._test_logical_xor(self, 'cpu')
@@ -12804,6 +12807,52 @@ tensor([[[1., 1., 1.,  ..., 1., 1., 1.],
         e1.fill_diagonal_(v, wrap=True)
         self.assertEqual(e1, e2)
 
+    def test_sign(self):
+        for device in torch.testing.get_all_device_types():
+            for dtype in torch.testing.get_all_math_dtypes(device):
+
+                # Include NaN for floating point numbers
+                if dtype.is_floating_point:
+                    dt_info = torch.finfo(dtype)
+
+                    # Create tensor (with NaN checking)
+                    a = torch.tensor([float('nan'), -12, 0, 71, dt_info.min, dt_info.max], device=device, dtype=dtype)
+                    a_target = torch.tensor([0, -1, 0, 1, -1, 1], device=device, dtype=dtype)
+
+                else:
+                    dt_info = torch.iinfo(dtype)
+
+                    # If unsigned type, everything should be >= 0
+                    if dt_info.min == 0:
+                        a = torch.tensor([12, 0, 71, dt_info.min, dt_info.max], device=device, dtype=dtype)
+                        a_target = torch.tensor([1, 0, 1, 0, 1], device=device, dtype=dtype)
+                    else:
+                        a = torch.tensor([-12, 0, 71, dt_info.min, dt_info.max], device=device, dtype=dtype)
+                        a_target = torch.tensor([-1, 0, 1, -1, 1], device=device, dtype=dtype)
+
+                self.assertEqual(a.sign(), a_target, 'sign device={} dtype={}'.format(device, dtype))
+                self.assertEqual(torch.sign(a), a_target, 'sign device={} dtype={}'.format(device, dtype))
+
+                out = torch.empty_like(a)
+                torch.sign(a, out=out)
+                self.assertEqual(out, a_target, 'sign_out device={} dtype={}'.format(device, dtype))
+
+                a.sign_()
+                self.assertEqual(a, a_target, 'sign_ device={} dtype={}'.format(device, dtype))
+
+            # Include test for bool dtype
+            a_bool = torch.tensor([True, True, False, float('nan')], device=device).bool()
+            a_bool_target = torch.tensor([True, True, False, True], device=device).bool()
+            self.assertEqual(a_bool.sign(), a_bool_target, 'sign device={} dtype=bool'.format(device))
+            self.assertEqual(torch.sign(a_bool), a_bool_target, 'sign device={} dtype=bool'.format(device))
+
+            a_out = torch.empty_like(a_bool)
+            torch.sign(a_bool, out=a_out)
+            self.assertEqual(a_out, a_bool_target, 'sign_out device={} dtype=bool'.format(device))
+
+            a_bool.sign_()
+            self.assertEqual(a_bool, a_bool_target, 'sign_ device={} dtype=bool'.format(device))
+
     def test_function_unwrap_message(self):
         self.assertRaisesRegex(RuntimeError, ' call to _th_lt',
                                lambda: torch.ones(1, dtype=torch.float) < torch.ones(1, dtype=torch.double))
@@ -12938,6 +12987,7 @@ tensor([[[1., 1., 1.,  ..., 1., 1., 1.],
             "mul",
             "sub",
             "div",
+            "logical_xor"
         ]
 
         for fn in ops:
