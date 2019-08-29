@@ -64,9 +64,7 @@ class CPUTestBase(DeviceTypeTestBase):
 
         if not TEST_MKL:
             reason = "PyTorch is built without MKL support"
-            tests = [
-                "test_fft_ifft_rfft_irfft_common"
-            ]
+            tests = []
             cls.tests_to_skip.update((t, reason) for t in tests)
 
         cls.add_skips()
@@ -129,7 +127,6 @@ class CUDATestBase(DeviceTypeTestBase):
         if TEST_WITH_ROCM:
             reason = "test doesn't currently work on the ROCm stack"
             tests = [
-                "test_fft_ifft_rfft_irfft_common",
                 "test_stft" # passes on ROCm w/ python 2.7, fails w/ python 3.6
             ]
             cls.tests_to_skip.update((t, reason) for t in tests)
@@ -156,7 +153,7 @@ if torch.cuda.is_available():
 # All tests in the generic suite must begin with "test_" and have two required
 # params, self and device.
 # The test suites are put into the caller's provided scope to allow discovery.
-def instantiate_device_type_tests(generic_test_class, classes, scope):
+def instantiate_device_type_tests(generic_test_class, scope):
     # Constructs a new class without the tests
     # Note: inheriting from the generic class is desirable because it may
     # container needed helper functions. Inherintg the "test_" functions,
