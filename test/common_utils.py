@@ -1198,7 +1198,7 @@ if num_shards is not None and shard is not None:
         test_suite = unittest.TestSuite()
         for test_group in tests:
             for test in test_group:
-                check_test_defined_in_running_script(test)
+                # check_test_defined_in_running_script(test)
                 name = test.id().split('.')[-1]
                 if name in THESE_TAKE_WAY_TOO_LONG:
                     continue
@@ -1213,6 +1213,6 @@ else:
         test_suite = unittest.TestSuite()
         for test_group in tests:
             for test in test_group:
-                check_test_defined_in_running_script(test)
+                # check_test_defined_in_running_script(test)
                 test_suite.addTest(test)
         return test_suite
