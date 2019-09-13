@@ -6,7 +6,6 @@
 #include <ATen/core/Generator.h>
 #include <ATen/core/DistributionsHelper.h>
 
-#if !defined(TH_REAL_IS_BFLOAT16)
 TH_API void THNN_(SpatialConvolutionMM_updateOutput)(
           THNNState *state,
           THTensor *input,
@@ -30,11 +29,9 @@ TH_API void THNN_(VolumetricConvolutionMM_updateOutput)(
           int kT, int kW, int kH,
           int dT, int dW, int dH,
           int pT, int pW, int pH);
-#endif
 
 #if !defined(TH_REAL_IS_LONG)
 
-#if !defined(TH_REAL_IS_BFLOAT16)
 TH_API void THNN_(AbsCriterion_updateOutput)(
           THNNState *state,            // library's state
           THTensor *input,             // input tensor
@@ -86,7 +83,6 @@ TH_API void THNN_(ClassNLLCriterion_updateGradInput)(
           THTensor *total_weight,      // [BUFFER]
           int64_t ignore_index);       // target index to ignore (loss = 0, gradInput = 0)
 
-#if !defined(TH_REAL_IS_BFLOAT16)
 TH_API void THNN_(ELU_updateOutput)(
           THNNState *state,            // library's state
           THTensor *input,             // input tensor
@@ -465,6 +461,4 @@ TH_API void THNN_(SpatialClassNLLCriterion_updateGradInput)(
           THTensor *total_weight,      // [BUFFER]
           int64_t ignore_index);       // target index to ignore (loss = 0, gradInput = 0)
 
-#endif
-#endif
 #endif
