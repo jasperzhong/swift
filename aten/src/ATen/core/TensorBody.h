@@ -18,6 +18,7 @@
 #include <ATen/core/DeprecatedTypePropertiesRegistry.h>
 #include <ATen/core/DeprecatedTypeProperties.h>
 #include <ATen/core/NamedTensor.h>
+#include <ATen/core/TensorIndexing.h>
 
 namespace caffe2 {
 class Tensor;
@@ -365,6 +366,79 @@ class CAFFE2_API Tensor {
   Tensor operator[](Scalar index) const;
   Tensor operator[](Tensor index) const;
   Tensor operator[](int64_t index) const;
+
+  /*
+  PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
+    HANDLE_TH_ERRORS
+    auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
+    OptionalDeviceGuard device_guard(device_of(self_));
+
+    // yf225 NOTE: this is single-dim
+    // handle simple types: integers, slices, ellipsis
+    if (index == Py_None) {
+      return wrap(self_.unsqueeze(0));
+    } else if (index == Py_Ellipsis) {
+      return wrap(at::alias(self_));
+    } else if (THPUtils_checkLong(index)) {
+      return wrap(applySelect(self_, 0, THPUtils_unpackLong(index)));
+    } else if (PySlice_Check(index)) {
+      return wrap(applySlice(self_, 0, index, true));
+    }
+
+    // wrap index in a tuple if it's not already one
+    THPObjectPtr holder = wrapTuple(index);
+
+    // yf225 NOTE: this is multi-dim
+    variable_list variableIndices;
+    Variable sliced = applySlicing(self_, holder.get(), variableIndices);
+    if (variableIndices.empty()) {
+      if (sliced.is_same(self_)) {
+        // ensure we return a shallow copy for things like x[...]
+        sliced = at::alias(sliced);
+      }
+      return wrap(sliced);
+    }
+
+    // indexing by tensors ("advanced" indexing)
+    return wrap(dispatch_index(sliced, variableIndices));
+    Py_RETURN_NONE;
+    END_HANDLE_TH_ERRORS
+  }
+  */
+
+  // yf225 TODO: write one function for each type in aten/src/ATen/core/TensorIndexing.h
+  // yf225 TODO: look at implementations in THPVariable_getitem / THPVariable_setitem / applySlicing in torch/csrc/autograd/python_variable_indexing.cpp
+  // yf225 TODO: helper functions should live in TensorIndexing.h/.cpp, such as applySelect and applySlice
+
+    // yf225 TODO: write integration tests for these methods first! see test_indexing.py and test_indexing_cuda.py
+  inline Tensor operator()(at::idx::None none) {
+    return unsqueeze(0);
+  }
+
+  inline Tensor operator()(at::idx::Ellipsis ellipsis) {
+    return alias();
+  }
+
+  inline Tensor operator()(int64_t index) {
+    return at::idx::applySelect(this, 0, index);
+  }
+
+  inline Tensor& operator()(at::idx::Slice slice) {
+    return at::idx::applySlice(this, 0, index, true));
+  }
+
+  template <typename First, typename... Rest>
+  Tensor& operator()(First&& first, Rest&&... rest) {
+    // yf225 TODO: we still need the single arg handling functions (to mirror sequential.h push_back)
+
+    // OptionalDeviceGuard device_guard(device_of(self_));   // yf225 TODO: should we use this here?
+
+    // yf225 NOTE: we can't inline this function, because it's recursive
+
+    // Recursively calls this method, until the parameter pack only has this
+    // entry left. Then calls `operator()` a final time.
+    return operator()(std::forward<First>(first)).operator()(std::forward<Rest>(rest)...);
+  }
 
   Tensor cpu() const;
   Tensor cuda() const;

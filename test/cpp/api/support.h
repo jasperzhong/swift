@@ -49,6 +49,10 @@ inline bool pointer_equal(at::Tensor first, at::Tensor second) {
   return first.data_ptr<float>() == second.data_ptr<float>();
 }
 
+inline bool tensor_equal(const at::Tensor& first, const at::Tensor& second) {
+  return first.sizes() == second.sizes() && first.allclose(second);
+}
+
 inline int count_substr_occurrences(const std::string& str, const std::string& substr) {
   int count = 0;
   size_t pos = str.find(substr);
