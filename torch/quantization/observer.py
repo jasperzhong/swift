@@ -515,10 +515,13 @@ class TensorObserver(ObserverBase):
     def get_tensor_value(self):
         return self.tensor_val
 
-
 def observer(observer_cls, **kwargs):
     return partial(observer_cls, **kwargs)
 
+def default_per_channel_weight_observer(**kwargs):
+    kwargs.setdefault('dtype', torch.qint8)
+    kwargs.setdefault('qscheme', torch.per_tensor_symmetric)
+    return observer(PerChannelMinMaxObserver, **kwargs)
 
 def default_observer(**kwargs):
     # Restrict activations to be in the range (0,127)
