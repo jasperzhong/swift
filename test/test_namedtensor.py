@@ -898,6 +898,12 @@ class TestNamedTensor(TestCase):
                 RuntimeError, "pdist is not yet supported with named tensors"):
             torch.pdist(named)
 
+    def test_permute(self):
+        tensor = torch.randn(2, 3, 5, 7, names=('N', 'C', 'H', 'W'))
+        order = ('C', 'W', 'N', 'H')
+        output = tensor.permute(order)
+        self.assertEqual(output.names, order)
+
     def test_reduction_fns(self):
         def check_output(output, expected_names):
             if isinstance(output, torch.Tensor):
