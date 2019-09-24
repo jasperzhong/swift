@@ -1,7 +1,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 import torch
 from torch.nn import Module
-from .observer import MinMaxObserver, _with_args
+from .observer import default_observer, default_weight_observer, _with_args
 
 class FakeQuantize(Module):
     ''' Simulate the quantize and dequantize operations in training time.
@@ -13,22 +13,20 @@ class FakeQuantize(Module):
         given the stats
     '''
 
-    def __init__(self, dtype=torch.quint8, qscheme=torch.per_tensor_affine,
-                 quant_min=0, quant_max=255, reduce_range=False):
+    def __init__(self, observer=default_observer, quant_min=0, quant_max=255):
         super(FakeQuantize, self).__init__()
-        assert torch.iinfo(dtype).min <= quant_min, 'quant_min out of bound'
         assert quant_min <= quant_max, \
             'quant_min must be less than or equal to quant_max'
-        assert quant_max <= torch.iinfo(dtype).max, 'quant_max out of bound'
-        self.dtype = dtype
-        self.qscheme = qscheme
         self.quant_min = quant_min
         self.quant_max = quant_max
         self.fake_quant_enabled = True
         self.observer_enabled = True
-        self.observer = MinMaxObserver.with_args(dtype=dtype, qscheme=qscheme, reduce_range=reduce_range)()
+        self.observer = observer()
+        assert torch.iinfo(self.observer.dtype).min <= quant_min, 'quant_min out of bound'
+        assert quant_max <= torch.iinfo(self.observer.dtype).max, 'quant_max out of bound'
         self.scale = None
         self.zero_point = None
+        self.dtype = self.observer.dtype
 
     def enable_fake_quant(self, enabled=True):
         self.fake_quant_enabled = enabled
@@ -63,6 +61,18 @@ class FakeQuantize(Module):
             self.fake_quant_enabled, self.observer_enabled,
             self.scale, self.zero_point)
 
+    def _save_to_state_dict(self, destination, prefix, keep_vars):
+        super(FakeQuantize, self)._save_to_state_dict(destination, prefix, keep_vars)
+        destination[prefix + 'scale'] = self.scale
+        destination[prefix + 'zero_point'] = self.zero_point
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+                              missing_keys, unexpected_keys, error_msgs):
+
+        self.scale = state_dict.pop(prefix + 'scale')
+        self.zero_point = state_dict.pop(prefix + 'zero_point')
+        super(FakeQuantize, self)._load_from_state_dict(state_dict, prefix, local_metadata, False,
+                                                        missing_keys, unexpected_keys, error_msgs)
+
 default_fake_quant = FakeQuantize
-default_weight_fake_quant = FakeQuantize.with_args(dtype=torch.qint8, qscheme=torch.per_tensor_symmetric,
-                                                   quant_min=-128, quant_max=127)
+default_weight_fake_quant = FakeQuantize.with_args(observer=default_weight_observer, quant_min=-128, quant_max=127)
