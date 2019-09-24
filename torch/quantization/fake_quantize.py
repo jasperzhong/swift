@@ -76,3 +76,19 @@ class FakeQuantize(Module):
 
 default_fake_quant = FakeQuantize
 default_weight_fake_quant = FakeQuantize.with_args(observer=default_weight_observer, quant_min=-128, quant_max=127)
+
+def disable_fake_quant(mod):
+    if type(mod) == FakeQuantize:
+        mod.disable_fake_quant()
+
+def enable_fake_quant(mod):
+    if type(mod) == FakeQuantize:
+        mod.enable_fake_quant()
+
+def disable_observer(mod):
+    if type(mod) == FakeQuantize:
+        mod.disable_observer()
+
+def enable_observer(mod):
+    if type(mod) == FakeQuantize:
+        mod.disable_observer()
