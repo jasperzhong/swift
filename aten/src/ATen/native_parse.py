@@ -256,6 +256,7 @@ def parse_arguments(args, func_variants, declaration, func_return):
     def is_tensor_option(argument):
         return argument['name'] in ['dtype', 'layout', 'device', 'pin_memory']
 
+    """
     new_arguments = []
     idx = 0
     while idx < len(arguments):
@@ -282,7 +283,8 @@ def parse_arguments(args, func_variants, declaration, func_return):
             idx += 1
 
     arguments = new_arguments
-
+    """
+    
     # Sanity checks
 
     # TODO: convention is that the ith-argument correspond to the i-th return, but it would
