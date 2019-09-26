@@ -500,8 +500,8 @@ class CAFFE2_API Tensor {
   Tensor div(Scalar other) const;
   Tensor & div_(Scalar other) const;
   Tensor dot(const Tensor & tensor) const;
-  Tensor new_empty(IntArrayRef size, const TensorOptions & options={}) const;
-  Tensor new_full(IntArrayRef size, Scalar fill_value, const TensorOptions & options={}) const;
+  Tensor new_empty(IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt) const;
+  Tensor new_full(IntArrayRef size, Scalar fill_value, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt) const;
   Tensor & resize_(IntArrayRef size) const;
   Tensor erf() const;
   Tensor & erf_() const;
@@ -776,7 +776,7 @@ class CAFFE2_API Tensor {
   int64_t q_per_channel_axis() const;
   Tensor int_repr() const;
   QScheme qscheme() const;
-  Tensor to(const TensorOptions & options, bool non_blocking=false, bool copy=false) const;
+  Tensor to(ScalarType dtype, Layout layout, Device device, bool pin_memory=false, bool non_blocking=false, bool copy=false) const;
   Tensor to(Device device, ScalarType dtype, bool non_blocking=false, bool copy=false) const;
   Tensor to(ScalarType dtype, bool non_blocking=false, bool copy=false) const;
   Tensor to(const Tensor & other, bool non_blocking=false, bool copy=false) const;

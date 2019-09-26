@@ -703,7 +703,7 @@ def device_guard(option, dispatch_options, dispatch_tensor):
     # For factory methods the `DeviceGuard` is already in the template.
     if option.get('device_guard', True):
         if dispatch_options:
-            return 'const DeviceGuard device_guard({}.device());'.format(dispatch_options['name'])
+            return 'const DeviceGuard device_guard(device.value()); // [CHECK THIS]' 
         if dispatch_tensor:
             return 'const OptionalDeviceGuard device_guard(device_of({}));'.format(dispatch_tensor)
     return '// DeviceGuard omitted'
@@ -732,7 +732,7 @@ if ({named_conditions}) {{
 
 def dispatch_scalar_type(option, dispatch_options, dispatch_tensor):
     if dispatch_options:
-        return 'auto dispatch_scalar_type = typeMetaToScalarType({}.dtype());'.format(dispatch_options['name'])
+        return 'auto dispatch_scalar_type = typeMetaToScalarType(dtype.value()); // [CHECK THIS]'
     if dispatch_tensor:
         return 'auto dispatch_scalar_type = infer_scalar_type({});'.format(dispatch_tensor)
     return '// dispatch_scalar_type omitted'
@@ -925,6 +925,7 @@ def create_generic(top_env, declarations):
         return None
 
     def find_multidispatch_tensors(formals):
+        # [CHECK THIS]
         # type: (List[AtFormal]) -> List[str]
         # Compute the list of all tensor arguments which should be considered
         # for multiple dispatch.  Note that this doesn't completely replace
@@ -941,9 +942,18 @@ def create_generic(top_env, declarations):
         # upshot is that if you have an operator with mixed TensorOptions
         # and Tensor arguments, you MUST only ever register it generically.
         r = []
-        for formal in formals:
-            if formal['dynamic_type'] in ['TensorOptions', 'TensorList'] or is_any_tensor_type(formal):
-                r.append(formal['name'])
+        if (any(formal['dynamic_type'] == 'ScalarType' for formal in formals) and
+            any(formal['dynamic_type'] == 'Layout' for formal in formals) and
+            any(formal['dynamic_type'] == 'Device' for formal in formals) and 
+            any(formal['dynamic_type'] == 'bool' for formal in formals)):
+                r.append('dtype')
+                r.append('layout')
+                r.append('device')
+                r.append('pin_memory')
+        else:
+            for formal in formals:
+                if formal['dynamic_type'] == 'TensorList' or is_any_tensor_type(formal):
+                    r.append(formal['name'])
         return r
 
     def format_formal(f):
@@ -1189,6 +1199,12 @@ def create_generic(top_env, declarations):
                     return formal
             return None
 
+        def check_tensor_options_in_formals(formals):
+            return (any(formal['dynamic_type'] == 'ScalarType' for formal in formals) and
+                    any(formal['dynamic_type'] == 'Layout' for formal in formals) and
+                    any(formal['dynamic_type'] == 'Device' for formal in formals) and 
+                    any(formal['dynamic_type'] == 'bool' for formal in formals))
+
         def has_named_tensor_formals(formals):
             return any(['Dimname' in formal['dynamic_type'] for formal in formals])
 
@@ -1325,7 +1341,12 @@ def create_generic(top_env, declarations):
         # For method-only entries, the first argument should be self
         if is_method and not is_namespace_function:
             assert formals[0]['name'] == 'self'
-        is_factory_method = find_formal('TensorOptions', formals) and 'method' not in option['variants']
+        
+        def check_if_factory_method(args):
+            a = any(arg['type'] == 'c10::optional<ScalarType>' for arg in args) and any(arg['type'] == 'c10::optional<Layout>' for arg in args) and any(arg['type'] == 'c10::optional<Device>' for arg in args) and any(arg['type'] == 'c10::optional<bool>' for arg in args)
+            b = any('TensorOptions' in arg['type'] for arg in args)
+            return a or b
+        is_factory_method = check_if_factory_method(option['arguments'])
 
         check_methods_do_not_start_with_underscore(option['name'], is_method)
 
@@ -1334,7 +1355,7 @@ def create_generic(top_env, declarations):
         # first argument.  Scalar type test will be removed once TH is removed.
         # If you need more complex device guard behavior, you should disable
         # device guard and then manually add the guards you need.
-        dispatch_options = find_formal('TensorOptions', formals)
+        dispatch_options = check_tensor_options_in_formals(formals)
         guard_tensor = None if dispatch_options else find_dispatch_tensor(formals)
         option['device_guard_declaration'] = device_guard(option, dispatch_options, guard_tensor)
         option['named_guard_declaration'] = named_guard(option, find_tensors(formals),

@@ -1024,22 +1024,22 @@ inline Tensor Tensor::dot(const Tensor & tensor) const {
         op, impl::dispatchTypeId(at::detail::multi_dispatch_tensor_type_set(*this, tensor)), const_cast<Tensor&>(*this), tensor);
 #endif
 }
-inline Tensor Tensor::new_empty(IntArrayRef size, const TensorOptions & options) const {
+inline Tensor Tensor::new_empty(IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) const {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
     return TypeDefault::new_empty(const_cast<Tensor&>(*this), size, options);
 #else
     static auto table = globalATenDispatch().getOpTable("aten::new_empty(Tensor self, int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor");
-    return table->callUnboxed<Tensor, const Tensor &, IntArrayRef, const TensorOptions &>(const_cast<Tensor&>(*this), size, options);
+    return table->callUnboxed<Tensor, const Tensor &, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(const_cast<Tensor&>(*this), size, size, dtype, layout, device, pin_memory);
 #endif
 }
-inline Tensor Tensor::new_full(IntArrayRef size, Scalar fill_value, const TensorOptions & options) const {
+inline Tensor Tensor::new_full(IntArrayRef size, Scalar fill_value, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) const {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
     return TypeDefault::new_full(const_cast<Tensor&>(*this), size, fill_value, options);
 #else
     static auto table = globalATenDispatch().getOpTable("aten::new_full(Tensor self, int[] size, Scalar fill_value, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor");
-    return table->callUnboxed<Tensor, const Tensor &, IntArrayRef, Scalar, const TensorOptions &>(const_cast<Tensor&>(*this), size, fill_value, options);
+    return table->callUnboxed<Tensor, const Tensor &, IntArrayRef, Scalar, Scalar, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(const_cast<Tensor&>(*this), size, fill_value, dtype, layout, device, pin_memory);
 #endif
 }
 inline Tensor & Tensor::resize_(IntArrayRef size) const {
@@ -3671,7 +3671,7 @@ inline QScheme Tensor::qscheme() const {
     return table->callUnboxed<QScheme, const Tensor &>(const_cast<Tensor&>(*this));
 #endif
 }
-inline Tensor Tensor::to(const TensorOptions & options, bool non_blocking, bool copy) const {
+inline Tensor Tensor::to(ScalarType dtype, Layout layout, Device device, bool pin_memory, bool non_blocking, bool copy) const {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
     return TypeDefault::to(const_cast<Tensor&>(*this), options, non_blocking, copy);
