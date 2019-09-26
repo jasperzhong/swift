@@ -51,6 +51,12 @@ except ImportError:
     from yaml import Loader
 
 
+def check_if_factory_method(args):
+    a = any(arg['type'] == 'c10::optional<ScalarType>' for arg in args) and any(arg['type'] == 'c10::optional<Layout>' for arg in args) and any(arg['type'] == 'c10::optional<Device>' for arg in args) and any(arg['type'] == 'c10::optional<bool>' for arg in args)
+    c = any(arg['type'] == 'ScalarType' for arg in args) and any(arg['type'] == 'Layout' for arg in args) and any(arg['type'] == 'Device' for arg in args) and any(arg['type'] == 'bool' for arg in args)
+    b = any('TensorOptions' in arg['type'] for arg in args)
+    return a or b or c
+
 def write(filename, s):
     with open(filename, "w") as f:
         f.write(s)
@@ -201,7 +207,7 @@ def get_num_inputs(o):
 def find_factory_methods(decls):
     factory_methods = {}
     for o in decls:
-        if any(arg['dynamic_type'] == 'TensorOptions' for arg in o['arguments']):
+        if check_if_factory_method(o['arguments']):
             factory_methods[o['name']] = 0
     return factory_methods
 

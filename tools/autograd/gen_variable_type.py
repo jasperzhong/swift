@@ -227,6 +227,9 @@ TypeDefault::${api_name}(${type_method_args})""")
 CALL_DISPATCH_VIA_NAMESPACE = CodeTemplate("""\
 at::${api_name}(${unpacked_args})""")
 
+CALL_DISPATCH_VIA_NAMESPACE_UNDERSCORE = CodeTemplate("""\
+at::_${api_name}(${unpacked_args})""")
+
 CALL_DISPATCH_VIA_METHOD = CodeTemplate("""\
 self_.${api_name}(${unpacked_method_args})""")
 
@@ -842,6 +845,13 @@ def emit_body(declaration):
                 RUN_ONLY_IN_DEBUG_MODE.substitute(statements=enforce_same_ptrs_stmts)
         return call
 
+    def check_if_factory_method(args):
+        a = any(arg['type'] == 'c10::optional<ScalarType>' for arg in args) and any(arg['type'] == 'c10::optional<Layout>' for arg in args) and any(arg['type'] == 'c10::optional<Device>' for arg in args) and any(arg['type'] == 'c10::optional<bool>' for arg in args)
+        c = any(arg['type'] == 'ScalarType' for arg in args) and any(arg['type'] == 'Layout' for arg in args) and any(arg['type'] == 'Device' for arg in args) and any(arg['type'] == 'bool' for arg in args)
+        b = any('TensorOptions' in arg['type'] for arg in args)
+        return a or b or c
+
+
     def emit_call(env):
         combined = nested_dict(env, declaration)
         extra_wrapping_stmts = []
@@ -852,7 +862,10 @@ def emit_body(declaration):
             # in are now Variables.
             # See NOTE [ Treating Variables as non-Variables in type dispatch ] for details.
             if 'namespace' in declaration['method_of']:
-                base_type_call = CALL_DISPATCH_VIA_NAMESPACE.substitute(combined)
+                if check_if_factory_method(declaration['arguments']):
+                    base_type_call = CALL_DISPATCH_VIA_NAMESPACE_UNDERSCORE.substitute(combined)
+                else:
+                    base_type_call = CALL_DISPATCH_VIA_NAMESPACE.substitute(combined)
             else:
                 unpacked_method_args = combined['unpacked_args'][1:]
                 base_type_call = CALL_DISPATCH_VIA_METHOD.substitute(

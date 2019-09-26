@@ -1225,7 +1225,6 @@ def do_test_dtypes(self, dtypes, layout, device):
 
 def do_test_empty_full(self, dtypes, layout, device):
     shape = torch.Size([2, 3])
-
     def check_value(tensor, dtype, layout, device, value, requires_grad):
         self.assertEqual(shape, tensor.shape)
         self.assertIs(dtype, tensor.dtype)
@@ -1252,6 +1251,7 @@ def do_test_empty_full(self, dtypes, layout, device):
             v = torch.empty(shape, dtype=dtype, device=device, layout=layout, requires_grad=rg)
             check_value(v, dtype, layout, device, None, rg)
             out = v.new()
+            
             check_value(torch.empty(shape, out=out, device=device, layout=layout, requires_grad=rg),
                         dtype, layout, device, None, rg)
             check_value(v.new_empty(shape), dtype, layout, device, None, False)

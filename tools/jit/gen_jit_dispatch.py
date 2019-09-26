@@ -239,6 +239,15 @@ def is_view(decl):
 def is_out_variant(decl):
     return decl['name'].endswith('_out')
 
+def check_if_factory_method(args):
+    for arg in args: 
+        if 'type' not in arg:
+            return False
+
+    a = any(arg['type'] == 'c10::optional<ScalarType>' for arg in args) and any(arg['type'] == 'c10::optional<Layout>' for arg in args) and any(arg['type'] == 'c10::optional<Device>' for arg in args) and any(arg['type'] == 'c10::optional<bool>' for arg in args)
+    c = any(arg['type'] == 'ScalarType' for arg in args) and any(arg['type'] == 'Layout' for arg in args) and any(arg['type'] == 'Device' for arg in args) and any(arg['type'] == 'bool' for arg in args)
+    b = any('TensorOptions' in arg['type'] for arg in args)
+    return a or b or c
 
 # Copied from ..autograd.gen_python_functions.SKIP_PYTHON_BINDINGS
 BACKWARD_OP_PATTERNS = [
@@ -274,8 +283,13 @@ def gen_jit_dispatch(declarations, out, template_path, disable_autograd=False):
         def pack_arguments(args):
             return ',\n'.join(args)
         is_namespace_function = 'namespace' in decl['method_of']
-        tensor_options_arg_index = decl.get('tensor_options_arg_index', None)
-        if tensor_options_arg_index is not None:
+        
+        if check_if_factory_method(decl['arguments']):
+            if 'ScalarType dtype' in decl['formals']:
+                tensor_options_arg_index = decl['formals'].index('ScalarType dtype')
+            if 'c10::optional<ScalarType> dtype' in decl['formals']:
+                tensor_options_arg_index = decl['formals'].index('c10::optional<ScalarType> dtype')
+            
             dtype = args[tensor_options_arg_index]
             layout = args[tensor_options_arg_index + 1]
             device = args[tensor_options_arg_index + 2]
@@ -408,7 +422,7 @@ def gen_jit_dispatch(declarations, out, template_path, disable_autograd=False):
                 el['simple_type'] += '?'
                 el['default'] = 'None'
         if 'default' in arg and arg['default'] == 'at::kLong':
-            tensor_options_expansion[0]['default'] = 'long'
+            tensor_options_expansion[0]['default'] = 'at::kLong'
         if 'kwarg_only' in arg and arg['kwarg_only']:
             for el in tensor_options_expansion:
                 el['kwarg_only'] = True
@@ -531,7 +545,9 @@ def signature(decl, should_match_schema=True):
                 .replace('QScheme::PER_TENSOR_AFFINE', 'per_tensor_affine') \
                 .replace('{}', 'None' if is_tensor_arg(arg) else '[]') \
                 .replace('{', '[') \
-                .replace('}', ']')
+                .replace('}', ']') \
+                .replace('}', ']') \
+                .replace('at::kLong', 'long')
 
             default = default_map.get(default, default)
             decl = '{}={}'.format(decl, default)
