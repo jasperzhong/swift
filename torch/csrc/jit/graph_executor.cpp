@@ -493,8 +493,9 @@ struct GraphExecutorImpl : public GraphExecutorImplBase {
   }
 
   ExecutionPlan getPlanFor(Stack& stack) override {
-    return getGraphExecutorOptimize() ? getOrCompile(stack)
-                                      : getOrCompileFallback();
+//    return getGraphExecutorOptimize() ? getOrCompile(stack)
+//                                      : getOrCompileFallback();
+    return ExecutionPlan(graph);
   }
 
   GraphExecutorState getDebugState() override {

@@ -23,6 +23,7 @@ class TORCH_API Module {
       : object_(object), cu_(cu) {};
   c10::IValue run_method(const std::string& method_name, Stack& stack);
   Function* find_method(const std::string& basename) const;
+  const c10::intrusive_ptr<c10::ivalue::Object>& module_object() const {return object_;}
  private:
   c10::intrusive_ptr<c10::ivalue::Object> object_;
   std::shared_ptr<CompilationUnit> cu_;
