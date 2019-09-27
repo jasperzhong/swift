@@ -312,6 +312,11 @@ class TestTypePromotion(TestCase):
             self.assertTrue(actual, expected)
             self.assertTrue(actual.dtype == torch.bool)
 
+    def test_promote_types(self):
+        self.assertEqual(torch.promote_types(torch.float, torch.int), torch.float)
+        self.assertEqual(torch.promote_types(torch.float, torch.double), torch.double)
+        self.assertEqual(torch.promote_types(torch.int, torch.uint8), torch.int)
+
     def test_sparse(self):
         t = torch.full([5, 5], 5, dtype=torch.int, device=self.device)
         t[0, 0] = 0
