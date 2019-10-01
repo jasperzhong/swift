@@ -4,9 +4,9 @@ import collections
 import copyreg
 import io
 import pickle
-import traceback
-import threading
 import six
+import threading
+import traceback
 
 import torch
 
