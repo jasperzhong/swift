@@ -130,7 +130,7 @@ Operations that are available from the ``torch`` namespace
 Fused modules
 
 * *torch.nn.intrinsic* — PQT module level layers. same as ``torch.nn.intrinsic.modules`` and ``torch.nn.intrinsic.module.fused``
-    * *ConvBn2d* —* *2D Convolution + BatchNorm
+    * *ConvBn2d* — 2D Convolution + BatchNorm
     * *ConvBnReLU2d* — 2D Convolution + BatchNorm + ReLU
     * *ConvReLU2d* — 2D Convolution + Relu
     * *LinearReLU* — 2D Linear + ReLU
