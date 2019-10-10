@@ -307,9 +307,6 @@ static void gatherParametersAndBuffers(
 std::pair<std::shared_ptr<TracingState>, Stack> enter(
     TypedStack inputs,
     script::Module* self) {
-  if (isTracing()) {
-    AT_ERROR("Tracing can't be nested");
-  }
   auto state = std::make_shared<TracingState>();
   pushTracingState(state);
 

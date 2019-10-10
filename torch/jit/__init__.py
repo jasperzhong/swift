@@ -989,12 +989,12 @@ def trace_module(mod,
     if not isinstance(inputs, dict):
         raise AttributeError("expected a dictionary of (method_name, input) pairs")
 
-
+    torch.jit._hack_traced_module_map = {}
     module = make_module(mod, _module_class, _compilation_unit, tuple(inputs.keys()))
 
     for method_name, example_inputs in inputs.items():
         # this is needed since Module.__call__ sets up some extra tracing
-        func = mod if method_name == "forward" else getattr(mod, method_name)
+        func = mod if method_name == "_slow_forward" else getattr(mod, method_name)
         example_inputs = make_tuple(example_inputs)
         module._c._create_method_from_trace(method_name, func, example_inputs, var_lookup_fn, _force_outplace)
         check_trace_method = module._c._get_method(method_name)
@@ -1681,6 +1681,7 @@ for name, method in _get_methods(torch.nn.Module):
     if name not in ScriptModule.__dict__ and name not in _compiled_methods_whitelist:
         setattr(ScriptModule, method.__name__, _make_fail(name))
 
+_hack_traced_module_map = {}
 
 class TracedModule(ScriptModule):
     __frozen = False
@@ -1718,6 +1719,8 @@ class TracedModule(ScriptModule):
             self._modules[name] = make_module(submodule, TracedModule, _compilation_unit)
 
         self._freeze()
+
+        _hack_traced_module_map[orig] = self
 
     def forward(self, *args, **kwargs):
         raise RuntimeError('Trace submodules cannot be called.')
