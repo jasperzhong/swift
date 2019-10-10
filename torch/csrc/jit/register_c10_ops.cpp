@@ -135,7 +135,7 @@ Operator createOperatorFromC10(const c10::OperatorHandle& op) {
         }
         graph->insertNode(node);
 
-        jit::tracer::setTracingState(nullptr);
+        jit::tracer::pushTracingState(nullptr);
       }
 
 #ifdef USE_STATIC_DISPATCH
@@ -153,7 +153,7 @@ Operator createOperatorFromC10(const c10::OperatorHandle& op) {
       }
 
       if (tracer_state) {
-        jit::tracer::setTracingState(std::move(tracer_state));
+        jit::tracer::popTracingState();
         int i = 0;
         for (auto iter = stack.end() - output_size; iter != stack.end();
              ++iter, ++i) {

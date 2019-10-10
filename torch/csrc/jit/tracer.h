@@ -86,6 +86,14 @@ private:
 
 };
 
+
+struct TORCH_API TracingStateList {
+  TracingStateList(std::shared_ptr<TracingState> state, std::shared_ptr<TracingStateList> next)
+    : state(std::move(state)), next(std::move(next)) {}
+  std::shared_ptr<TracingState> state;
+  std::shared_ptr<TracingStateList> next;
+};
+
 // This is meant to be used as a thread local place, where we can store extra
 // info that gets lost when we call into ATen from Python bindings. One example
 // for when this happens is when we get an IntArrayRef argument with e.g. sizes for
@@ -146,7 +154,8 @@ struct ArgumentStash {
 // Retrieve or set the current tracing state. Returns a nullptr if tracing is
 // disabled.
 TORCH_API const std::shared_ptr<TracingState>& getTracingState();
-TORCH_API void setTracingState(std::shared_ptr<TracingState> state);
+TORCH_API void pushTracingState(std::shared_ptr<TracingState> state);
+TORCH_API void popTracingState();
 
 inline bool isTracing() {
   return static_cast<bool>(getTracingState());

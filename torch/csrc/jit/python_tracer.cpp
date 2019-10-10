@@ -168,9 +168,9 @@ void initPythonTracerBindings(PyObject* module) {
   });
   m.def("_tracer_abandon", []() { tracer::abandon(); });
   m.def("_get_tracing_state", []() { return getTracingState(); });
-  m.def("_set_tracing_state", [](std::shared_ptr<TracingState> state) {
-    return setTracingState(state);
-  });
+  // m.def("_set_tracing_state", [](std::shared_ptr<TracingState> state) {
+  //   return setTracingState(state);
+  // });
   m.def("_get_value_trace", [](const Variable& var) {
     return getValueTrace(var);
   });

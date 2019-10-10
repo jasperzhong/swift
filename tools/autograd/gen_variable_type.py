@@ -262,7 +262,7 @@ if (jit::tracer::isTracing()) {
   ${add_trace_inputs}
   tracer_state->graph->insertNode(node);
   ${inplace_guard}
-  jit::tracer::setTracingState(nullptr);
+  jit::tracer::pushTracingState(nullptr);
 }
 """)
 
@@ -274,7 +274,7 @@ ADD_TRACE_INPUT = CodeTemplate("""jit::tracer::addInputs(node, "${name}", ${inpu
 
 POST_RECORD_TRACE = CodeTemplate("""\
 if (tracer_state) {
-  jit::tracer::setTracingState(std::move(tracer_state));
+  jit::tracer::popTracingState();
   ${add_trace_outputs}
 }
 """)
