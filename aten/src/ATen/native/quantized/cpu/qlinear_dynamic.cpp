@@ -3,6 +3,8 @@
 #include <ATen/cpp_custom_type_hack.h>
 #include <ATen/native/quantized/cpu/fbgemm_utils.h>
 #include <ATen/native/quantized/cpu/qnnpack_utils.h>
+#include <ATen/quantized/Quantizer.h>
+#include <caffe2/utils/threadpool/ThreadPoolMobile.h>
 
 #include <algorithm>
 #include <string>
@@ -221,39 +223,6 @@ class QLinearDynamicInt8 final : public torch::OperatorKernel {
     size_t rows_w = pack_ptr.bias.size(0);
     size_t cols_w = input_contig.size(input_contig.dim() - 1);
 
-    // TODO
-    // if (!pack_ptr.input_scale.has_value() ||
-    //     pack_ptr.input_scale.value() != input_scale) {
-    //   // Get the original weight and adjust it to uint8 from int8
-    //   auto weight_contig = pack_ptr.orig_weight;
-    //   auto bias_fp32 = pack_ptr.bias;
-    //   int8_t* w_data = (int8_t*)weight_contig.data_ptr<c10::qint8>();
-    //   Tensor qnnp_weight = at::_empty_affine_quantized(
-    //       weight_contig.sizes(),
-    //       at::device(kCPU).dtype(kQUInt8),
-    //       kernel_scale,
-    //       kernel_zp);
-    //   auto* qnnp_w_data = qnnp_weight.data_ptr<c10::quint8>();
-    //   auto wt_numel = weight_contig.numel();
-    //   for (int i = 0; i < wt_numel; ++i) {
-    //     qnnp_w_data[i] = static_cast<c10::quint8>(w_data[i] + 128);
-    //   }
-    //   // Original bias was float, so we requantize it here.
-    //   auto bias = at::quantize_per_tensor(
-    //       bias_fp32, kernel_scale * input_scale, 0, kQInt32);
-    //   // Update the input scale to not pack again.
-    //   pack_ptr.input_scale = input_scale;
-    //   pack_ptr.w.reset();
-    //   pack_ptr.w = guts::make_unique<qnnpack::PackBMatrix>(
-    //       cols_w /* input_channels */,
-    //       rows_w /* output_channels */,
-    //       kernel_zp,
-    //       kernel_scale,
-    //       (uint8_t*)qnnp_w_data,
-    //       (int32_t*)bias.data_ptr<c10::qint32>());
-    //   packB = pack_ptr.w.get();
-    // }
-
     size_t rows_input = 1;
     size_t cols_input = input_contig.size(input_contig.dim() - 1);
     for (size_t i = 0; i < input_contig.dim() - 1; ++i) {
@@ -294,10 +263,110 @@ class QLinearDynamicInt8 final : public torch::OperatorKernel {
         }
     }
 
+    // TODO affine
     // TODO choose quantization params
+    // HACK don't use FBGEMM
+    // Input tensor is quantized as 8-bit unsigned values
+    static constexpr int precision = 8;
+    static constexpr bool is_signed = false;
 
-    //TODO quantize_tensor from Quantizer?
+    std::cout << "x_max " << x_max << " x_min " << x_min << std::endl;
 
+    // Calculate scale and zero point for quantization of input tensor
+    auto q_params = fbgemm::ChooseQuantizationParams(
+        /*min=*/x_min,
+        /*max=*/x_max,
+        /*qmin=*/is_signed ? -(1 << (precision - 1)) : 0,
+        /*qmax=*/
+        is_signed ? ((1 << (precision - 1)) - 1) : (1 << precision) - 1,
+        /*preserve_sparsity=*/false);
+
+    if (!pack_ptr.input_scale.has_value() ||
+        pack_ptr.input_scale.value() != q_params.scale) {
+      // Get the original weight and adjust it to uint8 from int8
+      auto weight_contig = pack_ptr.orig_weight;
+      auto bias_fp32 = pack_ptr.bias;
+      int8_t* w_data = (int8_t*)weight_contig.data_ptr<c10::qint8>();
+      Tensor qnnp_weight = at::_empty_affine_quantized(
+          weight_contig.sizes(),
+          at::device(kCPU).dtype(kQUInt8),
+          kernel_scale,
+          kernel_zp);
+      auto* qnnp_w_data = qnnp_weight.data_ptr<c10::quint8>();
+      auto wt_numel = weight_contig.numel();
+      for (int i = 0; i < wt_numel; ++i) {
+        qnnp_w_data[i] = static_cast<c10::quint8>(w_data[i] + 128);
+      }
+      // Original bias was float, so we requantize it here.
+      auto bias = at::quantize_per_tensor(
+          bias_fp32, kernel_scale * q_params.scale, 0, kQInt32);
+      // Update the input scale to not pack again.
+      pack_ptr.input_scale = q_params.scale;
+      pack_ptr.w.reset();
+      pack_ptr.w = guts::make_unique<qnnpack::PackBMatrix>(
+          cols_w /* input_channels */,
+          rows_w /* output_channels */,
+          kernel_zp,
+          kernel_scale,
+          (uint8_t*)qnnp_w_data,
+          (int32_t*)bias.data_ptr<c10::qint32>());
+      packB = pack_ptr.w.get();
+    }
+
+    // Quantize input
+    Tensor qinput = at::_empty_affine_quantized(
+        input_contig.sizes(),
+        input_contig.options().dtype(at::kQUInt8),
+        q_params.scale,
+        q_params.zero_point,
+        input_contig.suggest_memory_format());
+    Tensor q_input = quantize_tensor<quint8>(input_contig, qinput, q_params.scale, q_params.zero_point);
+    // TODO: this is probably wrong, need row_offsets
+    auto output_scale = q_params.scale;
+    auto output_zero_point = q_params.zero_point;
+    Tensor q_output = at::_empty_affine_quantized(
+        out_sizes,
+        qinput.options(),
+        output_scale,
+        output_zero_point,
+        input_contig.suggest_memory_format()
+    );
+
+    std::cout << "output scale " << output_scale << " output zero point " << output_zero_point << std::endl;
+
+    auto output_min = ReluFused
+        ? activationLimits(output_scale, output_zero_point, Activation::RELU)
+              .first
+        : std::numeric_limits<uint8_t>::min();
+    auto output_max = ReluFused
+        ? activationLimits(output_scale, output_zero_point, Activation::RELU)
+              .second
+        : std::numeric_limits<uint8_t>::max();
+    TORCH_INTERNAL_ASSERT(packB != nullptr, "Packed Weights are NULL");
+    const pytorch_qnnp_status runStatus = qnnpack::qnnpackLinear(
+        rows_input /* batch_size */,
+        cols_input /* input_channels */,
+        rows_w /* output_channels */,
+        q_input.q_zero_point(),
+        q_input.q_scale(),
+        kernel_zp,
+        kernel_scale,
+        output_zero_point,
+        output_scale,
+        output_min,
+        output_max,
+        (uint8_t*)q_input.data_ptr<c10::quint8>(),
+        cols_input /* input_stride */,
+        packB->getPackedWeights(),
+        (uint8_t*)q_output.data_ptr<c10::quint8>(),
+        rows_w /* output_stride */,
+        caffe2::mobile_pthreadpool() /* threadpool */);
+
+    std::cout << "run status " << runStatus << std::endl;
+
+    TORCH_INTERNAL_ASSERT(
+        runStatus == pytorch_qnnp_status_success,
+        "failed to run QNNPACK Linear operator");
 
     return output;
   }
