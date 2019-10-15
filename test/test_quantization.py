@@ -580,7 +580,8 @@ class PostTrainingDynamicQuantTest(QuantizationTestCase):
                 return self.cell(x, hiddens)
 
         # TODO: TorchScript overloads don't work without this wrapper
-        cell_script = torch.jit.script(ScriptWrapper(cell_int8))
+        cell_script = torch.jit.trace(ScriptWrapper(cell_int8), (x, (hx, cx)))
+        # cell_script = torch.jit.script(ScriptWrapper(cell_int8))
         out_script, hid_script = cell_script(x, hiddens)
         self.assertEqual(len(out_script), len(ref_out))
         for out_val, ref_val in zip(out_script, ref_out):
@@ -588,7 +589,8 @@ class PostTrainingDynamicQuantTest(QuantizationTestCase):
 
         # Test save/load
         b = io.BytesIO()
-        torch.jit.save(cell_script, b)
+        # torch.jit.save(cell_script, b)
+        torch.jit.save(cell_script, '/home/jamesreed/foo.zip')
         b.seek(0)
         loaded = torch.jit.load(b)
         out_loaded, hid_loaded = loaded(x, hiddens)

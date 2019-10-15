@@ -2,6 +2,7 @@
 #include <ATen/core/op_registration/op_registration.h>
 #include <ATen/cpp_custom_type_hack.h>
 #include <ATen/native/quantized/cpu/fbgemm_utils.h>
+#include <ATen/native/quantized/cpu/qnnpack_utils.h>
 
 #include <algorithm>
 #include <string>
@@ -14,7 +15,7 @@ template <bool ReluFused>
 class QLinearDynamicInt8 final : public torch::OperatorKernel {
  public:
 #ifdef USE_FBGEMM
-  at::Tensor operator()(
+  at::Tensor fbgemm_linear(
       at::Tensor input,
       at::Tensor packed_weight) {
     // fp32 * int8 -> fp32 (with quantization on activation, and dequantization
@@ -196,17 +197,133 @@ class QLinearDynamicInt8 final : public torch::OperatorKernel {
 
     return output;
   }
-#else // USE_FBGEMM
-  at::Tensor operator()(
-      at::Tensor /* input */,
-      at::Tensor /* packed_weight */) {
-    // We make a strong guarantee that models using these operators will have
-    // the same numerics across different machines. Therefore, we do not provide
-    // a fallback path and rather fail loudly if we cannot run FBGEMM.
+#endif  // USE_FBGEMM
+#ifdef USE_PYTORCH_QNNPACK
+  at::Tensor qnnpack_linear(
+      at::Tensor input,
+      at::Tensor packed_weight) {
+    // TODO: contiguous is called for further jit optimizations.
+    auto input_contig = input.contiguous();
+    const auto* input_ptr = input_contig.data_ptr<float>();
+
     TORCH_CHECK(
-        false, "This PyTorch installation was not built with FBGEMM operators");
+        input.dim() >= 2,
+        "The dimension of input tensor should be larger than or equal to 2");
+    // C(output) = A(input) x B(weight), where C, A, B are M x N, M x K, K x N
+    // matrices, respectively.
+    int64_t M = size_to_dim_(input.dim() - 1, input.sizes());
+
+    auto& pack_ptr =
+        cpp_custom_type_hack::cast<PackedLinearWeightsQnnp>(packed_weight);
+    auto packB = pack_ptr.w.get();
+    auto kernel_zp = pack_ptr.w_zp;
+    auto kernel_scale = pack_ptr.w_scale;
+    size_t rows_w = pack_ptr.bias.size(0);
+    size_t cols_w = input_contig.size(input_contig.dim() - 1);
+
+    // TODO
+    // if (!pack_ptr.input_scale.has_value() ||
+    //     pack_ptr.input_scale.value() != input_scale) {
+    //   // Get the original weight and adjust it to uint8 from int8
+    //   auto weight_contig = pack_ptr.orig_weight;
+    //   auto bias_fp32 = pack_ptr.bias;
+    //   int8_t* w_data = (int8_t*)weight_contig.data_ptr<c10::qint8>();
+    //   Tensor qnnp_weight = at::_empty_affine_quantized(
+    //       weight_contig.sizes(),
+    //       at::device(kCPU).dtype(kQUInt8),
+    //       kernel_scale,
+    //       kernel_zp);
+    //   auto* qnnp_w_data = qnnp_weight.data_ptr<c10::quint8>();
+    //   auto wt_numel = weight_contig.numel();
+    //   for (int i = 0; i < wt_numel; ++i) {
+    //     qnnp_w_data[i] = static_cast<c10::quint8>(w_data[i] + 128);
+    //   }
+    //   // Original bias was float, so we requantize it here.
+    //   auto bias = at::quantize_per_tensor(
+    //       bias_fp32, kernel_scale * input_scale, 0, kQInt32);
+    //   // Update the input scale to not pack again.
+    //   pack_ptr.input_scale = input_scale;
+    //   pack_ptr.w.reset();
+    //   pack_ptr.w = guts::make_unique<qnnpack::PackBMatrix>(
+    //       cols_w /* input_channels */,
+    //       rows_w /* output_channels */,
+    //       kernel_zp,
+    //       kernel_scale,
+    //       (uint8_t*)qnnp_w_data,
+    //       (int32_t*)bias.data_ptr<c10::qint32>());
+    //   packB = pack_ptr.w.get();
+    // }
+
+    size_t rows_input = 1;
+    size_t cols_input = input_contig.size(input_contig.dim() - 1);
+    for (size_t i = 0; i < input_contig.dim() - 1; ++i) {
+      rows_input *= input_contig.size(i);
+    }
+
+    TORCH_CHECK(
+        cols_input == cols_w,
+        "quantized::linear(): input size does not match weight dimension 1 size: \
+         got ",
+        cols_input,
+        " but expected ",
+        cols_w);
+
+    // The resulting matrix here is 2-D, let's view it with the original
+    // left hand dimensions of the input. Here are two examples:
+    // 1. If the input tensor is {M, K}, the output tensor is {M, N}.
+    // 2. If the input tensor is {b, M, K}, the output tensor is {b, M, N}.
+    std::vector<int64_t> out_sizes = input.sizes().vec();
+    out_sizes.back() = rows_w;
+    // Allocate output Tensor and a buffer for fbgemmPacked to use
+    auto output = at::empty(out_sizes, input.options().dtype(at::kFloat));
+    auto buffer = at::empty_like(output, output.options().dtype(at::kInt));
+
+    // Calculate statistics for quantization of input Tensor
+    // TODO: optimized kernel
+    float x_min = std::numeric_limits<float>::infinity(),
+          x_max = -std::numeric_limits<float>::infinity();
+    auto input_numel = input_contig.numel();
+    auto input_contig_ptr = input_contig.data_ptr<float>();
+    for (int64_t i = 0; i < input_numel; ++i) {
+        auto val = input_contig_ptr[i];
+        if (val < x_min) {
+            x_min = val;
+        }
+        if (val > x_max) {
+            x_max = val;
+        }
+    }
+
+    // TODO choose quantization params
+
+    //TODO quantize_tensor from Quantizer?
+
+
+    return output;
   }
-#endif // USE_FBGEMM
+#endif  // USE_PYTORCH_QNNPACK
+  at::Tensor operator()(
+      at::Tensor input,
+      at::Tensor packed_weight) {
+    auto& ctx = at::globalContext();
+
+#ifdef USE_FBGEMM
+    if (ctx.qEngine() == at::QEngine::FBGEMM) {
+      return fbgemm_linear(
+          input, packed_weight);
+    }
+#endif
+#ifdef USE_PYTORCH_QNNPACK
+    if (ctx.qEngine() == at::QEngine::QNNPACK) {
+      return qnnpack_linear(
+          input, packed_weight);
+    }
+#endif
+    TORCH_CHECK(
+        false,
+        "Didn't find engine for operation quantized::linear_dynamic ",
+        toString(ctx.qEngine()));
+  }
 };
 
 static auto registry =

@@ -13,6 +13,10 @@ namespace at {
 namespace native {
 namespace {
 
+#ifndef USE_PYTORCH_QNNPACK
+#error FOOOO
+#endif
+
 template <bool ReluFused>
 class QLinearInt8 final : public torch::OperatorKernel {
  public:
