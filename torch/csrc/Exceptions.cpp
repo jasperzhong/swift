@@ -109,7 +109,7 @@ static std::string formatMessage(const char *format, va_list fmt_args) {
   static const size_t ERROR_BUF_SIZE = 1024;
   char error_buf[ERROR_BUF_SIZE];
   vsnprintf(error_buf, ERROR_BUF_SIZE, format, fmt_args);
-  
+
   // Ensure that the string is null terminated
   error_buf[sizeof(error_buf) / sizeof(*error_buf) - 1] = 0;
 
@@ -136,6 +136,81 @@ ValueError::ValueError(const char *format, ...) {
   msg = formatMessage(format, fmt_args);
   va_end(fmt_args);
 }
+
+// ATen warning handler for Python
+using warning_buffer_t =
+  std::vector<std::pair<c10::SourceLocation, std::string>>;
+
+static warning_buffer_t warning_buffer;
+static std::mutex warning_buffer_mutex;
+
+static void py_warning_handler(
+    const c10::SourceLocation& source_location,
+    const std::string& msg) {
+  std::unique_lock<std::mutex> lock(warning_buffer_mutex);
+  warning_buffer.push_back({source_location, msg});
+};
+
+EnforceWarningBuffer::EnforceWarningBuffer() noexcept(true): prev_handler(c10::Warning::get_warning_handler()) {
+  c10::Warning::set_warning_handler(&py_warning_handler);
+}
+
+/// See NOTE [ Conversion Cpp Python Warning ] for noexcept justification
+EnforceWarningBuffer::~EnforceWarningBuffer() noexcept(false) {
+  c10::Warning::set_warning_handler(prev_handler);
+
+  std::unique_lock<std::mutex> lock(warning_buffer_mutex);
+
+  if(warning_buffer.size() > 0) {
+    AutoGIL gil;
+
+    PyObject *ptype, *pvalue, *ptraceback;
+    PyErr_Fetch(&ptype, &pvalue, &ptraceback);
+
+    if(ptype) {
+      // A python error happened after the warning
+      // Simply handle with the cpp handler
+      for(const auto& warning: warning_buffer) {
+        auto source_location = warning.first;
+        const auto& msg = processErrorMsg(warning.second);
+        c10::Warning::warn(source_location, msg);
+      }
+      warning_buffer.clear();
+      // The parent function already returns an error
+      // We only restore the error and exit the
+      // destructor normally
+      PyErr_Restore(ptype, pvalue, ptraceback);
+    } else {
+      auto result = -1;
+      for(const auto& warning: warning_buffer) {
+        auto source_location = warning.first;
+        const auto& msg = processErrorMsg(warning.second);
+        if (source_location.file == nullptr) {
+          result = PyErr_WarnEx(PyExc_RuntimeWarning, msg.c_str(), 1);
+        } else {
+          result = PyErr_WarnExplicit(
+              /*category=*/PyExc_UserWarning,
+              /*message=*/msg.c_str(),
+              /*filename=*/source_location.file,
+              /*lineno=*/source_location.line,
+              /*module=*/nullptr,
+              /*registry=*/nullptr);
+        }
+        if (result < 0) {
+          break;
+        }
+      }
+      warning_buffer.clear();
+      if (result < 0) {
+        /// A warning raised an error, we need to force the parent
+        /// function to return an error code.
+        throw python_error();
+      }
+    }
+  }
+}
+
+
 
 } // namespace torch
 
