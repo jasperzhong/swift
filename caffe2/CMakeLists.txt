@@ -479,6 +479,7 @@ if (NOT INTERN_BUILD_MOBILE OR NOT BUILD_CAFFE2_MOBILE)
   if (NOT INTERN_BUILD_MOBILE)
     list(APPEND TORCH_SRCS
       ${TORCH_SRC_DIR}/csrc/api/src/jit.cpp
+      ${TORCH_SRC_DIR}/csrc/api/src/proto.cpp
       ${TORCH_SRC_DIR}/csrc/distributed/autograd/context/dist_autograd_container.cpp
       ${TORCH_SRC_DIR}/csrc/distributed/autograd/context/dist_autograd_context.cpp
       ${TORCH_SRC_DIR}/csrc/distributed/autograd/engine/dist_engine.cpp
@@ -550,6 +551,7 @@ if (NOT INTERN_BUILD_MOBILE OR NOT BUILD_CAFFE2_MOBILE)
       ${TORCH_SRC_DIR}/csrc/api/src/data/samplers/stream.cpp
       ${TORCH_SRC_DIR}/csrc/api/src/serialize.cpp
       ${TORCH_SRC_DIR}/csrc/api/src/jit.cpp
+      ${TORCH_SRC_DIR}/csrc/api/src/proto.cpp
       ${TORCH_SRC_DIR}/csrc/api/src/nn/init.cpp
       ${TORCH_SRC_DIR}/csrc/api/src/nn/module.cpp
       ${TORCH_SRC_DIR}/csrc/api/src/nn/modules/activation.cpp
