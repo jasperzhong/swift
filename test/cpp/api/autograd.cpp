@@ -471,6 +471,7 @@ TEST(CustomAutogradTest, DeepReentrant) {
       }
       {
         at::AutoGradMode enable_grad(true);
+        std::cout << apply(ctx->saved_data["x"].toTensor()) << std::endl;  // yf225 TODO: DEBUG
         apply(ctx->saved_data["x"].toTensor())[0].sum().backward();
         return grad_output;
       }
@@ -512,6 +513,7 @@ TEST(CustomAutogradTest, ReentrantPriority) {
       }
       {
         at::AutoGradMode enable_grad(true);
+        std::cout << apply(ctx->saved_data["x"].toTensor()) << std::endl;  // yf225 TODO: DEBUG
         apply(ctx->saved_data["x"].toTensor())[0].sum().backward();
         return grad_output;
       }
