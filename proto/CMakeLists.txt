@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
 project(hello_world)
 
-# LIST(APPEND CMAKE_PREFIX_PATH "/private/home/mruberry/git/pytorch/torch")
-
 find_package(Torch REQUIRED)
 
 add_executable(hello_world hello_world.cpp)
