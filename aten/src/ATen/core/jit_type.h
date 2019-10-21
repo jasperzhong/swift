@@ -49,7 +49,8 @@ using OptNameList = c10::optional<std::vector<std::string>>;
   _(FunctionType)           \
   _(ClassType)              \
   _(CapsuleType)            \
-  _(InterfaceType)
+  _(InterfaceType)          \
+  _(MobileType)
 
 enum class TypeKind {
 #define DEFINE_TYPE(T) T,
@@ -778,7 +779,21 @@ struct CAFFE2_API NamedType : public Type {
   const c10::optional<QualifiedName>& name() const {
     return name_;
   }
-private:
+
+  virtual size_t numAttributes() const {
+    return 0;
+  }
+
+  virtual size_t getAttributeSlot(const std::string& name) const {
+    return 0;
+  }
+
+  virtual const TypePtr& getAttribute(size_t slot) const {
+    static const TypePtr ptr = nullptr;
+    return ptr;
+  }
+
+ private:
   c10::optional<QualifiedName> name_;
 };
 
@@ -1402,7 +1417,7 @@ struct CAFFE2_API ClassType : public NamedType {
     return attributeTypes_[pos];
   }
 
-  const TypePtr& getAttribute(size_t slot) const {
+  const TypePtr& getAttribute(size_t slot) const override {
     AT_ASSERT(attributeNames_.size() == attributeTypes_.size());
     AT_ASSERT(slot < attributeTypes_.size());
     return attributeTypes_[slot];
@@ -1421,7 +1436,7 @@ struct CAFFE2_API ClassType : public NamedType {
   std::shared_ptr<CompilationUnit> compilation_unit();
   std::shared_ptr<const CompilationUnit> compilation_unit() const;
 
-  size_t numAttributes() const {
+  size_t numAttributes() const override {
     AT_ASSERT(attributeNames_.size() == attributeTypes_.size());
     return attributeNames_.size();
   }
@@ -1440,7 +1455,8 @@ struct CAFFE2_API ClassType : public NamedType {
     }
     return c10::nullopt;
   }
-  size_t getAttributeSlot(const std::string& name) const {
+
+  size_t getAttributeSlot(const std::string& name) const override {
     if (auto r = findAttributeSlot(name)) {
       return *r;
     }
@@ -1607,4 +1623,30 @@ struct CAFFE2_API InterfaceType : public NamedType {
   std::shared_ptr<std::vector<FunctionSchema>> methods_;
 };
 
+struct MobileType;
+using MobileTypePtr = std::shared_ptr<MobileType>;
+struct CAFFE2_API MobileType : public NamedType {
+  static MobileTypePtr create(c10::optional<c10::QualifiedName> name = c10::nullopt) {
+    return MobileTypePtr(
+        new MobileType(name)); // NOLINT(modernize-make-shared)
+  }
+
+  bool operator==(const Type& rhs) const override {
+    if (auto m_type = rhs.cast<MobileType>()) {
+      return m_type->name() == this->name();
+    }
+    return false;
+  }
+
+  std::string str() const override {
+    const auto& n = name().value();
+    return std::string("MobileType<") + n.name() + ">";
+  }
+
+  static const TypeKind Kind = TypeKind::MobileType;
+
+ private:
+  MobileType(c10::optional<c10::QualifiedName> name)
+      : NamedType(TypeKind::MobileType, name) {}
+};
 } // namespace c10

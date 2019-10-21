@@ -529,6 +529,8 @@ inline IValue toIValue(
       AT_ERROR("Function Values aren't yet supported");
     case TypeKind::CapsuleType:
       AT_ERROR("Capsule Values aren't supported");
+    case TypeKind::MobileType:
+      AT_ERROR("Mobile Values aren't supported");
     case TypeKind::AnyType:
       return toTypeInferredIValue(obj);
   }
@@ -671,7 +673,7 @@ inline py::object toPyObject(IValue&& ivalue) {
     return std::move(py_dict);
   } else if (ivalue.isObject()) {
     const auto obj = std::move(ivalue).toObject();
-    if (obj->type()->is_module()) {
+    if (obj->type()->expect<ClassType>()->is_module()) {
       return py::cast(script::Module(obj));
     }
 

@@ -33,7 +33,7 @@ using caffe2::serialize::ReadAdapterInterface;
 
 void postSetStateValidate(const IValue& v) {
   auto obj = v.toObject();
-  const auto& objType = obj->type();
+  const auto& objType = obj->type()->expect<ClassType>();
   for (size_t i = 0; i < objType->numAttributes(); i++) {
     const auto& attrType = objType->getAttribute(i);
     const auto& attrName = objType->getAttributeName(i);
@@ -114,22 +114,22 @@ IValue ScriptModuleDeserializer::readArchive(const std::string& archive_name) {
   };
 
   auto class_resolver = [&](const c10::QualifiedName& qn) {
-    auto cls = source_importer_.loadNamedType(qn)->expect<ClassType>();
-    return c10::StrongTypePtr(compilation_unit_, std::move(cls));
+    return source_importer_.loadNamedType(qn)->expect<ClassType>();
   };
 
   // Decouple how to get obj from type. In this file it's dependent on
   // Method.run() and graph executor, etc.
   // For bytecode import we need to decouple these dependencies.
-  auto obj_loader = [&](at::StrongTypePtr type, IValue input) {
+  auto obj_loader = [&](c10::NamedTypePtr typePtr, IValue input) {
+    c10::StrongTypePtr type(compilation_unit_, std::move(typePtr));
     auto cls = type.type_->expect<at::ClassType>();
     size_t n = cls->numAttributes();
-    if (checkHasValidSetGetState(type.type_)) {
+    if (checkHasValidSetGetState(cls)) {
       auto obj = c10::ivalue::Object::create(type, n);
       // XXX: Do not optimize __setstate__, so that we don't try to
       // specialize the class before it is initialized.
       setGraphExecutorOptimize(false);
-      Function* set_state = type.type_->getMethod("__setstate__");
+      Function* set_state = cls->getMethod("__setstate__");
       // since we are in the middle of unpickling we might still have lists and
       // dicts that do not have accurate tags (e.g. they report they are
       // List[Any]). But we need to run __setstate__ which will check the input

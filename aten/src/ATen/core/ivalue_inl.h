@@ -362,7 +362,8 @@ struct C10_EXPORT ivalue::Object final : c10::intrusive_ptr_target {
   const std::vector<IValue>& slots() const {
     return slots_;
   }
-  std::shared_ptr<ClassType> type() const {
+
+  std::shared_ptr<NamedType> type() const {
     return type_.type_;
   }
 
