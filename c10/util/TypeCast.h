@@ -51,6 +51,52 @@ C10_HOST_DEVICE inline dest_t static_cast_with_inter_type(src_t src) {
     static_cast<inter_copy_type_t<dest_t>>(src));
 }
 
+// Dynamic type casting utils:
+// - fetch_and_cast
+// - cast_and_store
+//
+// fetch_and_cast fetch a value with dynamic type specified by a ScalarType
+// from a void pointer and cast it to a static type.
+//
+// cast_and_store casts a static typed value into dynamic type specified
+// by a ScalarType, and store it into a void pointer.
+//
+// NOTE:
+//
+// Dynamic casting allows us to support type promotion without blowing up
+// the combination space: For example, without dynamic cast, in order to
+// implement `add_` with type promotion, we would need something like
+//
+// AT_DISPATCH_ALL_TYPES(output.dtype(),
+//    AT_DISPATCH_ALL_TYPES(input1.dtype(),
+//       AT_DISPATCH_ALL_TYPES(input2.dtype(),
+//           [](arg0_t a, arg1_t b) -> out_t { return a + b; }
+//       )
+//    )
+// )
+//
+// If we support N dtypes, the above code would generate the a+b kernel for
+// all the N * N * N different supported types, the compilation time and
+// binary size would become horrible.
+//
+// Dynamic casting might sounds like a bad idea in terms of performance.
+// Especially if you ever do it in a loop, you are going to do a billion tests.
+// But in practice it is not as bad as it might look:
+//
+// - on CPU, this is a branch that always has the same outcome, therefore
+//   hopefully the branch predictor could do the job pretty well
+// - on GPU, these branches will not diverge, so we could still have the same
+//   warp executing the same line of code
+// - Most kernels, like `add`, are bandwidth bound, adding a few clock cycles to
+//   check an integer does not hurt the performance much because the ALUs would
+//   wait for load instructions anyway.
+//
+// For the discussion and benchmark, refer to:
+// - https://github.com/pytorch/pytorch/pull/28343
+// - https://github.com/pytorch/pytorch/pull/28344
+// - https://github.com/pytorch/pytorch/pull/28345
+//
+
 #ifdef C10_HOST_DEVICE
 #define ERROR_UNSUPPORTED_CAST assert(false);
 #else
