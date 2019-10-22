@@ -7,5 +7,15 @@ add_executable(hello_world hello_world.cpp)
 target_link_libraries(hello_world "${TORCH_LIBRARIES}")
 set_property(TARGET hello_world PROPERTY CXX_STANDARD 11)
 
+add_executable(scalar_addition scalar_addition.cpp)
+target_link_libraries(scalar_addition "${TORCH_LIBRARIES}")
+set_property(TARGET scalar_addition PROPERTY CXX_STANDARD 11)
 
+add_executable(array_addition array_addition.cpp)
+target_link_libraries(array_addition "${TORCH_LIBRARIES}")
+set_property(TARGET array_addition PROPERTY CXX_STANDARD 11)
+
+add_executable(tensor_addition tensor_addition.cpp)
+target_link_libraries(tensor_addition "${TORCH_LIBRARIES}")
+set_property(TARGET tensor_addition PROPERTY CXX_STANDARD 11)
 
