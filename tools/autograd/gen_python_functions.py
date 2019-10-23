@@ -347,6 +347,7 @@ def create_python_bindings(python_functions, has_self, is_module=False):
         inputs = [arg for arg in declaration['arguments'] if not is_output(arg)]
         outputs = [arg for arg in declaration['arguments'] if is_output(arg)]
 
+        #has_tensor_options = any(arg['simple_type'] == 'TensorOptions' for arg in declaration['arguments'])
         has_tensor_options = hasTO(declaration['arguments'])
 
         def get_type_args(args):
@@ -374,6 +375,8 @@ def create_python_bindings(python_functions, has_self, is_module=False):
                 """.format(name=name, expr=unpack_expr, typ='DimnameList')
                 return [line.strip() for line in result.split('\n')]
 
+            if name == 'layout':
+                return ['auto {} = {}.layout;'.format(name, unpack_expr)]
             return ['auto {} = {};'.format(name, unpack_expr)]
 
         def parse_arg(arg, arg_index, unpack_args=False):
@@ -416,11 +419,6 @@ def create_python_bindings(python_functions, has_self, is_module=False):
 
         # We always want to unpack when we have TensorOptions.
         unpack = has_tensor_options
-        if declaration['name'] == 'bartlett_window':
-            print("\n\n -> # We always want to unpack")
-            print("unpack: ", unpack)
-            print("inputs: ", inputs)
-        
         for arg in inputs:
             if arg['simple_type'] in ['Type', 'TensorOptions']:
                 continue
@@ -445,12 +443,13 @@ def create_python_bindings(python_functions, has_self, is_module=False):
         # type args go after the outputs to match the signature generation.
         arg_idx = arg_idx if out_idx is None else out_idx + 1
         
-        if declaration['name'] == 'bartlett_window':
-            print("\n\n -> # We always want to unpack")
         for arg in type_args:
-            parsed_type_args = parse_arg(arg, arg_idx, unpack)
+            parsed_type_args = parse_arg(arg, arg_idx, False)
             arg_idx += 1
 
+        if declaration['name'] == 'bartlett_window':
+            print("\n body3: ", body)
+    
         # check python_binding_arguments
         has_device_bind = False
         requires_grad = None
@@ -476,7 +475,7 @@ def create_python_bindings(python_functions, has_self, is_module=False):
                 if len(outputs) == 0:
                     assert parsed_type_args
                     assert layout
-                    device, device_type = parse_arg(arg, device_idx, True)
+                    device, device_type = parse_arg(arg, device_idx, False)
 
                     if not has_tensor_options:
                         # add type, device formals and corresponding actuals.
@@ -512,10 +511,6 @@ def create_python_bindings(python_functions, has_self, is_module=False):
         env['unpack_args'] = []
         env['formal_args'] = formal_args
         env['actuals'] = actuals
-
-        if declaration['name'] == 'bartlett_window':
-            print("\n formal_args: ", formal_args)
-            print("\n actuals: ", actuals)
 
         if has_tensor_options:
             env['initialize_cuda'] = '//torch::utils::maybe_initialize_cuda(options);'
@@ -604,16 +599,12 @@ def create_python_bindings(python_functions, has_self, is_module=False):
                 has_tensor_input_arg = True
             if arg['simple_type'] == 'Type':
                 has_type_input_arg = True
+            #elif arg['simple_type'] == 'TensorOptions':
+            #    has_options_arg = True
+            if hasTO(declaration['arguments']):
+                has_options_arg = True
             if arg['name'] == 'requires_grad':
                 raise ValueError("argument named requires_grad not supported")
-
-        
-        #if hasTO(declaration['arguments']):
-        #    has_options_arg = True
-
-        if declaration['name'] == 'bartlett_window':
-            print("\n\n\n\n\n ARGS: ", declaration['arguments'])
-            print("\n has_options_arg: ", has_options_arg)
 
         has_tensor_return = False
         for ret in declaration['returns']:
@@ -687,8 +678,6 @@ def create_python_bindings(python_functions, has_self, is_module=False):
             }
             python_binding_arguments.append(requires_grad_arg)
 
-        if declaration['name'] == 'bartlett_window':
-            print("\n\n python_binding_arguments: ", python_binding_arguments)
         return python_binding_arguments
 
     def emit_namedtuple_return_type_def(declaration, next_index):
@@ -990,7 +979,4 @@ def get_python_signature(declaration, include_out):
     # This is the string that we give to FunctionParameter, which is
     # then parsed into the actual structure which we do parsing
     # with.
-    if declaration['name'] == 'bartlett_window':
-        print("signature name: ", name)
-        print("signature py_formal_args: ", py_formal_args)
     return PYTHON_FUNCTION_SIGNATURE.substitute(name=name, py_formal_args=py_formal_args)
