@@ -191,6 +191,7 @@ struct CAFFE2_API TensorIterator {
   IntArrayRef strides(int arg) const { return operands_[arg].stride_bytes; }
   void* data_ptr(int arg) const;
   ScalarType dtype(int arg=0) const { return operands_[arg].tensor.scalar_type(); }
+  ScalarType common_dtype() const { return common_dtype_; }
   ScalarType input_dtype(int arg=0) const { return operands_[num_outputs_ + arg].dtype; }
   Device device(int arg=0) const { return operands_[arg].device; }
   DeviceType device_type(int arg=0) const { return device(arg).type(); }
@@ -286,6 +287,18 @@ struct CAFFE2_API TensorIterator {
   /// CUDA reductions.
   bool is_final_output() const { return final_output_; }
 
+  bool has_promotion() const {
+    if (common_dtype_ == ScalarType::Undefined) {
+      return false;
+    }
+    for (auto& op : operands_) {
+      if (op.tensor.scalar_type() != common_dtype_) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   void set_check_mem_overlap(bool check_mem_overlap) {
     check_mem_overlap_ = check_mem_overlap;
   }
@@ -352,6 +365,7 @@ protected:
   SmallVector<OperandInfo, 4> operands_;
   int num_outputs_ = 0;
   CommonDTypeStrategy common_dtype_strategy_ = CommonDTypeStrategy::CHECK;
+  ScalarType common_dtype_ = ScalarType::Undefined;
   bool has_coalesced_dimensions_ = false;
   bool accumulate_ = false;
   bool resize_outputs_ = true;
