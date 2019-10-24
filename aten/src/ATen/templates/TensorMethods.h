@@ -28,25 +28,25 @@ struct Quantizer;
 using ConstQuantizerPtr = const c10::intrusive_ptr<Quantizer>&;
 
 inline Tensor Tensor::cpu() const {
-  return to(options().device(DeviceType::CPU), /*non_blocking*/ false, /*copy*/ false);
+  return to(typeMetaToScalarType(dtype()), layout(), Device(DeviceType::CPU), false, /*non_blocking*/ false, /*copy*/ false);
 }
 
 // TODO: The Python version also accepts arguments
 inline Tensor Tensor::cuda() const {
-  return to(options().device(DeviceType::CUDA), /*non_blocking*/ false, /*copy*/ false);
+  return to(typeMetaToScalarType(dtype()), layout(), Device(DeviceType::CUDA), false, /*non_blocking*/ false, /*copy*/ false);
 }
 
 inline Tensor Tensor::hip() const {
-  return to(options().device(DeviceType::HIP), /*non_blocking*/ false, /*copy*/ false);
+  return to(typeMetaToScalarType(dtype()), layout(), Device(DeviceType::HIP), false, /*non_blocking*/ false, /*copy*/ false);
 }
 
 inline Tensor Tensor::toType(ScalarType t) const {
-  return to(options().dtype(t), /*non_blocking*/ false, /*copy*/ false);
+  return to(t, layout(), device(), false, /*non_blocking*/ false, /*copy*/ false);
 }
 
 // TODO: Deprecate me
 inline Tensor Tensor::toBackend(Backend b) const {
-  return to(options().device(backendToDeviceType(b)).layout(layout_from_backend(b)), /*non_blocking*/ false, /*copy*/ false);
+  return to(typeMetaToScalarType(dtype()), Layout(layout_from_backend(b)), Device(backendToDeviceType(b)), false, /*non_blocking*/ false, /*copy*/ false);
 }
 
 inline TensorOptions Tensor::options() const {

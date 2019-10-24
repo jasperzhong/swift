@@ -413,7 +413,7 @@ def gen_jit_dispatch(declarations, out, template_path, disable_autograd=False):
                 el['simple_type'] += '?'
                 el['default'] = 'None'
         if 'default' in arg and arg['default'] == 'at::kLong':
-            tensor_options_expansion[0]['default'] = 'long'
+            tensor_options_expansion[0]['default'] = 'at::kLong'
         if 'kwarg_only' in arg and arg['kwarg_only']:
             for el in tensor_options_expansion:
                 el['kwarg_only'] = True
@@ -536,7 +536,8 @@ def signature(decl, should_match_schema=True):
                 .replace('QScheme::PER_TENSOR_AFFINE', 'per_tensor_affine') \
                 .replace('{}', 'None' if is_tensor_arg(arg) else '[]') \
                 .replace('{', '[') \
-                .replace('}', ']')
+                .replace('}', ']') \
+                .replace('at::kLong', 'long')
 
             default = default_map.get(default, default)
             decl = '{}={}'.format(decl, default)

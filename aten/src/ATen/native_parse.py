@@ -225,7 +225,7 @@ def parse_arguments(args, func_variants, declaration, func_return):
     supported_topt_arguments.append(
         [
             {'name': 'dtype', 'type': 'ScalarType', 'annotation': None, 'kwarg_only': True,
-             'default': 'long', 'is_nullable': True},
+             'default': 'at::kLong', 'is_nullable': True},
             {'name': 'layout', 'type': 'Layout', 'annotation': None, 'kwarg_only': True,
              'default': 'c10::nullopt', 'is_nullable': True},
             {'name': 'device', 'type': 'Device', 'annotation': None, 'kwarg_only': True,
@@ -256,10 +256,37 @@ def parse_arguments(args, func_variants, declaration, func_return):
     def is_tensor_option(argument):
         return argument['name'] in ['dtype', 'layout', 'device', 'pin_memory']
 
-    """
     new_arguments = []
     idx = 0
+    
+    if declaration['name'] == 'tril_indices':
+        print("\n\n ARGS BEFORE tril_indices: ", arguments)
+
+    if declaration['name'] == 'trul_indices':
+        print("\n\n ARGS BEFORE trul_indices: ", arguments)
+
+    #TODO: fix this hack
     while idx < len(arguments):
+        argument = arguments[idx]
+        if declaration['name'] == 'tril_indices' or declaration['name'] == 'triu_indices':
+            print("we are in!")
+            arguments = [
+                {'type': 'int64_t', 'name': 'row', 'is_nullable': False, 'annotation': None}, 
+                {'type': 'int64_t', 'name': 'col', 'is_nullable': False, 'annotation': None},
+                {'type': 'int64_t', 'name': 'offset', 'is_nullable': False, 'annotation': None, 'default': 0}, 
+                {'name': 'dtype', 'type': 'ScalarType', 'annotation': None, 'kwarg_only': True,
+                'default': 'at::kLong', 'is_nullable': True},
+                {'name': 'layout', 'type': 'Layout', 'annotation': None, 'kwarg_only': True,
+                'default': 'c10::nullopt', 'is_nullable': True},
+                {'name': 'device', 'type': 'Device', 'annotation': None, 'kwarg_only': True,
+                'default': 'c10::nullopt', 'is_nullable': True},
+                {'name': 'pin_memory', 'type': 'bool', 'annotation': None, 'kwarg_only': True,
+                'default': 'c10::nullopt', 'is_nullable': True},
+            ]
+    
+        idx += 1
+    
+    '''
         argument = arguments[idx]
         number_of_arguments = len(supported_topt_arguments[0])
         if is_tensor_option(argument) and len(arguments) - idx >= number_of_arguments:
@@ -281,9 +308,9 @@ def parse_arguments(args, func_variants, declaration, func_return):
         else:
             new_arguments.append(argument)
             idx += 1
-
-    arguments = new_arguments
-    """
+    '''
+    
+    #arguments = new_arguments
     
     # Sanity checks
 
