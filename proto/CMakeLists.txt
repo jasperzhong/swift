@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
-project(hello_world)
+project(proto_tensor)
 
 find_package(Torch REQUIRED)
 
@@ -19,3 +19,10 @@ add_executable(tensor_addition tensor_addition.cpp)
 target_link_libraries(tensor_addition "${TORCH_LIBRARIES}")
 set_property(TARGET tensor_addition PROPERTY CXX_STANDARD 11)
 
+add_executable(hash_benchmark hash_benchmark.cpp)
+target_link_libraries(hash_benchmark "${TORCH_LIBRARIES}")
+set_property(TARGET hash_benchmark PROPERTY CXX_STANDARD 11)
+
+add_executable(tensor_addition tensor_addition.cpp)
+target_link_libraries(tensor_addition "${TORCH_LIBRARIES}")
+set_property(TARGET tensor_addition PROPERTY CXX_STANDARD 11)
