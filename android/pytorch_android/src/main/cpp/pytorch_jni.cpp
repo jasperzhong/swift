@@ -704,7 +704,7 @@ class PytorchJni : public facebook::jni::HybridClass<PytorchJni> {
           facebook::jni::JArrayClass<JIValue::javaobject>::javaobject>
           jinputs) {
 #ifdef TRACE_ENABLED
-	  Trace _s{"jni::Module::forward"};	      
+	  Trace _s{"jni::Module::forward"};
 #endif
     std::vector<at::IValue> inputs{};
     size_t n = jinputs->size();
