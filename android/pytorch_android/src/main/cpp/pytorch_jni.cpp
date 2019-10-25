@@ -8,7 +8,82 @@
 
 #include <torch/script.h>
 
+#include <torch/csrc/autograd/record_function.h>
+
+#include "cmake_macros.h"
+
+
+#if defined(TRACE_ENABLED) && defined(__ANDROID__)
+#include <android/log.h>
+
+#include <android/trace.h>
+#include <dlfcn.h>
+
+#define ALOGI(...)                                                             \
+    __android_log_print(ANDROID_LOG_INFO, "pytorch-jni", __VA_ARGS__)
+#endif
+
 namespace pytorch_jni {
+
+#ifdef TRACE_ENABLED
+class Trace {
+ public:
+# ifdef __ANDROID__
+  typedef void *(*fp_ATrace_beginSection) (const char* sectionName);
+  typedef void *(*fp_ATrace_endSection) (void);
+
+  static void *(*ATrace_beginSection)(const char *sectionName);
+  static void *(*ATrace_endSection)(void);
+# endif
+
+  static void ensureInit() {
+    if (!is_initialized_) {
+      init();
+      is_initialized_ = true;
+    }
+  }
+
+  static void beginSection(const char *name) {
+    ensureInit();
+# ifdef __ANDROID__
+    ATrace_beginSection(name);
+# endif
+  }
+
+  static void endSection() {
+# ifdef __ANDROID__
+  ATrace_endSection();
+# endif
+  }
+
+  Trace(const char *name) {
+    ensureInit();
+    beginSection(name);
+  }
+
+  ~Trace() {
+    endSection();
+  }
+ 
+ private:
+  static void init() {
+# ifdef __ANDROID__
+    void *lib = dlopen("libandroid.so", RTLD_NOW || RTLD_LOCAL);
+    if (lib != NULL) {
+      ATrace_beginSection = reinterpret_cast<fp_ATrace_beginSection>(
+          dlsym(lib, "ATrace_beginSection"));
+      ATrace_endSection = reinterpret_cast<fp_ATrace_endSection>(
+          dlsym(lib, "ATrace_endSection"));
+    }
+# endif
+  }
+  static bool is_initialized_;
+};
+
+bool Trace::is_initialized_ = false;
+Trace::fp_ATrace_beginSection Trace::ATrace_beginSection = {};
+Trace::fp_ATrace_endSection Trace::ATrace_endSection = {};
+#endif
 
 // NOTE: Codes must be kept in sync with DType.java.
 // NOTE: Never serialize these, because they can change between releases.
@@ -208,6 +283,9 @@ class JIValue : public facebook::jni::JavaClass<JIValue> {
 
   static facebook::jni::local_ref<JIValue> newJIValueFromAtIValue(
       const at::IValue& ivalue) {
+#ifdef TRACE_ENABLED
+	  Trace _s{"jni::JIValue::newJIValueFromAtIValue"};
+#endif
     if (ivalue.isNone()) {
       static auto jMethodOptionalNull =
           JIValue::javaClassStatic()
@@ -584,12 +662,31 @@ class PytorchJni : public facebook::jni::HybridClass<PytorchJni> {
     return makeCxxInstance(modelPath);
   }
 
+#ifdef TRACE_ENABLED
+  static void onFunctionEnter(const torch::autograd::profiler::RecordFunction& fn) {
+    auto name = fn.name().str();
+    ALOGI("onFunctionEnter %s", name);
+    Trace::beginSection(name);
+  }
+
+  static void onFunctionExit(const torch::autograd::profiler::RecordFunction&) {
+    ALOGI("onFunctionExit");
+    Trace::endSection();
+  }
+#endif
+
   PytorchJni(facebook::jni::alias_ref<jstring> modelPath) {
     auto qengines = at::globalContext().supportedQEngines();
     if (std::find(qengines.begin(), qengines.end(), at::QEngine::QNNPACK) !=
         qengines.end()) {
       at::globalContext().setQEngine(at::QEngine::QNNPACK);
     }
+
+    caffe2::ATrace::ensureInit();
+#ifdef TRACE_ENABLED
+    torch::autograd::profiler::pushCallback(&onFunctionEnter, &onFunctionExit, /* need_inputs */ false, /* sampled */ false);
+#endif
+
     module_ = torch::jit::load(std::move(modelPath->toStdString()));
     module_.eval();
   }
@@ -606,6 +703,9 @@ class PytorchJni : public facebook::jni::HybridClass<PytorchJni> {
       facebook::jni::alias_ref<
           facebook::jni::JArrayClass<JIValue::javaobject>::javaobject>
           jinputs) {
+#ifdef TRACE_ENABLED
+	  Trace _s{"jni::Module::forward"};
+#endif
     std::vector<at::IValue> inputs{};
     size_t n = jinputs->size();
     inputs.reserve(n);
