@@ -7,6 +7,7 @@
 #include <fbjni/fbjni.h>
 
 #include <torch/script.h>
+
 #include <torch/csrc/autograd/record_function.h>
 
 #include "cmake_macros.h"
@@ -41,7 +42,7 @@ class Trace {
       is_initialized_ = true;
     }
   }
-  
+
   static void beginSection(const char *name) {
     ensureInit();
 # ifdef __ANDROID__
@@ -63,7 +64,7 @@ class Trace {
   ~Trace() {
     endSection();
   }
-
+ 
  private:
   static void init() {
 # ifdef __ANDROID__
@@ -283,7 +284,7 @@ class JIValue : public facebook::jni::JavaClass<JIValue> {
   static facebook::jni::local_ref<JIValue> newJIValueFromAtIValue(
       const at::IValue& ivalue) {
 #ifdef TRACE_ENABLED
-    Trace _s{"jni::JIValue::newJIValueFromAtIValue"};
+	  Trace _s{"jni::JIValue::newJIValueFromAtIValue"};
 #endif
     if (ivalue.isNone()) {
       static auto jMethodOptionalNull =
@@ -680,11 +681,12 @@ class PytorchJni : public facebook::jni::HybridClass<PytorchJni> {
         qengines.end()) {
       at::globalContext().setQEngine(at::QEngine::QNNPACK);
     }
-    
+
     caffe2::ATrace::ensureInit();
 #ifdef TRACE_ENABLED
     torch::autograd::profiler::pushCallback(&onFunctionEnter, &onFunctionExit, /* need_inputs */ false, /* sampled */ false);
 #endif
+
     module_ = torch::jit::load(std::move(modelPath->toStdString()));
     module_.eval();
   }
@@ -702,7 +704,7 @@ class PytorchJni : public facebook::jni::HybridClass<PytorchJni> {
           facebook::jni::JArrayClass<JIValue::javaobject>::javaobject>
           jinputs) {
 #ifdef TRACE_ENABLED
-     Trace _s{"jni::Module::forward"};
+	  Trace _s{"jni::Module::forward"};	      
 #endif
     std::vector<at::IValue> inputs{};
     size_t n = jinputs->size();
@@ -713,7 +715,6 @@ class PytorchJni : public facebook::jni::HybridClass<PytorchJni> {
     }
     auto output = [&]() {
       torch::autograd::AutoGradMode guard(false);
-      at::AutoNonVariableTypeMode non_var_type_mode(true);
       return module_.forward(std::move(inputs));
     }();
     return JIValue::newJIValueFromAtIValue(output);
@@ -736,7 +737,6 @@ class PytorchJni : public facebook::jni::HybridClass<PytorchJni> {
     if (auto method = module_.find_method(methodName)) {
       auto output = [&]() {
         torch::autograd::AutoGradMode guard(false);
-        at::AutoNonVariableTypeMode non_var_type_mode(true);
         return (*method)(std::move(inputs));
       }();
       return JIValue::newJIValueFromAtIValue(output);
