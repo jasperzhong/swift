@@ -82,7 +82,7 @@ struct TensorDataContainer {
 #define TENSOR(T, S) \
   TensorDataContainer(T value) : \
       sizes_(), \
-      scalar_type_(at::k##S), \
+      scalar_type_(at::k##S), \  // yf225 TODO: we should compute the dtype here based on default dtype
       type_(TensorDataContainerType::Scalar), \
       scalar_(value) {}
 AT_FORALL_SCALAR_TYPES_AND3(Bool, Half, BFloat16, TENSOR)
@@ -196,7 +196,19 @@ AT_FORALL_SCALAR_TYPES_AND2(Half, BFloat16, TENSOR)
 
   at::Tensor convert_to_tensor(at::TensorOptions options) const {
     if (!options.has_dtype()) {
-      options = options.dtype(scalar_type_);
+      // yf225 TODO: no, we want to preserve the `T` in at::ArrayRef<T> and std::vector<T>
+      if (at::isIntegralType(scalar_type_, /*includeBool=*/false)) {
+        // In Python, `torch.tensor(1)` always gives a tensor of `torch.int64` dtype,
+        // and we should do the same for C++ `torch::tensor(1)` as well.
+        options = options.dtype(at::kLong);
+      } else if (at::isFloatingType(scalar_type_)) {
+        // In Python, the dtype of `torch.tensor(1.0)` depends on the value of
+        // `torch.get_default_dtype()`, and we should do the same for C++
+        // `torch::tensor(1.0)` as well.
+        options = options.dtype(at::typeMetaToScalarType(at::get_default_dtype()));
+      } else {
+        options = options.dtype(scalar_type_);
+      }
     }
 
     if (is_scalar()) {

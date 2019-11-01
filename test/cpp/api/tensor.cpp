@@ -224,7 +224,7 @@ TEST(TensorTest, TorchTensorCtorScalar) {
   auto tensor = torch::tensor(123);
   ASSERT_EQ(tensor.numel(), 1);
   ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({}));
-  ASSERT_EQ(tensor.dtype(), at::kInt);
+  ASSERT_EQ(tensor.dtype(), at::kLong);
   ASSERT_EQ(tensor.item<int32_t>(), 123);
 
   tensor = torch::tensor(123.456f);
@@ -233,16 +233,30 @@ TEST(TensorTest, TorchTensorCtorScalar) {
   ASSERT_EQ(tensor.dtype(), at::kFloat);
   ASSERT_TRUE(almost_equal(tensor, 123.456f));
 
+  {
+    // dtype of `torch::tensor(123.456f)` always follows the value of
+    // `torch::get_default_dtype()`, regardless of whether the scalar value
+    // 
+    caffe2::TypeMeta prev_dtype = torch::get_default_dtype();
+    torch::set_default_dtype(torch::scalarTypeToTypeMeta(at::kDouble));
+    tensor = torch::tensor(123.456f);
+    ASSERT_EQ(tensor.numel(), 1);
+    ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({}));
+    ASSERT_EQ(tensor.dtype(), at::kDouble);
+    ASSERT_TRUE(almost_equal(tensor, 123.456f));
+    torch::set_default_dtype(prev_dtype);
+  }
+
   tensor = torch::tensor(123.456);
   ASSERT_EQ(tensor.numel(), 1);
   ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({}));
-  ASSERT_EQ(tensor.dtype(), at::kDouble);
+  ASSERT_EQ(tensor.dtype(), at::kFloat);
   ASSERT_TRUE(almost_equal(tensor, 123.456));
 
   tensor = torch::tensor({123.456});
   ASSERT_EQ(tensor.numel(), 1);
   ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({1}));
-  ASSERT_EQ(tensor.dtype(), at::kDouble);
+  ASSERT_EQ(tensor.dtype(), at::kFloat);
   ASSERT_TRUE(almost_equal(tensor[0], 123.456));
 
   tensor = torch::tensor(true);
@@ -263,7 +277,7 @@ TEST(TensorTest, TorchTensorCtorSingleDim) {
   ASSERT_TRUE(tensor.is_variable());
   ASSERT_EQ(tensor.numel(), 3);
   ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({3}));
-  ASSERT_EQ(tensor.dtype(), at::kInt);
+  ASSERT_EQ(tensor.dtype(), at::kLong);
   ASSERT_TRUE(exactly_equal(tensor[0], 1));
   ASSERT_TRUE(exactly_equal(tensor[1], 2));
   ASSERT_TRUE(exactly_equal(tensor[2], 3));
@@ -290,7 +304,7 @@ TEST(TensorTest, TorchTensorCtorSingleDim) {
   ASSERT_TRUE(tensor.is_variable());
   ASSERT_EQ(tensor.numel(), 3);
   ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({3}));
-  ASSERT_EQ(tensor.dtype(), at::kDouble);
+  ASSERT_EQ(tensor.dtype(), at::kFloat);
   ASSERT_TRUE(almost_equal(tensor[0], 1.5));
   ASSERT_TRUE(almost_equal(tensor[1], 2.25));
   ASSERT_TRUE(almost_equal(tensor[2], 3.125));
@@ -334,9 +348,9 @@ TEST(TensorTest, TorchTensorCtorSingleDim) {
 TEST(TensorTest, TorchTensorCtorMultiDim) {
   {
     auto tensor = torch::tensor({{1, 2}});
-    ASSERT_EQ(tensor.dtype(), torch::kInt);
+    ASSERT_EQ(tensor.dtype(), torch::kLong);
     ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({1, 2}));
-    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 3, torch::kInt).view(tensor.sizes())));
+    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 3, torch::kLong).view(tensor.sizes())));
     ASSERT_FALSE(tensor.requires_grad());
   }
   {
@@ -351,9 +365,9 @@ TEST(TensorTest, TorchTensorCtorMultiDim) {
   }
   {
     auto tensor = torch::tensor({{1.0, 2.0}});
-    ASSERT_EQ(tensor.dtype(), torch::kDouble);
+    ASSERT_EQ(tensor.dtype(), torch::kFloat);
     ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({1, 2}));
-    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 3, torch::kDouble).view(tensor.sizes())));
+    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 3, torch::kFloat).view(tensor.sizes())));
     ASSERT_FALSE(tensor.requires_grad());
   }
   {
@@ -365,9 +379,9 @@ TEST(TensorTest, TorchTensorCtorMultiDim) {
   }
   {
     auto tensor = torch::tensor({{1}, {2}});
-    ASSERT_EQ(tensor.dtype(), torch::kInt);
+    ASSERT_EQ(tensor.dtype(), torch::kLong);
     ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({2, 1}));
-    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 3, torch::kInt).view(tensor.sizes())));
+    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 3, torch::kLong).view(tensor.sizes())));
     ASSERT_FALSE(tensor.requires_grad());
   }
   {
@@ -382,23 +396,23 @@ TEST(TensorTest, TorchTensorCtorMultiDim) {
   }
   {
     auto tensor = torch::tensor({{{1, 2}}});
-    ASSERT_EQ(tensor.dtype(), torch::kInt);
+    ASSERT_EQ(tensor.dtype(), torch::kLong);
     ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({1, 1, 2}));
-    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 3, torch::kInt).view(tensor.sizes())));
+    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 3, torch::kLong).view(tensor.sizes())));
     ASSERT_FALSE(tensor.requires_grad());
   }
   {
     auto tensor = torch::tensor({{{1}, {2}}});
-    ASSERT_EQ(tensor.dtype(), torch::kInt);
+    ASSERT_EQ(tensor.dtype(), torch::kLong);
     ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({1, 2, 1}));
-    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 3, torch::kInt).view(tensor.sizes())));
+    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 3, torch::kLong).view(tensor.sizes())));
     ASSERT_FALSE(tensor.requires_grad());
   }
   {
     auto tensor = torch::tensor({{1, 2}, {3, 4}});
-    ASSERT_EQ(tensor.dtype(), torch::kInt);
+    ASSERT_EQ(tensor.dtype(), torch::kLong);
     ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({2, 2}));
-    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 5, torch::kInt).view(tensor.sizes())));
+    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 5, torch::kLong).view(tensor.sizes())));
     ASSERT_FALSE(tensor.requires_grad());
   }
   {
@@ -410,9 +424,9 @@ TEST(TensorTest, TorchTensorCtorMultiDim) {
   }
   {
     auto tensor = torch::tensor({{{{{{{{1.0, 2.0, 3.0}}}}}, {{{{{4.0, 5.0, 6.0}}}}}, {{{{{7.0, 8.0, 9.0}}}}}}}});
-    ASSERT_EQ(tensor.dtype(), torch::kDouble);
+    ASSERT_EQ(tensor.dtype(), torch::kFloat);
     ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({1, 1, 3, 1, 1, 1, 1, 3}));
-    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 10, torch::kDouble).view(tensor.sizes())));
+    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 10, torch::kFloat).view(tensor.sizes())));
     ASSERT_FALSE(tensor.requires_grad());
   }
   {
@@ -437,16 +451,16 @@ TEST(TensorTest, TorchTensorCtorMultiDim) {
   }
   {
     auto tensor = torch::tensor({{{{{{{{{{1}}}}}}}}}});
-    ASSERT_EQ(tensor.dtype(), torch::kInt);
+    ASSERT_EQ(tensor.dtype(), torch::kLong);
     ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({1, 1, 1, 1, 1, 1, 1, 1, 1, 1}));
-    ASSERT_TRUE(torch::allclose(tensor, torch::full({1}, 1, torch::kInt).view(tensor.sizes())));
+    ASSERT_TRUE(torch::allclose(tensor, torch::full({1}, 1, torch::kLong).view(tensor.sizes())));
     ASSERT_FALSE(tensor.requires_grad());
   }
   {
     auto tensor = torch::tensor({{{{{{{{{{1, 2}}}}}}}}}});
-    ASSERT_EQ(tensor.dtype(), torch::kInt);
+    ASSERT_EQ(tensor.dtype(), torch::kLong);
     ASSERT_EQ(tensor.sizes(), std::vector<int64_t>({1, 1, 1, 1, 1, 1, 1, 1, 1, 2}));
-    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 3, torch::kInt).view(tensor.sizes())));
+    ASSERT_TRUE(torch::allclose(tensor, torch::arange(1, 3, torch::kLong).view(tensor.sizes())));
     ASSERT_FALSE(tensor.requires_grad());
   }
 }
@@ -519,15 +533,15 @@ TEST(TensorTest, TorchTensorCtorZeroSizedDim) {
 }
 
 TEST(TensorTest, TorchTensorCtorPreservesInitListDtype) {
-  ASSERT_EQ(torch::tensor({1, 2, 3}).dtype(), torch::kInt);
-  ASSERT_EQ(torch::tensor({{1, 2, 3}}).dtype(), torch::kInt);
-  ASSERT_EQ(torch::tensor({1., 2., 3.}).dtype(), torch::kDouble);
-  ASSERT_EQ(torch::tensor({{1., 2., 3.}}).dtype(), torch::kDouble);
+  ASSERT_EQ(torch::tensor({1, 2, 3}).dtype(), torch::kLong);
+  ASSERT_EQ(torch::tensor({{1, 2, 3}}).dtype(), torch::kLong);
+  ASSERT_EQ(torch::tensor({1., 2., 3.}).dtype(), torch::kFloat);
+  ASSERT_EQ(torch::tensor({{1., 2., 3.}}).dtype(), torch::kFloat);
 
-  ASSERT_EQ(torch::tensor({1, 2, 3}, torch::TensorOptions()).dtype(), torch::kInt);
-  ASSERT_EQ(torch::tensor({{1, 2, 3}}, torch::TensorOptions()).dtype(), torch::kInt);
-  ASSERT_EQ(torch::tensor({1., 2., 3.}, torch::TensorOptions()).dtype(), torch::kDouble);
-  ASSERT_EQ(torch::tensor({{1., 2., 3.}}, torch::TensorOptions()).dtype(), torch::kDouble);
+  ASSERT_EQ(torch::tensor({1, 2, 3}, torch::TensorOptions()).dtype(), torch::kLong);
+  ASSERT_EQ(torch::tensor({{1, 2, 3}}, torch::TensorOptions()).dtype(), torch::kLong);
+  ASSERT_EQ(torch::tensor({1., 2., 3.}, torch::TensorOptions()).dtype(), torch::kFloat);
+  ASSERT_EQ(torch::tensor({{1., 2., 3.}}, torch::TensorOptions()).dtype(), torch::kFloat);
 }
 
 TEST(TensorTest, PrettyPrintTensorDataContainer) {
