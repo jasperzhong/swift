@@ -28,6 +28,8 @@ struct ConvOptions {
   /// Changing this parameter after construction __has no effect__.
   TORCH_ARG(c10::optional<int64_t>, in_channels) = c10::nullopt;
 
+  has_in_channels
+
   /// The number of output channels the convolution should produce.
   /// Changing this parameter after construction __has no effect__.
   TORCH_ARG(c10::optional<int64_t>, out_channels) = c10::nullopt;
@@ -81,9 +83,41 @@ struct ConvOptions {
   // FIXME: The following methods are added so that we can merge PR #28917
   // without breaking torchvision builds in CI. After PR #28917 is merged
   // and a new PyTorch nightly is built, @yf225 will open a PR to torchvision
-  // to change all `with_bias` call sites to `bias`, and then open a PR to PyTorch
-  // to remove the methods below.
+  // to do the following:
+  // - Change all `with_bias` call sites to `bias`
+  // - Change all `input_channels` call sites to `in_channels_`, and use `.value()` to access its value
+  // - Change all `output_channels` call sites to `out_channels_`, and use `.value()` to access its value
+  // - Use `options.kernel_size().value()` instead of `options.kernel_size()`
+  // and then he will open a PR to PyTorch to remove the methods below.
  public:
+  inline auto input_channels(const int64_t& new_input_channels)->decltype(*this) {
+    this->in_channels_ = new_input_channels;
+    return *this;
+  }
+
+  inline auto input_channels(int64_t&& new_input_channels)->decltype(*this) {
+    this->in_channels_ = std::move(new_input_channels);
+    return *this;
+  }
+
+  inline const int64_t& input_channels() const noexcept {
+    return this->in_channels_.value();
+  }
+
+  inline auto output_channels(const int64_t& new_output_channels)->decltype(*this) {
+    this->out_channels_ = new_output_channels;
+    return *this;
+  }
+
+  inline auto output_channels(int64_t&& new_output_channels)->decltype(*this) {
+    this->out_channels_ = std::move(new_output_channels);
+    return *this;
+  }
+
+  inline const int64_t& output_channels() const noexcept {
+    return this->out_channels_.value();
+  }
+
   inline auto with_bias(const bool& new_with_bias)->decltype(*this) {
     this->bias_ = new_with_bias;
     return *this;
