@@ -39,8 +39,8 @@ from common_methods_invocations import (method_tests,
                                         mask_not_all_zeros,
                                         S)
 from common_device_type import (instantiate_device_type_tests, skipCUDAIfRocm,
-                                onlyCUDA, dtypes, dtypesIfCUDA,
-                                deviceCountAtLeast)
+                                onlyCPU, onlyCUDA, dtypes, dtypesIfCUDA,
+                                deviceCountAtLeast, skipCUDAIfCudnnVersionLessThan)
 
 # load_tests from common_utils is used to automatically filter tests for
 # sharding on sandcastle. This line silences flake warnings
@@ -2631,18 +2631,55 @@ class TestAutograd(TestCase):
     def test_record_function(self):
         x = torch.randn(10, 10)
 
-        with profile() as p:
-            with record_function("label"):
+        def forward(x):
+            with record_function("outer"):
                 y = x * 2 + 4
+                with record_function("inner"):
+                    y = y - 1
+            y = y / 1
 
-        last_end = 0
-        names = ['mul', 'add']
-        labels = ['label']
-        self.assertEqual(len(p.function_events), len(names) + len(labels))
-        for info, expected_name in zip(p.function_events, labels):
-            self.assertGreater(info.cpu_interval.start, last_end)
+        forward(x)
+
+        with profile() as p:
+            forward(x)
+
+        events = p.function_events
+        start_order = [
+            'profiler::_record_function_enter',
+            'outer',
+            'mul',
+            'add',
+            'profiler::_record_function_enter',
+            'inner',
+            'sub',
+            'profiler::_record_function_exit',
+            'profiler::_record_function_exit',
+            'div',
+        ]
+        self.assertEqual(len(events), len(start_order))
+        for info, expected_name in zip(events, start_order):
             self.assertEqual(info.name, expected_name)
-            last_end = info.cpu_interval.end
+
+        def count_events_before(before, target):
+            matches = [e for e in events if e.name == before]
+            self.assertEqual(len(matches), 1)
+            match = matches[0]
+
+            count = 0
+            for e in events:
+                if e.name == target and e.cpu_interval.end <= match.cpu_interval.end:
+                    count += 1
+            return count
+
+        self.assertEqual(
+            count_events_before("inner", "profiler::_record_function_exit"),
+            1,
+        )
+        self.assertEqual(
+            count_events_before("outer", "profiler::_record_function_exit"),
+            2,
+        )
+
 
     def test_dir(self):
         x = torch.randn(10, 10)
@@ -2703,7 +2740,7 @@ class TestAutograd(TestCase):
         def construct_inputs(*shapes):
             start = cast(torch.randn(shapes[0])).requires_grad_()
             end = cast(torch.randn(shapes[1])).requires_grad_()
-            weight = cast(torch.randn(shapes[2]))
+            weight = cast(torch.randn(shapes[2])).requires_grad_()
             return [start, end, weight]
 
         all_test_shapes = [((3, 3, 3), (3, 3, 3), (3, 3, 3)),  # no broadcasting
@@ -3733,6 +3770,31 @@ class TestAutogradDeviceType(TestCase):
             gradcheck(ctc_after_softmax, [x], nondet_tol=1e-7)
 
     @onlyCUDA
+    @skipCUDAIfRocm
+    @skipCUDAIfCudnnVersionLessThan(7600)
+    def test_ctc_loss_cudnn(self, device):
+        batch_size = 16
+        input_length = 30
+        num_labels = 101
+        target_length = 15
+        targets = torch.randint(1, num_labels, (batch_size * target_length,),
+                                device='cuda', dtype=torch.long)
+        log_probs = torch.log_softmax(torch.randn(input_length, batch_size, num_labels, device='cuda', dtype=torch.float), 2)
+        log_probs.requires_grad_()
+
+        input_lengths = batch_size * [input_length]
+        target_lengths = batch_size * [target_length]
+        grad_out = torch.randn(batch_size, device='cuda', dtype=torch.float)
+        with torch.backends.cudnn.flags(enabled=False):
+            loss_native = torch.nn.functional.ctc_loss(log_probs, targets, input_lengths, target_lengths, reduction='none')
+            grad_native, = torch.autograd.grad(loss_native, log_probs, grad_out)
+        loss_cudnn = torch.nn.functional.ctc_loss(log_probs, targets.to('cpu', torch.int32),
+                                                  input_lengths, target_lengths, reduction='none')
+        self.assertTrue("Cudnn" in str(loss_cudnn.grad_fn))
+        grad_cudnn, = torch.autograd.grad(loss_cudnn, log_probs, grad_out)
+        self.assertEqual(grad_cudnn, grad_native, prec=1e-4)
+
+    @onlyCUDA
     def test_free_unneeded_tensor(self, device):
         x = torch.randn(2, 3, 10, 10, device=device, requires_grad=True)
         m = torch.randn(1, 3, 1, 1, device=device)
@@ -3895,6 +3957,19 @@ class TestAutogradDeviceType(TestCase):
         input = torch.randn(1, device=devices[0], requires_grad=True)
         output = input.to(device=devices[1]) + input.to(device=devices[1])
         output.backward()
+
+    @onlyCPU
+    def test_copy_(self, device):
+        # At the time of writing this test, copy_ is not generated from native_functions.yaml
+        # there was a bug that bfloat16 was not recognized as floating.
+        x = torch.randn(10, device=device, requires_grad=True)
+        floating_dt = [dt for dt in torch.testing.get_all_dtypes() if dt.is_floating_point]
+        for dt in floating_dt:
+            y = torch.empty(10, device=device, dtype=dt)
+            y.copy_(x)
+            self.assertTrue(y.requires_grad)
+            z = x.to(torch.bfloat16)
+            self.assertTrue(z.requires_grad)
 
     @onlyCUDA
     def test_cross_device_reentrant_autograd(self, device):
