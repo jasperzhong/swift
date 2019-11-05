@@ -41,7 +41,7 @@ void BatchNormImpl::reset() {
 void BatchNormImpl::pretty_print(std::ostream& stream) const {
   stream << std::boolalpha
          << "torch::nn::BatchNorm(num_features=" << options.num_features()
-         << ", eps=" << options.eps() << ", momentum=" << options.momentum().value()
+         << ", eps=" << options.eps() << ", momentum=" << options.momentum()
          << ", affine=" << options.affine() << ", track_running_stats=" << options.track_running_stats()
          << ")";
 }
@@ -73,7 +73,7 @@ Tensor BatchNormImpl::pure_forward(
       mean,
       variance,
       is_training(),
-      options.momentum().value(),
+      options.momentum(),
       options.eps(),
       torch::cuda::cudnn_is_available());
 }
@@ -125,7 +125,7 @@ void BatchNormImplBase<D, Derived>::pretty_print(std::ostream& stream) const {
          << "torch::nn::BatchNorm" << D << "d("
          << options.num_features() << ", "
          << "eps=" << options.eps() << ", "
-         << "momentum=" << options.momentum().value() << ", "
+         << "momentum=" << options.momentum() << ", "
          << "affine=" << options.affine() << ", "
          << "track_running_stats=" << options.track_running_stats() << ")";
 }
@@ -135,19 +135,19 @@ Tensor BatchNormImplBase<D, Derived>::forward(const Tensor& input) {
   _check_input_dim(input);
 
   double exponential_average_factor;
-  if (options.momentum() == c10::nullopt) {
+  if (options.has_momentum()) {
     exponential_average_factor = 0.0;
   } else {
-    exponential_average_factor = options.momentum().value();
+    exponential_average_factor = options.momentum();
   }
 
   if (this->is_training() && options.track_running_stats()) {
     if (num_batches_tracked.defined()) {
       num_batches_tracked += 1;
-      if (options.momentum() == c10::nullopt) {  // use cumulative moving average
+      if (options.has_momentum()) {  // use cumulative moving average
         exponential_average_factor = 1.0 / num_batches_tracked.item<double>();
       } else {  // use exponential moving average
-        exponential_average_factor = options.momentum().value();
+        exponential_average_factor = options.momentum();
       }
     }
   }

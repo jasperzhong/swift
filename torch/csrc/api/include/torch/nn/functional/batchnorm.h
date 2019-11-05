@@ -26,7 +26,7 @@ inline Tensor batch_norm(const Tensor& input, const Tensor& running_mean,
     running_mean,
     running_var,
     training,
-    options.momentum().value(),
+    options.momentum(),
     options.eps(),
     at::globalContext().userEnabledCuDNN());
 }

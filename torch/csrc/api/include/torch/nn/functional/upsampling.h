@@ -44,14 +44,14 @@ inline Tensor interpolate(const Tensor& input, InterpolateOptions options) {
 
   if (c10::get_if<enumtype::kNearest>(&options.mode()) ||
       c10::get_if<enumtype::kArea>(&options.mode())) {
-    if (options.align_corners() != c10::nullopt) {
+    if (options.has_align_corners()) {
       TORCH_CHECK(
           false,
           "align_corners option can only be set with the "
           "interpolating modes: linear | bilinear | bicubic | trilinear");
     }
   } else {
-    if (options.align_corners() == c10::nullopt) {
+    if (options.has_align_corners()) {
       TORCH_WARN(
           "Default upsampling behavior when mode is linear, bilinear, bicubic, "
           "or trilinear, has changed to align_corners=False since 0.4.0. "
@@ -74,7 +74,7 @@ inline Tensor interpolate(const Tensor& input, InterpolateOptions options) {
   } else if (input.dim() == 5 && c10::get_if<enumtype::kArea>(&options.mode())) {
     return adaptive_avg_pool3d(input, _output_size(3));
   } else if (input.dim() == 3 && c10::get_if<enumtype::kLinear>(&options.mode())) {
-    return torch::upsample_linear1d(input, _output_size(1), *options.align_corners());
+    return torch::upsample_linear1d(input, _output_size(1), options.align_corners());
   } else if (input.dim() == 3 && c10::get_if<enumtype::kBilinear>(&options.mode())) {
     TORCH_CHECK(false, "Got 3D input, but bilinear mode needs 4D input");
   } else if (input.dim() == 3 && c10::get_if<enumtype::kTrilinear>(&options.mode())) {
@@ -82,7 +82,7 @@ inline Tensor interpolate(const Tensor& input, InterpolateOptions options) {
   } else if (input.dim() == 4 && c10::get_if<enumtype::kLinear>(&options.mode())) {
     TORCH_CHECK(false, "Got 4D input, but linear mode needs 3D input");
   } else if (input.dim() == 4 && c10::get_if<enumtype::kBilinear>(&options.mode())) {
-    return torch::upsample_bilinear2d(input, _output_size(2), *options.align_corners());
+    return torch::upsample_bilinear2d(input, _output_size(2), options.align_corners());
   } else if (input.dim() == 4 && c10::get_if<enumtype::kTrilinear>(&options.mode())) {
     TORCH_CHECK(false, "Got 4D input, but trilinear mode needs 5D input");
   } else if (input.dim() == 5 && c10::get_if<enumtype::kLinear>(&options.mode())) {
@@ -90,9 +90,9 @@ inline Tensor interpolate(const Tensor& input, InterpolateOptions options) {
   } else if (input.dim() == 5 && c10::get_if<enumtype::kBilinear>(&options.mode())) {
     TORCH_CHECK(false, "Got 5D input, but bilinear mode needs 4D input");
   } else if (input.dim() == 5 && c10::get_if<enumtype::kTrilinear>(&options.mode())) {
-    return torch::upsample_trilinear3d(input, _output_size(3), *options.align_corners());
+    return torch::upsample_trilinear3d(input, _output_size(3), options.align_corners());
   } else if (input.dim() == 4 && c10::get_if<enumtype::kBicubic>(&options.mode())) {
-    return torch::upsample_bicubic2d(input, _output_size(2), *options.align_corners());
+    return torch::upsample_bicubic2d(input, _output_size(2), options.align_corners());
   } else {
     TORCH_CHECK(
         false,

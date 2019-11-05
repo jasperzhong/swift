@@ -12,8 +12,14 @@
     this->name##_ = std::move(new_##name);                       \
     return *this;                                                \
   }                                                              \
-  inline const T& name() const noexcept { /* NOLINT */                  \
-    return this->name##_;                                        \
+  inline bool has_##name() const noexcept { /* NOLINT */ \
+    return this->name##_.has_value(); \
+  } \
+  inline const T& name() const { /* NOLINT */                  \
+    TORCH_CHECK( \
+      this->name##_.has_value(), \
+      "Expected `", #name, "` to be specified in options, but it wasn't"); \
+    return this->name##_.value(); \
   }                                                              \
  private:                                                        \
-  T name##_ /* NOLINT */
+  c10::optional<T> name##_ /* NOLINT */

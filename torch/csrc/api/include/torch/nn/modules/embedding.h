@@ -20,9 +20,9 @@ struct TORCH_API EmbeddingOptions {
   /// The size of each embedding vector.
   TORCH_ARG(int64_t, embedding_dim);
   /// If given, pads the output with the embedding vector at `padding_idx` (initialized to zeros) whenever it encounters the index.
-  TORCH_ARG(c10::optional<int64_t>, padding_idx) = c10::nullopt;
+  TORCH_ARG(int64_t, padding_idx) = c10::nullopt;
   /// If given, each embedding vector with norm larger than `max_norm` is renormalized to have norm `max_norm`.
-  TORCH_ARG(c10::optional<float>, max_norm) = c10::nullopt;
+  TORCH_ARG(float, max_norm) = c10::nullopt;
   /// The p of the p-norm to compute for the `max_norm` option. Default ``2``.
   TORCH_ARG(float, norm_type) = 2.;
   /// If given, this will scale gradients by the inverse of frequency of the words in the mini-batch. Default ``False``.
@@ -42,7 +42,7 @@ struct TORCH_API EmbeddingBagOptions {
   /// The size of each embedding vector.
   TORCH_ARG(int64_t, embedding_dim);
   /// If given, each embedding vector with norm larger than `max_norm` is renormalized to have norm `max_norm`.
-  TORCH_ARG(c10::optional<float>, max_norm) = c10::nullopt;
+  TORCH_ARG(float, max_norm) = c10::nullopt;
   /// The p of the p-norm to compute for the `max_norm` option. Default ``2``.
   TORCH_ARG(float, norm_type) = 2.;
   /// If given, this will scale gradients by the inverse of frequency of the words in the mini-batch. Default ``False``.

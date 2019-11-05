@@ -84,7 +84,7 @@ inline Tensor grid_sample(
     padding_mode_enum = 2;
   }
   
-  if (!options.align_corners().has_value()) {
+  if (!options.has_align_corners()) {
     TORCH_WARN("Default grid_sample and affine_grid behavior has changed ",
                    "to align_corners=False since 1.3.0. Please specify ",
                    "align_corners=True if the old behavior is desired. ",
@@ -92,7 +92,7 @@ inline Tensor grid_sample(
     options.align_corners(false);
   }
   
-  return torch::grid_sampler(input, grid, mode_enum, padding_mode_enum, options.align_corners().value());
+  return torch::grid_sampler(input, grid, mode_enum, padding_mode_enum, options.align_corners());
 }
 
 } // namespace functional

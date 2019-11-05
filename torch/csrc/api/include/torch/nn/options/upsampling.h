@@ -41,7 +41,7 @@ struct TORCH_API InterpolateOptions {
   /// this operation *independent* of input size when :attr:`scale_factor` is
   /// kept the same. This only has an effect when :attr:`mode` is "linear",
   /// "bilinear", "bicubic" or "trilinear". Default: "False"
-  TORCH_ARG(c10::optional<bool>, align_corners) = c10::nullopt;
+  TORCH_ARG(bool, align_corners) = c10::nullopt;
 };
 
 /// Options for a `D`-dimensional Upsample module.
@@ -66,7 +66,7 @@ struct TORCH_API UpsampleOptions {
   /// aligned, and thus preserving the values at those pixels. This only has
   /// effect when :attr:`mode` is "linear", "bilinear", or
   /// "trilinear". Default: "False"
-  TORCH_ARG(c10::optional<bool>, align_corners) = c10::nullopt;
+  TORCH_ARG(bool, align_corners) = c10::nullopt;
 };
 
 } // namespace nn

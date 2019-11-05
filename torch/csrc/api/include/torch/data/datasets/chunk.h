@@ -254,20 +254,20 @@ struct ChunkDatasetOptions {
         cache_size_(cache_size),
         cross_chunk_shuffle_count_(cross_chunk_shuffle_count) {
     TORCH_CHECK(
-        preloader_count_ > 0,
+        preloader_count_.value() > 0,
         "Preloader count is 0. At least one preloader needs to be specified.");
     TORCH_CHECK(
-        batch_size_ > 0,
+        batch_size_.value() > 0,
         "Batch size is 0. A positive batch size needs to be specified.");
     TORCH_CHECK(
-        cache_size_ > 0,
+        cache_size_.value() > 0,
         "Cache size is 0. A positive cache size needs to be specified.");
     TORCH_CHECK(
-        cache_size_ >= batch_size_,
+        cache_size_.value() >= batch_size_.value(),
         "Cache size is less than batch size. Cache needs to be large enough to "
         "hold at least one batch.");
     TORCH_CHECK(
-        cross_chunk_shuffle_count_ > 0,
+        cross_chunk_shuffle_count_.value() > 0,
         "cross_chunk_shuffle_count needs to be greater than 0.");
   }
 

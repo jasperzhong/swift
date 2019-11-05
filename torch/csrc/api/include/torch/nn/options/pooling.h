@@ -30,7 +30,7 @@ struct AvgPoolOptions {
   TORCH_ARG(bool, count_include_pad) = true;
 
   /// if specified, it will be used as divisor, otherwise `kernel_size` will be used
-  TORCH_ARG(c10::optional<int64_t>, divisor_override) = c10::nullopt;
+  TORCH_ARG(int64_t, divisor_override) = c10::nullopt;
 };
 
 /// `AvgPoolOptions` specialized for 1-D avgpool.

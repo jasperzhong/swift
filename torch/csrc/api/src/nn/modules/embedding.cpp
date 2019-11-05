@@ -16,13 +16,13 @@ EmbeddingImpl::EmbeddingImpl(const EmbeddingOptions& options_) : options(options
 }
 
 void EmbeddingImpl::reset() {
-  if (options.padding_idx() != c10::nullopt) {
-    if (*options.padding_idx() > 0) {
-      TORCH_CHECK(*options.padding_idx() < options.num_embeddings(), "Padding_idx must be within num_embeddings");
+  if (options.has_padding_idx()) {
+    if (options.padding_idx() > 0) {
+      TORCH_CHECK(options.padding_idx() < options.num_embeddings(), "Padding_idx must be within num_embeddings");
     }
-    else if (*options.padding_idx() < 0) {
-      TORCH_CHECK(*options.padding_idx() >= -(options.num_embeddings()), "Padding_idx must be within num_embedding");
-      options.padding_idx(options.num_embeddings() + *options.padding_idx());
+    else if (options.padding_idx() < 0) {
+      TORCH_CHECK(options.padding_idx() >= -(options.num_embeddings()), "Padding_idx must be within num_embedding");
+      options.padding_idx(options.num_embeddings() + options.padding_idx());
     }
   }
 
@@ -30,9 +30,9 @@ void EmbeddingImpl::reset() {
     weight = register_parameter(
         "weight", torch::empty({options.num_embeddings(), options.embedding_dim()}));
     torch::nn::init::normal_(weight);
-    if (options.padding_idx() != c10::nullopt) {
+    if (options.has_padding_idx()) {
       torch::NoGradGuard no_grad;
-      weight[*options.padding_idx()].fill_(0);
+      weight[options.padding_idx()].fill_(0);
     }
   } else {
     TORCH_CHECK(options._weight().sizes() == torch::IntArrayRef({options.num_embeddings(), options.embedding_dim()}), "Shape of _weight does not match num_embeddings and embedding_dim");
@@ -43,11 +43,11 @@ void EmbeddingImpl::reset() {
 void EmbeddingImpl::pretty_print(std::ostream& stream) const {
   stream << "torch::nn::Embedding(num_embeddings=" << options.num_embeddings()
          << ", embedding_dim=" << options.embedding_dim();
-  if (options.padding_idx() != c10::nullopt) {
-    stream << ", padding_idx=" << *options.padding_idx();
+  if (options.has_padding_idx()) {
+    stream << ", padding_idx=" << options.padding_idx();
   }
-  if (options.max_norm() != c10::nullopt) {
-    stream << ", max_norm=" << *options.max_norm();
+  if (options.has_max_norm()) {
+    stream << ", max_norm=" << options.max_norm();
   }
   if (options.norm_type() != 2) {
     stream << ", norm_type=" << options.norm_type();
@@ -62,23 +62,23 @@ void EmbeddingImpl::pretty_print(std::ostream& stream) const {
 }
 
 torch::Tensor EmbeddingImpl::forward(const Tensor& input) {
-  if (options.padding_idx() != c10::nullopt) {
-    if (*options.padding_idx() > 0) {
-      TORCH_CHECK(*options.padding_idx() < weight.size(0), "Padding_idx must be within num_embeddings");
+  if (options.has_padding_idx()) {
+    if (options.padding_idx() > 0) {
+      TORCH_CHECK(options.padding_idx() < weight.size(0), "Padding_idx must be within num_embeddings");
     }
-    else if (*options.padding_idx() < 0) {
-      TORCH_CHECK(*options.padding_idx() >= -weight.size(0), "Padding_idx must be within num_embedding");
-      options.padding_idx(weight.size(0) + *options.padding_idx());
+    else if (options.padding_idx() < 0) {
+      TORCH_CHECK(options.padding_idx() >= -weight.size(0), "Padding_idx must be within num_embedding");
+      options.padding_idx(weight.size(0) + options.padding_idx());
     }
   } else {
     options.padding_idx(-1);
   }
 
-  if (options.max_norm() != c10::nullopt) {
+  if (options.has_max_norm()) {
     torch::NoGradGuard no_grad;
-    torch::embedding_renorm_(weight, input.contiguous(), *options.max_norm(), options.norm_type());
+    torch::embedding_renorm_(weight, input.contiguous(), options.max_norm(), options.norm_type());
   }
-  return torch::embedding(weight, input.contiguous(), *options.padding_idx(), options.scale_grad_by_freq(), options.sparse());
+  return torch::embedding(weight, input.contiguous(), options.padding_idx(), options.scale_grad_by_freq(), options.sparse());
 }
 
 EmbeddingBagImpl::EmbeddingBagImpl(const EmbeddingBagOptions& options_) : options(options_) { // NOLINT(modernize-pass-by-value)
@@ -141,9 +141,9 @@ torch::Tensor EmbeddingBagImpl::forward(
     TORCH_CHECK(false, "mode has to be one of sum, mean or max");
   }
 
-  if (options.max_norm() != c10::nullopt) {
+  if (options.has_max_norm()) {
     torch::NoGradGuard no_grad;
-    torch::embedding_renorm_(weight, input_, *options.max_norm(), options.norm_type());
+    torch::embedding_renorm_(weight, input_, options.max_norm(), options.norm_type());
   }
 
   TORCH_CHECK(
@@ -166,8 +166,8 @@ torch::Tensor EmbeddingBagImpl::forward(
 void EmbeddingBagImpl::pretty_print(std::ostream& stream) const {
   stream << "torch::nn::EmbeddingBag(num_embeddings=" << options.num_embeddings()
          << ", embedding_dim=" << options.embedding_dim();
-  if (options.max_norm() != c10::nullopt) {
-    stream << ", max_norm=" << *options.max_norm();
+  if (options.has_max_norm()) {
+    stream << ", max_norm=" << options.max_norm();
   }
   if (options.norm_type() != 2) {
     stream << ", norm_type=" << options.norm_type();
