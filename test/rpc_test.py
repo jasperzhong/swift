@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import concurrent.futures
+from datetime import timedelta
 import sys
 import unittest
 from collections import namedtuple
@@ -9,6 +10,7 @@ from unittest import mock
 import torch
 import torch.distributed as dist
 import torch.distributed.rpc as rpc
+from torch.distributed.rpc import RRef
 from common_utils import load_tests
 from dist_utils import INIT_METHOD_TEMPLATE, TEST_CONFIG, dist_init
 from torch.distributed.rpc.internal import PythonUDF, _internal_rpc_pickler
@@ -85,6 +87,14 @@ class MyClass:
 
 def _call_method_on_rref(method, rref, *args, **kwargs):
     return method(rref.local_value().wait(), *args, **kwargs)
+
+
+def get_rref_list(values):
+    return [RRef(MyClass(a)) for a in values]
+
+
+def add_rref_to_value(rref, value):
+    return rref.to_here().wait() + value
 
 
 def run_nested_pickle(pickle_cls_instance, tensor):
@@ -916,6 +926,50 @@ class RpcTest(object):
         self.assertEqual(ret, torch.add(torch.ones(n, n), 1))
 
     @dist_init
+    def test_local_rref_no_fork(self):
+        local_rref = RRef(35)
+        self.assertEqual(local_rref.local_value().wait(), 35)
+
+    @dist_init
+    def test_return_local_rrefs(self):
+        n = self.rank + 1
+        dst_rank = n % self.world_size
+
+        rref_list = rpc.rpc_sync(
+            "worker{}".format(dst_rank), get_rref_list, args=(
+                [1, 2, 3], ))
+
+        for rref in rref_list:
+            rpc.rpc_sync(rref.owner(), _call_method_on_rref, args=(
+                MyClass.increment_value, rref, 10))
+
+        rets = [
+            rpc.rpc_sync(rref.owner(), _call_method_on_rref, args=(
+                MyClass.get_value, rref))
+            for rref in rref_list]
+
+        self.assertEqual(rets, [11, 12, 13])
+
+    @dist_init
+    def test_pass_local_rrefs(self):
+        n = self.rank + 1
+        dst_rank = n % self.world_size
+        dst_worker = "worker{}".format(dst_rank)
+
+        rref = RRef(40)
+        self.assertEqual(
+            rpc.rpc_sync(
+                dst_worker, add_rref_to_value, args=(rref, 50)), 90)
+        self.assertEqual(
+            rpc.rpc_async(
+                dst_worker, add_rref_to_value, args=(rref, 50)).wait(), 90)
+        self.assertEqual(
+            rpc.remote(
+                dst_worker,
+                add_rref_to_value,
+                args=(rref, 50)).to_here().wait(), 90)
+
+    @dist_init
     def test_remote_same_worker(self):
         n = self.rank + 1
         dst_rank = n % self.world_size
@@ -956,6 +1010,28 @@ class RpcTest(object):
             MyClass.get_value, rref))
 
         self.assertEqual(result, sum(vals))
+
+    @requires_process_group_agent("PROCESS_GROUP rpc backend specific test, skip")
+    @dist_init
+    def test_get_default_rpc_timeout(self):
+        timeout = rpc.get_rpc_timeout()
+        self.assertEqual(timeout, rpc.constants.DEFAULT_RPC_TIMEOUT)
+
+    @requires_process_group_agent("PROCESS_GROUP rpc backend specific test, skip")
+    @dist_init(setup_model_parallel=False)
+    def test_set_rpc_timeout(self):
+        timeout = timedelta(seconds=1)
+        rpc.init_model_parallel(
+            self_name="worker{}".format(self.rank),
+            backend=rpc.backend_registry.BackendType[TEST_CONFIG.rpc_backend_name],
+            init_method=self.init_method,
+            self_rank=self.rank,
+            worker_name_to_id=self.worker_name_to_id,
+            rpc_timeout=timeout
+        )
+        set_timeout = rpc.get_rpc_timeout()
+        self.assertEqual(timeout, set_timeout)
+        rpc.join_rpc()
 
 
     def test_requires_process_group_agent_decorator(self):

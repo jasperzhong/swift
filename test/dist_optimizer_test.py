@@ -3,10 +3,12 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import unittest
 
 from dist_utils import INIT_METHOD_TEMPLATE, dist_init
+from torch import optim
+from torch.distributed.optim import DistributedOptimizer
 import torch
 import torch.distributed.autograd as dist_autograd
-from torch.distributed.optim import DistributedOptimizer, FunctionalOptimizer
 import torch.distributed.rpc as rpc
+
 
 class MyModule:
     def __init__(self):
@@ -20,24 +22,11 @@ class MyModule:
         return self.w
 
 
-class FunctionalSGD(FunctionalOptimizer):
-    """Simplistic implementation of Stocastic Gradient Descent optimizer.
+class FailingOptimizer(optim.Optimizer):
+    def __init__(self, params):
+        super(FailingOptimizer, self).__init__(params, {})
 
-    Arguments:
-        params (list): list of parameters to optimize
-        lr (float): learning rate
-    """
-    def __init__(self, params, lr=0.01):
-        super(FunctionalSGD, self).__init__(params)
-        self.lr = lr
-
-    def step(self, gradients):
-        for param, grad in zip(self.params, gradients):
-            param.data.add_(-self.lr, grad.data)
-
-
-class FailingOptimizer(FunctionalOptimizer):
-    def step(self, gradients):
+    def step(self, closure=None):
         raise ValueError('Error running optimizer.')
 
 
@@ -116,18 +105,18 @@ class DistOptimizerTest(object):
             [remote_param1, remote_param2],
         )
 
-        with dist_autograd.context() as context_id:
+        with dist_autograd.context():
             torch.manual_seed(0)
             t1 = torch.rand((3, 3), requires_grad=True)
             t2 = torch.rand((3, 3), requires_grad=True)
             output1 = rpc_async_method(MyModule.forward, remote_module1, t2)
             output2 = rpc_async_method(
                 MyModule.forward, remote_module2, output1.wait())
-            loss = torch.add(output2.wait(), t1)
+            loss = torch.add(output2.wait(), t1).sum()
 
-            dist_autograd.backward([loss.sum()])
+            dist_autograd.backward([loss])
             with self.assertRaisesRegex(Exception, "Error running optimizer"):
-                dist_optim.step(context_id)
+                dist_optim.step()
 
     @dist_init()
     def test_dist_optim(self):
@@ -135,7 +124,7 @@ class DistOptimizerTest(object):
         module1 = MyModule()
         module2 = MyModule()
         params = [module1.get_w(), module2.get_w()]
-        optim = FunctionalSGD(params, lr=0.05)
+        local_optim = optim.SGD(params, lr=0.05)
 
         old_w1 = module1.w.clone().detach()
         old_w2 = module2.w.clone().detach()
@@ -145,11 +134,10 @@ class DistOptimizerTest(object):
         t2 = torch.rand((3, 3), requires_grad=True)
         output1 = module1.forward(t2)
         output2 = module2.forward(output1)
-        loss = torch.add(output2, t1)
+        loss = torch.add(output2, t1).sum()
 
-        grads = torch.autograd.grad([loss.sum()], params + [t1, t2])
-        param_grads = grads[:len(params)]
-        optim.step(param_grads)
+        loss.backward()
+        local_optim.step()
 
         # distributed version
         owner1 = 'worker%d' % ((self.rank + 1) % self.world_size)
@@ -161,12 +149,12 @@ class DistOptimizerTest(object):
         remote_param2 = remote_method(MyModule.get_w, remote_module2)
 
         dist_optim = DistributedOptimizer(
-            FunctionalSGD,
+            optim.SGD,
             [remote_param1, remote_param2],
             lr=0.05,
         )
 
-        with dist_autograd.context() as context_id:
+        with dist_autograd.context():
             torch.manual_seed(0)
             t1 = torch.rand((3, 3), requires_grad=True)
             t2 = torch.rand((3, 3), requires_grad=True)
@@ -176,7 +164,7 @@ class DistOptimizerTest(object):
             loss = torch.add(output2.wait(), t1)
 
             dist_autograd.backward([loss.sum()])
-            dist_optim.step(context_id)
+            dist_optim.step()
 
             new_w1 = rpc_async_method(MyModule.get_w, remote_module1).wait()
             new_w2 = rpc_async_method(MyModule.get_w, remote_module2).wait()

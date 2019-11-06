@@ -3,4 +3,4 @@
 of remote parameters and runs the optimizer locally on the workers where the
 parameters live.
 """
-from .optimizer import DistributedOptimizer, FunctionalOptimizer
+from .optimizer import DistributedOptimizer
