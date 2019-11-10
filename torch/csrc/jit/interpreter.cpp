@@ -845,8 +845,15 @@ struct InterpreterStateImpl : c10::intrusive_ptr_target {
     ActiveFrame af(frames.back());
     try {
       while (true) {
-//         std::cout << "RUNNING ";
-//         frames.back().function->dump(std::cout, af.pc);
+         std::cout << "RUNNING ";
+         frames.back().function->dump(std::cout, af.pc);
+    for (auto val : stack) {
+      if (val.isTensor()) {
+        std::cout << val.toTensor().sizes() << std::endl;
+      } else {
+        std::cout << val << std::endl;
+      }
+    }
         Instruction inst = af.instructions[af.pc];
         switch (inst.op) {
           case OP:
