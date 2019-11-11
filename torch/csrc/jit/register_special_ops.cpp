@@ -500,7 +500,7 @@ RegisterOperators reg({
           at::Tensor tensor;
           double val;
           pop(stack, tensor, val);
-          push(stack, at::fill_(tensor, val));
+          push(stack, tensor.fill_(val));
           return 0;
         },
         aliasAnalysisFromSchema()),
@@ -512,7 +512,7 @@ RegisterOperators reg({
 
           at::Tensor tensor;
           pop(stack, tensor);
-          push(stack, at::zero_(tensor));
+          push(stack, tensor.zero_());
           return 0;
         },
         aliasAnalysisFromSchema()),

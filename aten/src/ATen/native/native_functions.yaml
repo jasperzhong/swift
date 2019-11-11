@@ -3354,7 +3354,7 @@
   requires_tensor: True
 
 - func: copy_sparse_to_sparse_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
-  variants: function
+  variants: function, method
   dispatch:
     SparseCPU: copy_sparse_
     SparseCUDA: copy_sparse_

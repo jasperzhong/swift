@@ -200,7 +200,7 @@ Tensor & resize_as_(Tensor & self, const Tensor & the_template) {
   }
   {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    at::resize_as_(self_, the_template_);
+    self_.resize_as_(the_template_);
   }
   return self;
 }

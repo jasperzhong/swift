@@ -196,6 +196,16 @@ const auto options = TensorOptions()
     .pinned_memory(${pin_memory});
 """)
 
+# These function variants should not exist because they either are in-place or should be in the nn module. But we exempt
+# them for now because they've been added early on.
+EXEMPTED_INPLACE_FUNCTIONS = ('dropout_', 'feature_dropout_', 'alpha_dropout_', 'feature_alpha_dropout_',
+                              'abs_', 'acos_', 'addmv_', 'as_strided_', 'asin_', 'atan_', 'ceil_', 'celu_',
+                              'clamp_', 'clamp_max_', 'clamp_min_', 'cos_', 'cosh_', 'detach_',
+                              'embedding_renorm_', 'erf_', 'erfc_', 'exp_', 'expm1_', 'fill_', 'floor_', 'frac_',
+                              'index_put_', 'log10_', 'log1p_', 'log2_', 'log_', 'neg_', 'reciprocal_', 'relu_',
+                              'resize_as_', 'round_', 'rrelu_', 'rsqrt_', 'selu_', 'sigmoid_', 'sin_', 'sinh_',
+                              'sqrt_', 'tan_', 'tanh_', 'threshold_', 'trunc_', 'zero_')
+
 def should_generate_python_binding(declaration):
     name = declaration['name']
     for pattern in SKIP_PYTHON_BINDINGS:
@@ -738,6 +748,14 @@ def create_python_bindings(python_functions, has_self, is_module=False):
         for declaration in declarations:
             typedef, next_index = emit_namedtuple_return_type_def(declaration, next_index)
             env['declare_namedtuple_return_types'] += typedef
+
+        # In-place operator, should be method only, unless it is exempted.
+        if not is_module and not has_self and name.endswith('_') and not name.startswith('_'):
+            if name not in EXEMPTED_INPLACE_FUNCTIONS:
+                # An in-place function that is not exempted.
+                raise AssertionError('In-place operator {} should not have a function variant. '
+                                     'Please remove its function variant in '
+                                     'aten/src/ATen/native/native_functions.yaml.'.format(name))
 
         # emit dispatch
         grouped = group_declarations(declarations)
