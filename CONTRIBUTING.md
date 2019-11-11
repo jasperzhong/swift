@@ -239,11 +239,11 @@ python -m http.server
 
 If you are developing on a remote machine, you can set up an SSH tunnel so that
 you can access the HTTP server on the remote machine on your local machine. To map
-remote port 8086 to local port 8086, use either of the following commands.
+remote port 8086 to local port 8086, run either of the following commands on your local machine, where `my_machine` is your remote machine.
 
 ```bash
 # For SSH
-ssh my_machine -L 8086:my_machine:8086
+ssh -L 8086:localhost:8086 my_machine
 
 # For Eternal Terminal
 et my_machine -t="8086:8086"
