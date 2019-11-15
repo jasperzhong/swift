@@ -2,19 +2,34 @@
 
 #include <c10/core/Scalar.h>
 #include <ATen/Tensor.h>
+#include <ATen/native/TensorIndexing.h>
 
 #include <string>
 #include <stdexcept>
 
 namespace at {
 
+#define MAYBE_ASSIGN_VALUE_BY_MULTI_DIM_INDEXING(value) \
+if (TensorMultiDimIndexingMeta::has_indexing_history()) { \
+  if (TensorMultiDimIndexingMeta::has_indexing_history_for(*this)) { \
+    TensorMultiDimIndexingMeta::assign_value_using_indexing(value); \
+    TensorMultiDimIndexingMeta::clear_indexing_history(); \
+    return *this; \
+  } else { \
+    TensorMultiDimIndexingMeta::clear_indexing_history(); \
+  } \
+}
+
 inline Tensor & Tensor::operator=(Tensor const & rhs) && {
+  MAYBE_ASSIGN_VALUE_BY_MULTI_DIM_INDEXING(rhs);
   return copy_(rhs);
 }
 inline Tensor & Tensor::operator=(Tensor && rhs) && {
+  MAYBE_ASSIGN_VALUE_BY_MULTI_DIM_INDEXING(rhs);
   return copy_(rhs);
 }
 inline Tensor & Tensor::operator=(Scalar v) && {
+  MAYBE_ASSIGN_VALUE_BY_MULTI_DIM_INDEXING(v);
   return fill_(v);
 }
 inline Tensor Tensor::operator-() const {

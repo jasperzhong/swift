@@ -435,6 +435,64 @@ void set_item(Tensor& self, ArrayRef<TensorIndex> indices, Scalar v) {
   return set_item(self, indices, value);
 }
 
+struct TensorMultiDimIndexingMetaImpl {
+ public:
+  TensorMultiDimIndexingMetaImpl(Tensor pre_indexing_tensor, Tensor post_indexing_tensor, std::vector<TensorIndex> indices)
+  : pre_indexing_tensor_(std::move(pre_indexing_tensor)),
+    post_indexing_tensor_(std::move(post_indexing_tensor)),
+    indices_(std::move(indices)) {}
+
+  Tensor& pre_indexing_tensor() {
+    return pre_indexing_tensor_;
+  }
+
+  const Tensor& pre_indexing_tensor() const {
+    return pre_indexing_tensor_;
+  }
+
+  const Tensor& post_indexing_tensor() const {
+    return post_indexing_tensor_;
+  }
+
+  const std::vector<TensorIndex>& indices() const {
+    return indices_;
+  }
+ private:
+  Tensor pre_indexing_tensor_;
+  Tensor post_indexing_tensor_;
+  std::vector<TensorIndex> indices_;
+};
+
+thread_local std::unique_ptr<TensorMultiDimIndexingMetaImpl> tensor_indexing_meta;
+
+bool TensorMultiDimIndexingMeta::has_indexing_history() {
+  return tensor_indexing_meta != nullptr;
+}
+
+void TensorMultiDimIndexingMeta::clear_indexing_history() {
+  tensor_indexing_meta = nullptr;
+}
+
+bool TensorMultiDimIndexingMeta::has_indexing_history_for(const Tensor& tensor) {
+  return tensor_indexing_meta->post_indexing_tensor().unsafeGetTensorImpl() == tensor.unsafeGetTensorImpl();
+}
+
+void TensorMultiDimIndexingMeta::save_indexing_history(Tensor pre_indexing_tensor, Tensor post_indexing_tensor, std::vector<TensorIndex> indices) {
+  tensor_indexing_meta = c10::guts::make_unique<TensorMultiDimIndexingMetaImpl>(std::move(pre_indexing_tensor), std::move(post_indexing_tensor), std::move(indices));
+}
+
+void TensorMultiDimIndexingMeta::assign_value_using_indexing(Tensor const & rhs) {
+  tensor_indexing_meta->pre_indexing_tensor().idx_put_(tensor_indexing_meta->indices(), rhs);
+}
+
+void TensorMultiDimIndexingMeta::assign_value_using_indexing(Tensor && rhs) {
+  tensor_indexing_meta->pre_indexing_tensor().idx_put_(tensor_indexing_meta->indices(), rhs);
+}
+
+void TensorMultiDimIndexingMeta::assign_value_using_indexing(Scalar v) {
+  tensor_indexing_meta->pre_indexing_tensor().idx_put_(tensor_indexing_meta->indices(), v);
+}
+
 } // namespace indexing
 
 Tensor Tensor::idx(ArrayRef<TensorIndex> indices) const {
@@ -464,6 +522,17 @@ Tensor & Tensor::idx_put_(std::initializer_list<TensorIndex> indices, Tensor && 
 }
 Tensor & Tensor::idx_put_(std::initializer_list<TensorIndex> indices, Scalar v) {
   return idx_put_(ArrayRef<TensorIndex>(indices), v);
+}
+
+Tensor Tensor::operator()(const TensorIndex& index_dim1) const {
+  Tensor post_indexing_tensor = idx(ArrayRef<TensorIndex>({index_dim1}));
+  at::indexing::TensorMultiDimIndexingMeta::save_indexing_history(*this, post_indexing_tensor, {index_dim1});
+  return post_indexing_tensor;
+}
+Tensor Tensor::operator()(const TensorIndex& index_dim1, const TensorIndex& index_dim2) const {
+  Tensor post_indexing_tensor = idx(ArrayRef<TensorIndex>({index_dim1, index_dim2}));
+  at::indexing::TensorMultiDimIndexingMeta::save_indexing_history(*this, post_indexing_tensor, {index_dim1, index_dim2});
+  return post_indexing_tensor;
 }
 
 } // namespace at

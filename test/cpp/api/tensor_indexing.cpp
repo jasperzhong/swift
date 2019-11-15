@@ -151,6 +151,13 @@ TEST(TensorIndexingTest, TestStepAssignment) {
   assert_tensor_equal(v.idx({{1, None}}).sum(), 0);
 }
 
+TEST(TensorIndexingTest, TestStepAssignmentTLS) {
+  auto v = torch::zeros({4, 4});
+  v(0, {1, None, 2}) = torch::tensor({3., 4.});
+  assert_tensor_equal(v(0), torch::tensor({0., 3., 0., 4.}));
+  assert_tensor_equal(v({1, None}).sum(), 0);
+}
+
 /*
     def test_bool_indices(self):
         v = torch.randn(5, 7, 3)

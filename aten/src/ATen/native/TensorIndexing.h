@@ -44,7 +44,7 @@ CAFFE2_API std::ostream& operator<<(std::ostream& stream, const Slice& slice);
 // `None`                  | `at::indexing::None`
 // `Ellipsis`              | `at::indexing::Ellipsis`
 // `...`                   | `"..."`
-// `123`                   | `123`  
+// `123`                   | `123`
 // `True` / `False`        | `true` / `false`
 // `:`                     | `{}` / `{None, None}`
 // `::`                    | `{}` / `{None, None, None}`
@@ -101,6 +101,22 @@ struct CAFFE2_API TensorIndex {
   Slice slice_;
   Tensor tensor_;
   TensorIndexType type_;
+};
+
+struct CAFFE2_API TensorMultiDimIndexingMeta {
+  // yf225 TODO: hmm do we need to handle other operators as well? (like `+=`?) Try it out in Python and see what the expected behavior is!
+  /* yf225 TODO
+  1. how would it work in Python if `b = a[advanced indexing with tensor], b = some scalar value`? and `b = a[advanced indexing with tensor], b.zero_()`? compared it to C++ API behavior!
+  2. also how would a[adv indexing][adv indexing] = some scalar value work in Python and in C++? try it out in both languages
+  */
+  // yf225 TODO: what happens if during `a(indices) = func()`, the RHS throws an exception? How do we clean up the thread-local TensorMultiDimIndexingMeta in this case?
+  static bool has_indexing_history();
+  static void save_indexing_history(Tensor pre_indexing_tensor, Tensor post_indexing_tensor, std::vector<TensorIndex> indices);
+  static void clear_indexing_history();
+  static bool has_indexing_history_for(const Tensor& tensor);
+  static void assign_value_using_indexing(Tensor const & rhs);
+  static void assign_value_using_indexing(Tensor && rhs);
+  static void assign_value_using_indexing(Scalar v);
 };
 
 CAFFE2_API std::ostream& operator<<(std::ostream& stream, const TensorIndex& tensor_index);

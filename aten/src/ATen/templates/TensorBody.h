@@ -386,6 +386,9 @@ class CAFFE2_API Tensor {
   Tensor operator[](Tensor index) const;
   Tensor operator[](int64_t index) const;
 
+  Tensor operator()(const TensorIndex& index_dim1) const;
+  Tensor operator()(const TensorIndex& index_dim1, const TensorIndex& index_dim2) const;
+
   Tensor idx(ArrayRef<TensorIndex> indices) const;
   Tensor idx(std::initializer_list<TensorIndex> indices) const;
   Tensor & idx_put_(ArrayRef<TensorIndex> indices, Tensor const & rhs);
