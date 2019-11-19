@@ -405,3 +405,46 @@ class TestModuleInterface(JitTestCase):
 
         scripted_mod.proxy_mod = NewScriptModule()
         self.assertEqual(scripted_mod(input), input * (input + 1) + 1)
+
+    # The call to forward of proxy_mod cannot be inlined. Making sure
+    # Freezing is perserving proxy_mod.
+    def test_freeze_module_with_interface(self):
+        class SubModule(torch.nn.Module):
+            def __init__(self):
+                super(SubModule, self).__init__()
+                self.b =20
+
+            def forward(self, x):
+                return self.b
+
+        class OrigMod(torch.nn.Module):
+            def __init__(self):
+                super(OrigMod, self).__init__()
+                self.a = 0
+
+            def forward(self, x):
+                return self.a
+
+        @torch.jit.interface
+        class ModInterface(torch.nn.Module):
+            def forward(self, x):
+                # type:  (Tensor) -> int
+                pass
+
+        class TestModule(torch.nn.Module):
+            proxy_mod : ModInterface
+
+            def __init__(self):
+                super(TestModule, self).__init__()
+                self.proxy_mod = OrigMod()
+                self.sub = SubModule()  # folded
+
+            def forward(self, x):
+                return self.proxy_mod(x) + self.sub.b
+
+        m = torch.jit.script(TestModule())
+        m.eval()
+        mf = torch._C._freeze_module(m._c)
+        self.assertTrue(mf.hasattr('proxy_mod'))
+        self.assertFalse(mf.hasattr('sub'))
+
