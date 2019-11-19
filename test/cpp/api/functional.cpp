@@ -766,6 +766,7 @@ TEST_F(FunctionalTest, ELU) {
       }
     }
   }
+  std::cout << F::elu(torch::tensor(1)) << std::endl;
 }
 
 TEST_F(FunctionalTest, SELU) {
