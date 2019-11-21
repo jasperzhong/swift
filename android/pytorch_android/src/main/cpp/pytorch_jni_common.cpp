@@ -7,6 +7,8 @@
 #include <fbjni/fbjni.h>
 
 #include "pytorch_jni_common.h"
+#define ALOGI(...) \
+  __android_log_print(ANDROID_LOG_INFO, "pytorch-jni", __VA_ARGS__)
 
 namespace pytorch_jni {
 
@@ -529,13 +531,15 @@ at::IValue JIValue::JIValueToAtIValue(
     }
 
     auto firstEntryValue = JIValue::JIValueToAtIValue(it->second);
-    c10::TypePtr typePtr = firstEntryValue.type();
+    ALOGI("XXX typePtr:%s", c10::typeKindToString(typePtr->kind()));
     c10::impl::GenericDict dict{c10::StringType::get(), typePtr};
     dict.insert(it->first->toStdString(), firstEntryValue);
     it++;
     for (; it != jmap->end(); it++) {
-      dict.insert(
-          it->first->toStdString(), JIValue::JIValueToAtIValue(it->second));
+      auto value = JIValue::JIValueToAtIValue(it->second);
+      c10::TypePtr valueTypePtr =  value.type();
+      ALOGI("XXX typePtr:%s", c10::typeKindToString(valueTypePtr->kind()));
+      dict.insert(it->first->toStdString(), std::move(value));
     }
     return at::IValue{dict};
   } else if (JIValue::kTypeCodeDictLongKey == typeCode) {

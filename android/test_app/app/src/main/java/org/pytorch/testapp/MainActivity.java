@@ -18,6 +18,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.FloatBuffer;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
@@ -99,12 +103,27 @@ public class MainActivity extends AppCompatActivity {
 
     final long startTime = SystemClock.elapsedRealtime();
     final long moduleForwardStartTime = SystemClock.elapsedRealtime();
-    final Tensor outputTensor = mModule.forward(IValue.from(mInputTensor)).toTensor();
-    final long moduleForwardDuration = SystemClock.elapsedRealtime() - moduleForwardStartTime;
-    final float[] scores = outputTensor.getDataAsFloatArray();
-    final long analysisDuration = SystemClock.elapsedRealtime() - startTime;
 
-    return new Result(scores, moduleForwardDuration, analysisDuration);
+    Map<String, IValue> hm = new HashMap<String, IValue>();
+    List<String> keys = Arrays.asList("p2", "p3", "p4", "p5", "p6");;
+    for (String key : keys) {
+      Tensor t = Tensor.fromBlob(Tensor.allocateFloatBuffer(3 * 224 * 224), new long[]{1, 3, 224, 224});
+      hm.put(key, IValue.from(t));
+    }
+    final IValue input = IValue.dictStringKeyFrom(hm);
+    final IValue output = mModule.forward(input);
+    Map<String, IValue> outputDict = output.toDictStringKey();
+    for (Map.Entry<String, IValue> e : outputDict.entrySet()) {
+      IValue iv = e.getValue();
+      Tensor t = iv.toTensor();
+      Log.i(TAG, "output: " + e.getKey() + ": " + t);
+    }
+
+//    final long moduleForwardDuration = SystemClock.elapsedRealtime() - moduleForwardStartTime;
+//    final float[] scores = outputTensor.getDataAsFloatArray();
+//    final long analysisDuration = SystemClock.elapsedRealtime() - startTime;
+
+    return null;// new Result(scores, moduleForwardDuration, analysisDuration);
   }
 
   public static String assetFilePath(Context context, String assetName) {
