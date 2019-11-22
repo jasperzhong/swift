@@ -333,6 +333,7 @@ def add_torch_libs():
         "torch/csrc/utils/throughput_benchmark.cpp",
         "torch/csrc/utils.cpp",
         "torch/csrc/utils/cuda_lazy_init.cpp",
+        "torch/csrc/utils/hooks.cpp",
         "torch/csrc/utils/invalid_arguments.cpp",
         "torch/csrc/utils/object_ptr.cpp",
         "torch/csrc/utils/python_arg_parser.cpp",

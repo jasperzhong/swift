@@ -449,6 +449,7 @@ if (NOT INTERN_BUILD_MOBILE OR NOT BUILD_CAFFE2_MOBILE)
     ${TORCH_SRC_DIR}/csrc/jit/source_range_serialization.cpp
     ${TORCH_SRC_DIR}/csrc/jit/tracer.cpp
     ${TORCH_SRC_DIR}/csrc/jit/hooks_for_testing.cpp
+    ${TORCH_SRC_DIR}/csrc/utils/hooks.cpp
     ${TORCH_SRC_DIR}/csrc/utils/tensor_flatten.cpp
     ${TORCH_SRC_DIR}/csrc/utils/variadic.cpp
     ${TORCH_SRC_DIR}/csrc/jit/fuser/kernel_cache.cpp

@@ -14,6 +14,7 @@
 #include <c10/util/Deprecated.h>
 #include <c10/util/Optional.h>
 #include <c10/util/intrusive_ptr.h>
+#include <c10/util/ordered_dict.h>
 #include <ATen/core/DeprecatedTypePropertiesRegistry.h>
 #include <ATen/core/DeprecatedTypeProperties.h>
 #include <ATen/core/EnableNamedTensor.h>
@@ -36,7 +37,26 @@ namespace torch { namespace autograd {
 
 struct Node;
 
+using hooks_dict = c10::OrderedDict<unsigned, std::function<at::Tensor(const at::Tensor&)>>;
+
 }} // namespace torch::autograd
+
+namespace torch { namespace utils { namespace hooks {
+
+/// A handle which provides the capability to remove a hook.
+struct CAFFE2_API RemovableHandle {
+ public:
+  explicit RemovableHandle(const std::shared_ptr<torch::autograd::hooks_dict>& hooks_dict);
+  void remove() const;
+  unsigned id() const;
+
+ private:
+  std::weak_ptr<torch::autograd::hooks_dict> hooks_dict_ref_;
+  unsigned id_;
+  static std::atomic<unsigned> next_id;
+};
+
+}}} // namespace torch::utils::hooks
 
 namespace at {
 
@@ -474,11 +494,11 @@ class CAFFE2_API Tensor {
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   template <typename T>
-  using hook_return_void_t = c10::guts::enable_if_t<std::is_void<typename std::result_of<T&(Tensor)>::type>::value, unsigned>;
+  using hook_return_void_t = c10::guts::enable_if_t<std::is_void<typename std::result_of<T&(Tensor)>::type>::value, torch::utils::hooks::RemovableHandle>;
   template <typename T>
-  using hook_return_var_t = c10::guts::enable_if_t<std::is_same<typename std::result_of<T&(Tensor)>::type, Tensor>::value, unsigned>;
+  using hook_return_var_t = c10::guts::enable_if_t<std::is_same<typename std::result_of<T&(Tensor)>::type, Tensor>::value, torch::utils::hooks::RemovableHandle>;
 
-  // Returns the index of the hook in the list which can be used to remove hook
+  // Returns a handle with a method `handle.remove()` that removes the hook
   // Register a hook with no return value
   template <typename T>
   hook_return_void_t<T> register_hook(T&& hook) const;
@@ -487,12 +507,9 @@ class CAFFE2_API Tensor {
   hook_return_var_t<T> register_hook(T&& hook) const;
 
 private:
-  unsigned _register_hook(std::function<Tensor(const Tensor&)> hook) const;
+  torch::utils::hooks::RemovableHandle _register_hook(std::function<Tensor(const Tensor&)> hook) const;
 
 public:
-
-  // Remove hook at given position
-  void remove_hook(unsigned pos) const;
 
   // View Variables
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
