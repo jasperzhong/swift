@@ -14,15 +14,16 @@ void check_single_result (Variable value, Variable result, std::string hook_name
 
 namespace torch { namespace autograd {
 
-CppFunctionPreHook::CppFunctionPreHook(const std::shared_ptr<hooks_list> &hooks, int value_idx)
-: hooks_(hooks)
+CppFunctionPreHook::CppFunctionPreHook(std::shared_ptr<hooks_dict> hooks, int value_idx)
+: hooks_(std::move(hooks))
 , value_idx_(value_idx)
 {}
 
 variable_list CppFunctionPreHook::operator()(const variable_list& values) {
   auto value = values[value_idx_];
-  for (unsigned i = 0; i < hooks_->size(); ++i) {
-    auto &hook = (*hooks_)[i];
+  for (const auto& item : *hooks_) {
+    unsigned id = item.key();
+    const std::function<Variable(const Variable&)>& hook = item.value();
     if (!hook) {
       // hook was removed
       continue;
@@ -32,7 +33,7 @@ variable_list CppFunctionPreHook::operator()(const variable_list& values) {
       // Don't change gradient
       continue;
     }
-    check_single_result(value, res, c10::to_string(i));
+    check_single_result(value, res, c10::to_string(id));
     value = res;
   }
   variable_list results(values);
