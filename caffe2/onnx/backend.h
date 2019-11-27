@@ -205,6 +205,8 @@ class CAFFE2_API Caffe2Backend {
 
   Caffe2Ops CreateReshape(OnnxNode* onnx_node, const ConversionContext& ctx);
 
+  Caffe2Ops CreateInt8Reshape(OnnxNode* onnx_node, const ConversionContext& ctx);
+
   Caffe2Ops CreateGather(OnnxNode* onnx_node, const ConversionContext& ctx);
 
   Caffe2Ops CreateGemm(OnnxNode* onnx_node, const ConversionContext& ctx);
@@ -212,6 +214,8 @@ class CAFFE2_API Caffe2Backend {
   Caffe2Ops CreatePad(OnnxNode* onnx_node, const ConversionContext& ctx);
 
   Caffe2Ops CreateConcat(OnnxNode* onnx_node, const ConversionContext& ctx);
+
+  Caffe2Ops CreateInt8Concat(OnnxNode* onnx_node, const ConversionContext& ctx);
 
   Caffe2Ops CreateLogSoftmax(OnnxNode* onnx_node, const ConversionContext& ctx);
 

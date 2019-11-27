@@ -13,10 +13,34 @@ def register_quantized_ops(domain, version):
     quant_version_ops = getmembers(sym_registry._symbolic_versions['caffe2'])
     for op in quant_version_ops:
         if isfunction(op[1]) and not sym_registry.is_registered_op(op[0], domain, version):
-            aten_q_ops = ['relu', '_empty_affine_quantized', 'dequantize', 'quantize_per_tensor', 'upsample_nearest2d']
+            aten_q_ops = ['relu', '_empty_affine_quantized', 'dequantize', 'quantize_per_tensor', 'upsample_nearest2d', 'avg_pool2d', 'slice', 'reshape', 'cat', 'permute']
             if op[0] in aten_q_ops:
                 sym_registry.register_op(op[0], op[1], '', version)
             sym_registry.register_op(op[0], op[1], domain, version)
+
+def nchw2nhwc(g, input):
+    axes = [0, 2, 3, 1]
+
+    quant_args = {
+        "axes_i": axes,
+        "Y_scale_f": input.node()["Y_scale"],
+        "Y_zero_point_i": input.node()["Y_zero_point"],
+    }
+    output = g.op("_caffe2::Int8Transpose", input, **quant_args)
+    sym_help._quantized_ops.add(output)
+    return output
+
+def nhwc2nchw(g, input):
+    axes = [0, 3, 1, 2]
+
+    quant_args = {
+        "axes_i": axes,
+        "Y_scale_f": input.node()["Y_scale"],
+        "Y_zero_point_i": input.node()["Y_zero_point"],
+    }
+    output = g.op("_caffe2::Int8Transpose", input, **quant_args)
+    sym_help._quantized_ops.add(output)
+    return output
 
 def linear_prepack(g, weight, bias):
     # Mapping to a dummy caffe2 prepack node.
@@ -88,6 +112,24 @@ def add(g, input_a, input_b, scale, zero_point):
     sym_help._quantized_ops.add(output)
     return output
 
+def upsample_nearest2d(g, input, output_size):
+    if input not in sym_help._quantized_ops:
+        from torch.onnx.symbolic_opset9 import upsample_nearest2d
+        return upsample_nearest2d(g, input, output_size)
+
+    output_size = sym_help._parse_arg(output_size, 'is')
+    kwargs = {
+        "output_size_i": output_size,
+        "Y_scale_f": input.node()["Y_scale"],
+        "Y_zero_point_i": input.node()["Y_zero_point"],
+    }
+
+    input = nchw2nhwc(g, input)
+    output = g.op("_caffe2::Int8ResizeNearest", input, **kwargs)
+    output = nhwc2nchw(g, output)
+    sym_help._quantized_ops.add(output)
+    return output
+
 @parse_args('v')
 def relu(g, input):
     if input not in sym_help._quantized_ops:
@@ -109,6 +151,7 @@ def quantize_per_tensor(g, input, scale, zero_point, dtype):
     }
     output = g.op("_caffe2::Int8Quantize", input, **kwargs)
     sym_help._quantized_ops.add(output)
+    print("adding ", output.node())
     return output
 
 @parse_args('v')
@@ -119,18 +162,92 @@ def dequantize(g, input):
 def _empty_affine_quantized(g, input, shape, scale, zero_point, dtype, pin_memory, memory_format, layout):
     return input
 
-def upsample_nearest2d(g, input, output_size, align_corners=None):
+@parse_args('v', 'is', 'is', 'is', 'i', 'i', 'none')
+def avg_pool2d(g, input, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override=None):
     if input not in sym_help._quantized_ops:
-        from torch.onnx.symbolic_opset9 import upsample_nearest2d as upsample_nearest2d_impl
-        return upsample_nearest2d_impl(g, input, output_size, align_corners)
-
-    output_size = sym_help._parse_arg(output_size, 'is')
+        from torch.onnx.symbolic_opset9 import avg_pool2d
+        return avg_pool2d(g, input, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override)
     kwargs = {
-        "output_size_i": output_size,
+        "strides_i": stride,
+        "pads_i": padding + padding,
+        "kernel_i": kernel_size[0],
+        "order_s": "NHWC",
         "Y_scale_f": input.node()["Y_scale"],
         "Y_zero_point_i": input.node()["Y_zero_point"],
     }
+    input = nchw2nhwc(g, input)
+    output = g.op("_caffe2::Int8AveragePool", input, **kwargs)
+    output = nhwc2nchw(g, output)
+    sym_help._quantized_ops.add(output)
+    return output
 
-    output = g.op("_caffe2::Int8ResizeNearest", input, **kwargs)
+@parse_args('v', 'v', 'v', 'v', 'i')
+def slice(g, input, dim, start, end, step):
+    if input not in sym_help._quantized_ops:
+        from torch.onnx.symbolic_opset9 import slice
+        return slice(g, input, dim, start, end, step)
+
+    start = sym_help._parse_arg(start, 'i')
+    end = sym_help._parse_arg(end, 'i')
+    dim = sym_help._parse_arg(dim, 'i')
+
+    start_list = [0] * 4
+    end_list = [-1] * 4
+    start_list[dim] = start
+    end_list[dim] = end
+
+    kwargs = {
+        "starts_i": start_list,
+        "ends_i": end_list,
+        "Y_scale_f": input.node()["Y_scale"],
+        "Y_zero_point_i": input.node()["Y_zero_point"],
+    }
+    output = g.op("_caffe2::Int8Slice", input, **kwargs)
+    sym_help._quantized_ops.add(output)
+    return output
+
+def reshape(g, input, shape):
+    if input not in sym_help._quantized_ops:
+        from torch.onnx.symbolic_opset9 import reshape
+        return reshape(g, input, shape)
+
+    kwargs = {
+        "Y_scale_f": input.node()["Y_scale"],
+        "Y_zero_point_i": input.node()["Y_zero_point"],
+    }
+    output = g.op("_caffe2::Int8Reshape", input, shape, **kwargs)
+    sym_help._quantized_ops.add(output)
+    return output
+
+def cat(g, tensor_list, dim, scale=None, zero_point=None):
+    tensors = sym_help._unpack_list(tensor_list)
+    input = tensors[0]
+    if input not in sym_help._quantized_ops:
+        from torch.onnx.symbolic_opset9 import cat
+        return cat(g, tensor_list, dim)
+
+    dim = sym_help._parse_arg(dim, 'i')
+    kwargs = {
+        "Y_scale_f": tensors[0].node()["Y_scale"],
+        "Y_zero_point_i": tensors[0].node()["Y_zero_point"],
+    }
+    output = g.op("_caffe2::Int8Concat", *tensors, axis_i=dim, **kwargs)
+    sym_help._quantized_ops.add(output)
+    return output
+
+@parse_args('v', 'is')
+def permute(g, input, dims):
+    if dims == list(range(0, len(dims))):
+        return input
+    if input not in sym_help._quantized_ops:
+        from torch.onnx.symbolic_opset9 import permute
+        return permute(g, input, dims)
+
+    quant_args = {
+        "axes_i": dims,
+        "Y_scale_f": input.node()["Y_scale"],
+        "Y_zero_point_i": input.node()["Y_zero_point"],
+    }
+    output = g.op("_caffe2::Int8Transpose", input, **quant_args)
     sym_help._quantized_ops.add(output)
     return output
