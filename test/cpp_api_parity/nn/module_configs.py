@@ -3,7 +3,7 @@ import torch
 from cpp_api_parity import TorchNNModuleMetadata
 
 # NOTE: In order to let Python/C++ API parity test pass for any of the modules here,
-# after fixing the C++ module implementation you should change change its "Implementation Parity"
+# after fixing the C++ module implementation you should change its "Implementation Parity"
 # from "No" to "Yes" in parity-tracker.md, and change the module's `TorchNNModuleMetadata` here
 # to look like:
 #
