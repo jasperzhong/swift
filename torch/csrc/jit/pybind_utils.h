@@ -16,6 +16,7 @@
 #include <torch/csrc/jit/script/module.h>
 #include <torch/csrc/jit/script/module_python.h>
 #include <torch/csrc/jit/script/schema_matching.h>
+#include <torch/csrc/jit/script/error_report.h>
 #include <torch/csrc/jit/tracer.h>
 #include <torch/csrc/utils/pybind.h>
 #include <torch/csrc/utils/six.h>
@@ -75,6 +76,75 @@ inline TypedIValue toDictKeyIValue(py::handle key) {
   } else {
     AT_ERROR("Dictionary inputs may only have string, int, or float keys");
   }
+}
+
+inline bool isNamedTupleClass(py::object obj) {
+  auto tuple_type = reinterpret_cast<PyObject*>(&PyTuple_Type);
+  return PyObject_IsSubclass(obj.ptr(), tuple_type) &&
+      py::hasattr(obj, "_fields");
+}
+
+inline TypePtr getOrCreateNamedTupleType(
+  py::object obj,
+  const c10::QualifiedName& qualName,
+  c10::optional<std::vector<TypePtr>> element_types,
+  const SourceRange& loc) {
+  // Currently don't support default values
+  if (py::hasattr(obj, "_field_defaults")) {
+    auto default_dict = py::cast<std::map<std::string, py::object>>(
+        py::getattr(obj, "_field_defaults"));
+    if (default_dict.size()) {
+      std::string error_msg =
+          "Default values are currently not supported"
+          " on NamedTuple fields in TorchScript. Fields "
+          "with default values: [";
+      bool first = true;
+      for (const auto& kv : default_dict) {
+        if (!first) {
+          error_msg += ", ";
+        }
+        error_msg += kv.first;
+      }
+      error_msg += "]";
+      throw script::ErrorReport(loc) << error_msg;
+    }
+  }
+
+  std::string unqualName;
+  std::vector<std::string> fields;
+  c10::NamedTypePtr named_type;
+  py::object props;
+  if (element_types.has_value()) {
+    // if element_types is inferred (i.e. inner element types are inferred in tracing),
+    // we only need to get names from the python type in order to create NamedTupleType
+    props = py::module::import("torch.jit")
+                .attr("_get_named_tuple_names")(obj);
+    std::tie(unqualName, fields) = py::cast<
+        std::tuple<std::string, decltype(fields)>>(props);
+    named_type = TupleType::createNamed(qualName, fields, element_types.value());
+  } else {
+    // if no element_types, which means we did not infer the inner types, we need to
+    // refer the python type for field types to create NamedTupleType
+    std::vector<TypePtr> annotations;
+    props = py::module::import("torch.jit")
+                .attr("_get_named_tuple_properties")(obj);
+    std::tie(unqualName, fields, annotations) = py::cast<
+        std::tuple<std::string, decltype(fields), decltype(annotations)>>(props);
+    named_type = TupleType::createNamed(qualName, fields, annotations);
+  }
+
+  if (auto type = get_python_cu()->get_type(qualName)) {
+    // we check on whether one type is a subtype of the other
+    // to ensure that we don't redefine the named tuple type again
+    TORCH_CHECK(
+        type->isSubtypeOf(named_type) || named_type->isSubtypeOf(type),
+        "Can't to redefine NamedTuple: ",
+        named_type->python_str());
+    return type;
+  }
+  // register the newly created named tuple type to the python cu
+  get_python_cu()->register_type(named_type);
+  return named_type;
 }
 
 inline c10::optional<TypePtr> unifyOrInitializeType(
@@ -170,6 +240,18 @@ inline InferredType tryToInferContainerType(py::handle input) {
         // Forward error message along
         return type_match.reason();
       }
+    }
+    py::object input_type =py::cast<py::object>(input.get_type());
+    if (isNamedTupleClass(input_type)) {
+      // If the tuple is a NamedTuple type
+      auto qualifiedName = c10::QualifiedName(py::cast<std::string>(
+          py::module::import("torch.jit").attr("_qualified_name")(input_type)));
+      c10::TypePtr named_type = getOrCreateNamedTupleType(
+          input_type,
+          qualifiedName,
+          element_types,
+          tracer::getPythonInterpreterSourceRange());
+      return InferredType(named_type);
     }
     return InferredType(TupleType::create(element_types));
   } else if (PyDict_Check(input.ptr())) {

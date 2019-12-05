@@ -98,10 +98,11 @@ Value* TracingState::getValue(const IValue& var) {
                 [&](const IValue& val) { return getValue(val); })))
         ->output();
   } else if (var.isTuple()) {
+    TupleTypePtr tuple_type = var.type()->cast<TupleType>();
     return graph
         ->insertNode(graph->createTuple(fmap(
             var.toTuple()->elements(),
-            [&](const IValue& val) { return getValue(val); })))
+            [&](const IValue& val) { return getValue(val); }), tuple_type))
         ->output();
   } if (var.isTensor()) {
     auto ten = var.toTensor();
@@ -203,13 +204,14 @@ Value* TracingState::getOutput(const IValue& iv, size_t i) {
      return it->second;
   } else if (iv.isTuple()) {
     auto tuple = iv.toTuple()->elements();
-    auto tuple_node = graph->createTuple(
-        fmap(tuple, [&](const IValue& ival) { return getOutput(ival, i); }));
+    TupleTypePtr tuple_type = iv.type()->cast<TupleType>();
+    Node* tuple_node = graph->createTuple(
+        fmap(tuple, [&](const IValue& ival) { return getOutput(ival, i); }), tuple_type);
     graph->insertNode(tuple_node);
     return tuple_node->output();
   } else {
     AT_ERROR(
-        "Only tensors or tuples of tensors can be output from traced functions");
+        "Only tensors, tuples or named tuples of tensors can be output from traced functions");
   }
 }
 
@@ -278,7 +280,7 @@ static IValue addInput(const std::shared_ptr<TracingState> & state, const IValue
     }
   } else {
     AT_ERROR(
-        "Only tensors or (possibly nested) dict or tuples of tensors can be "
+        "Only tensors, named tuples, (possibly nested) dict or tuples of tensors can be "
         "inputs to traced functions. Got ", type->python_str());
   }
 }
