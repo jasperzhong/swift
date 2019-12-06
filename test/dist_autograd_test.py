@@ -1401,5 +1401,27 @@ class DistAutogradTest(RpcAgentTestFixture):
 
             self.assertEqual(local_grad.to_dense(), remote_grad)
 
+    def _mixed_requires_grad(t1, t2):
+        if t2.requires_grad:
+            return t1 - t2
+        else:
+            return t1 * t2
+
+    @dist_init
+    def test_mixed_requires_grad(self):
+        for exec_mode in [ExecMode.RPC_SYNC, ExecMode.REMOTE]:
+            t1 = torch.rand((3, 3), requires_grad=True)
+            t2 = torch.rand((3, 3), requires_grad=False)
+            with dist_autograd.context() as context_id:
+                ret = self._exec_func(exec_mode, DistAutogradTest._mixed_requires_grad, t1, t2)
+                self.assertEqual(t1 * t2, ret)
+                dist_autograd.backward([ret.sum()])
+                self.assertTrue(t1.requires_grad)
+                self.assertFalse(t2.requires_grad)
+                grads = dist_autograd.get_gradients(context_id)
+                self.assertIn(t1, grads)
+                self.assertNotIn(t2, grads)
+                self.assertEqual(t2, grads[t1])
+
 if __name__ == '__main__':
     unittest.main()
