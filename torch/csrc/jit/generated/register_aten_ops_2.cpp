@@ -724,14 +724,14 @@ RegisterOperators reg(
          atenOperatorOptions()
      ),
      Operator(
-         "aten::_sparse_coo_tensor_with_dims(int sparse_dim, int dense_dim, int[] size, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False) -> Tensor",
+         "aten::_sparse_coo_tensor_with_dims(int sparse_dim, int dense_dim, int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=False) -> Tensor",
          [](Stack & stack) {
          
              const auto options = TensorOptions()
-                     .dtype((std::move(peek(stack, 3, 7))).toScalarType())
-                     .layout((std::move(peek(stack, 4, 7))).toLayout())
-                     .device((std::move(peek(stack, 5, 7))).toDevice())
-                     .pinned_memory((std::move(peek(stack, 6, 7))).toBool());
+                     .dtype((std::move(peek(stack, 3, 7))).toOptional<ScalarType>())
+                     .layout((std::move(peek(stack, 4, 7))).toOptional<c10::Layout>())
+                     .device((std::move(peek(stack, 5, 7))).toOptional<c10::Device>())
+                     .pinned_memory((std::move(peek(stack, 6, 7))).toOptional<bool>());
              #ifdef USE_STATIC_DISPATCH
                  auto result_ = at::_sparse_coo_tensor_with_dims((std::move(peek(stack, 0, 7))).toInt(),
              (std::move(peek(stack, 1, 7))).toInt(),
@@ -5344,14 +5344,14 @@ RegisterOperators reg(
          atenOperatorOptions()
      ),
      Operator(
-         "aten::sparse_coo_tensor.size(int[] size, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False) -> Tensor",
+         "aten::sparse_coo_tensor.size(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=False) -> Tensor",
          [](Stack & stack) {
          
              const auto options = TensorOptions()
-                     .dtype((std::move(peek(stack, 1, 5))).toScalarType())
-                     .layout((std::move(peek(stack, 2, 5))).toLayout())
-                     .device((std::move(peek(stack, 3, 5))).toDevice())
-                     .pinned_memory((std::move(peek(stack, 4, 5))).toBool());
+                     .dtype((std::move(peek(stack, 1, 5))).toOptional<ScalarType>())
+                     .layout((std::move(peek(stack, 2, 5))).toOptional<c10::Layout>())
+                     .device((std::move(peek(stack, 3, 5))).toOptional<c10::Device>())
+                     .pinned_memory((std::move(peek(stack, 4, 5))).toOptional<bool>());
              #ifdef USE_STATIC_DISPATCH
                  auto result_ = at::sparse_coo_tensor((std::move(peek(stack, 0, 5))).toIntListRef(),
              options);
@@ -5776,14 +5776,14 @@ RegisterOperators reg(
          atenOperatorOptions()
      ),
      Operator(
-         "aten::to.dtype_layout(Tensor self, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False, bool non_blocking=False, bool copy=False, MemoryFormat? memory_format=None) -> Tensor",
+         "aten::to.dtype_layout(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=False, bool non_blocking=False, bool copy=False, MemoryFormat? memory_format=None) -> Tensor",
          [](Stack & stack) {
          
              const auto options = TensorOptions()
-                     .dtype((std::move(peek(stack, 1, 8))).toScalarType())
-                     .layout((std::move(peek(stack, 2, 8))).toLayout())
-                     .device((std::move(peek(stack, 3, 8))).toDevice())
-                     .pinned_memory((std::move(peek(stack, 4, 8))).toBool());;
+                     .dtype((std::move(peek(stack, 1, 8))).toOptional<ScalarType>())
+                     .layout((std::move(peek(stack, 2, 8))).toOptional<c10::Layout>())
+                     .device((std::move(peek(stack, 3, 8))).toOptional<c10::Device>())
+                     .pinned_memory((std::move(peek(stack, 4, 8))).toOptional<bool>());;
              auto result_ = ((std::move(peek(stack, 0, 8))).toTensor()).to(options,
              (std::move(peek(stack, 5, 8))).toBool(),
              (std::move(peek(stack, 6, 8))).toBool(),

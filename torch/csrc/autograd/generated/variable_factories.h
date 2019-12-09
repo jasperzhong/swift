@@ -16,6 +16,10 @@
 #include <initializer_list>
 #include <utility>
 
+using at::Device;
+using at::ScalarType;
+using at::Layout;
+
 #ifdef BUILD_NAMEDTENSOR
 using at::DimnameList;
 #endif
@@ -133,13 +137,16 @@ inline at::Tensor _cudnn_init_dropout_state(double dropout, bool train, int64_t 
     jit::tracer::addInputs(node, "train", train);
     jit::tracer::addInputs(node, "dropout_seed", dropout_seed);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::_cudnn_init_dropout_state(dropout, train, dropout_seed, at::TensorOptions(options));
+    return at::__cudnn_init_dropout_state(dropout, train, dropout_seed, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -149,7 +156,7 @@ inline at::Tensor _cudnn_init_dropout_state(double dropout, bool train, int64_t 
   }
   return result;
 }
-inline at::Tensor arange(at::Scalar end, const at::TensorOptions & options = {}) {
+inline at::Tensor arange(at::Scalar end, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -160,13 +167,20 @@ inline at::Tensor arange(at::Scalar end, const at::TensorOptions & options = {})
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "end", end);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::arange(end, at::TensorOptions(options));
+    auto currDtype = options.dtype_opt();
+    if (currDtype.has_value()) {
+      return at::_arange(end, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+    }
+    return at::_arange(end, c10::nullopt, options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -176,7 +190,7 @@ inline at::Tensor arange(at::Scalar end, const at::TensorOptions & options = {})
   }
   return result;
 }
-inline at::Tensor arange(at::Scalar start, at::Scalar end, const at::TensorOptions & options = {}) {
+inline at::Tensor arange(at::Scalar start, at::Scalar end, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -188,13 +202,20 @@ inline at::Tensor arange(at::Scalar start, at::Scalar end, const at::TensorOptio
     jit::tracer::addInputs(node, "start", start);
     jit::tracer::addInputs(node, "end", end);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::arange(start, end, at::TensorOptions(options));
+    auto currDtype = options.dtype_opt();
+    if (currDtype.has_value()) {
+      return at::_arange(start, end, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+    }
+    return at::_arange(start, end, c10::nullopt, options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -204,7 +225,7 @@ inline at::Tensor arange(at::Scalar start, at::Scalar end, const at::TensorOptio
   }
   return result;
 }
-inline at::Tensor arange(at::Scalar start, at::Scalar end, at::Scalar step, const at::TensorOptions & options = {}) {
+inline at::Tensor arange(at::Scalar start, at::Scalar end, at::Scalar step, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -217,13 +238,20 @@ inline at::Tensor arange(at::Scalar start, at::Scalar end, at::Scalar step, cons
     jit::tracer::addInputs(node, "end", end);
     jit::tracer::addInputs(node, "step", step);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::arange(start, end, step, at::TensorOptions(options));
+    auto currDtype = options.dtype_opt();
+    if (currDtype.has_value()) {
+      return at::_arange(start, end, step, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+    }
+    return at::_arange(start, end, step, c10::nullopt, options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -233,7 +261,7 @@ inline at::Tensor arange(at::Scalar start, at::Scalar end, at::Scalar step, cons
   }
   return result;
 }
-inline at::Tensor bartlett_window(int64_t window_length, const at::TensorOptions & options = {}) {
+inline at::Tensor bartlett_window(int64_t window_length, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -244,13 +272,16 @@ inline at::Tensor bartlett_window(int64_t window_length, const at::TensorOptions
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "window_length", window_length);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::bartlett_window(window_length, at::TensorOptions(options));
+    return at::_bartlett_window(window_length, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -260,7 +291,7 @@ inline at::Tensor bartlett_window(int64_t window_length, const at::TensorOptions
   }
   return result;
 }
-inline at::Tensor bartlett_window(int64_t window_length, bool periodic, const at::TensorOptions & options = {}) {
+inline at::Tensor bartlett_window(int64_t window_length, bool periodic, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -272,13 +303,16 @@ inline at::Tensor bartlett_window(int64_t window_length, bool periodic, const at
     jit::tracer::addInputs(node, "window_length", window_length);
     jit::tracer::addInputs(node, "periodic", periodic);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::bartlett_window(window_length, periodic, at::TensorOptions(options));
+    return at::_bartlett_window(window_length, periodic, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -288,7 +322,7 @@ inline at::Tensor bartlett_window(int64_t window_length, bool periodic, const at
   }
   return result;
 }
-inline at::Tensor blackman_window(int64_t window_length, const at::TensorOptions & options = {}) {
+inline at::Tensor blackman_window(int64_t window_length, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -299,13 +333,16 @@ inline at::Tensor blackman_window(int64_t window_length, const at::TensorOptions
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "window_length", window_length);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::blackman_window(window_length, at::TensorOptions(options));
+    return at::_blackman_window(window_length, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -315,7 +352,7 @@ inline at::Tensor blackman_window(int64_t window_length, const at::TensorOptions
   }
   return result;
 }
-inline at::Tensor blackman_window(int64_t window_length, bool periodic, const at::TensorOptions & options = {}) {
+inline at::Tensor blackman_window(int64_t window_length, bool periodic, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -327,13 +364,16 @@ inline at::Tensor blackman_window(int64_t window_length, bool periodic, const at
     jit::tracer::addInputs(node, "window_length", window_length);
     jit::tracer::addInputs(node, "periodic", periodic);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::blackman_window(window_length, periodic, at::TensorOptions(options));
+    return at::_blackman_window(window_length, periodic, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -343,7 +383,7 @@ inline at::Tensor blackman_window(int64_t window_length, bool periodic, const at
   }
   return result;
 }
-inline at::Tensor empty(at::IntArrayRef size, c10::optional<DimnameList> names, const at::TensorOptions & options = {}, c10::optional<MemoryFormat> memory_format = c10::nullopt) {
+inline at::Tensor empty(at::IntArrayRef size, c10::optional<DimnameList> names, const at::TensorOptions & options={}, c10::optional<MemoryFormat> memory_format = c10::nullopt) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -355,6 +395,9 @@ inline at::Tensor empty(at::IntArrayRef size, c10::optional<DimnameList> names, 
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "names", names);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     jit::tracer::addInputs(node, "memory_format", memory_format);
     tracer_state->graph->insertNode(node);
   
@@ -362,7 +405,7 @@ inline at::Tensor empty(at::IntArrayRef size, c10::optional<DimnameList> names, 
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::empty(size, names, at::TensorOptions(options), memory_format);
+    return at::_empty(size, names, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -372,7 +415,7 @@ inline at::Tensor empty(at::IntArrayRef size, c10::optional<DimnameList> names, 
   }
   return result;
 }
-inline at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options = {}, c10::optional<MemoryFormat> memory_format = c10::nullopt) {
+inline at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options={}, c10::optional<MemoryFormat> memory_format = c10::nullopt) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -383,6 +426,9 @@ inline at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options 
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     jit::tracer::addInputs(node, "memory_format", memory_format);
     tracer_state->graph->insertNode(node);
   
@@ -390,7 +436,7 @@ inline at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options 
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::empty(size, at::TensorOptions(options), memory_format);
+    return at::_empty(size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -400,7 +446,7 @@ inline at::Tensor empty(at::IntArrayRef size, const at::TensorOptions & options 
   }
   return result;
 }
-inline at::Tensor _empty_affine_quantized(at::IntArrayRef size, const at::TensorOptions & options = {}, double scale = 1, int64_t zero_point = 0, c10::optional<MemoryFormat> memory_format = MemoryFormat::Contiguous) {
+inline at::Tensor _empty_affine_quantized(at::IntArrayRef size, const at::TensorOptions & options={}, double scale = 1, int64_t zero_point = 0, c10::optional<MemoryFormat> memory_format = MemoryFormat::Contiguous) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -411,6 +457,9 @@ inline at::Tensor _empty_affine_quantized(at::IntArrayRef size, const at::Tensor
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     jit::tracer::addInputs(node, "scale", scale);
     jit::tracer::addInputs(node, "zero_point", zero_point);
     jit::tracer::addInputs(node, "memory_format", memory_format);
@@ -420,7 +469,7 @@ inline at::Tensor _empty_affine_quantized(at::IntArrayRef size, const at::Tensor
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::_empty_affine_quantized(size, at::TensorOptions(options), scale, zero_point, memory_format);
+    return at::__empty_affine_quantized(size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), scale, zero_point, memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -430,7 +479,7 @@ inline at::Tensor _empty_affine_quantized(at::IntArrayRef size, const at::Tensor
   }
   return result;
 }
-inline at::Tensor _empty_per_channel_affine_quantized(at::IntArrayRef size, const at::Tensor & scales, const at::Tensor & zero_points, int64_t axis, const at::TensorOptions & options = {}, c10::optional<MemoryFormat> memory_format = MemoryFormat::Contiguous) {
+inline at::Tensor _empty_per_channel_affine_quantized(at::IntArrayRef size, const at::Tensor & scales, const at::Tensor & zero_points, int64_t axis, const at::TensorOptions & options={}, c10::optional<MemoryFormat> memory_format = MemoryFormat::Contiguous) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -444,6 +493,9 @@ inline at::Tensor _empty_per_channel_affine_quantized(at::IntArrayRef size, cons
     jit::tracer::addInputs(node, "zero_points", zero_points);
     jit::tracer::addInputs(node, "axis", axis);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     jit::tracer::addInputs(node, "memory_format", memory_format);
     tracer_state->graph->insertNode(node);
   
@@ -451,7 +503,7 @@ inline at::Tensor _empty_per_channel_affine_quantized(at::IntArrayRef size, cons
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::_empty_per_channel_affine_quantized(size, scales, zero_points, axis, at::TensorOptions(options), memory_format);
+    return at::__empty_per_channel_affine_quantized(size, scales, zero_points, axis, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -478,7 +530,7 @@ inline at::Tensor empty_like(const at::Tensor & self, c10::optional<MemoryFormat
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::empty_like(self, self.options(), memory_format);
+    return at::_empty_like(self, at::typeMetaToScalarType(self.options().dtype()), self.options().layout(), self.options().device(), self.options().pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/false);
@@ -499,6 +551,9 @@ inline at::Tensor empty_like(const at::Tensor & self, const at::TensorOptions & 
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "self", self);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     jit::tracer::addInputs(node, "memory_format", memory_format);
     tracer_state->graph->insertNode(node);
   
@@ -506,7 +561,7 @@ inline at::Tensor empty_like(const at::Tensor & self, const at::TensorOptions & 
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::empty_like(self, at::TensorOptions(options), memory_format);
+    return at::_empty_like(self, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -516,7 +571,7 @@ inline at::Tensor empty_like(const at::Tensor & self, const at::TensorOptions & 
   }
   return result;
 }
-inline at::Tensor empty_strided(at::IntArrayRef size, at::IntArrayRef stride, const at::TensorOptions & options = {}) {
+inline at::Tensor empty_strided(at::IntArrayRef size, at::IntArrayRef stride, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -528,13 +583,16 @@ inline at::Tensor empty_strided(at::IntArrayRef size, at::IntArrayRef stride, co
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "stride", stride);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::empty_strided(size, stride, at::TensorOptions(options));
+    return at::_empty_strided(size, stride, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -544,7 +602,7 @@ inline at::Tensor empty_strided(at::IntArrayRef size, at::IntArrayRef stride, co
   }
   return result;
 }
-inline at::Tensor eye(int64_t n, const at::TensorOptions & options = {}) {
+inline at::Tensor eye(int64_t n, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -555,13 +613,16 @@ inline at::Tensor eye(int64_t n, const at::TensorOptions & options = {}) {
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "n", n);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::eye(n, at::TensorOptions(options));
+    return at::_eye(n, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -571,7 +632,7 @@ inline at::Tensor eye(int64_t n, const at::TensorOptions & options = {}) {
   }
   return result;
 }
-inline at::Tensor eye(int64_t n, int64_t m, const at::TensorOptions & options = {}) {
+inline at::Tensor eye(int64_t n, int64_t m, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -583,13 +644,16 @@ inline at::Tensor eye(int64_t n, int64_t m, const at::TensorOptions & options = 
     jit::tracer::addInputs(node, "n", n);
     jit::tracer::addInputs(node, "m", m);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::eye(n, m, at::TensorOptions(options));
+    return at::_eye(n, m, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -599,7 +663,7 @@ inline at::Tensor eye(int64_t n, int64_t m, const at::TensorOptions & options = 
   }
   return result;
 }
-inline at::Tensor full(at::IntArrayRef size, at::Scalar fill_value, c10::optional<DimnameList> names, const at::TensorOptions & options = {}) {
+inline at::Tensor full(at::IntArrayRef size, at::Scalar fill_value, c10::optional<DimnameList> names, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -612,13 +676,16 @@ inline at::Tensor full(at::IntArrayRef size, at::Scalar fill_value, c10::optiona
     jit::tracer::addInputs(node, "fill_value", fill_value);
     jit::tracer::addInputs(node, "names", names);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::full(size, fill_value, names, at::TensorOptions(options));
+    return at::_full(size, fill_value, names, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -628,7 +695,7 @@ inline at::Tensor full(at::IntArrayRef size, at::Scalar fill_value, c10::optiona
   }
   return result;
 }
-inline at::Tensor full(at::IntArrayRef size, at::Scalar fill_value, const at::TensorOptions & options = {}) {
+inline at::Tensor full(at::IntArrayRef size, at::Scalar fill_value, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -640,13 +707,16 @@ inline at::Tensor full(at::IntArrayRef size, at::Scalar fill_value, const at::Te
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "fill_value", fill_value);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::full(size, fill_value, at::TensorOptions(options));
+    return at::_full(size, fill_value, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -674,7 +744,7 @@ inline at::Tensor full_like(const at::Tensor & self, at::Scalar fill_value, c10:
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::full_like(self, fill_value, self.options(), memory_format);
+    return at::_full_like(self, fill_value, at::typeMetaToScalarType(self.options().dtype()), self.options().layout(), self.options().device(), self.options().pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/false);
@@ -696,6 +766,9 @@ inline at::Tensor full_like(const at::Tensor & self, at::Scalar fill_value, cons
     jit::tracer::addInputs(node, "self", self);
     jit::tracer::addInputs(node, "fill_value", fill_value);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     jit::tracer::addInputs(node, "memory_format", memory_format);
     tracer_state->graph->insertNode(node);
   
@@ -703,7 +776,7 @@ inline at::Tensor full_like(const at::Tensor & self, at::Scalar fill_value, cons
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::full_like(self, fill_value, at::TensorOptions(options), memory_format);
+    return at::_full_like(self, fill_value, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -713,7 +786,7 @@ inline at::Tensor full_like(const at::Tensor & self, at::Scalar fill_value, cons
   }
   return result;
 }
-inline at::Tensor from_file(std::string filename, c10::optional<bool> shared = c10::nullopt, c10::optional<int64_t> size = 0, const at::TensorOptions & options = {}) {
+inline at::Tensor from_file(std::string filename, c10::optional<bool> shared = c10::nullopt, c10::optional<int64_t> size = 0, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -726,13 +799,16 @@ inline at::Tensor from_file(std::string filename, c10::optional<bool> shared = c
     jit::tracer::addInputs(node, "shared", shared);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::from_file(filename, shared, size, at::TensorOptions(options));
+    return at::_from_file(filename, shared, size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -742,7 +818,7 @@ inline at::Tensor from_file(std::string filename, c10::optional<bool> shared = c
   }
   return result;
 }
-inline at::Tensor hann_window(int64_t window_length, const at::TensorOptions & options = {}) {
+inline at::Tensor hann_window(int64_t window_length, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -753,13 +829,16 @@ inline at::Tensor hann_window(int64_t window_length, const at::TensorOptions & o
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "window_length", window_length);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::hann_window(window_length, at::TensorOptions(options));
+    return at::_hann_window(window_length, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -769,7 +848,7 @@ inline at::Tensor hann_window(int64_t window_length, const at::TensorOptions & o
   }
   return result;
 }
-inline at::Tensor hann_window(int64_t window_length, bool periodic, const at::TensorOptions & options = {}) {
+inline at::Tensor hann_window(int64_t window_length, bool periodic, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -781,13 +860,16 @@ inline at::Tensor hann_window(int64_t window_length, bool periodic, const at::Te
     jit::tracer::addInputs(node, "window_length", window_length);
     jit::tracer::addInputs(node, "periodic", periodic);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::hann_window(window_length, periodic, at::TensorOptions(options));
+    return at::_hann_window(window_length, periodic, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -797,7 +879,7 @@ inline at::Tensor hann_window(int64_t window_length, bool periodic, const at::Te
   }
   return result;
 }
-inline at::Tensor hamming_window(int64_t window_length, const at::TensorOptions & options = {}) {
+inline at::Tensor hamming_window(int64_t window_length, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -808,13 +890,16 @@ inline at::Tensor hamming_window(int64_t window_length, const at::TensorOptions 
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "window_length", window_length);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::hamming_window(window_length, at::TensorOptions(options));
+    return at::_hamming_window(window_length, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -824,7 +909,7 @@ inline at::Tensor hamming_window(int64_t window_length, const at::TensorOptions 
   }
   return result;
 }
-inline at::Tensor hamming_window(int64_t window_length, bool periodic, const at::TensorOptions & options = {}) {
+inline at::Tensor hamming_window(int64_t window_length, bool periodic, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -836,13 +921,16 @@ inline at::Tensor hamming_window(int64_t window_length, bool periodic, const at:
     jit::tracer::addInputs(node, "window_length", window_length);
     jit::tracer::addInputs(node, "periodic", periodic);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::hamming_window(window_length, periodic, at::TensorOptions(options));
+    return at::_hamming_window(window_length, periodic, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -852,7 +940,7 @@ inline at::Tensor hamming_window(int64_t window_length, bool periodic, const at:
   }
   return result;
 }
-inline at::Tensor hamming_window(int64_t window_length, bool periodic, double alpha, const at::TensorOptions & options = {}) {
+inline at::Tensor hamming_window(int64_t window_length, bool periodic, double alpha, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -865,13 +953,16 @@ inline at::Tensor hamming_window(int64_t window_length, bool periodic, double al
     jit::tracer::addInputs(node, "periodic", periodic);
     jit::tracer::addInputs(node, "alpha", alpha);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::hamming_window(window_length, periodic, alpha, at::TensorOptions(options));
+    return at::_hamming_window(window_length, periodic, alpha, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -881,7 +972,7 @@ inline at::Tensor hamming_window(int64_t window_length, bool periodic, double al
   }
   return result;
 }
-inline at::Tensor hamming_window(int64_t window_length, bool periodic, double alpha, double beta, const at::TensorOptions & options = {}) {
+inline at::Tensor hamming_window(int64_t window_length, bool periodic, double alpha, double beta, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -895,13 +986,16 @@ inline at::Tensor hamming_window(int64_t window_length, bool periodic, double al
     jit::tracer::addInputs(node, "alpha", alpha);
     jit::tracer::addInputs(node, "beta", beta);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::hamming_window(window_length, periodic, alpha, beta, at::TensorOptions(options));
+    return at::_hamming_window(window_length, periodic, alpha, beta, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -911,7 +1005,7 @@ inline at::Tensor hamming_window(int64_t window_length, bool periodic, double al
   }
   return result;
 }
-inline at::Tensor linspace(at::Scalar start, at::Scalar end, int64_t steps = 100, const at::TensorOptions & options = {}) {
+inline at::Tensor linspace(at::Scalar start, at::Scalar end, int64_t steps = 100, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -924,13 +1018,16 @@ inline at::Tensor linspace(at::Scalar start, at::Scalar end, int64_t steps = 100
     jit::tracer::addInputs(node, "end", end);
     jit::tracer::addInputs(node, "steps", steps);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::linspace(start, end, steps, at::TensorOptions(options));
+    return at::_linspace(start, end, steps, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -940,7 +1037,7 @@ inline at::Tensor linspace(at::Scalar start, at::Scalar end, int64_t steps = 100
   }
   return result;
 }
-inline at::Tensor logspace(at::Scalar start, at::Scalar end, int64_t steps = 100, double base = 10.0, const at::TensorOptions & options = {}) {
+inline at::Tensor logspace(at::Scalar start, at::Scalar end, int64_t steps = 100, double base = 10.0, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -954,13 +1051,16 @@ inline at::Tensor logspace(at::Scalar start, at::Scalar end, int64_t steps = 100
     jit::tracer::addInputs(node, "steps", steps);
     jit::tracer::addInputs(node, "base", base);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::logspace(start, end, steps, base, at::TensorOptions(options));
+    return at::_logspace(start, end, steps, base, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -970,7 +1070,7 @@ inline at::Tensor logspace(at::Scalar start, at::Scalar end, int64_t steps = 100
   }
   return result;
 }
-inline at::Tensor ones(at::IntArrayRef size, c10::optional<DimnameList> names, const at::TensorOptions & options = {}) {
+inline at::Tensor ones(at::IntArrayRef size, c10::optional<DimnameList> names, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -982,13 +1082,16 @@ inline at::Tensor ones(at::IntArrayRef size, c10::optional<DimnameList> names, c
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "names", names);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::ones(size, names, at::TensorOptions(options));
+    return at::_ones(size, names, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -998,7 +1101,7 @@ inline at::Tensor ones(at::IntArrayRef size, c10::optional<DimnameList> names, c
   }
   return result;
 }
-inline at::Tensor ones(at::IntArrayRef size, const at::TensorOptions & options = {}) {
+inline at::Tensor ones(at::IntArrayRef size, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1009,13 +1112,16 @@ inline at::Tensor ones(at::IntArrayRef size, const at::TensorOptions & options =
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::ones(size, at::TensorOptions(options));
+    return at::_ones(size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1042,7 +1148,7 @@ inline at::Tensor ones_like(const at::Tensor & self, c10::optional<MemoryFormat>
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::ones_like(self, self.options(), memory_format);
+    return at::_ones_like(self, at::typeMetaToScalarType(self.options().dtype()), self.options().layout(), self.options().device(), self.options().pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/false);
@@ -1063,6 +1169,9 @@ inline at::Tensor ones_like(const at::Tensor & self, const at::TensorOptions & o
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "self", self);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     jit::tracer::addInputs(node, "memory_format", memory_format);
     tracer_state->graph->insertNode(node);
   
@@ -1070,7 +1179,7 @@ inline at::Tensor ones_like(const at::Tensor & self, const at::TensorOptions & o
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::ones_like(self, at::TensorOptions(options), memory_format);
+    return at::_ones_like(self, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1080,7 +1189,7 @@ inline at::Tensor ones_like(const at::Tensor & self, const at::TensorOptions & o
   }
   return result;
 }
-inline at::Tensor scalar_tensor(at::Scalar s, const at::TensorOptions & options = {}) {
+inline at::Tensor scalar_tensor(at::Scalar s, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1091,13 +1200,16 @@ inline at::Tensor scalar_tensor(at::Scalar s, const at::TensorOptions & options 
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "s", s);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::scalar_tensor(s, at::TensorOptions(options));
+    return at::_scalar_tensor(s, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1107,7 +1219,7 @@ inline at::Tensor scalar_tensor(at::Scalar s, const at::TensorOptions & options 
   }
   return result;
 }
-inline at::Tensor rand(at::IntArrayRef size, c10::optional<DimnameList> names, const at::TensorOptions & options = {}) {
+inline at::Tensor rand(at::IntArrayRef size, c10::optional<DimnameList> names, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1119,13 +1231,16 @@ inline at::Tensor rand(at::IntArrayRef size, c10::optional<DimnameList> names, c
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "names", names);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::rand(size, names, at::TensorOptions(options));
+    return at::_rand(size, names, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1135,7 +1250,7 @@ inline at::Tensor rand(at::IntArrayRef size, c10::optional<DimnameList> names, c
   }
   return result;
 }
-inline at::Tensor rand(at::IntArrayRef size, at::Generator * generator, c10::optional<DimnameList> names, const at::TensorOptions & options = {}) {
+inline at::Tensor rand(at::IntArrayRef size, at::Generator * generator, c10::optional<DimnameList> names, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1148,13 +1263,16 @@ inline at::Tensor rand(at::IntArrayRef size, at::Generator * generator, c10::opt
     jit::tracer::addInputs(node, "generator", generator);
     jit::tracer::addInputs(node, "names", names);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::rand(size, generator, names, at::TensorOptions(options));
+    return at::_rand(size, generator, names, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1164,7 +1282,7 @@ inline at::Tensor rand(at::IntArrayRef size, at::Generator * generator, c10::opt
   }
   return result;
 }
-inline at::Tensor rand(at::IntArrayRef size, const at::TensorOptions & options = {}) {
+inline at::Tensor rand(at::IntArrayRef size, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1175,13 +1293,16 @@ inline at::Tensor rand(at::IntArrayRef size, const at::TensorOptions & options =
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::rand(size, at::TensorOptions(options));
+    return at::_rand(size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1191,7 +1312,7 @@ inline at::Tensor rand(at::IntArrayRef size, const at::TensorOptions & options =
   }
   return result;
 }
-inline at::Tensor rand(at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options = {}) {
+inline at::Tensor rand(at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1203,13 +1324,16 @@ inline at::Tensor rand(at::IntArrayRef size, at::Generator * generator, const at
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "generator", generator);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::rand(size, generator, at::TensorOptions(options));
+    return at::_rand(size, generator, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1236,7 +1360,7 @@ inline at::Tensor rand_like(const at::Tensor & self, c10::optional<MemoryFormat>
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::rand_like(self, self.options(), memory_format);
+    return at::_rand_like(self, at::typeMetaToScalarType(self.options().dtype()), self.options().layout(), self.options().device(), self.options().pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/false);
@@ -1257,6 +1381,9 @@ inline at::Tensor rand_like(const at::Tensor & self, const at::TensorOptions & o
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "self", self);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     jit::tracer::addInputs(node, "memory_format", memory_format);
     tracer_state->graph->insertNode(node);
   
@@ -1264,7 +1391,7 @@ inline at::Tensor rand_like(const at::Tensor & self, const at::TensorOptions & o
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::rand_like(self, at::TensorOptions(options), memory_format);
+    return at::_rand_like(self, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1274,7 +1401,7 @@ inline at::Tensor rand_like(const at::Tensor & self, const at::TensorOptions & o
   }
   return result;
 }
-inline at::Tensor randint(int64_t high, at::IntArrayRef size, const at::TensorOptions & options = {}) {
+inline at::Tensor randint(int64_t high, at::IntArrayRef size, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1286,13 +1413,16 @@ inline at::Tensor randint(int64_t high, at::IntArrayRef size, const at::TensorOp
     jit::tracer::addInputs(node, "high", high);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randint(high, size, at::TensorOptions(options));
+    return at::_randint(high, size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1302,7 +1432,7 @@ inline at::Tensor randint(int64_t high, at::IntArrayRef size, const at::TensorOp
   }
   return result;
 }
-inline at::Tensor randint(int64_t high, at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options = {}) {
+inline at::Tensor randint(int64_t high, at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1315,13 +1445,16 @@ inline at::Tensor randint(int64_t high, at::IntArrayRef size, at::Generator * ge
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "generator", generator);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randint(high, size, generator, at::TensorOptions(options));
+    return at::_randint(high, size, generator, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1331,7 +1464,7 @@ inline at::Tensor randint(int64_t high, at::IntArrayRef size, at::Generator * ge
   }
   return result;
 }
-inline at::Tensor randint(int64_t low, int64_t high, at::IntArrayRef size, const at::TensorOptions & options = {}) {
+inline at::Tensor randint(int64_t low, int64_t high, at::IntArrayRef size, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1344,13 +1477,16 @@ inline at::Tensor randint(int64_t low, int64_t high, at::IntArrayRef size, const
     jit::tracer::addInputs(node, "high", high);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randint(low, high, size, at::TensorOptions(options));
+    return at::_randint(low, high, size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1360,7 +1496,7 @@ inline at::Tensor randint(int64_t low, int64_t high, at::IntArrayRef size, const
   }
   return result;
 }
-inline at::Tensor randint(int64_t low, int64_t high, at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options = {}) {
+inline at::Tensor randint(int64_t low, int64_t high, at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1374,13 +1510,16 @@ inline at::Tensor randint(int64_t low, int64_t high, at::IntArrayRef size, at::G
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "generator", generator);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randint(low, high, size, generator, at::TensorOptions(options));
+    return at::_randint(low, high, size, generator, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1408,7 +1547,7 @@ inline at::Tensor randint_like(const at::Tensor & self, int64_t high, c10::optio
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randint_like(self, high, self.options(), memory_format);
+    return at::_randint_like(self, high, at::typeMetaToScalarType(self.options().dtype()), self.options().layout(), self.options().device(), self.options().pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/false);
@@ -1437,7 +1576,7 @@ inline at::Tensor randint_like(const at::Tensor & self, int64_t low, int64_t hig
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randint_like(self, low, high, self.options(), memory_format);
+    return at::_randint_like(self, low, high, at::typeMetaToScalarType(self.options().dtype()), self.options().layout(), self.options().device(), self.options().pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/false);
@@ -1459,6 +1598,9 @@ inline at::Tensor randint_like(const at::Tensor & self, int64_t high, const at::
     jit::tracer::addInputs(node, "self", self);
     jit::tracer::addInputs(node, "high", high);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     jit::tracer::addInputs(node, "memory_format", memory_format);
     tracer_state->graph->insertNode(node);
   
@@ -1466,7 +1608,7 @@ inline at::Tensor randint_like(const at::Tensor & self, int64_t high, const at::
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randint_like(self, high, at::TensorOptions(options), memory_format);
+    return at::_randint_like(self, high, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1489,6 +1631,9 @@ inline at::Tensor randint_like(const at::Tensor & self, int64_t low, int64_t hig
     jit::tracer::addInputs(node, "low", low);
     jit::tracer::addInputs(node, "high", high);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     jit::tracer::addInputs(node, "memory_format", memory_format);
     tracer_state->graph->insertNode(node);
   
@@ -1496,7 +1641,7 @@ inline at::Tensor randint_like(const at::Tensor & self, int64_t low, int64_t hig
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randint_like(self, low, high, at::TensorOptions(options), memory_format);
+    return at::_randint_like(self, low, high, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1506,7 +1651,7 @@ inline at::Tensor randint_like(const at::Tensor & self, int64_t low, int64_t hig
   }
   return result;
 }
-inline at::Tensor randn(at::IntArrayRef size, const at::TensorOptions & options = {}) {
+inline at::Tensor randn(at::IntArrayRef size, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1517,13 +1662,16 @@ inline at::Tensor randn(at::IntArrayRef size, const at::TensorOptions & options 
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randn(size, at::TensorOptions(options));
+    return at::_randn(size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1533,7 +1681,7 @@ inline at::Tensor randn(at::IntArrayRef size, const at::TensorOptions & options 
   }
   return result;
 }
-inline at::Tensor randn(at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options = {}) {
+inline at::Tensor randn(at::IntArrayRef size, at::Generator * generator, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1545,13 +1693,16 @@ inline at::Tensor randn(at::IntArrayRef size, at::Generator * generator, const a
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "generator", generator);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randn(size, generator, at::TensorOptions(options));
+    return at::_randn(size, generator, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1561,7 +1712,7 @@ inline at::Tensor randn(at::IntArrayRef size, at::Generator * generator, const a
   }
   return result;
 }
-inline at::Tensor randn(at::IntArrayRef size, c10::optional<DimnameList> names, const at::TensorOptions & options = {}) {
+inline at::Tensor randn(at::IntArrayRef size, c10::optional<DimnameList> names, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1573,13 +1724,16 @@ inline at::Tensor randn(at::IntArrayRef size, c10::optional<DimnameList> names, 
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "names", names);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randn(size, names, at::TensorOptions(options));
+    return at::_randn(size, names, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1589,7 +1743,7 @@ inline at::Tensor randn(at::IntArrayRef size, c10::optional<DimnameList> names, 
   }
   return result;
 }
-inline at::Tensor randn(at::IntArrayRef size, at::Generator * generator, c10::optional<DimnameList> names, const at::TensorOptions & options = {}) {
+inline at::Tensor randn(at::IntArrayRef size, at::Generator * generator, c10::optional<DimnameList> names, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1602,13 +1756,16 @@ inline at::Tensor randn(at::IntArrayRef size, at::Generator * generator, c10::op
     jit::tracer::addInputs(node, "generator", generator);
     jit::tracer::addInputs(node, "names", names);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randn(size, generator, names, at::TensorOptions(options));
+    return at::_randn(size, generator, names, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1635,7 +1792,7 @@ inline at::Tensor randn_like(const at::Tensor & self, c10::optional<MemoryFormat
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randn_like(self, self.options(), memory_format);
+    return at::_randn_like(self, at::typeMetaToScalarType(self.options().dtype()), self.options().layout(), self.options().device(), self.options().pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/false);
@@ -1656,6 +1813,9 @@ inline at::Tensor randn_like(const at::Tensor & self, const at::TensorOptions & 
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "self", self);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     jit::tracer::addInputs(node, "memory_format", memory_format);
     tracer_state->graph->insertNode(node);
   
@@ -1663,7 +1823,7 @@ inline at::Tensor randn_like(const at::Tensor & self, const at::TensorOptions & 
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randn_like(self, at::TensorOptions(options), memory_format);
+    return at::_randn_like(self, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1673,7 +1833,7 @@ inline at::Tensor randn_like(const at::Tensor & self, const at::TensorOptions & 
   }
   return result;
 }
-inline at::Tensor randperm(int64_t n, const at::TensorOptions & options = {}) {
+inline at::Tensor randperm(int64_t n, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1684,13 +1844,16 @@ inline at::Tensor randperm(int64_t n, const at::TensorOptions & options = {}) {
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "n", n);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randperm(n, at::TensorOptions(options));
+    return at::_randperm(n, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1700,7 +1863,7 @@ inline at::Tensor randperm(int64_t n, const at::TensorOptions & options = {}) {
   }
   return result;
 }
-inline at::Tensor randperm(int64_t n, at::Generator * generator, const at::TensorOptions & options = {}) {
+inline at::Tensor randperm(int64_t n, at::Generator * generator, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1712,13 +1875,16 @@ inline at::Tensor randperm(int64_t n, at::Generator * generator, const at::Tenso
     jit::tracer::addInputs(node, "n", n);
     jit::tracer::addInputs(node, "generator", generator);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::randperm(n, generator, at::TensorOptions(options));
+    return at::_randperm(n, generator, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1728,7 +1894,7 @@ inline at::Tensor randperm(int64_t n, at::Generator * generator, const at::Tenso
   }
   return result;
 }
-inline at::Tensor range(at::Scalar start, at::Scalar end, at::Scalar step = 1, const at::TensorOptions & options = {}) {
+inline at::Tensor range(at::Scalar start, at::Scalar end, at::Scalar step = 1, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1741,13 +1907,16 @@ inline at::Tensor range(at::Scalar start, at::Scalar end, at::Scalar step = 1, c
     jit::tracer::addInputs(node, "end", end);
     jit::tracer::addInputs(node, "step", step);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::range(start, end, step, at::TensorOptions(options));
+    return at::_range(start, end, step, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1757,7 +1926,7 @@ inline at::Tensor range(at::Scalar start, at::Scalar end, at::Scalar step = 1, c
   }
   return result;
 }
-inline at::Tensor range(at::Scalar start, at::Scalar end, const at::TensorOptions & options = {}) {
+inline at::Tensor range(at::Scalar start, at::Scalar end, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1769,13 +1938,16 @@ inline at::Tensor range(at::Scalar start, at::Scalar end, const at::TensorOption
     jit::tracer::addInputs(node, "start", start);
     jit::tracer::addInputs(node, "end", end);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::range(start, end, at::TensorOptions(options));
+    return at::_range(start, end, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1785,7 +1957,7 @@ inline at::Tensor range(at::Scalar start, at::Scalar end, const at::TensorOption
   }
   return result;
 }
-inline at::Tensor zeros(at::IntArrayRef size, c10::optional<DimnameList> names, const at::TensorOptions & options = {}) {
+inline at::Tensor zeros(at::IntArrayRef size, c10::optional<DimnameList> names, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1797,13 +1969,16 @@ inline at::Tensor zeros(at::IntArrayRef size, c10::optional<DimnameList> names, 
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "names", names);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::zeros(size, names, at::TensorOptions(options));
+    return at::_zeros(size, names, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1813,7 +1988,7 @@ inline at::Tensor zeros(at::IntArrayRef size, c10::optional<DimnameList> names, 
   }
   return result;
 }
-inline at::Tensor zeros(at::IntArrayRef size, const at::TensorOptions & options = {}) {
+inline at::Tensor zeros(at::IntArrayRef size, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1824,13 +1999,16 @@ inline at::Tensor zeros(at::IntArrayRef size, const at::TensorOptions & options 
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::zeros(size, at::TensorOptions(options));
+    return at::_zeros(size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1857,7 +2035,7 @@ inline at::Tensor zeros_like(const at::Tensor & self, c10::optional<MemoryFormat
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::zeros_like(self, self.options(), memory_format);
+    return at::_zeros_like(self, at::typeMetaToScalarType(self.options().dtype()), self.options().layout(), self.options().device(), self.options().pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/false);
@@ -1878,6 +2056,9 @@ inline at::Tensor zeros_like(const at::Tensor & self, const at::TensorOptions & 
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "self", self);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     jit::tracer::addInputs(node, "memory_format", memory_format);
     tracer_state->graph->insertNode(node);
   
@@ -1885,7 +2066,7 @@ inline at::Tensor zeros_like(const at::Tensor & self, const at::TensorOptions & 
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::zeros_like(self, at::TensorOptions(options), memory_format);
+    return at::_zeros_like(self, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1895,7 +2076,7 @@ inline at::Tensor zeros_like(const at::Tensor & self, const at::TensorOptions & 
   }
   return result;
 }
-inline at::Tensor sparse_coo_tensor(at::IntArrayRef size, const at::TensorOptions & options) {
+inline at::Tensor sparse_coo_tensor(at::IntArrayRef size, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1906,13 +2087,16 @@ inline at::Tensor sparse_coo_tensor(at::IntArrayRef size, const at::TensorOption
     jit::tracer::recordSourceLocation(node);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::sparse_coo_tensor(size, at::TensorOptions(options));
+    return at::_sparse_coo_tensor(size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1922,7 +2106,7 @@ inline at::Tensor sparse_coo_tensor(at::IntArrayRef size, const at::TensorOption
   }
   return result;
 }
-inline at::Tensor sparse_coo_tensor(const at::Tensor & indices, const at::Tensor & values, const at::TensorOptions & options = {}) {
+inline at::Tensor sparse_coo_tensor(const at::Tensor & indices, const at::Tensor & values, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1934,13 +2118,16 @@ inline at::Tensor sparse_coo_tensor(const at::Tensor & indices, const at::Tensor
     jit::tracer::addInputs(node, "indices", indices);
     jit::tracer::addInputs(node, "values", values);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::sparse_coo_tensor(indices, values, at::TensorOptions(options));
+    return at::_sparse_coo_tensor(indices, values, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1950,7 +2137,7 @@ inline at::Tensor sparse_coo_tensor(const at::Tensor & indices, const at::Tensor
   }
   return result;
 }
-inline at::Tensor sparse_coo_tensor(const at::Tensor & indices, const at::Tensor & values, at::IntArrayRef size, const at::TensorOptions & options = {}) {
+inline at::Tensor sparse_coo_tensor(const at::Tensor & indices, const at::Tensor & values, at::IntArrayRef size, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1963,13 +2150,16 @@ inline at::Tensor sparse_coo_tensor(const at::Tensor & indices, const at::Tensor
     jit::tracer::addInputs(node, "values", values);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::sparse_coo_tensor(indices, values, size, at::TensorOptions(options));
+    return at::_sparse_coo_tensor(indices, values, size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -1979,7 +2169,7 @@ inline at::Tensor sparse_coo_tensor(const at::Tensor & indices, const at::Tensor
   }
   return result;
 }
-inline at::Tensor _sparse_coo_tensor_unsafe(const at::Tensor & indices, const at::Tensor & values, at::IntArrayRef size, const at::TensorOptions & options = {}) {
+inline at::Tensor _sparse_coo_tensor_unsafe(const at::Tensor & indices, const at::Tensor & values, at::IntArrayRef size, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -1992,13 +2182,16 @@ inline at::Tensor _sparse_coo_tensor_unsafe(const at::Tensor & indices, const at
     jit::tracer::addInputs(node, "values", values);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::_sparse_coo_tensor_unsafe(indices, values, size, at::TensorOptions(options));
+    return at::__sparse_coo_tensor_unsafe(indices, values, size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -2008,7 +2201,7 @@ inline at::Tensor _sparse_coo_tensor_unsafe(const at::Tensor & indices, const at
   }
   return result;
 }
-inline at::Tensor _sparse_coo_tensor_with_dims(int64_t sparse_dim, int64_t dense_dim, at::IntArrayRef size, const at::TensorOptions & options) {
+inline at::Tensor _sparse_coo_tensor_with_dims(int64_t sparse_dim, int64_t dense_dim, at::IntArrayRef size, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -2021,13 +2214,16 @@ inline at::Tensor _sparse_coo_tensor_with_dims(int64_t sparse_dim, int64_t dense
     jit::tracer::addInputs(node, "dense_dim", dense_dim);
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::_sparse_coo_tensor_with_dims(sparse_dim, dense_dim, size, at::TensorOptions(options));
+    return at::__sparse_coo_tensor_with_dims(sparse_dim, dense_dim, size, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -2052,13 +2248,16 @@ inline at::Tensor _sparse_coo_tensor_with_dims_and_tensors(int64_t sparse_dim, i
     jit::tracer::addInputs(node, "indices", indices);
     jit::tracer::addInputs(node, "values", values);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::_sparse_coo_tensor_with_dims_and_tensors(sparse_dim, dense_dim, size, indices, values, at::TensorOptions(options));
+    return at::__sparse_coo_tensor_with_dims_and_tensors(sparse_dim, dense_dim, size, indices, values, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -2068,7 +2267,7 @@ inline at::Tensor _sparse_coo_tensor_with_dims_and_tensors(int64_t sparse_dim, i
   }
   return result;
 }
-inline at::Tensor tril_indices(int64_t row, int64_t col, int64_t offset = 0, const at::TensorOptions & options = at::kLong) {
+inline at::Tensor tril_indices(int64_t row, int64_t col, int64_t offset = 0, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -2081,13 +2280,16 @@ inline at::Tensor tril_indices(int64_t row, int64_t col, int64_t offset = 0, con
     jit::tracer::addInputs(node, "col", col);
     jit::tracer::addInputs(node, "offset", offset);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::tril_indices(row, col, offset, at::TensorOptions(options));
+    return at::_tril_indices(row, col, offset, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -2097,7 +2299,7 @@ inline at::Tensor tril_indices(int64_t row, int64_t col, int64_t offset = 0, con
   }
   return result;
 }
-inline at::Tensor triu_indices(int64_t row, int64_t col, int64_t offset = 0, const at::TensorOptions & options = at::kLong) {
+inline at::Tensor triu_indices(int64_t row, int64_t col, int64_t offset = 0, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -2110,13 +2312,16 @@ inline at::Tensor triu_indices(int64_t row, int64_t col, int64_t offset = 0, con
     jit::tracer::addInputs(node, "col", col);
     jit::tracer::addInputs(node, "offset", offset);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::triu_indices(row, col, offset, at::TensorOptions(options));
+    return at::_triu_indices(row, col, offset, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
@@ -2126,7 +2331,7 @@ inline at::Tensor triu_indices(int64_t row, int64_t col, int64_t offset = 0, con
   }
   return result;
 }
-inline at::Tensor normal(double mean, double std, at::IntArrayRef size, at::Generator * generator = nullptr, const at::TensorOptions & options = {}) {
+inline at::Tensor normal(double mean, double std, at::IntArrayRef size, at::Generator * generator = nullptr, const at::TensorOptions & options={}) {
   torch::jit::Node* node = nullptr;
   std::shared_ptr<jit::tracer::TracingState> tracer_state;
   if (jit::tracer::isTracing()) {
@@ -2140,13 +2345,16 @@ inline at::Tensor normal(double mean, double std, at::IntArrayRef size, at::Gene
     jit::tracer::addInputs(node, "size", size);
     jit::tracer::addInputs(node, "generator", generator);
     jit::tracer::addInputs(node, "options", options);
+    
+    
+    
     tracer_state->graph->insertNode(node);
   
     jit::tracer::setTracingState(nullptr);
   }
   at::Tensor tensor = ([&]() {
     at::AutoNonVariableTypeMode non_var_type_mode(true);
-    return at::normal(mean, std, size, generator, at::TensorOptions(options));
+    return at::_normal(mean, std, size, generator, at::typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
   })();
   at::Tensor result =
     autograd::make_variable(std::move(tensor), /*requires_grad=*/options.requires_grad());
