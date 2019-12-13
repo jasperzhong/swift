@@ -580,15 +580,43 @@ class PyTorchAndroidJni : public facebook::jni::JavaClass<PyTorchAndroidJni> {
 
   static void registerNatives() {
     javaClassStatic()->registerNatives({
-        makeNativeMethod(
-            "nativeSetNumThreads", PyTorchAndroidJni::setNumThreads),
+        makeNativeMethod("nativeSetNumThreads", PyTorchAndroidJni::setNumThreads),
+        makeNativeMethod("nativeStdOutErrToLogcat", PyTorchAndroidJni::stdOutErrToLogcat),
     });
   }
 
   static void setNumThreads(facebook::jni::alias_ref<jclass>, jint numThreads) {
     caffe2::mobile_threadpool()->setNumThreads(numThreads);
   }
+
+  static int pfd[2];
+  static pthread_t log_thread;
+  static jint stdOutErrToLogcat(facebook::jni::alias_ref<jclass>) {
+    setvbuf(stdout, 0, _IOLBF, 0);
+    setvbuf(stderr, 0, _IOLBF, 0);
+    pipe(pfd);
+    dup2(pfd[1], 1);
+    dup2(pfd[1], 2);
+    if(pthread_create(&log_thread, 0, log_thread_func, 0) == -1)
+        return -1;
+    pthread_detach(log_thread);
+    return 0;
+  }
+
+  static void *log_thread_func(void*) {
+      ssize_t rdsz;
+      char buf[128];
+      while((rdsz = read(pfd[0], buf, sizeof buf - 1)) > 0) {
+          if(buf[rdsz - 1] == '\n') --rdsz;
+          buf[rdsz] = 0;
+          __android_log_write(ANDROID_LOG_DEBUG, "pytorch-stdOutErr", buf);
+      }
+      return 0;
+  }
 };
+int PyTorchAndroidJni::pfd[2];
+pthread_t PyTorchAndroidJni::log_thread;
+
 #endif
 
 void common_registerNatives() {

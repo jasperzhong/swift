@@ -277,6 +277,7 @@ public final class TensorImageUtils {
         int r = clamp((a0 + a1) >> 10, 0, 255);
         int g = clamp((a0 - a2 - a3) >> 10, 0, 255);
         int b = clamp((a0 + a4) >> 10, 0, 255);
+
         final int offset = outBufferOffset + y * tensorWidth + x;
         float rF = ((r / 255.f) - normMeanRGB[0]) / normStdRGB[0];
         float gF = ((g / 255.f) - normMeanRGB[1]) / normStdRGB[1];
@@ -285,6 +286,132 @@ public final class TensorImageUtils {
         outBuffer.put(offset, rF);
         outBuffer.put(offset + tensorInputOffsetG, gF);
         outBuffer.put(offset + tensorInputOffsetB, bF);
+      }
+    }
+  }
+
+  public static void imageYUV420CenterCropToFloatBufferOpt(
+      final Image image,
+      int rotateCWDegrees,
+      final int tensorWidth,
+      final int tensorHeight,
+      float[] normMeanRGB,
+      float[] normStdRGB,
+      final FloatBuffer outBuffer,
+      final int outBufferOffset) {
+    checkOutBufferCapacity(outBuffer, outBufferOffset, tensorWidth, tensorHeight);
+
+    if (image.getFormat() != ImageFormat.YUV_420_888) {
+      throw new IllegalArgumentException(
+          String.format(
+              Locale.US, "Image format %d != ImageFormat.YUV_420_888", image.getFormat()));
+    }
+
+    checkNormMeanArg(normMeanRGB);
+    checkNormStdArg(normStdRGB);
+    checkRotateCWDegrees(rotateCWDegrees);
+    checkTensorSize(tensorWidth, tensorHeight);
+
+    final int widthBeforeRotation = image.getWidth();
+    final int heightBeforeRotation = image.getHeight();
+
+    int widthAfterRotation = widthBeforeRotation;
+    int heightAfterRotation = heightBeforeRotation;
+    boolean oddRtn = rotateCWDegrees == 90 || rotateCWDegrees == 270;
+    if (oddRtn) {
+      widthAfterRotation = heightBeforeRotation;
+      heightAfterRotation = widthBeforeRotation;
+    }
+
+    int centerCropWidthAfterRotation = widthAfterRotation;
+    int centerCropHeightAfterRotation = heightAfterRotation;
+
+    if (tensorWidth * heightAfterRotation <= tensorHeight * widthAfterRotation) {
+      centerCropWidthAfterRotation =
+          (int) Math.floor((float) tensorWidth * heightAfterRotation / tensorHeight);
+    } else {
+      centerCropHeightAfterRotation =
+          (int) Math.floor((float) tensorHeight * widthAfterRotation / tensorWidth);
+    }
+
+    int centerCropWidthBeforeRotation = centerCropWidthAfterRotation;
+    int centerCropHeightBeforeRotation = centerCropHeightAfterRotation;
+    if (oddRtn) {
+      centerCropHeightBeforeRotation = centerCropWidthAfterRotation;
+      centerCropWidthBeforeRotation = centerCropHeightAfterRotation;
+    }
+
+    final int offsetX =
+        (int) Math.floor((widthBeforeRotation - centerCropWidthBeforeRotation) / 2.f);
+    final int offsetY =
+        (int) Math.floor((heightBeforeRotation - centerCropHeightBeforeRotation) / 2.f);
+
+    final Image.Plane yPlane = image.getPlanes()[0];
+    final Image.Plane uPlane = image.getPlanes()[1];
+    final Image.Plane vPlane = image.getPlanes()[2];
+
+    final ByteBuffer yBuffer = yPlane.getBuffer();
+    final ByteBuffer uBuffer = uPlane.getBuffer();
+    final ByteBuffer vBuffer = vPlane.getBuffer();
+
+    final int yRowStride = yPlane.getRowStride();
+    final int uRowStride = uPlane.getRowStride();
+
+    final int yPixelStride = yPlane.getPixelStride();
+    final int uPixelStride = uPlane.getPixelStride();
+
+    final float scale = (float) centerCropWidthAfterRotation / tensorWidth;
+    final int uvRowStride = uRowStride >> 1;
+
+
+    int cropXMult = 1;
+    int cropYMult = 1;
+    int cropXAdd = offsetX;
+    int cropYAdd = offsetY;
+    if (rotateCWDegrees == 90) {
+      cropYMult = -1;
+      cropYAdd = offsetY + (centerCropHeightBeforeRotation - 1);
+    } else if (rotateCWDegrees == 180) {
+      cropXMult = -1;
+      cropXAdd = offsetX + (centerCropWidthBeforeRotation - 1);
+      cropYMult = -1;
+      cropYAdd = offsetY + (centerCropHeightBeforeRotation - 1);
+    } else if (rotateCWDegrees == 270) {
+      cropXMult = -1;
+      cropXAdd = offsetX + (centerCropWidthBeforeRotation - 1);
+    }
+
+    float normMeanRm255 = 255 * normMeanRGB[0];
+    float normMeanGm255 = 255 * normMeanRGB[1];
+    float normMeanBm255 = 255 * normMeanRGB[2];
+    float normStdRm255 = 255 * normStdRGB[0];
+    float normStdGm255 = 255 * normStdRGB[1];
+    float normStdBm255 = 255 * normStdRGB[2];
+    int xBeforeRotation;
+    int yBeforeRotation;
+    int yIdx;
+    int uvIdx;
+    int Ui, Vi, a0;
+    int r,g,b;
+    final int channelSize = tensorHeight * tensorWidth;
+    int wr = outBufferOffset;
+    int wg = wr + channelSize;
+    int wb = wg + channelSize;
+    for (int x = 0; x < tensorWidth; x++) {
+      for (int y = 0; y < tensorHeight; y++) {
+        xBeforeRotation = cropXAdd + cropXMult * ((int) Math.floor(x * scale));
+        yBeforeRotation = cropYAdd + cropYMult * ((int) Math.floor(y * scale));
+        yIdx = yBeforeRotation * yRowStride + xBeforeRotation * yPixelStride;
+        uvIdx = (yBeforeRotation >> 1) * uvRowStride + xBeforeRotation * uPixelStride;
+        Ui = uBuffer.get(uvIdx) & 0xff;
+        Vi = vBuffer.get(uvIdx) & 0xff;
+        a0 = 1192 * ((yBuffer.get(yIdx) & 0xff) - 16);
+        r = clamp0255((a0 + 1634 * (Vi - 128)) >> 10);
+        g = clamp0255((a0 - 832 * (Vi - 128) - 400 * (Ui - 128)) >> 10);
+        b = clamp0255((a0 + 2066 * (Ui - 128)) >> 10);
+        outBuffer.put(wr++, (r - normMeanRm255) / normStdRm255);
+        outBuffer.put(wg++, (g - normMeanGm255) / normStdGm255);
+        outBuffer.put(wb++, (b - normMeanBm255) / normStdBm255);
       }
     }
   }
@@ -308,6 +435,10 @@ public final class TensorImageUtils {
         && rotateCWDegrees != 270) {
       throw new IllegalArgumentException("rotateCWDegrees must be one of 0, 90, 180, 270");
     }
+  }
+
+  private static final int clamp0255(int c) {
+    return c > 255 ? 255 : c < 0 ? 0 : c;
   }
 
   private static final int clamp(int c, int min, int max) {

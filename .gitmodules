@@ -118,3 +118,6 @@
     ignore = dirty
     path = android/libs/fbjni
     url = https://github.com/facebookincubator/fbjni.git
+[submodule "android/libs/libyuv"]
+	path = android/libs/libyuv
+	url = https://chromium.googlesource.com/libyuv/libyuv

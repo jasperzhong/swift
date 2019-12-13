@@ -28,11 +28,15 @@ android {
         buildConfigField ("String", "MODULE_ASSET_NAME", buildConfigProps('MODULE_ASSET_NAME'))
         buildConfigField ("String", "LOGCAT_TAG", "@string/app_name")
         buildConfigField ("int", "TU_TYPE", "0")
-        buildConfigField ("int", "FORWARD_COUNT", "50")
+        buildConfigField ("int", "PERF_WARMUP_FORWARD_COUNT", "12")
+        buildConfigField ("int", "FORWARD_COUNT", "75")
         addManifestPlaceholders([APP_NAME: "@string/app_name", MAIN_ACTIVITY: "org.pytorch.testapp.MainActivity"])
     }
     buildTypes {
         debug {
+            minifyEnabled false
+        }
+        release {
             minifyEnabled false
         }
     }
@@ -60,30 +64,6 @@ android {
             buildConfigField ("String", "LOGCAT_TAG", "\"pytorch-mbqCamera\"")
             buildConfigField ("int", "TU_TYPE", "0")
         }
-        mbqCameraC1 {
-            dimension "model"
-            applicationIdSuffix ".mbqCameraC1"
-            buildConfigField ("String", "MODULE_ASSET_NAME", buildConfigProps('MODULE_ASSET_NAME_MOBNET2_QUANT'))
-            addManifestPlaceholders([APP_NAME: "MBQ_C1", MAIN_ACTIVITY: "org.pytorch.testapp.CameraActivity"])
-            buildConfigField ("String", "LOGCAT_TAG", "\"pytorch-mbqCamera-C1\"")
-            buildConfigField ("int", "TU_TYPE", "1")
-        }
-        mbqCameraC2 {
-            dimension "model"
-            applicationIdSuffix ".mbqCameraC2"
-            buildConfigField ("String", "MODULE_ASSET_NAME", buildConfigProps('MODULE_ASSET_NAME_MOBNET2_QUANT'))
-            addManifestPlaceholders([APP_NAME: "MBQ_C2", MAIN_ACTIVITY: "org.pytorch.testapp.CameraActivity"])
-            buildConfigField ("String", "LOGCAT_TAG", "\"pytorch-mbqCamera-C2\"")
-            buildConfigField ("int", "TU_TYPE", "2")
-        }
-        mbqCameraL {
-            dimension "model"
-            applicationIdSuffix ".mbqCameraL"
-            buildConfigField ("String", "MODULE_ASSET_NAME", buildConfigProps('MODULE_ASSET_NAME_MOBNET2_QUANT'))
-            addManifestPlaceholders([APP_NAME: "MBQ_CAMERA_L", MAIN_ACTIVITY: "org.pytorch.testapp.CameraActivity"])
-            buildConfigField ("String", "LOGCAT_TAG", "\"pytorch-mbqCamera-L\"")
-            buildConfigField ("int", "TU_TYPE", "3")
-        }
         resnet18 {
             dimension "model"
             applicationIdSuffix ".resneti18"
@@ -93,7 +73,8 @@ android {
         }
     }
     packagingOptions {
-        doNotStrip '**.so'
+        //doNotStrip '**.so'
+        pickFirst '**/libfbjni.so'
     }
 }
 

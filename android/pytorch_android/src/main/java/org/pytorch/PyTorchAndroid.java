@@ -39,4 +39,6 @@ public final class PyTorchAndroid {
   }
 
   private static native void nativeSetNumThreads(int numThreads);
+
+  public static native int nativeStdOutErrToLogcat();
 }
