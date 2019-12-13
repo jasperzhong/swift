@@ -12,6 +12,7 @@ import org.pytorch.IValue;
 import org.pytorch.Module;
 import org.pytorch.Tensor;
 import org.pytorch.PyTorchAndroid;
+import org.pytorch.torchvision.PytorchVision;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -47,9 +48,9 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void run() {
           handleResult(result);
-          if (mBackgroundHandler != null) {
-            mBackgroundHandler.post(mModuleForwardRunnable);
-          }
+//          if (mBackgroundHandler != null) {
+//            mBackgroundHandler.post(mModuleForwardRunnable);
+//          }
         }
       });
     }
@@ -98,7 +99,11 @@ public class MainActivity extends AppCompatActivity {
 
     final long startTime = SystemClock.elapsedRealtime();
     final long moduleForwardStartTime = SystemClock.elapsedRealtime();
-    final Tensor outputTensor = mModule.forward(IValue.from(mInputTensor)).toTensor();
+//    final Tensor outputTensor = mModule.forward(IValue.from(mInputTensor)).toTensor();
+
+    int i = 0;
+    mModule.forward(IValue.from(i));
+
     final long moduleForwardDuration = SystemClock.elapsedRealtime() - moduleForwardStartTime;
     final float[] scores = outputTensor.getDataAsFloatArray();
     final long analysisDuration = SystemClock.elapsedRealtime() - startTime;
