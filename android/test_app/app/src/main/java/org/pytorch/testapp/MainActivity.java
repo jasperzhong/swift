@@ -91,6 +91,7 @@ public class MainActivity extends AppCompatActivity {
   @Nullable
   protected Result doModuleForward() {
     if (mModule == null) {
+      PyTorchAndroid.nativeStdOutErrToLogcat();
       mModule = PyTorchAndroid.loadModuleFromAsset(getAssets(), BuildConfig.MODULE_ASSET_NAME);
       mInputTensorBuffer = Tensor.allocateFloatBuffer(3 * 224 * 224);
       mInputTensor = Tensor.fromBlob(mInputTensorBuffer, new long[]{1, 3, 224, 224});
