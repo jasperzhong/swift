@@ -12,8 +12,8 @@
 #include <c10/macros/Macros.h>
 
 #if !defined(__clang__) && !defined(_MSC_VER) && defined(__GNUC__) && \
-  __GNUC__ < 5
-#error "You're trying to build PyTorch with a too old version of GCC. We need GCC 5 or later."
+  (__GNUC__ < 5 || (__GNUC__ == 5 && __GNUC_MINOR__ < 4))
+#error "You're trying to build PyTorch with a too old version of GCC. We need GCC 5.4 or later."
 #endif
 
 #if defined(__clang__) && __clang_major__ < 4
