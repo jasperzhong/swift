@@ -32,21 +32,8 @@
 #include <c10/util/BFloat16.h>
 #include <c10/util/flat_hash_map.h>
 
-/*
- * TypeIdentifier is a small type containing an id.
- * Types must be registered using CAFFE_KNOWN_TYPE() for them to have a type id.
- * If a type is registered, you can also create an object containing meta data
- * like constructor, destructor, stringified name, ... about the type by calling
- * TypeMeta::Make<T>. This returns a TypeMeta() object, which is basically just
- * a pointer to the type information, so it's cheap to pass around.
- */
-
 // TODO: This file is still in the caffe2 namespace, despite living
-// in the ATen directory.  This is because the macro
-// CAFFE_KNOWN_TYPE defines a template specialization, which relies
-// on the namespace of TypeMeta matching the namespace where the macro is
-// called.  This requires us to fix all of the call-sites, which I want to do
-// later.  So the namespace is not fixed at the moment.
+// in the ATen directory. Move to c10.
 
 // Make at::Half a fundamental type.
 namespace c10 {
@@ -59,10 +46,8 @@ struct is_fundamental<at::Half> : std::true_type {};
 namespace caffe2 {
 
 /**
- * A type id is a unique id for a given C++ type.
- * You need to register your types using CAFFE_KNOWN_TYPE(MyType) to be able to
- * use TypeIdentifier with custom types. This is for example used to store the
- * dtype of tensors.
+ * A TypeIdentifier is a unique id for a given C++ type.
+ * This is for example used to store the dtype of tensors.
  */
 class C10_API TypeIdentifier final
     : public at::IdWrapper<TypeIdentifier, c10::util::type_index> {
@@ -88,7 +73,7 @@ class C10_API TypeIdentifier final
 
  private:
   constexpr explicit TypeIdentifier(c10::util::type_index id) : IdWrapper(id) {}
-  friend class TypeMeta; // TODO Is this friend an issue?
+  friend class TypeMeta;
 };
 
 // Allow usage in std::map / std::set
@@ -293,8 +278,10 @@ inline constexpr TypeMetaData::Delete* _PickDelete() noexcept {
   return &_Delete<T>;
 }
 
+class _Uninitialized final {};
+
 template <class T>
-inline C10_TYPENAME_CONSTEXPR TypeMetaData _makeTypeMetaDataInstance() {
+inline TypeMetaData _makeTypeMetaDataInstance() {
   C10_HOST_CONSTEXPR_VAR auto typeId = TypeIdentifier::Get<T>();
   C10_TYPENAME_CONSTEXPR auto typeName = c10::util::get_fully_qualified_type_name<T>();
 
@@ -308,7 +295,17 @@ inline C10_TYPENAME_CONSTEXPR TypeMetaData _makeTypeMetaDataInstance() {
           typeName};
 }
 
-class _Uninitialized final {};
+template <>
+inline constexpr TypeMetaData _makeTypeMetaDataInstance<_Uninitialized>() {
+  return {0,
+          nullptr,
+          nullptr,
+          nullptr,
+          nullptr,
+          nullptr,
+          TypeIdentifier::uninitialized(),
+          "nullptr (uninitialized)"};
+}
 
 } // namespace detail
 
@@ -326,7 +323,8 @@ class C10_API TypeMeta final {
   using PlacementDelete = detail::TypeMetaData::PlacementDelete;
   using Delete = detail::TypeMetaData::Delete;
 
-  /** Create a dummy TypeMeta object. To create a TypeMeta object for a specific
+  /**
+   * Create a dummy TypeMeta object. To create a TypeMeta object for a specific
    * type, use TypeMeta::Make<T>().
    */
   TypeMeta() noexcept;
@@ -400,7 +398,7 @@ class C10_API TypeMeta final {
 
   template <typename T>
   bool Match() const noexcept {
-    return (*this == Make<T>());
+    return (id() == TypeIdentifier::Get<T>());
   }
 
   // Below are static functions that can be called by passing a specific type.
@@ -425,42 +423,22 @@ class C10_API TypeMeta final {
    */
   template <typename T>
   static TypeMeta Make() {
-    // The instance pointed to is declared here, but defined in a .cpp file.
-    // We need to silence the compiler warning about using an undefined
-    // variable template. '-Wpragmas' and '-Wunknown-warning-option' has to be
-    // disabled for compilers that don't know '-Wundefined-var-template' and
-    // would error at our attempt to disable it.
-#ifndef _MSC_VER
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpragmas"
-#pragma GCC diagnostic ignored "-Wunknown-warning-option"
-#pragma GCC diagnostic ignored "-Wundefined-var-template"
-#endif
-    return TypeMeta(_typeMetaDataInstance<T>());
-#ifndef _MSC_VER
-#pragma GCC diagnostic pop
-#endif
+    static detail::TypeMetaData singleton =
+        detail::_makeTypeMetaDataInstance<T>();
+    return TypeMeta(&singleton);
   }
 
  private:
   const detail::TypeMetaData* data_;
-
-  template <class T>
-  C10_API static const detail::TypeMetaData* _typeMetaDataInstance() noexcept;
 };
 
-template <>
-C10_EXPORT const detail::TypeMetaData* TypeMeta::_typeMetaDataInstance<
-    detail::_Uninitialized>() noexcept;
-
 inline TypeMeta::TypeMeta() noexcept
-    : data_(_typeMetaDataInstance<detail::_Uninitialized>()) {
-}
+    : TypeMeta(TypeMeta::Make<detail::_Uninitialized>()) {}
 
 inline bool operator==(
     const TypeMeta& lhs,
     const TypeMeta& rhs) noexcept {
-  return (lhs.data_ == rhs.data_);
+  return (lhs.id() == rhs.id());
 }
 inline bool operator!=(
     const TypeMeta& lhs,
@@ -474,38 +452,8 @@ inline std::ostream& operator<<(
   return stream << typeMeta.name();
 }
 
-/**
- * Register unique id for a type so it can be used in TypeMeta context, e.g. be
- * used as a type for Blob or for Tensor elements.
- *
- * CAFFE_KNOWN_TYPE does explicit instantiation of TypeIdentifier::Get<T>
- * template function and thus needs to be put in a single translation unit (.cpp
- * file) for a given type T. Other translation units that use type T as a type
- * of the caffe2::Blob or element type of caffe2::Tensor need to depend on the
- * translation unit that contains CAFFE_KNOWN_TYPE declaration via regular
- * linkage dependencies.
- *
- * NOTE: the macro needs to be invoked in ::caffe2 namespace
- */
-// Implementation note: in MSVC, we will need to prepend the C10_API
-// keyword in order to get things compiled properly. in Linux, gcc seems to
-// create attribute ignored error for explicit template instantiations, see
-//   http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0537r0.html
-//   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=51930
-// and as a result, we define these two macros slightly differently.
-#if defined(_MSC_VER) || defined(__clang__)
-#define EXPORT_IF_NOT_GCC C10_EXPORT
-#else
-#define EXPORT_IF_NOT_GCC
-#endif
-
-#define CAFFE_KNOWN_TYPE(T)                                        \
-  template <>                                                      \
-  EXPORT_IF_NOT_GCC const detail::TypeMetaData*                    \
-  TypeMeta::_typeMetaDataInstance<T>() noexcept {                  \
-    static C10_TYPENAME_CONSTEXPR detail::TypeMetaData singleton = \
-        detail::_makeTypeMetaDataInstance<T>();                    \
-    return &singleton;                                             \
-  }
+// Deprecated. CAFFE_KNOWN_TYPE is not needed anymore.
+// TODO Remove all CAFFE_KNOWN_TYPE occurrences
+#define CAFFE_KNOWN_TYPE(T)
 
 } // namespace caffe2
