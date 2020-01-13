@@ -111,10 +111,12 @@ static Variable applySlice(const Variable& self, int64_t dim, PyObject* slice, b
 static Variable applySelect(const Variable& self, int64_t dim, PyObject* index, int64_t real_dim=0) {
   if (jit::tracer::isTracing() && THPVariable_Check(index)) {
     auto& var = THPVariable_Unpack(index);
+    std::cout << "var: " << var << std::endl;
     jit::tracer::ArgumentStash::stashValue(std::string("index"), 1, var, jit::IntType::get());
   }
 
   int64_t unpacked_index = THPUtils_unpackLong(index);
+  std::cout << "unpacked_index: " << unpacked_index << std::endl;
   if (unpacked_index == 0 && dim == 0 && self.dim() == 0) {
     throw IndexError(
         "invalid index of a 0-dim tensor. "
