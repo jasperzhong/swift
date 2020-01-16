@@ -89,7 +89,7 @@ inline C10_TYPENAME_CONSTEXPR c10::string_view fully_qualified_type_name_impl() 
 }
 
 template <typename T>
-inline constexpr uint64_t type_index_impl() {
+inline C10_TYPENAME_CONSTEXPR uint64_t type_index_impl() {
 #if !defined(__CUDA_ARCH__)
 // Idea: __PRETTY_FUNCTION__ (or __FUNCSIG__ on msvc) contains a qualified name
 // of this function, including its template parameter, i.e. including the
@@ -110,13 +110,17 @@ inline constexpr uint64_t type_index_impl() {
 } // namespace detail
 
 template <typename T>
-inline constexpr type_index get_type_index() {
+inline C10_TYPENAME_CONSTEXPR type_index get_type_index() {
 #if !defined(__CUDA_ARCH__)
   // To enforce that this is really computed at compile time, we pass the
   // type index through std::integral_constant.
+#if C10_TYPENAME_SUPPORTS_CONSTEXPR
   return type_index{std::integral_constant<
       uint64_t,
       detail::type_index_impl<std::remove_cv_t<std::decay_t<T>>>()>::value};
+#else
+  return type_index{detail::type_index_impl<std::remove_cv_t<std::decay_t<T>>>()};
+#endif
 #else
   // There's nothing in theory preventing us from running this on device code
   // except for nvcc throwing a compiler error if we enable it.
@@ -148,8 +152,8 @@ public:
       if (*id_for_float != get_type_index<float>()) {
         TORCH_INTERNAL_ASSERT(false,
           "PyTorch was compiled using multiple different and incompatible compilers. ",
-          "One compiler assigned float the typeid ", *id_for_float,
-          " while the other compiler assigned it the typeid ", get_type_index<float>());
+          "A compiler whose code got loaded previously had assigned float the typeid ", *id_for_float,
+          " but the current one assigns it the typeid ", get_type_index<float>());
       }
     } else {
       id_for_float = get_type_index<float>();
