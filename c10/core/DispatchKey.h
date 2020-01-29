@@ -59,6 +59,14 @@ enum class DispatchKey : uint8_t {
 
   VariableTensorId,
 
+  // Compound ops denote operators which don't directly have a Variable
+  // definition for them, but instead are conventionally implemented as
+  // a series of calls to operations which do support autograd.  We can't
+  // register these operators directly to VariableTensorId because
+  // VariableTensorId is disabled in some circumstances (but compound
+  // ops must keep working).
+  CompoundOp,
+
   // Pre-autograd backend keys allow backends to override the autograd behavior
   // (aka VariableTensorId) for operators which have a Variable kernel
   // already registered.  For example, XLA wants to define autograd for
