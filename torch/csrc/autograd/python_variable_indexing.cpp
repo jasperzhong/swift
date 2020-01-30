@@ -172,9 +172,85 @@ Tensor dispatch_index_no_gil(Tensor & self, ArrayRef<TensorIndex> tensor_index_l
   return std::move(self.index(tensor_index_list));
 }
 
+static Variable applySelect(const Variable& self, int64_t dim, PyObject* index, int64_t real_dim=0) {
+  if (jit::tracer::isTracing() && THPVariable_Check(index)) {
+    auto& var = THPVariable_Unpack(index);
+    jit::tracer::ArgumentStash::stashValue(std::string("index"), 1, var, jit::IntType::get());
+  }
+
+  int64_t unpacked_index = THPUtils_unpackLong(index);
+  if (unpacked_index == 0 && dim == 0 && self.dim() == 0) {
+    throw IndexError(
+        "invalid index of a 0-dim tensor. "
+        "Use tensor.item() to convert a 0-dim tensor to a Python number");
+  }
+  int64_t size = self.size(dim);
+  if (unpacked_index < -size || unpacked_index >= size) {
+    throw IndexError("index %lld is out of bounds for dimension %lld with size %lld",
+      unpacked_index, real_dim, size);
+  }
+  // if the index is negative, do not normalize it because that would fix the index
+  // on the current tensor size in the tracer.
+  // aten::select also works on negative indices
+  return self.select(dim, unpacked_index);
+}
+
+static Variable applySlice(const Variable& self, int64_t dim, PyObject* slice, bool ensure_view=false) {
+  Py_ssize_t start, stop, step;
+  auto length = self.size(dim);
+
+  if (!THPUtils_unpackSlice(slice, &start, &stop, &step)) {
+    throw python_error();
+  }
+  if (step == 0) {
+    throw ValueError("step cannot be zero");
+  }
+  if (step < 0) {
+    // TODO: implement negative step
+    throw ValueError("negative step not yet supported");
+  }
+
+  PySliceObject* sliceobj = (PySliceObject*) slice;
+  if (jit::tracer::isTracing() && THPVariable_Check(sliceobj->start)) {
+      auto& var = THPVariable_Unpack(sliceobj->start);
+      jit::tracer::ArgumentStash::stashValue(std::string("start"), 1, var, jit::IntType::get());
+  }
+  if (jit::tracer::isTracing() && THPVariable_Check(sliceobj->stop)) {
+      auto& var = THPVariable_Unpack(sliceobj->stop);
+      jit::tracer::ArgumentStash::stashValue(std::string("end"), 1, var, jit::IntType::get());
+  }
+  if (jit::tracer::isTracing() && THPVariable_Check(sliceobj->step)) {
+      auto& var = THPVariable_Unpack(sliceobj->step);
+      jit::tracer::ArgumentStash::stashValue(std::string("step"), 1, var, jit::IntType::get());
+  }
+
+
+  // Skip this optimization if we are tracing, as the trace may be polymorphic
+  // over the shape of the `self` tensor, and we still want to record
+  // the slice.
+  if (!ensure_view && start == 0 && stop == length && step == 1 && !jit::tracer::isTracing()) {
+    return self;
+  }
+  return self.slice(dim, start, stop, step);
+}
+
 PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   HANDLE_TH_ERRORS
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
+
+  // yf225 TODO: comment why we need this special case for 1-dim indexing
+  OptionalDeviceGuard device_guard(device_of(self_));
+
+  // handle simple types: integers, slices, ellipsis
+  if (index == Py_None) {
+    return wrap(self_.unsqueeze(0));
+  } else if (index == Py_Ellipsis) {
+    return wrap(at::alias(self_));
+  } else if (THPUtils_checkLong(index)) {
+    return wrap(applySelect(self_, 0, index));
+  } else if (PySlice_Check(index)) {
+    return wrap(applySlice(self_, 0, index, true));
+  }
 
   return wrap(std::move(dispatch_index_no_gil(self_, indexToTensorIndexList(self_, index))));
 
