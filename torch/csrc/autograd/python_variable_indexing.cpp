@@ -105,11 +105,10 @@ static THPObjectPtr wrapTuple(PyObject* index) {
   return res;
 }
 
-static inline std::vector<TensorIndex> indexToTensorIndexList(const Variable& self, PyObject* index) {
+static inline void indexToTensorIndexList(const Variable& self, PyObject* index, std::vector<TensorIndex>& tensor_index_list) {
   THPObjectPtr holder = wrapTuple(index);
   int64_t size = PyTuple_GET_SIZE(holder.get());
 
-  std::vector<TensorIndex> tensor_index_list;
   tensor_index_list.reserve(size);
 
   for (int64_t i = 0; i < size; i++) {
@@ -164,10 +163,9 @@ static inline std::vector<TensorIndex> indexToTensorIndexList(const Variable& se
       }
     }
   }
-  return std::move(tensor_index_list);
 }
 
-inline Tensor dispatch_index_no_gil(Tensor & self, ArrayRef<TensorIndex> tensor_index_list) {
+inline Tensor dispatch_index_no_gil(Tensor & self, std::vector<TensorIndex>& tensor_index_list) {
   pybind11::gil_scoped_release no_gil;
   return std::move(self.index(tensor_index_list));
 }
@@ -273,7 +271,9 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
     return wrap(at::indexing::applySlice(self_, 0, start, stop, step, start_tensor, stop_tensor, step_tensor, true));
   }
 
-  return wrap(std::move(dispatch_index_no_gil(self_, indexToTensorIndexList(self_, index))));
+  std::vector<TensorIndex> tensor_index_list;
+  indexToTensorIndexList(self_, index, tensor_index_list);
+  return wrap(std::move(dispatch_index_no_gil(self_, tensor_index_list)));
 
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
@@ -295,7 +295,9 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
     throw TypeError("Tensor does not support deleting items");
   }
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
-  std::vector<TensorIndex> tensor_index_list = indexToTensorIndexList(self_, index);
+
+  std::vector<TensorIndex> tensor_index_list;
+  indexToTensorIndexList(self_, index, tensor_index_list);
 
   // yf225 TODO: do we need special case for 1-dim here as well?
 
