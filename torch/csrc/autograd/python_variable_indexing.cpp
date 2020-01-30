@@ -50,11 +50,11 @@ static void invalid_index(PyObject* obj) {
     "Variables are valid indices (got %s)", Py_TYPE(obj)->tp_name);
 }
 
-static Variable sequenceToVariable(c10::DispatchKey dispatch_key, PyObject* seq) {
+static inline Variable sequenceToVariable(c10::DispatchKey dispatch_key, PyObject* seq) {
   return torch::utils::indexing_tensor_from_data(dispatch_key, kLong, c10::nullopt, seq);
 }
 
-static bool treatSequenceAsTuple(PyObject* index) {
+static inline bool treatSequenceAsTuple(PyObject* index) {
   if (PyTuple_Check(index)) {
     return true;
   }
@@ -94,7 +94,7 @@ static bool treatSequenceAsTuple(PyObject* index) {
   return false;
 }
 
-static THPObjectPtr wrapTuple(PyObject* index) {
+static inline THPObjectPtr wrapTuple(PyObject* index) {
   THPObjectPtr res;
   if (treatSequenceAsTuple(index)) {
     res = PySequence_Tuple(index);
@@ -165,7 +165,7 @@ static inline void indexToTensorIndexList(const Variable& self, PyObject* index,
   }
 }
 
-inline Tensor dispatch_index_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list) {
+static inline Tensor dispatch_index_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list) {
   pybind11::gil_scoped_release no_gil;
   return std::move(at::indexing::get_item(self, tensor_index_list));
 }
@@ -218,12 +218,12 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   END_HANDLE_TH_ERRORS
 }
 
-inline void dispatch_index_put_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list, Tensor const & rhs) {
+static inline void dispatch_index_put_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list, Tensor const & rhs) {
   pybind11::gil_scoped_release no_gil;
   at::indexing::set_item(self, tensor_index_list, rhs);
 }
 
-inline void dispatch_index_put_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list, Scalar v) {
+static inline void dispatch_index_put_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list, Scalar v) {
   pybind11::gil_scoped_release no_gil;
   at::indexing::set_item(self, tensor_index_list, v);
 }
