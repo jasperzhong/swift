@@ -3,6 +3,9 @@
 #include <c10/util/Optional.h>
 #include <ATen/core/TensorBody.h>
 
+#include <torch/csrc/jit/ir.h>
+#include <torch/csrc/jit/tracer.h>
+
 namespace at {
 namespace indexing {
 
@@ -303,6 +306,62 @@ inline const Tensor& TensorIndex::tensor() const {
 
 CAFFE2_API std::ostream& operator<<(std::ostream& stream, const TensorIndex& tensor_index);
 CAFFE2_API std::ostream& operator<<(std::ostream& stream, const std::vector<TensorIndex>& tensor_indices);
+
+inline Tensor applySlice(
+    const Tensor& self,
+    int64_t dim,
+    int64_t start,
+    int64_t stop,
+    int64_t step,
+    const Tensor& start_tensor,
+    const Tensor& stop_tensor,
+    const Tensor& step_tensor,
+    bool ensure_view=false) {
+  const auto& length = self.size(dim);
+
+  TORCH_CHECK_VALUE(step != 0, "step cannot be zero");
+  // TODO: implement negative step
+  TORCH_CHECK_VALUE(step >= 0, "negative step not yet supported");
+
+  if (torch::jit::tracer::isTracing() && start_tensor.defined()) {
+    torch::jit::tracer::ArgumentStash::stashValue(std::string("start"), 1, start_tensor, torch::jit::IntType::get());
+  }
+  if (torch::jit::tracer::isTracing() && stop_tensor.defined()) {
+    torch::jit::tracer::ArgumentStash::stashValue(std::string("end"), 1, stop_tensor, torch::jit::IntType::get());
+  }
+  if (torch::jit::tracer::isTracing() && step_tensor.defined()) {
+    torch::jit::tracer::ArgumentStash::stashValue(std::string("step"), 1, step_tensor, torch::jit::IntType::get());
+  }
+
+  // Skip this optimization if we are tracing, as the trace may be polymorphic
+  // over the shape of the `self` tensor, and we still want to record
+  // the slice.
+  if (!ensure_view && start == 0 && stop == length && step == 1 && !torch::jit::tracer::isTracing()) {
+    return self;
+  }
+  return self.slice(dim, start, stop, step);
+}
+
+inline Tensor applySelect(const Tensor& self, int64_t dim, int64_t index, const Tensor& index_tensor, int64_t real_dim=0) {
+  if (torch::jit::tracer::isTracing() && index_tensor.defined()) {
+    torch::jit::tracer::ArgumentStash::stashValue(std::string("index"), 1, index_tensor, torch::jit::IntType::get());
+  }
+
+  TORCH_CHECK_INDEX(
+    !(index == 0 && dim == 0 && self.dim() == 0),
+    "invalid index of a 0-dim tensor. ",
+    "Use tensor.item() to convert a 0-dim tensor to a number");
+
+  int64_t size = self.size(dim);
+  TORCH_CHECK_INDEX(
+    index >= -size && index < size,
+    "index ", index, " is out of bounds for dimension ", real_dim, " with size ", size);
+
+  // if the index is negative, do not normalize it because that would fix the index
+  // on the current tensor size in the tracer.
+  // aten::select also works on negative indices
+  return self.select(dim, index);
+}
 
 } // namespace indexing
 } // namespace at

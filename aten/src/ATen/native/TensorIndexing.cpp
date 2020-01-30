@@ -5,8 +5,6 @@
 #include <ATen/native/TensorIndexing.h>
 
 #include <c10/util/Exception.h>
-#include <torch/csrc/jit/ir.h>
-#include <torch/csrc/jit/tracer.h>
 
 namespace at {
 namespace indexing {
@@ -66,61 +64,6 @@ inline int64_t count_specified_dimensions(ArrayRef<TensorIndex> indices) {
   return count;
 }
 
-// This mirrors `applySlice` in torch/csrc/autograd/python_variable_indexing.cpp
-inline Tensor applySlice(const Tensor& self, int64_t dim, const Slice& slice, bool ensure_view=false) {
-  const auto& start = slice.start();
-  const auto& stop = slice.stop();
-  const auto& step = slice.step();
-  const auto& length = self.size(dim);
-
-  TORCH_CHECK_VALUE(step != 0, "step cannot be zero");
-  // TODO: implement negative step
-  TORCH_CHECK_VALUE(step >= 0, "negative step not yet supported");
-
-  if (torch::jit::tracer::isTracing() && slice.has_start_tensor()) {
-    auto& var = slice.start_tensor();
-    torch::jit::tracer::ArgumentStash::stashValue(std::string("start"), 1, var, torch::jit::IntType::get());
-  }
-  if (torch::jit::tracer::isTracing() && slice.has_stop_tensor()) {
-    auto& var = slice.stop_tensor();
-    torch::jit::tracer::ArgumentStash::stashValue(std::string("end"), 1, var, torch::jit::IntType::get());
-  }
-  if (torch::jit::tracer::isTracing() && slice.has_step_tensor()) {
-    auto& var = slice.step_tensor();
-    torch::jit::tracer::ArgumentStash::stashValue(std::string("step"), 1, var, torch::jit::IntType::get());
-  }
-
-  // Skip this optimization if we are tracing, as the trace may be polymorphic
-  // over the shape of the `self` tensor, and we still want to record
-  // the slice.
-  if (!ensure_view && start == 0 && stop == length && step == 1 && !torch::jit::tracer::isTracing()) {
-    return self;
-  }
-  return self.slice(dim, start, stop, step);
-}
-
-// This mirrors `applySelect` in torch/csrc/autograd/python_variable_indexing.cpp
-inline Tensor applySelect(const Tensor& self, int64_t dim, int64_t index, const Tensor& index_tensor, int64_t real_dim=0) {
-  if (torch::jit::tracer::isTracing() && index_tensor.defined()) {
-    torch::jit::tracer::ArgumentStash::stashValue(std::string("index"), 1, index_tensor, torch::jit::IntType::get());
-  }
-
-  TORCH_CHECK_INDEX(
-    !(index == 0 && dim == 0 && self.dim() == 0),
-    "invalid index of a 0-dim tensor. ",
-    "Use tensor.item() to convert a 0-dim tensor to a number");
-
-  int64_t size = self.size(dim);
-  TORCH_CHECK_INDEX(
-    index >= -size && index < size,
-    "index ", index, " is out of bounds for dimension ", real_dim, " with size ", size);
-
-  // if the index is negative, do not normalize it because that would fix the index
-  // on the current tensor size in the tracer.
-  // aten::select also works on negative indices
-  return self.select(dim, index);
-}
-
 // This mirrors `valueToTensor` in torch/csrc/autograd/python_variable_indexing.cpp
 inline Tensor valueToTensor(c10::TensorOptions options, Scalar v) {
   return at::native::scalar_tensor(v, options);
@@ -162,7 +105,15 @@ inline Tensor applySlicing(const Tensor& self, ArrayRef<TensorIndex> indices, st
         obj.is_integer_with_tensor() ? obj.tensor() : Tensor(),
         i);
     } else if (obj.is_slice()) {
-      result = applySlice(result, dim, obj.slice());
+      result = applySlice(
+        result,
+        dim,
+        obj.slice().start(),
+        obj.slice().stop(),
+        obj.slice().step(),
+        obj.slice().start_tensor(),
+        obj.slice().stop_tensor(),
+        obj.slice().step_tensor());
       dim++;
     } else if (obj.is_ellipsis()) {
       dim += self.dim() - specified_dims;
@@ -238,7 +189,16 @@ inline Tensor get_item(const Tensor& self, ArrayRef<TensorIndex> indices) {
     } else if (index.is_integer()) {
       return applySelect(self, 0, index.integer(), index.is_integer_with_tensor() ? index.tensor() : Tensor());
     } else if (index.is_slice()) {
-      return applySlice(self, 0, index.slice(), true);
+      return applySlice(
+        self,
+        0,
+        index.slice().start(),
+        index.slice().stop(),
+        index.slice().step(),
+        index.slice().start_tensor(),
+        index.slice().stop_tensor(),
+        index.slice().step_tensor(),
+        true);
     }
   }
 
@@ -303,7 +263,15 @@ inline void set_item(Tensor& self, ArrayRef<TensorIndex> indices, const Tensor& 
       copy_to(applySelect(self, 0, index.integer(), index.is_integer_with_tensor() ? index.tensor() : Tensor()), value);
       return;
     } else if (index.is_slice()) {
-      copy_to(applySlice(self, 0, index.slice()), value);
+      copy_to(applySlice(
+        self,
+        0,
+        index.slice().start(),
+        index.slice().stop(),
+        index.slice().step(),
+        index.slice().start_tensor(),
+        index.slice().stop_tensor(),
+        index.slice().step_tensor()), value);
       return;
     }
   }
