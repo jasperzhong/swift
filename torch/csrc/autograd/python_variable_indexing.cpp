@@ -167,7 +167,7 @@ static inline void indexToTensorIndexList(const Variable& self, PyObject* index,
 
 static inline Tensor dispatch_index_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list) {
   pybind11::gil_scoped_release no_gil;
-  return std::move(at::indexing::get_item(self, tensor_index_list));
+  return at::indexing::get_item(self, tensor_index_list);
 }
 
 PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
