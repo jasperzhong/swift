@@ -44,7 +44,7 @@ std::ostream& operator<<(std::ostream& stream, const std::vector<TensorIndex>& t
 }
 
 // This mirrors `count_specified_dimensions` in torch/csrc/autograd/python_variable_indexing.cpp
-inline int64_t count_specified_dimensions(ArrayRef<TensorIndex> indices) {
+inline int64_t count_specified_dimensions(const ArrayRef<TensorIndex>& indices) {
   // Count the number of indexed dimensions (everything but ellipsis and None)
   int64_t count = 0;
   size_t size = indices.size();
@@ -80,7 +80,7 @@ inline Tensor boolToIndexingTensor(const Tensor& self, bool value) {
 }
 
 // This mirrors `applySlicing` in torch/csrc/autograd/python_variable_indexing.cpp
-inline Tensor applySlicing(const Tensor& self, ArrayRef<TensorIndex> indices, std::vector<Tensor>& outIndices) {
+inline Tensor applySlicing(const Tensor& self, const ArrayRef<TensorIndex>& indices, std::vector<Tensor>& outIndices) {
   int64_t size = indices.size();
   int64_t dim = 0;
   int64_t specified_dims = count_specified_dimensions(indices);
@@ -176,7 +176,7 @@ inline Tensor dispatch_index_put_(Tensor& self, const std::vector<Tensor>& indic
 }
 
 // This mirrors `THPVariable_getitem` in torch/csrc/autograd/python_variable_indexing.cpp
-inline Tensor get_item(const Tensor& self, ArrayRef<TensorIndex> indices) {
+inline Tensor get_item(const Tensor& self, const ArrayRef<TensorIndex>& indices) {
   OptionalDeviceGuard device_guard(device_of(self));
 
   // handle simple types: integers, slices, ellipsis
@@ -243,7 +243,7 @@ inline void copy_to(Tensor dst, const Tensor& src) {
 
 // This mirrors `THPVariable_setitem` in torch/csrc/autograd/python_variable_indexing.cpp
 // for "the assigned value is a Tensor" case
-inline void set_item(Tensor& self, ArrayRef<TensorIndex> indices, const Tensor& value) {
+inline void set_item(Tensor& self, const ArrayRef<TensorIndex>& indices, const Tensor& value) {
   OptionalDeviceGuard device_guard(device_of(self));
 
   // handle simple types: integers, slices, ellipsis, bool
@@ -296,7 +296,7 @@ inline void set_item(Tensor& self, ArrayRef<TensorIndex> indices, const Tensor& 
 
 // This mirrors `set_item` in torch/csrc/autograd/python_variable_indexing.cpp
 // for "the assigned value is a Scalar" case
-inline void set_item(Tensor& self, ArrayRef<TensorIndex> indices, Scalar v) {
+inline void set_item(Tensor& self, const ArrayRef<TensorIndex>& indices, Scalar v) {
   OptionalDeviceGuard device_guard(device_of(self));
   Tensor value;
 
@@ -312,22 +312,22 @@ inline void set_item(Tensor& self, ArrayRef<TensorIndex> indices, Scalar v) {
 
 } // namespace indexing
 
-Tensor Tensor::index(ArrayRef<TensorIndex> indices) const {
+Tensor Tensor::index(const ArrayRef<TensorIndex>& indices) const {
   return at::indexing::get_item(*this, indices);
 }
 Tensor Tensor::index(std::initializer_list<TensorIndex> indices) const {
   return index(ArrayRef<TensorIndex>(indices));
 }
 
-Tensor & Tensor::index_put_(ArrayRef<TensorIndex> indices, Tensor const & rhs) {
+Tensor & Tensor::index_put_(const ArrayRef<TensorIndex>& indices, Tensor const & rhs) {
   at::indexing::set_item(*this, indices, rhs);
   return *this;
 }
-Tensor & Tensor::index_put_(ArrayRef<TensorIndex> indices, Tensor && rhs) {
+Tensor & Tensor::index_put_(const ArrayRef<TensorIndex>& indices, Tensor && rhs) {
   at::indexing::set_item(*this, indices, rhs);
   return *this;
 }
-Tensor & Tensor::index_put_(ArrayRef<TensorIndex> indices, Scalar v) {
+Tensor & Tensor::index_put_(const ArrayRef<TensorIndex>& indices, Scalar v) {
   at::indexing::set_item(*this, indices, v);
   return *this;
 }

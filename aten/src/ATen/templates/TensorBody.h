@@ -398,11 +398,11 @@ class CAFFE2_API Tensor {
   Tensor operator[](Tensor index) const;
   Tensor operator[](int64_t index) const;
 
-  Tensor index(ArrayRef<TensorIndex> indices) const;
+  Tensor index(const ArrayRef<TensorIndex>& indices) const;
   Tensor index(std::initializer_list<TensorIndex> indices) const;
-  Tensor & index_put_(ArrayRef<TensorIndex> indices, Tensor const & rhs);
-  Tensor & index_put_(ArrayRef<TensorIndex> indices, Tensor && rhs);
-  Tensor & index_put_(ArrayRef<TensorIndex> indices, Scalar v);
+  Tensor & index_put_(const ArrayRef<TensorIndex>& indices, Tensor const & rhs);
+  Tensor & index_put_(const ArrayRef<TensorIndex>& indices, Tensor && rhs);
+  Tensor & index_put_(const ArrayRef<TensorIndex>& indices, Scalar v);
   Tensor & index_put_(std::initializer_list<TensorIndex> indices, Tensor const & rhs);
   Tensor & index_put_(std::initializer_list<TensorIndex> indices, Tensor && rhs);
   Tensor & index_put_(std::initializer_list<TensorIndex> indices, Scalar v);

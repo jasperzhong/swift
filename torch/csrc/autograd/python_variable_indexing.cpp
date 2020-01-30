@@ -165,7 +165,7 @@ static inline void indexToTensorIndexList(const Variable& self, PyObject* index,
   }
 }
 
-inline Tensor dispatch_index_no_gil(Tensor & self, std::vector<TensorIndex>& tensor_index_list) {
+inline Tensor dispatch_index_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list) {
   pybind11::gil_scoped_release no_gil;
   return std::move(self.index(tensor_index_list));
 }
@@ -279,12 +279,12 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   END_HANDLE_TH_ERRORS
 }
 
-inline void dispatch_index_put_no_gil(Tensor & self, ArrayRef<TensorIndex> tensor_index_list, Tensor const & rhs) {
+inline void dispatch_index_put_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list, Tensor const & rhs) {
   pybind11::gil_scoped_release no_gil;
   self.index_put_(tensor_index_list, rhs);
 }
 
-inline void dispatch_index_put_no_gil(Tensor & self, ArrayRef<TensorIndex> tensor_index_list, Scalar v) {
+inline void dispatch_index_put_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list, Scalar v) {
   pybind11::gil_scoped_release no_gil;
   self.index_put_(tensor_index_list, v);
 }
