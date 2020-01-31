@@ -8,7 +8,6 @@ namespace indexing {
 const EllipsisIndexType Ellipsis = EllipsisIndexType();
 
 Slice::Slice() {}
-
 Slice::Slice(int64_t start, int64_t stop, int64_t step) : start_(start), stop_(stop), step_(step) {}
 
 int64_t Slice::start() const {
