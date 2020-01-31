@@ -402,6 +402,7 @@ class CAFFE2_API Tensor {
   Tensor index(ArrayRef<TensorIndex> indices) const;
   Tensor index(std::initializer_list<TensorIndex> indices) const;
 
+  // yf225 TODO: we need to add `bool accumulate = false` as argument
   Tensor & index_put_(std::initializer_list<Tensor> indices, Tensor const & rhs);
   Tensor & index_put_(ArrayRef<TensorIndex> indices, Tensor const & rhs);
   Tensor & index_put_(ArrayRef<TensorIndex> indices, Tensor && rhs);
