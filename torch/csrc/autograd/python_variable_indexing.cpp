@@ -74,57 +74,6 @@ static inline Variable sequenceToVariable(c10::DispatchKey dispatch_key, PyObjec
   return torch::utils::indexing_tensor_from_data(dispatch_key, kLong, c10::nullopt, seq);
 }
 
-static inline bool treatSequenceAsTuple(PyObject* index) {
-  if (PyTuple_Check(index)) {
-    return true;
-  }
-  if (!PySequence_Check(index)) {
-    return false;
-  }
-  // This uses a heuristics from NumPy for determining whether to treat
-  // non-tuple sequences as if they were a tuple. From the NumPy code comments:
-  //
-  // "At this point, we're left with a non-tuple, non-array, sequence:
-  //  typically, a list. We use some somewhat-arbitrary heuristics from here
-  //  onwards to decided whether to treat that list as a single index, or a
-  //  list of indices. Backwards compatibility only takes effect for short
-  //  sequences - otherwise we treat it like any other scalar."
-  auto n = PySequence_Size(index);
-  if (n < 0) {
-    // Negative size indicates a Python error in the PySequence_Size call.
-    PyErr_Clear();
-    return false;
-  }
-  if (n >= 32) {
-    return false;
-  }
-  for (Py_ssize_t i = 0; i < n; i++) {
-    auto obj = THPObjectPtr{PySequence_GetItem(index, i)};
-    if (!obj.get()) {
-      PyErr_Clear();
-      return false;
-    }
-    if (THPVariable_Check(obj.get()) || PySequence_Check(obj.get()) || PySlice_Check(obj.get())) {
-      return true;
-    }
-    if (obj.get() == Py_Ellipsis || obj.get() == Py_None) {
-      return true;
-    }
-  }
-  return false;
-}
-
-static inline THPObjectPtr wrapTuple(PyObject* index) {
-  THPObjectPtr res;
-  if (treatSequenceAsTuple(index)) {
-    res = PySequence_Tuple(index);
-  } else {
-    res = PyTuple_Pack(1, index); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
-  }
-  if (!res) throw python_error();
-  return res;
-}
-
 static inline Variable valueToTensor(c10::TensorOptions options, PyObject* value) {
   if (THPVariable_Check(value)) {
     return reinterpret_cast<THPVariable*>(value)->cdata;
@@ -225,6 +174,57 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
     }
   }
   return result;
+}
+
+static inline bool treatSequenceAsTuple(PyObject* index) {
+  if (PyTuple_Check(index)) {
+    return true;
+  }
+  if (!PySequence_Check(index)) {
+    return false;
+  }
+  // This uses a heuristics from NumPy for determining whether to treat
+  // non-tuple sequences as if they were a tuple. From the NumPy code comments:
+  //
+  // "At this point, we're left with a non-tuple, non-array, sequence:
+  //  typically, a list. We use some somewhat-arbitrary heuristics from here
+  //  onwards to decided whether to treat that list as a single index, or a
+  //  list of indices. Backwards compatibility only takes effect for short
+  //  sequences - otherwise we treat it like any other scalar."
+  auto n = PySequence_Size(index);
+  if (n < 0) {
+    // Negative size indicates a Python error in the PySequence_Size call.
+    PyErr_Clear();
+    return false;
+  }
+  if (n >= 32) {
+    return false;
+  }
+  for (Py_ssize_t i = 0; i < n; i++) {
+    auto obj = THPObjectPtr{PySequence_GetItem(index, i)};
+    if (!obj.get()) {
+      PyErr_Clear();
+      return false;
+    }
+    if (THPVariable_Check(obj.get()) || PySequence_Check(obj.get()) || PySlice_Check(obj.get())) {
+      return true;
+    }
+    if (obj.get() == Py_Ellipsis || obj.get() == Py_None) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static inline THPObjectPtr wrapTuple(PyObject* index) {
+  THPObjectPtr res;
+  if (treatSequenceAsTuple(index)) {
+    res = PySequence_Tuple(index);
+  } else {
+    res = PyTuple_Pack(1, index); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+  }
+  if (!res) throw python_error();
+  return res;
 }
 
 PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
