@@ -235,21 +235,8 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
         i);
     } else if (PySlice_Check(obj)) {
       Py_ssize_t start, stop, step;
-      if (!THPUtils_unpackSlice(obj, &start, &stop, &step)) {
-        throw python_error();
-      }
-
-      PySliceObject* sliceobj = (PySliceObject*)obj;
       Tensor start_tensor, stop_tensor, step_tensor;
-      if (THPVariable_Check(sliceobj->start)) {
-        start_tensor = THPVariable_Unpack(sliceobj->start);
-      }
-      if (THPVariable_Check(sliceobj->stop)) {
-        stop_tensor = THPVariable_Unpack(sliceobj->stop);
-      }
-      if (THPVariable_Check(sliceobj->step)) {
-        step_tensor = THPVariable_Unpack(sliceobj->step);
-      }
+      unpackSliceAndExtractTensors(obj, start, stop, step, start_tensor, stop_tensor, step_tensor);
       result = at::indexing::handleSlice(
         result,
         dim,
@@ -355,6 +342,7 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
   }
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
 
+  // yf225 TODO: merge the qint type checking with C++ path
   // yf225 TODO: merge 1-D path for C++ and Python
   // yf225 TODO: merge n-D path for C++ and Python
 
