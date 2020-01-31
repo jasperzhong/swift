@@ -1,6 +1,5 @@
 #pragma once
 
-#include <c10/util/Exception.h>
 #include <c10/util/Optional.h>
 #include <ATen/core/TensorBody.h>
 #include <ATen/ExpandUtils.h>
@@ -36,17 +35,17 @@ struct CAFFE2_API Slice final {
     const Tensor& stop_tensor,
     const Tensor& step_tensor);
 
-  inline int64_t start() const;
-  inline int64_t stop() const;
-  inline int64_t step() const;
+  int64_t start() const;
+  int64_t stop() const;
+  int64_t step() const;
 
-  inline const Tensor& start_tensor() const;
-  inline const Tensor& stop_tensor() const;
-  inline const Tensor& step_tensor() const;
+  const Tensor& start_tensor() const;
+  const Tensor& stop_tensor() const;
+  const Tensor& step_tensor() const;
 
-  inline bool has_start_tensor() const;
-  inline bool has_stop_tensor() const;
-  inline bool has_step_tensor() const;
+  bool has_start_tensor() const;
+  bool has_stop_tensor() const;
+  bool has_step_tensor() const;
 
  private:
   int64_t start_;
@@ -56,58 +55,6 @@ struct CAFFE2_API Slice final {
   Tensor stop_tensor_;
   Tensor step_tensor_;
 };
-
-Slice::Slice() {}
-
-Slice::Slice(
-    int64_t start,
-    int64_t stop,
-    int64_t step,
-    const Tensor& start_tensor,
-    const Tensor& stop_tensor,
-    const Tensor& step_tensor)
-  : start_(start),
-    stop_(stop),
-    step_(step),
-    start_tensor_(start_tensor),
-    stop_tensor_(stop_tensor),
-    step_tensor_(step_tensor) {}
-
-inline int64_t Slice::start() const {
-  return start_;
-}
-
-inline int64_t Slice::stop() const {
-  return stop_;
-}
-
-inline int64_t Slice::step() const {
-  return step_;
-}
-
-inline const Tensor& Slice::start_tensor() const {
-  return start_tensor_;
-}
-
-inline const Tensor& Slice::stop_tensor() const {
-  return stop_tensor_;
-}
-
-inline const Tensor& Slice::step_tensor() const {
-  return step_tensor_;
-}
-
-inline bool Slice::has_start_tensor() const {
-  return start_tensor_.defined();
-}
-
-inline bool Slice::has_stop_tensor() const {
-  return stop_tensor_.defined();
-}
-
-inline bool Slice::has_step_tensor() const {
-  return step_tensor_.defined();
-}
 
 CAFFE2_API std::ostream& operator<<(std::ostream& stream, const Slice& slice);
 
@@ -145,7 +92,7 @@ struct CAFFE2_API TensorIndex final {
   TensorIndex(const char *str);
 
   // Case 3: Integer value (the tensor form can optionally be provided)
-  TensorIndex(int64_t integer, Tensor tensor = {});
+  TensorIndex(int64_t integer, Tensor tensor = undefined_tensor);
   TensorIndex(int integer);
 
   // Case 4: Boolean value
@@ -163,21 +110,21 @@ struct CAFFE2_API TensorIndex final {
   // Case 5: Tensor value
   TensorIndex(Tensor tensor);
 
-  inline bool is_none() const;
-  inline bool is_ellipsis() const;
+  bool is_none() const;
+  bool is_ellipsis() const;
 
-  inline bool is_integer() const;
-  inline bool is_integer_with_tensor() const;
-  inline int64_t integer() const;
+  bool is_integer() const;
+  bool is_integer_with_tensor() const;
+  int64_t integer() const;
 
-  inline bool is_boolean() const;
-  inline bool boolean() const;
+  bool is_boolean() const;
+  bool boolean() const;
 
-  inline bool is_slice() const;
-  inline const Slice& slice() const;
+  bool is_slice() const;
+  const Slice& slice() const;
 
-  inline bool is_tensor() const;
-  inline const Tensor& tensor() const;
+  bool is_tensor() const;
+  const Tensor& tensor() const;
 
  private:
   int64_t integer_;
@@ -186,129 +133,6 @@ struct CAFFE2_API TensorIndex final {
   Tensor tensor_;
   TensorIndexType type_;
 };
-
-// This mirrors `__PySlice_Unpack` in torch/csrc/utils/python_compat.h
-inline Slice unpackSlice(
-    c10::optional<int64_t> start_index,
-    c10::optional<int64_t> stop_index,
-    c10::optional<int64_t> step_index,
-    const Tensor& start_tensor,
-    const Tensor& stop_tensor,
-    const Tensor& step_tensor) {
-  int64_t start, stop, step;
-  if (!step_index.has_value()) {
-    step = 1;
-  } else {
-    step = step_index.value();
-    TORCH_CHECK_VALUE(step != 0, "slice step cannot be zero");
-
-    // Here step might be -INDEX_MAX-1; in this case we replace it
-    // with -INDEX_MAX.  This doesn't affect the semantics, and it
-    // guards against later undefined behaviour resulting from code that
-    // does "step = -step" as part of a slice reversal.
-    if (step < -INDEX_MAX)
-      step = -INDEX_MAX;
-  }
-  if (!start_index.has_value()) {
-    start = step < 0 ? INDEX_MAX : 0;
-  } else {
-    start = start_index.value();
-  }
-  if (!stop_index.has_value()) {
-    stop = step < 0 ? INDEX_MIN : INDEX_MAX;
-  } else {
-    stop = stop_index.value();
-  }
-  return Slice(start, stop, step, start_tensor, stop_tensor, step_tensor);
-}
-
-TensorIndex::TensorIndex(c10::nullopt_t) : type_(TensorIndexType::None) {}
-TensorIndex::TensorIndex(at::indexing::EllipsisIndexType) : type_(TensorIndexType::Ellipsis) {}
-TensorIndex::TensorIndex(const char *str) : TensorIndex(at::indexing::Ellipsis) {
-  TORCH_CHECK_VALUE(
-    strcmp(str, "...") == 0,
-    "Expected \"...\" to represent an ellipsis index, but got \"", str, "\"");
-}
-TensorIndex::TensorIndex(int64_t integer, Tensor tensor)
-    : integer_(integer),
-      tensor_(tensor),
-      type_(TensorIndexType::Integer) {}
-TensorIndex::TensorIndex(int integer) : TensorIndex((int64_t)integer) {}
-TensorIndex::TensorIndex(
-    std::initializer_list<c10::optional<int64_t>> slice,
-    at::ArrayRef<Tensor> slice_tensors)
-    : type_(TensorIndexType::Slice) {
-  if (slice.size() == 0) {
-    slice_ = unpackSlice(c10::nullopt, c10::nullopt, c10::nullopt, {}, {}, {});
-  } else if (slice.size() == 2) {
-    slice_ = unpackSlice(
-      *slice.begin(),
-      *(slice.begin() + 1),
-      c10::nullopt,
-      slice_tensors.size() > 0 ? slice_tensors[0] : undefined_tensor,
-      slice_tensors.size() > 0 ? slice_tensors[1] : undefined_tensor,
-      {});
-  } else if (slice.size() == 3) {
-    slice_ = unpackSlice(
-      *slice.begin(),
-      *(slice.begin() + 1),
-      *(slice.begin() + 2),
-      slice_tensors.size() > 0 ? slice_tensors[0] : undefined_tensor,
-      slice_tensors.size() > 0 ? slice_tensors[1] : undefined_tensor,
-      slice_tensors.size() > 0 ? slice_tensors[2] : undefined_tensor);
-  } else {
-    TORCH_CHECK_VALUE(
-      false,
-      "Expected 0 / 2 / 3 elements in the braced-init-list to represent a slice index, but got ",
-      slice.size(),
-      " element(s)");
-  }
-}
-TensorIndex::TensorIndex(Tensor tensor) : tensor_(tensor), type_(TensorIndexType::Tensor) {}
-
-inline bool TensorIndex::is_none() const {
-  return type_ == TensorIndexType::None;
-}
-
-inline bool TensorIndex::is_ellipsis() const {
-  return type_ == TensorIndexType::Ellipsis;
-}
-
-inline bool TensorIndex::is_integer() const {
-  return type_ == TensorIndexType::Integer;
-}
-
-inline bool TensorIndex::is_integer_with_tensor() const {
-  return type_ == TensorIndexType::Integer && tensor_.defined();
-}
-
-inline int64_t TensorIndex::integer() const {
-  return integer_;
-}
-
-inline bool TensorIndex::is_boolean() const {
-  return type_ == TensorIndexType::Boolean;
-}
-
-inline bool TensorIndex::boolean() const {
-  return boolean_;
-}
-
-inline bool TensorIndex::is_slice() const {
-  return type_ == TensorIndexType::Slice;
-}
-
-inline const Slice& TensorIndex::slice() const {
-  return slice_;
-}
-
-inline bool TensorIndex::is_tensor() const {
-  return type_ == TensorIndexType::Tensor;
-}
-
-inline const Tensor& TensorIndex::tensor() const {
-  return tensor_;
-}
 
 CAFFE2_API std::ostream& operator<<(std::ostream& stream, const TensorIndex& tensor_index);
 CAFFE2_API std::ostream& operator<<(std::ostream& stream, const std::vector<TensorIndex>& tensor_indices);
@@ -367,27 +191,6 @@ inline Tensor applySelect(const Tensor& self, int64_t dim, int64_t index, const 
   // on the current tensor size in the tracer.
   // aten::select also works on negative indices
   return at::select(self, dim, index);
-}
-
-// This mirrors `count_specified_dimensions` in torch/csrc/autograd/python_variable_indexing.cpp
-inline int64_t count_specified_dimensions(const ArrayRef<TensorIndex>& indices) {
-  // Count the number of indexed dimensions (everything but ellipsis and None)
-  int64_t count = 0;
-  size_t size = indices.size();
-  for (size_t i = 0; i < size; i++) {
-    auto& obj = indices[i];
-    if (obj.is_tensor()) {
-      auto& tensor = obj.tensor();
-      if (tensor.scalar_type() == kByte || tensor.scalar_type() == kBool) {
-        count += tensor.dim();
-      } else {
-        count++;
-      }
-    } else if (!obj.is_none() && !obj.is_ellipsis() && !obj.is_boolean()) {
-      count++;
-    }
-  }
-  return count;
 }
 
 // This mirrors `boolToIndexingTensor` in torch/csrc/autograd/python_variable_indexing.cpp
@@ -507,49 +310,6 @@ inline Tensor handleSliceSingleDim(
     /*ensure_view=*/is_get);
 }
 
-// This mirrors `applySlicing` in torch/csrc/autograd/python_variable_indexing.cpp
-inline Tensor applySlicing(const Tensor& self, const ArrayRef<TensorIndex>& indices, std::vector<Tensor>& outIndices) {
-  int64_t size = indices.size();
-  int64_t dim = 0;
-  int64_t specified_dims = count_specified_dimensions(indices);
-
-  TORCH_CHECK_INDEX(specified_dims <= self.dim(), "too many indices for tensor of dimension ", (int)self.dim());
-
-  Tensor result = self;
-  for (int64_t i = 0; i < size; i++) {
-    auto& obj = indices[i];
-    if (obj.is_integer()) {
-      result = handleInteger(
-        result,
-        dim,
-        obj.integer(),
-        obj.is_integer_with_tensor() ? obj.tensor() : undefined_tensor,
-        i);
-    } else if (obj.is_slice()) {
-      result = handleSlice(
-        result,
-        dim,
-        obj.slice().start(),
-        obj.slice().stop(),
-        obj.slice().step(),
-        obj.slice().start_tensor(),
-        obj.slice().stop_tensor(),
-        obj.slice().step_tensor());
-    } else if (obj.is_ellipsis()) {
-      handleEllipsis(self, dim, specified_dims);
-    } else if (obj.is_none()) {
-      result = handleNone(result, dim);
-    } else if (obj.is_boolean()) {
-      result = handleBoolean(result, obj.boolean(), outIndices, dim);
-    } else if (obj.is_tensor()) {
-      result = handleTensor(result, obj.tensor(), outIndices, dim, i);
-    } else {
-      TORCH_INTERNAL_ASSERT(false, "Invalid TensorIndex type");
-    }
-  }
-  return result;
-}
-
 // This mirrors `typeConvertIndices` in torch/csrc/autograd/python_variable_indexing.cpp
 inline std::vector<Tensor> typeConvertIndices(const Tensor& self, const std::vector<Tensor>& indices) {
   std::vector<Tensor> converted_inds(indices.size());
@@ -578,46 +338,6 @@ inline Tensor dispatch_index_put_(Tensor& self, const std::vector<Tensor>& indic
   return self.index_put_(converted_indices, value);
 }
 
-// This mirrors `THPVariable_getitem` in torch/csrc/autograd/python_variable_indexing.cpp
-inline Tensor get_item(const Tensor& self, const ArrayRef<TensorIndex>& indices) {
-  OptionalDeviceGuard device_guard(device_of(self));
-
-  // handle simple types: integers, slices, ellipsis
-  if (indices.size() == 1) {
-    const TensorIndex& index = indices[0];
-    if (index.is_none()) {
-      return handleNoneSingleDim(self);
-    } else if (index.is_ellipsis()) {
-      return handleEllipsisSingleDim(self);
-    } else if (index.is_integer()) {
-      return handleIntegerSingleDim(self, index.integer(), index.is_integer_with_tensor() ? index.tensor() : undefined_tensor);
-    } else if (index.is_slice()) {
-      return handleSliceSingleDim(
-        self,
-        index.slice().start(),
-        index.slice().stop(),
-        index.slice().step(),
-        index.slice().start_tensor(),
-        index.slice().stop_tensor(),
-        index.slice().step_tensor(),
-        true);
-    }
-  }
-
-  std::vector<Tensor> tensorIndices;
-  Tensor sliced = applySlicing(self, indices, tensorIndices);
-  if (tensorIndices.empty()) {
-    if (sliced.is_same(self)) {
-      // ensure we return a shallow copy for things like x[...]
-      sliced = sliced.alias();
-    }
-    return sliced;
-  }
-
-  // indexing by tensors ("advanced" indexing)
-  return dispatch_index(sliced, tensorIndices);
-}
-
 // This mirrors `slicePrefix1sSize` in torch/csrc/autograd/python_variable_indexing.cpp
 //
 // To match numpy semantics:
@@ -641,75 +361,6 @@ inline void copy_to(Tensor dst, const Tensor& src) {
   IntArrayRef sliced_src_sizes = slicePrefix1sSize(src.sizes());
   std::tie(b_src) = expand_inplace(dst, src.view(sliced_src_sizes), "setitem");
   dst.copy_(b_src);
-}
-
-// This mirrors `THPVariable_setitem` in torch/csrc/autograd/python_variable_indexing.cpp
-// for "the assigned value is a Tensor" case
-inline void set_item(Tensor& self, const ArrayRef<TensorIndex>& indices, const Tensor& value) {
-  OptionalDeviceGuard device_guard(device_of(self));
-
-  // handle simple types: integers, slices, ellipsis, bool
-  if (indices.size() == 1) {
-    const TensorIndex& index = indices[0];
-    if (index.is_boolean() && !index.boolean()) {
-      // do nothing for false (technically we should check the size, but we don't have
-      // real 0-sized shapes.
-      return;
-    } else if (index.is_ellipsis()) {
-      copy_to(self, value);
-      return;
-    } else if (index.is_none() || (index.is_boolean() && index.boolean())) {
-      copy_to(handleNoneSingleDim(self), value);
-      return;
-    } else if (index.is_integer()) {
-      copy_to(handleIntegerSingleDim(self, index.integer(), index.is_integer_with_tensor() ? index.tensor() : undefined_tensor), value);
-      return;
-    } else if (index.is_slice()) {
-      copy_to(handleSliceSingleDim(
-        self,
-        index.slice().start(),
-        index.slice().stop(),
-        index.slice().step(),
-        index.slice().start_tensor(),
-        index.slice().stop_tensor(),
-        index.slice().step_tensor(),
-        false), value);
-      return;
-    }
-  }
-
-  std::vector<Tensor> tensorIndices;
-  Tensor sliced = applySlicing(self, indices, tensorIndices);
-  if (tensorIndices.empty()) {
-    copy_to(sliced, value);
-    return;
-  }
-
-  IntArrayRef slicedValueSizes = slicePrefix1sSize(value.sizes());
-  Tensor valuesSliced;
-  if (!value.sizes().equals(slicedValueSizes)) {
-    valuesSliced = value.view(slicedValueSizes);
-  } else {
-    valuesSliced = value;
-  }
-  dispatch_index_put_(sliced, tensorIndices, valuesSliced);
-  return;
-}
-
-// This mirrors `set_item` in torch/csrc/autograd/python_variable_indexing.cpp
-// for "the assigned value is a Scalar" case
-inline void set_item(Tensor& self, const ArrayRef<TensorIndex>& indices, Scalar v) {
-  OptionalDeviceGuard device_guard(device_of(self));
-  Tensor value;
-
-  // TODO: This qint special case looks very suspicious...
-  if (isQIntType(self.scalar_type())) {
-    value = at::native::scalar_tensor(v, device(kCPU).dtype(kFloat));
-  } else {
-    value = at::native::scalar_tensor(v, self.options());
-  }
-
-  return set_item(self, indices, value);
 }
 
 } // namespace indexing

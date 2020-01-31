@@ -24,7 +24,6 @@
 #include <tuple>
 
 using namespace at;
-using namespace at::indexing;
 using namespace torch::autograd::utils;
 
 namespace torch { namespace autograd {
@@ -300,13 +299,13 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
     // real 0-sized shapes.
     return 0;
   } else if (index == Py_Ellipsis) {
-    copy_to(self_, value);
+    at::indexing::copy_to(self_, value);
     return 0;
   } else if (index == Py_None || index == Py_True) { // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
-    copy_to(at::indexing::handleNoneSingleDim(self_), value);
+    at::indexing::copy_to(at::indexing::handleNoneSingleDim(self_), value);
     return 0;
   } else if (THPUtils_checkLong(index)) {
-    copy_to(at::indexing::handleIntegerSingleDim(
+    at::indexing::copy_to(at::indexing::handleIntegerSingleDim(
       self_,
       THPUtils_unpackLong(index),
       THPVariable_Check(index) ? THPVariable_Unpack(index) : at::indexing::undefined_tensor), value);
@@ -315,7 +314,7 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
     Py_ssize_t start, stop, step;
     Tensor start_tensor, stop_tensor, step_tensor;
     unpackSliceAndExtractTensors(index, start, stop, step, start_tensor, stop_tensor, step_tensor);
-    copy_to(at::indexing::handleSliceSingleDim(
+    at::indexing::copy_to(at::indexing::handleSliceSingleDim(
       self_,
       start,
       stop,
@@ -333,7 +332,7 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
   variable_list variableIndices;
   Variable sliced = applySlicing(self_, holder.get(), variableIndices);
   if (variableIndices.empty()) {
-    copy_to(sliced, value);
+    at::indexing::copy_to(sliced, value);
     return 0;
   }
 
