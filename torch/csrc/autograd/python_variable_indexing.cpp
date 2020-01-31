@@ -43,7 +43,7 @@ Py_ssize_t THPVariable_length(PyObject* self) {
 // and tuples of those types. We also handle bools as if they were a
 // Variable[ByteTensor].
 
-static int64_t count_specified_dimensions(PyObject* index) {
+static inline int64_t count_specified_dimensions(PyObject* index) {
   // Count the number of indexed dimensions (everything but ellipsis and None)
   int64_t count = 0;
   auto size = PyTuple_GET_SIZE(index); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
@@ -64,7 +64,7 @@ static int64_t count_specified_dimensions(PyObject* index) {
 }
 
 [[noreturn]]
-static void invalid_index(PyObject* obj) {
+static inline void invalid_index(PyObject* obj) {
   throw IndexError(
     "only integers, slices (`:`), ellipsis (`...`), None and long or byte "
     "Variables are valid indices (got %s)", Py_TYPE(obj)->tp_name);
@@ -125,7 +125,7 @@ static inline THPObjectPtr wrapTuple(PyObject* index) {
   return res;
 }
 
-static Variable valueToTensor(c10::TensorOptions options, PyObject* value) {
+static inline Variable valueToTensor(c10::TensorOptions options, PyObject* value) {
   if (THPVariable_Check(value)) {
     return reinterpret_cast<THPVariable*>(value)->cdata;
   }
