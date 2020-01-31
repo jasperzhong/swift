@@ -79,7 +79,7 @@ struct CAFFE2_API TensorIndex final {
   TensorIndex(T boolean) : boolean_(boolean), type_(TensorIndexType::Boolean) {}
 
   // Case 5: Slice represented in `{start, stop, step}` form,
-  // where `start` / `stop` / `step` can be integer or `at::indexing::None`.
+  // where `start` / `stop` / `step` can be integer or `at::indexing::None`
   TensorIndex(std::initializer_list<c10::optional<int64_t>> slice);
 
   // Case 5: Tensor value

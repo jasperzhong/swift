@@ -295,7 +295,6 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
     throw TypeError("Tensor does not support deleting items");
   }
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
-
   OptionalDeviceGuard device_guard(device_of(self_));
   Variable value;
   // TODO: This qint special case looks very suspicious...
