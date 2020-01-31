@@ -271,7 +271,10 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   }
 
   // indexing by tensors ("advanced" indexing)
-  return wrap(at::indexing::dispatch_index(sliced, variableIndices));
+  return wrap(([&]() {
+    pybind11::gil_scoped_release no_gil;
+    return at::indexing::dispatch_index(sliced, variableIndices);
+  })());
 
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
