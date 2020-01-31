@@ -390,11 +390,6 @@ inline int64_t count_specified_dimensions(const ArrayRef<TensorIndex>& indices) 
   return count;
 }
 
-// This mirrors `valueToTensor` in torch/csrc/autograd/python_variable_indexing.cpp
-inline Tensor valueToTensor(c10::TensorOptions options, Scalar v) {
-  return at::native::scalar_tensor(v, options);
-}
-
 // This mirrors `boolToIndexingTensor` in torch/csrc/autograd/python_variable_indexing.cpp
 inline Tensor boolToIndexingTensor(const Tensor& self, bool value) {
   // booleans add a dimension of size 1. true indexes this dimension as if 0:, false as empty.
@@ -709,9 +704,9 @@ inline void set_item(Tensor& self, const ArrayRef<TensorIndex>& indices, Scalar 
 
   // TODO: This qint special case looks very suspicious...
   if (isQIntType(self.scalar_type())) {
-    value = valueToTensor(device(kCPU).dtype(kFloat), v);
+    value = at::native::scalar_tensor(v, device(kCPU).dtype(kFloat));
   } else {
-    value = valueToTensor(self.options(), v);
+    value = at::native::scalar_tensor(v, self.options());
   }
 
   return set_item(self, indices, value);

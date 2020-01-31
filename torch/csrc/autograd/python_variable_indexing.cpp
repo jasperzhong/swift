@@ -105,70 +105,22 @@ static inline THPObjectPtr wrapTuple(PyObject* index) {
   return res;
 }
 
-static inline void indexToTensorIndexList(const Variable& self, PyObject* index, std::vector<TensorIndex>& tensor_index_list) {
-  THPObjectPtr holder = wrapTuple(index);
-  int64_t size = PyTuple_GET_SIZE(holder.get());
-
-  tensor_index_list.reserve(size);
-
-  for (int64_t i = 0; i < size; i++) {
-    PyObject* obj = PyTuple_GET_ITEM(holder.get(), i);
-    if (THPUtils_checkLong(obj)) {
-      if (THPVariable_Check(obj)) {
-        tensor_index_list.emplace_back(TensorIndex(THPUtils_unpackLong(obj), THPVariable_Unpack(obj)));
-      } else {
-        tensor_index_list.emplace_back(TensorIndex(THPUtils_unpackLong(obj)));
-      }
-    } else if (PySlice_Check(obj)) {
-      Py_ssize_t start, stop, step;
-      if (!THPUtils_unpackSlice(obj, &start, &stop, &step)) {
-        throw python_error();
-      }
-
-      PySliceObject* sliceobj = (PySliceObject*)obj;
-      Tensor start_tensor, stop_tensor, step_tensor;
-      if (THPVariable_Check(sliceobj->start)) {
-        start_tensor = THPVariable_Unpack(sliceobj->start);
-      }
-      if (THPVariable_Check(sliceobj->stop)) {
-        stop_tensor = THPVariable_Unpack(sliceobj->stop);
-      }
-      if (THPVariable_Check(sliceobj->step)) {
-        step_tensor = THPVariable_Unpack(sliceobj->step);
-      }
-
-      tensor_index_list.emplace_back(TensorIndex({start, stop, step}, {start_tensor, stop_tensor, step_tensor}));
-    } else if (obj == Py_Ellipsis) {
-      tensor_index_list.emplace_back(TensorIndex(at::indexing::Ellipsis));
-    } else if (obj == Py_None) {
-      tensor_index_list.emplace_back(TensorIndex(at::indexing::None));
-    } else if (PyBool_Check(obj)) {
-      tensor_index_list.emplace_back(TensorIndex(obj == Py_True));
-    } else if (THPVariable_Check(obj)) {
-      tensor_index_list.emplace_back(TensorIndex(THPVariable_Unpack(obj)));
-    } else if (PySequence_Check(obj)) {
-      // TODO: Naughty naughty get out of jail free
-      // (Fixing this means I have to fix the call chain though :/)
-      tensor_index_list.emplace_back(TensorIndex(sequenceToVariable(legacyExtractDispatchKey(self), obj)));
-    } else {
-      auto ind = THPObjectPtr(PyNumber_Index(obj));
-      if (!ind) {
-        PyErr_Clear();
-        invalid_index(obj);
-      }
-      if (THPVariable_Check(ind)) {
-        tensor_index_list.emplace_back(TensorIndex(THPUtils_unpackLong(ind), THPVariable_Unpack(ind)));
-      } else {
-        tensor_index_list.emplace_back(TensorIndex(THPUtils_unpackLong(ind)));
-      }
-    }
+static Variable valueToTensor(c10::TensorOptions options, PyObject* value) {
+  if (THPVariable_Check(value)) {
+    return reinterpret_cast<THPVariable*>(value)->cdata;
   }
+  at::AutoNonVariableTypeMode guard;
+  if (THPUtils_checkLong(value) || PyBool_Check(value)) {
+    return at::scalar_tensor(Scalar(THPUtils_unpackLong(value)), options);
+  }
+  if (PyFloat_Check(value)) {
+    return at::scalar_tensor(Scalar(THPUtils_unpackDouble(value)), options);
+  }
+  throw TypeError(
+    "can't assign a %s to a %s",
+    Py_TYPE(value)->tp_name,
+    torch::utils::options_to_string(options).c_str());
 }
-
-// static inline Tensor dispatch_index_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list) {
-//   pybind11::gil_scoped_release no_gil;
-//   return at::indexing::get_item(self, tensor_index_list);
-// }
 
 static int64_t count_specified_dimensions(PyObject* index) {
   // Count the number of indexed dimensions (everything but ellipsis and None)
@@ -326,16 +278,6 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   END_HANDLE_TH_ERRORS
 }
 
-static inline void dispatch_index_put_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list, Tensor const & rhs) {
-  pybind11::gil_scoped_release no_gil;
-  at::indexing::set_item(self, tensor_index_list, rhs);
-}
-
-static inline void dispatch_index_put_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list, Scalar v) {
-  pybind11::gil_scoped_release no_gil;
-  at::indexing::set_item(self, tensor_index_list, v);
-}
-
 int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
   HANDLE_TH_ERRORS
   if (py_value == nullptr) {
@@ -343,82 +285,70 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
   }
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
 
-  // OptionalDeviceGuard device_guard(device_of(self_));
-  // Variable value;
-  // // TODO: This qint special case looks very suspicious...
-  // if (isQIntType(self_.scalar_type())) {
-  //   value = valueToTensor(device(kCPU).dtype(kFloat), py_value);
-  // } else {
-  //   value = valueToTensor(self_.options(), py_value);
-  // }
-
-  // // handle simple types: integers, slices, ellipsis, bool
-  // if (index == Py_False) { // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
-  //   // do nothing for false (technically we should check the size, but we don't have
-  //   // real 0-sized shapes.
-  //   return 0;
-  // } else if (index == Py_Ellipsis) {
-  //   copy_to(self_, value);
-  //   return 0;
-  // } else if (index == Py_None || index == Py_True) { // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
-  //   copy_to(self_.unsqueeze(0), value);
-  //   return 0;
-  // } else if (THPUtils_checkLong(index)) {
-  //   copy_to(applySelect(self_, 0, index), value);
-  //   return 0;
-  // } else if (PySlice_Check(index)) {
-  //   copy_to(applySlice(self_, 0, index), value);
-  //   return 0;
-  // }
-
-  // // wrap index in a tuple if it's not already one
-  // THPObjectPtr holder = wrapTuple(index);
-
-  // variable_list variableIndices;
-  // Variable sliced = applySlicing(self_, holder.get(), variableIndices);
-  // if (variableIndices.empty()) {
-  //   copy_to(sliced, value);
-  //   return 0;
-  // }
-
-  // IntArrayRef slicedValueSizes = slicePrefix1sSize(value.sizes());
-  // torch::autograd::Variable valuesSliced;
-  // if (!value.sizes().equals(slicedValueSizes)) {
-  //   valuesSliced = value.view(slicedValueSizes);
-  // } else {
-  //   valuesSliced = value;
-  // }
-  // {
-  //   pybind11::gil_scoped_release no_gil;
-  //   at::indexing::dispatch_index_put_(sliced, variableIndices, valuesSliced);  
-  // }
-  // return 0;
-
-  // yf225 TODO: merge the qint type checking with C++ path
-  // yf225 TODO: merge 1-D path for C++ and Python
-  // yf225 TODO: merge n-D path for C++ and Python
-
-  // yf225 TODO: decompose this as well!
-  std::vector<TensorIndex> tensor_index_list;
-  indexToTensorIndexList(self_, index, tensor_index_list);
-
-  if (THPVariable_Check(py_value)) {
-    dispatch_index_put_no_gil(self_, tensor_index_list, reinterpret_cast<THPVariable*>(py_value)->cdata);
-    return 0;
-  } else if (THPUtils_checkLong(py_value) || PyBool_Check(py_value)) {
-    Scalar v = Scalar(THPUtils_unpackLong(py_value));
-    dispatch_index_put_no_gil(self_, tensor_index_list, v);
-    return 0;
-  } else if (PyFloat_Check(py_value)) {
-    Scalar v = Scalar(THPUtils_unpackDouble(py_value));
-    dispatch_index_put_no_gil(self_, tensor_index_list, v);
-    return 0;
+  OptionalDeviceGuard device_guard(device_of(self_));
+  Variable value;
+  // TODO: This qint special case looks very suspicious...
+  if (isQIntType(self_.scalar_type())) {
+    value = valueToTensor(device(kCPU).dtype(kFloat), py_value);
   } else {
-    throw TypeError(
-      "can't assign a %s to a %s",
-      Py_TYPE(py_value)->tp_name,
-      torch::utils::options_to_string(self_.options()).c_str());
+    value = valueToTensor(self_.options(), py_value);
   }
+
+  // handle simple types: integers, slices, ellipsis, bool
+  if (index == Py_False) { // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+    // do nothing for false (technically we should check the size, but we don't have
+    // real 0-sized shapes.
+    return 0;
+  } else if (index == Py_Ellipsis) {
+    copy_to(self_, value);
+    return 0;
+  } else if (index == Py_None || index == Py_True) { // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+    copy_to(at::indexing::handleNoneSingleDim(self_), value);
+    return 0;
+  } else if (THPUtils_checkLong(index)) {
+    copy_to(at::indexing::handleIntegerSingleDim(
+      self_,
+      THPUtils_unpackLong(index),
+      THPVariable_Check(index) ? THPVariable_Unpack(index) : at::indexing::undefined_tensor), value);
+    return 0;
+  } else if (PySlice_Check(index)) {
+    Py_ssize_t start, stop, step;
+    Tensor start_tensor, stop_tensor, step_tensor;
+    unpackSliceAndExtractTensors(index, start, stop, step, start_tensor, stop_tensor, step_tensor);
+    copy_to(at::indexing::handleSliceSingleDim(
+      self_,
+      start,
+      stop,
+      step,
+      start_tensor,
+      stop_tensor,
+      step_tensor,
+      false), value);
+    return 0;
+  }
+
+  // wrap index in a tuple if it's not already one
+  THPObjectPtr holder = wrapTuple(index);
+
+  variable_list variableIndices;
+  Variable sliced = applySlicing(self_, holder.get(), variableIndices);
+  if (variableIndices.empty()) {
+    copy_to(sliced, value);
+    return 0;
+  }
+
+  IntArrayRef slicedValueSizes = slicePrefix1sSize(value.sizes());
+  torch::autograd::Variable valuesSliced;
+  if (!value.sizes().equals(slicedValueSizes)) {
+    valuesSliced = value.view(slicedValueSizes);
+  } else {
+    valuesSliced = value;
+  }
+  {
+    pybind11::gil_scoped_release no_gil;
+    at::indexing::dispatch_index_put_(sliced, variableIndices, valuesSliced);
+  }
+  return 0;
   END_HANDLE_TH_ERRORS_RET(-1)
 }
 
