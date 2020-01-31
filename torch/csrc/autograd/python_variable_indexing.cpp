@@ -38,6 +38,7 @@ Py_ssize_t THPVariable_length(PyObject* self) {
   END_HANDLE_TH_ERRORS_RET(-1)
 }
 
+
 // We allow indexing by integers, slices, ellipsis, None, Variables,
 // and tuples of those types. We also handle bools as if they were a
 // Variable[ByteTensor].
