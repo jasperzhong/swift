@@ -165,9 +165,103 @@ static inline void indexToTensorIndexList(const Variable& self, PyObject* index,
   }
 }
 
-static inline Tensor dispatch_index_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list) {
-  pybind11::gil_scoped_release no_gil;
-  return at::indexing::get_item(self, tensor_index_list);
+// static inline Tensor dispatch_index_no_gil(Tensor & self, const ArrayRef<TensorIndex>& tensor_index_list) {
+//   pybind11::gil_scoped_release no_gil;
+//   return at::indexing::get_item(self, tensor_index_list);
+// }
+
+static int64_t count_specified_dimensions(PyObject* index) {
+  // Count the number of indexed dimensions (everything but ellipsis and None)
+  int64_t count = 0;
+  auto size = PyTuple_GET_SIZE(index); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+  for (Py_ssize_t i = 0; i < size; i++) {
+    PyObject* obj = PyTuple_GET_ITEM(index, i); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+    if (THPVariable_Check(obj)) {
+      auto& var = reinterpret_cast<THPVariable*>(obj)->cdata;
+      if (var.scalar_type() == kByte || var.scalar_type() == kBool) {
+        count += var.dim();
+      } else {
+        count++;
+      }
+    } else if (obj != Py_None && obj != Py_Ellipsis && obj != Py_True && obj != Py_False) { // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+      count++;
+    }
+  }
+  return count;
+}
+
+static inline Variable applySlicing(const Variable& self, PyObject* index, variable_list& outIndices) {
+  int64_t size = PyTuple_GET_SIZE(index); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+  int64_t dim = 0;
+  int64_t specified_dims = count_specified_dimensions(index);
+
+  if (specified_dims > self.dim()) {
+    throw IndexError("too many indices for tensor of dimension %d", (int)self.dim());
+  }
+
+  Variable result = self;
+  for (int64_t i = 0; i < size; i++) {
+    PyObject* obj = PyTuple_GET_ITEM(index, i); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+    if (THPUtils_checkLong(obj)) {
+      result = at::indexing::handleInteger(
+        result,
+        dim,
+        THPUtils_unpackLong(obj),
+        THPVariable_Check(obj) ? THPVariable_Unpack(obj) : Tensor(),
+        i);
+    } else if (PySlice_Check(obj)) {
+      Py_ssize_t start, stop, step;
+      if (!THPUtils_unpackSlice(obj, &start, &stop, &step)) {
+        throw python_error();
+      }
+
+      PySliceObject* sliceobj = (PySliceObject*)obj;
+      Tensor start_tensor, stop_tensor, step_tensor;
+      if (THPVariable_Check(sliceobj->start)) {
+        start_tensor = THPVariable_Unpack(sliceobj->start);
+      }
+      if (THPVariable_Check(sliceobj->stop)) {
+        stop_tensor = THPVariable_Unpack(sliceobj->stop);
+      }
+      if (THPVariable_Check(sliceobj->step)) {
+        step_tensor = THPVariable_Unpack(sliceobj->step);
+      }
+      result = at::indexing::handleSlice(
+        result,
+        dim,
+        start,
+        stop,
+        step,
+        start_tensor,
+        stop_tensor,
+        step_tensor);
+    } else if (obj == Py_Ellipsis) {
+      at::indexing::handleEllipsis(self, dim, specified_dims);
+    } else if (obj == Py_None) {
+      result = at::indexing::handleNone(result, dim);
+    } else if (PyBool_Check(obj)) {
+      result = at::indexing::handleBoolean(result, obj == Py_True, outIndices, dim);
+    } else if (THPVariable_Check(obj)) {
+      result = at::indexing::handleTensor(result, THPVariable_Unpack(obj), outIndices, dim, i);
+    } else if (PySequence_Check(obj)) {
+      // TODO: Naughty naughty get out of jail free
+      // (Fixing this means I have to fix the call chain though :/)
+      at::indexing::_record_tensor_index(sequenceToVariable(legacyExtractDispatchKey(self), obj), outIndices, dim);
+    } else {
+      auto idx = THPObjectPtr(PyNumber_Index(obj));
+      if (!idx) {
+        PyErr_Clear();
+        invalid_index(obj);
+      }
+      result = at::indexing::handleInteger(
+        result,
+        dim,
+        THPUtils_unpackLong(obj),
+        THPVariable_Check(obj) ? THPVariable_Unpack(obj) : Tensor(),
+        i);
+    }
+  }
+  return result;
 }
 
 PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
@@ -212,54 +306,25 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   }
 
   // yf225 TODO: Plan: decompose the for-loop, and avoid constructing std::vector<TensorIndex>. Use `PyObject* index` as the index container
-  std::vector<TensorIndex> tensor_index_list;
-  indexToTensorIndexList(self_, index, tensor_index_list);
-  return wrap(std::move(dispatch_index_no_gil(self_, tensor_index_list)));
+  // std::vector<TensorIndex> tensor_index_list;
+  // indexToTensorIndexList(self_, index, tensor_index_list);
+  // return wrap(std::move(dispatch_index_no_gil(self_, tensor_index_list)));
 
-  // yf225 TODO debug
-  /*
+  // wrap index in a tuple if it's not already one
   THPObjectPtr holder = wrapTuple(index);
-  int64_t size = PyTuple_GET_SIZE(holder.get());
 
-  Tensor result = self_;
-  int64_t dim = 0;
-
-  for (int64_t i = 0; i < size; i++) {
-    PyObject* obj = PyTuple_GET_ITEM(holder.get(), i);
-    if (THPUtils_checkLong(obj)) {
-      if (THPVariable_Check(obj)) {
-        result = at::indexing::applySelect(
-          result,
-          dim,
-          THPUtils_unpackLong(obj),
-          THPVariable_Unpack(obj),
-          i);
-      } else {
-        result = at::indexing::applySelect(
-          result,
-          dim,
-          THPUtils_unpackLong(obj),
-          {},
-          i);
-      }
+  variable_list variableIndices;
+  Variable sliced = applySlicing(self_, holder.get(), variableIndices);
+  if (variableIndices.empty()) {
+    if (sliced.is_same(self_)) {
+      // ensure we return a shallow copy for things like x[...]
+      sliced = at::alias(sliced);
     }
+    return wrap(sliced);
   }
-  return wrap(result);
-  */
-  // yf225 TODO debug end
 
-  // std::vector<Tensor> tensorIndices;
-  // Tensor sliced = applySlicing(self, indices, tensorIndices);
-  // if (tensorIndices.empty()) {
-  //   if (sliced.is_same(self)) {
-  //     // ensure we return a shallow copy for things like x[...]
-  //     sliced = sliced.alias();
-  //   }
-  //   return sliced;
-  // }
-
-  // // indexing by tensors ("advanced" indexing)
-  // return dispatch_index(sliced, tensorIndices);
+  // indexing by tensors ("advanced" indexing)
+  return wrap(at::indexing::dispatch_index(sliced, variableIndices));
 
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
@@ -282,6 +347,7 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
   }
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
 
+  // yf225 TODO: decompose this as well!
   std::vector<TensorIndex> tensor_index_list;
   indexToTensorIndexList(self_, index, tensor_index_list);
 
