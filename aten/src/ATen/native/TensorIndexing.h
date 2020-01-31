@@ -403,18 +403,85 @@ inline Tensor boolToIndexingTensor(const Tensor& self, bool value) {
   }
 }
 
+inline void _record_tensor_index(const Tensor& tensor, std::vector<Tensor>& outIndices, int64_t& dim) {
+  // TODO: check scalarType
+  outIndices.resize(dim + 1);
+  outIndices[dim] = tensor;
+  dim++;
+};
+
+inline Tensor handleInteger(const Tensor& self, int64_t& dim, int64_t index, const Tensor& index_tensor, int64_t real_dim) {
+  return applySelect(
+    self,
+    dim,
+    index,
+    index_tensor,
+    real_dim);
+}
+
+inline Tensor handleSlice(
+  const Tensor& self,
+  int64_t& dim,
+  int64_t start,
+  int64_t stop,
+  int64_t step,
+  const Tensor& start_tensor,
+  const Tensor& stop_tensor,
+  const Tensor& step_tensor) {
+  Tensor result = applySlice(
+    self,
+    dim,
+    start,
+    stop,
+    step,
+    start_tensor,
+    stop_tensor,
+    step_tensor);
+  dim++;
+  return result;
+}
+
+inline void handleEllipsis(const Tensor& self, int64_t& dim, int64_t specified_dims) {
+  dim += self.dim() - specified_dims;
+}
+
+inline Tensor handleNone(const Tensor& self, int64_t& dim) {
+  Tensor result = self.unsqueeze(dim);
+  dim++;
+  return result;
+}
+
+inline Tensor handleBoolean(const Tensor& self, bool boolean, std::vector<Tensor>& outIndices, int64_t& dim) {
+  Tensor result = self.unsqueeze(dim);
+  _record_tensor_index(boolToIndexingTensor(result, boolean), outIndices, dim);
+  return result;
+}
+
+inline Tensor handleTensor(const Tensor& self, const Tensor& tensor, std::vector<Tensor>& outIndices, int64_t& dim, int64_t real_dim) {
+  Tensor result = self;
+  auto scalar_type = tensor.scalar_type();
+  if (tensor.dim() == 0 && at::isIntegralType(scalar_type, /*includeBool=*/true)) {
+    if (scalar_type != at::kByte && scalar_type != at::kBool) {
+      result = applySelect(result, dim, tensor.item<int64_t>(), tensor, real_dim);
+    } else {
+      result = result.unsqueeze(dim);
+      if (scalar_type == at::kBool) {
+        _record_tensor_index(boolToIndexingTensor(result, tensor.item<bool>() != 0), outIndices, dim);
+      } else {
+        _record_tensor_index(boolToIndexingTensor(result, tensor.item<uint8_t>() != 0), outIndices, dim);
+      }
+    }
+  } else {
+    _record_tensor_index(tensor, outIndices, dim);
+  }
+  return result;
+}
+
 // This mirrors `applySlicing` in torch/csrc/autograd/python_variable_indexing.cpp
 inline Tensor applySlicing(const Tensor& self, const ArrayRef<TensorIndex>& indices, std::vector<Tensor>& outIndices) {
   int64_t size = indices.size();
   int64_t dim = 0;
   int64_t specified_dims = count_specified_dimensions(indices);
-
-  auto handle_tensor = [&](const Tensor& tensor) {
-    // TODO: check scalarType
-    outIndices.resize(dim + 1);
-    outIndices[dim] = tensor;
-    dim++;
-  };
 
   TORCH_CHECK_INDEX(specified_dims <= self.dim(), "too many indices for tensor of dimension ", (int)self.dim());
 
@@ -422,14 +489,14 @@ inline Tensor applySlicing(const Tensor& self, const ArrayRef<TensorIndex>& indi
   for (int64_t i = 0; i < size; i++) {
     auto& obj = indices[i];
     if (obj.is_integer()) {
-      result = applySelect(
+      result = handleInteger(
         result,
         dim,
         obj.integer(),
         obj.is_integer_with_tensor() ? obj.tensor() : Tensor(),
         i);
     } else if (obj.is_slice()) {
-      result = applySlice(
+      result = handleSlice(
         result,
         dim,
         obj.slice().start(),
@@ -438,32 +505,14 @@ inline Tensor applySlicing(const Tensor& self, const ArrayRef<TensorIndex>& indi
         obj.slice().start_tensor(),
         obj.slice().stop_tensor(),
         obj.slice().step_tensor());
-      dim++;
     } else if (obj.is_ellipsis()) {
-      dim += self.dim() - specified_dims;
+      handleEllipsis(self, dim, specified_dims);
     } else if (obj.is_none()) {
-      result = result.unsqueeze(dim);
-      dim++;
+      result = handleNone(result, dim);
     } else if (obj.is_boolean()) {
-      result = result.unsqueeze(dim);
-      handle_tensor(boolToIndexingTensor(result, obj.boolean()));
+      result = handleBoolean(result, obj.boolean(), outIndices, dim);
     } else if (obj.is_tensor()) {
-      auto& tensor = obj.tensor();
-      auto scalar_type = tensor.scalar_type();
-      if (tensor.dim() == 0 && at::isIntegralType(scalar_type, /*includeBool=*/true)) {
-        if (scalar_type != at::kByte && scalar_type != at::kBool) {
-          result = applySelect(result, dim, tensor.item<int64_t>(), tensor, i);
-        } else {
-          result = result.unsqueeze(dim);
-          if(scalar_type == at::kBool) {
-            handle_tensor(boolToIndexingTensor(result, tensor.item<bool>() != 0));
-          } else {
-            handle_tensor(boolToIndexingTensor(result, tensor.item<uint8_t>() != 0));
-          }
-        }
-      } else {
-        handle_tensor(tensor);
-      }
+      result = handleTensor(result, obj.tensor(), outIndices, dim, i);
     } else {
       TORCH_INTERNAL_ASSERT(false, "Invalid TensorIndex type");
     }

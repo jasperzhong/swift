@@ -175,7 +175,7 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
 
   // yf225 TODO: comment why we need this special case for 1-dim indexing
-  // yf225 TODO: how to merge this with C++ 1-dim path?
+  // yf225 TODO: how to merge this with C++ 1-dim path? Can we merge this with n-dim path?
   OptionalDeviceGuard device_guard(device_of(self_));
 
   // handle simple types: integers, slices, ellipsis
@@ -190,6 +190,7 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
       return wrap(at::indexing::applySelect(self_, 0, THPUtils_unpackLong(index), {}));
     }
   } else if (PySlice_Check(index)) {
+    // yf225 TODO: can we dedup this with another use site?
     Py_ssize_t start, stop, step;
     if (!THPUtils_unpackSlice(index, &start, &stop, &step)) {
       throw python_error();
@@ -211,11 +212,12 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   }
 
   // yf225 TODO: Plan: decompose the for-loop, and avoid constructing std::vector<TensorIndex>. Use `PyObject* index` as the index container
-  // std::vector<TensorIndex> tensor_index_list;
-  // indexToTensorIndexList(self_, index, tensor_index_list);
-  // return wrap(std::move(dispatch_index_no_gil(self_, tensor_index_list)));
+  std::vector<TensorIndex> tensor_index_list;
+  indexToTensorIndexList(self_, index, tensor_index_list);
+  return wrap(std::move(dispatch_index_no_gil(self_, tensor_index_list)));
 
   // yf225 TODO debug
+  /*
   THPObjectPtr holder = wrapTuple(index);
   int64_t size = PyTuple_GET_SIZE(holder.get());
 
@@ -243,7 +245,21 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
     }
   }
   return wrap(result);
+  */
   // yf225 TODO debug end
+
+  // std::vector<Tensor> tensorIndices;
+  // Tensor sliced = applySlicing(self, indices, tensorIndices);
+  // if (tensorIndices.empty()) {
+  //   if (sliced.is_same(self)) {
+  //     // ensure we return a shallow copy for things like x[...]
+  //     sliced = sliced.alias();
+  //   }
+  //   return sliced;
+  // }
+
+  // // indexing by tensors ("advanced" indexing)
+  // return dispatch_index(sliced, tensorIndices);
 
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
