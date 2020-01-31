@@ -210,9 +210,40 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
     return wrap(at::indexing::applySlice(self_, 0, start, stop, step, start_tensor, stop_tensor, step_tensor, true));
   }
 
-  std::vector<TensorIndex> tensor_index_list;
-  indexToTensorIndexList(self_, index, tensor_index_list);
-  return wrap(std::move(dispatch_index_no_gil(self_, tensor_index_list)));
+  // yf225 TODO: Plan: decompose the for-loop, and avoid constructing std::vector<TensorIndex>. Use `PyObject* index` as the index container
+  // std::vector<TensorIndex> tensor_index_list;
+  // indexToTensorIndexList(self_, index, tensor_index_list);
+  // return wrap(std::move(dispatch_index_no_gil(self_, tensor_index_list)));
+
+  // yf225 TODO debug
+  THPObjectPtr holder = wrapTuple(index);
+  int64_t size = PyTuple_GET_SIZE(holder.get());
+
+  Tensor result = self_;
+  int64_t dim = 0;
+
+  for (int64_t i = 0; i < size; i++) {
+    PyObject* obj = PyTuple_GET_ITEM(holder.get(), i);
+    if (THPUtils_checkLong(obj)) {
+      if (THPVariable_Check(obj)) {
+        result = at::indexing::applySelect(
+          result,
+          dim,
+          THPUtils_unpackLong(obj),
+          THPVariable_Unpack(obj),
+          i);
+      } else {
+        result = at::indexing::applySelect(
+          result,
+          dim,
+          THPUtils_unpackLong(obj),
+          {},
+          i);
+      }
+    }
+  }
+  return wrap(result);
+  // yf225 TODO debug end
 
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
