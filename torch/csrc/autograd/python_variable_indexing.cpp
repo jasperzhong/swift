@@ -227,6 +227,10 @@ static inline THPObjectPtr wrapTuple(PyObject* index) {
   return res;
 }
 
+// NOTE: You might ask "why can't we convert all Python indices into an `std::vector<TensorIndex>`,
+// and then simply call the C++ multi-dim indexing function?" The answer is that the conversion
+// in general adds an overhead of 100s of nanoseconds to indexing calls such as `tensor[0]`
+// and `tensor[0, 0]`, which attributes to 10%-30% increase in runtime and thus undesirable.
 PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   HANDLE_TH_ERRORS
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
