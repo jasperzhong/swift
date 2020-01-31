@@ -3,6 +3,7 @@
 namespace at {
 namespace indexing {
 
+const Tensor undefined_tensor = Tensor();
 const EllipsisIndexType Ellipsis = EllipsisIndexType();
 
 std::ostream& operator<<(std::ostream& stream, const Slice& slice) {

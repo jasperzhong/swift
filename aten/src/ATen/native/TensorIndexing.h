@@ -16,6 +16,8 @@ namespace indexing {
 const int64_t INDEX_MAX = std::numeric_limits<int64_t>::max();
 const int64_t INDEX_MIN = std::numeric_limits<int64_t>::min();
 
+CAFFE2_API extern const Tensor undefined_tensor;
+
 enum class TensorIndexType { None, Ellipsis, Integer, Boolean, Slice, Tensor };
 
 constexpr c10::nullopt_t None{c10::nullopt_t::init()};
@@ -243,17 +245,17 @@ TensorIndex::TensorIndex(
       *slice.begin(),
       *(slice.begin() + 1),
       c10::nullopt,
-      slice_tensors.size() > 0 ? slice_tensors[0] : Tensor(),
-      slice_tensors.size() > 0 ? slice_tensors[1] : Tensor(),
+      slice_tensors.size() > 0 ? slice_tensors[0] : undefined_tensor,
+      slice_tensors.size() > 0 ? slice_tensors[1] : undefined_tensor,
       {});
   } else if (slice.size() == 3) {
     slice_ = unpackSlice(
       *slice.begin(),
       *(slice.begin() + 1),
       *(slice.begin() + 2),
-      slice_tensors.size() > 0 ? slice_tensors[0] : Tensor(),
-      slice_tensors.size() > 0 ? slice_tensors[1] : Tensor(),
-      slice_tensors.size() > 0 ? slice_tensors[2] : Tensor());
+      slice_tensors.size() > 0 ? slice_tensors[0] : undefined_tensor,
+      slice_tensors.size() > 0 ? slice_tensors[1] : undefined_tensor,
+      slice_tensors.size() > 0 ? slice_tensors[2] : undefined_tensor);
   } else {
     TORCH_CHECK_VALUE(
       false,
@@ -525,7 +527,7 @@ inline Tensor applySlicing(const Tensor& self, const ArrayRef<TensorIndex>& indi
         result,
         dim,
         obj.integer(),
-        obj.is_integer_with_tensor() ? obj.tensor() : Tensor(),
+        obj.is_integer_with_tensor() ? obj.tensor() : undefined_tensor,
         i);
     } else if (obj.is_slice()) {
       result = handleSlice(
@@ -592,7 +594,7 @@ inline Tensor get_item(const Tensor& self, const ArrayRef<TensorIndex>& indices)
     } else if (index.is_ellipsis()) {
       return handleEllipsisSingleDim(self);
     } else if (index.is_integer()) {
-      return handleIntegerSingleDim(self, index.integer(), index.is_integer_with_tensor() ? index.tensor() : Tensor());
+      return handleIntegerSingleDim(self, index.integer(), index.is_integer_with_tensor() ? index.tensor() : undefined_tensor);
     } else if (index.is_slice()) {
       return handleSliceSingleDimGet(
         self,
@@ -663,7 +665,7 @@ inline void set_item(Tensor& self, const ArrayRef<TensorIndex>& indices, const T
       copy_to(at::unsqueeze(self, 0), value);
       return;
     } else if (index.is_integer()) {
-      copy_to(applySelect(self, 0, index.integer(), index.is_integer_with_tensor() ? index.tensor() : Tensor()), value);
+      copy_to(applySelect(self, 0, index.integer(), index.is_integer_with_tensor() ? index.tensor() : undefined_tensor), value);
       return;
     } else if (index.is_slice()) {
       copy_to(applySlice(

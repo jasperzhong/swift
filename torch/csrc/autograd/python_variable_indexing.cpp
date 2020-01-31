@@ -231,7 +231,7 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
         result,
         dim,
         THPUtils_unpackLong(obj),
-        THPVariable_Check(obj) ? THPVariable_Unpack(obj) : Tensor(),
+        THPVariable_Check(obj) ? THPVariable_Unpack(obj) : at::indexing::undefined_tensor,
         i);
     } else if (PySlice_Check(obj)) {
       Py_ssize_t start, stop, step;
@@ -281,7 +281,7 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
         result,
         dim,
         THPUtils_unpackLong(obj),
-        THPVariable_Check(obj) ? THPVariable_Unpack(obj) : Tensor(),
+        THPVariable_Check(obj) ? THPVariable_Unpack(obj) : at::indexing::undefined_tensor,
         i);
     }
   }
@@ -292,7 +292,6 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   HANDLE_TH_ERRORS
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
 
-  // yf225 TODO: comment why we need this special case for 1-dim indexing
   OptionalDeviceGuard device_guard(device_of(self_));
 
   // handle simple types: integers, slices, ellipsis
@@ -304,7 +303,7 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
     return wrap(at::indexing::handleIntegerSingleDim(
       self_,
       THPUtils_unpackLong(index),
-      THPVariable_Check(index) ? THPVariable_Unpack(index) : Tensor()));
+      THPVariable_Check(index) ? THPVariable_Unpack(index) : at::indexing::undefined_tensor));
   } else if (PySlice_Check(index)) {
     Py_ssize_t start, stop, step;
     Tensor start_tensor, stop_tensor, step_tensor;
@@ -356,11 +355,12 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
   }
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
 
+  // yf225 TODO: merge 1-D path for C++ and Python
+  // yf225 TODO: merge n-D path for C++ and Python
+
   // yf225 TODO: decompose this as well!
   std::vector<TensorIndex> tensor_index_list;
   indexToTensorIndexList(self_, index, tensor_index_list);
-
-  // yf225 TODO: do we need special case for 1-dim here as well?
 
   if (THPVariable_Check(py_value)) {
     dispatch_index_put_no_gil(self_, tensor_index_list, reinterpret_cast<THPVariable*>(py_value)->cdata);
