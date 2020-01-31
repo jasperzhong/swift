@@ -190,6 +190,30 @@ static int64_t count_specified_dimensions(PyObject* index) {
   return count;
 }
 
+static inline void unpackSliceAndExtractTensors(
+  PyObject* obj,
+  Py_ssize_t& start,
+  Py_ssize_t& stop,
+  Py_ssize_t& step,
+  Tensor& start_tensor,
+  Tensor& stop_tensor,
+  Tensor& step_tensor) {
+  if (!THPUtils_unpackSlice(obj, &start, &stop, &step)) {
+    throw python_error();
+  }
+
+  PySliceObject* sliceobj = (PySliceObject*)obj;
+  if (THPVariable_Check(sliceobj->start)) {
+    start_tensor = THPVariable_Unpack(sliceobj->start);
+  }
+  if (THPVariable_Check(sliceobj->stop)) {
+    stop_tensor = THPVariable_Unpack(sliceobj->stop);
+  }
+  if (THPVariable_Check(sliceobj->step)) {
+    step_tensor = THPVariable_Unpack(sliceobj->step);
+  }
+}
+
 static inline Variable applySlicing(const Variable& self, PyObject* index, variable_list& outIndices) {
   int64_t size = PyTuple_GET_SIZE(index); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
   int64_t dim = 0;
@@ -269,46 +293,31 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
 
   // yf225 TODO: comment why we need this special case for 1-dim indexing
-  // yf225 TODO: how to merge this with C++ 1-dim path? Can we merge this with n-dim path?
   OptionalDeviceGuard device_guard(device_of(self_));
 
   // handle simple types: integers, slices, ellipsis
   if (index == Py_None) {
-    return wrap(self_.unsqueeze(0));
+    return wrap(at::indexing::handleNoneSingleDim(self_));
   } else if (index == Py_Ellipsis) {
-    return wrap(at::alias(self_));
+    return wrap(at::indexing::handleEllipsisSingleDim(self_));
   } else if (THPUtils_checkLong(index)) {
-    if (THPVariable_Check(index)) {
-      return wrap(at::indexing::applySelect(self_, 0, THPUtils_unpackLong(index), THPVariable_Unpack(index)));
-    } else {
-      return wrap(at::indexing::applySelect(self_, 0, THPUtils_unpackLong(index), {}));
-    }
+    return wrap(at::indexing::handleIntegerSingleDim(
+      self_,
+      THPUtils_unpackLong(index),
+      THPVariable_Check(index) ? THPVariable_Unpack(index) : Tensor()));
   } else if (PySlice_Check(index)) {
-    // yf225 TODO: can we dedup this with another use site?
     Py_ssize_t start, stop, step;
-    if (!THPUtils_unpackSlice(index, &start, &stop, &step)) {
-      throw python_error();
-    }
-
-    PySliceObject* sliceobj = (PySliceObject*)index;
     Tensor start_tensor, stop_tensor, step_tensor;
-    if (THPVariable_Check(sliceobj->start)) {
-      start_tensor = THPVariable_Unpack(sliceobj->start);
-    }
-    if (THPVariable_Check(sliceobj->stop)) {
-      stop_tensor = THPVariable_Unpack(sliceobj->stop);
-    }
-    if (THPVariable_Check(sliceobj->step)) {
-      step_tensor = THPVariable_Unpack(sliceobj->step);
-    }
-
-    return wrap(at::indexing::applySlice(self_, 0, start, stop, step, start_tensor, stop_tensor, step_tensor, true));
+    unpackSliceAndExtractTensors(index, start, stop, step, start_tensor, stop_tensor, step_tensor);
+    return wrap(at::indexing::handleSliceSingleDimGet(
+      self_,
+      start,
+      stop,
+      step,
+      start_tensor,
+      stop_tensor,
+      step_tensor));
   }
-
-  // yf225 TODO: Plan: decompose the for-loop, and avoid constructing std::vector<TensorIndex>. Use `PyObject* index` as the index container
-  // std::vector<TensorIndex> tensor_index_list;
-  // indexToTensorIndexList(self_, index, tensor_index_list);
-  // return wrap(std::move(dispatch_index_no_gil(self_, tensor_index_list)));
 
   // wrap index in a tuple if it's not already one
   THPObjectPtr holder = wrapTuple(index);

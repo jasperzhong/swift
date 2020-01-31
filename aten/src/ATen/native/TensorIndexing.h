@@ -477,6 +477,38 @@ inline Tensor handleTensor(const Tensor& self, const Tensor& tensor, std::vector
   return result;
 }
 
+inline Tensor handleNoneSingleDim(const Tensor& self) {
+  return at::unsqueeze(self, 0);
+}
+
+inline Tensor handleEllipsisSingleDim(const Tensor& self) {
+  return at::alias(self);
+}
+
+inline Tensor handleIntegerSingleDim(const Tensor& self, int64_t index, const Tensor& index_tensor) {
+  return applySelect(self, 0, index, index_tensor);
+}
+
+inline Tensor handleSliceSingleDimGet(
+  const Tensor& self,
+  int64_t start,
+  int64_t stop,
+  int64_t step,
+  const Tensor& start_tensor,
+  const Tensor& stop_tensor,
+  const Tensor& step_tensor) {
+  return applySlice(
+    self,
+    0,
+    start,
+    stop,
+    step,
+    start_tensor,
+    stop_tensor,
+    step_tensor,
+    true);
+}
+
 // This mirrors `applySlicing` in torch/csrc/autograd/python_variable_indexing.cpp
 inline Tensor applySlicing(const Tensor& self, const ArrayRef<TensorIndex>& indices, std::vector<Tensor>& outIndices) {
   int64_t size = indices.size();
@@ -556,22 +588,20 @@ inline Tensor get_item(const Tensor& self, const ArrayRef<TensorIndex>& indices)
   if (indices.size() == 1) {
     const TensorIndex& index = indices[0];
     if (index.is_none()) {
-      return at::unsqueeze(self, 0);
+      return handleNoneSingleDim(self);
     } else if (index.is_ellipsis()) {
-      return at::alias(self);
+      return handleEllipsisSingleDim(self);
     } else if (index.is_integer()) {
-      return applySelect(self, 0, index.integer(), index.is_integer_with_tensor() ? index.tensor() : Tensor());
+      return handleIntegerSingleDim(self, index.integer(), index.is_integer_with_tensor() ? index.tensor() : Tensor());
     } else if (index.is_slice()) {
-      return applySlice(
+      return handleSliceSingleDimGet(
         self,
-        0,
         index.slice().start(),
         index.slice().stop(),
         index.slice().step(),
         index.slice().start_tensor(),
         index.slice().stop_tensor(),
-        index.slice().step_tensor(),
-        true);
+        index.slice().step_tensor());
     }
   }
 
