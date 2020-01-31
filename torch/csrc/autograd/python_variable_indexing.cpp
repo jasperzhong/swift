@@ -230,7 +230,6 @@ static inline THPObjectPtr wrapTuple(PyObject* index) {
 PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   HANDLE_TH_ERRORS
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
-
   OptionalDeviceGuard device_guard(device_of(self_));
 
   // handle simple types: integers, slices, ellipsis
