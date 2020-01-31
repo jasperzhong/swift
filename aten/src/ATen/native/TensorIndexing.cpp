@@ -378,7 +378,7 @@ void set_item(Tensor& self, ArrayRef<TensorIndex> indices, const Tensor& value) 
   return;
 }
 
-// This mirrors `set_item` in torch/csrc/autograd/python_variable_indexing.cpp
+// This mirrors `THPVariable_setitem` in torch/csrc/autograd/python_variable_indexing.cpp
 // for "the assigned value is a Scalar" case
 void set_item(Tensor& self, ArrayRef<TensorIndex> indices, Scalar v) {
   OptionalDeviceGuard device_guard(device_of(self));

@@ -193,7 +193,6 @@ inline Tensor applySelect(const Tensor& self, int64_t dim, int64_t index, const 
   return at::select(self, dim, index);
 }
 
-// This mirrors `boolToIndexingTensor` in torch/csrc/autograd/python_variable_indexing.cpp
 inline Tensor boolToIndexingTensor(const Tensor& self, bool value) {
   // booleans add a dimension of size 1. true indexes this dimension as if 0:, false as empty.
   if (value) {
@@ -310,7 +309,6 @@ inline Tensor handleSliceSingleDim(
     /*ensure_view=*/is_get);
 }
 
-// This mirrors `typeConvertIndices` in torch/csrc/autograd/python_variable_indexing.cpp
 inline std::vector<Tensor> typeConvertIndices(const Tensor& self, const std::vector<Tensor>& indices) {
   std::vector<Tensor> converted_inds(indices.size());
   for (size_t i = 0; i < indices.size(); ++i) {
@@ -324,22 +322,18 @@ inline std::vector<Tensor> typeConvertIndices(const Tensor& self, const std::vec
   return converted_inds;
 }
 
-// This mirrors `dispatch_index` in torch/csrc/autograd/python_variable_indexing.cpp
 inline Tensor dispatch_index(const Tensor& self, const std::vector<Tensor>& indices) {
   std::vector<Tensor> converted_indices = typeConvertIndices(self, indices);
   OptionalDeviceGuard device_guard(device_of(self));
   return self.index(converted_indices);
 }
 
-// This mirrors `dispatch_index_put_` in torch/csrc/autograd/python_variable_indexing.cpp
 inline Tensor dispatch_index_put_(Tensor& self, const std::vector<Tensor>& indices, const Tensor& value) {
   std::vector<Tensor> converted_indices = typeConvertIndices(self, indices);
   OptionalDeviceGuard device_guard(device_of(self));
   return self.index_put_(converted_indices, value);
 }
 
-// This mirrors `slicePrefix1sSize` in torch/csrc/autograd/python_variable_indexing.cpp
-//
 // To match numpy semantics:
 // As a special case for backwards compatibility,
 // strip away unit dimensions from the left of 'src'
@@ -355,7 +349,6 @@ inline IntArrayRef slicePrefix1sSize(IntArrayRef sizes) {
   return sizes.slice(first_non1_src);
 }
 
-// This mirrors `copy_to` in torch/csrc/autograd/python_variable_indexing.cpp
 inline void copy_to(Tensor dst, const Tensor& src) {
   Tensor b_src;
   IntArrayRef sliced_src_sizes = slicePrefix1sSize(src.sizes());
