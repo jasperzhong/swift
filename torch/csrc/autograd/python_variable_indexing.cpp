@@ -43,6 +43,26 @@ Py_ssize_t THPVariable_length(PyObject* self) {
 // and tuples of those types. We also handle bools as if they were a
 // Variable[ByteTensor].
 
+static int64_t count_specified_dimensions(PyObject* index) {
+  // Count the number of indexed dimensions (everything but ellipsis and None)
+  int64_t count = 0;
+  auto size = PyTuple_GET_SIZE(index); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+  for (Py_ssize_t i = 0; i < size; i++) {
+    PyObject* obj = PyTuple_GET_ITEM(index, i); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+    if (THPVariable_Check(obj)) {
+      auto& var = reinterpret_cast<THPVariable*>(obj)->cdata;
+      if (var.scalar_type() == kByte || var.scalar_type() == kBool) {
+        count += var.dim();
+      } else {
+        count++;
+      }
+    } else if (obj != Py_None && obj != Py_Ellipsis && obj != Py_True && obj != Py_False) { // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+      count++;
+    }
+  }
+  return count;
+}
+
 [[noreturn]]
 static void invalid_index(PyObject* obj) {
   throw IndexError(
@@ -120,26 +140,6 @@ static Variable valueToTensor(c10::TensorOptions options, PyObject* value) {
     "can't assign a %s to a %s",
     Py_TYPE(value)->tp_name,
     torch::utils::options_to_string(options).c_str());
-}
-
-static int64_t count_specified_dimensions(PyObject* index) {
-  // Count the number of indexed dimensions (everything but ellipsis and None)
-  int64_t count = 0;
-  auto size = PyTuple_GET_SIZE(index); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
-  for (Py_ssize_t i = 0; i < size; i++) {
-    PyObject* obj = PyTuple_GET_ITEM(index, i); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
-    if (THPVariable_Check(obj)) {
-      auto& var = reinterpret_cast<THPVariable*>(obj)->cdata;
-      if (var.scalar_type() == kByte || var.scalar_type() == kBool) {
-        count += var.dim();
-      } else {
-        count++;
-      }
-    } else if (obj != Py_None && obj != Py_Ellipsis && obj != Py_True && obj != Py_False) { // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
-      count++;
-    }
-  }
-  return count;
 }
 
 static inline void unpackSliceAndExtractTensors(
