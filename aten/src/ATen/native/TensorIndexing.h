@@ -131,7 +131,7 @@ inline Tensor applySlice(
   if (!ensure_view && start == 0 && stop == length && step == 1 && !is_tracing) {
     return self;
   }
-  return at::native::slice(self, dim, start, stop, step);
+  return self.slice(dim, start, stop, step);
 }
 
 inline Tensor applySelect(const Tensor& self, int64_t dim, int64_t index, int64_t real_dim=0) {
@@ -148,7 +148,7 @@ inline Tensor applySelect(const Tensor& self, int64_t dim, int64_t index, int64_
   // if the index is negative, do not normalize it because that would fix the index
   // on the current tensor size in the tracer.
   // aten::select also works on negative indices
-  return at::native::select(self, dim, index);
+  return self.select(dim, index);
 }
 
 inline Tensor boolToIndexingTensor(const Tensor& self, bool value) {
@@ -182,13 +182,13 @@ inline void handleEllipsis(const Tensor& self, int64_t& dim, int64_t specified_d
 }
 
 inline Tensor handleNone(const Tensor& self, int64_t& dim) {
-  Tensor result = at::native::unsqueeze(self, dim);
+  Tensor result = self.unsqueeze(dim);
   dim++;
   return result;
 }
 
 inline Tensor handleBoolean(const Tensor& self, bool boolean, std::vector<Tensor>& outIndices, int64_t& dim) {
-  Tensor result = at::native::unsqueeze(self, dim);
+  Tensor result = self.unsqueeze(dim);
   recordTensorIndex(boolToIndexingTensor(result, boolean), outIndices, dim);
   return result;
 }
@@ -214,11 +214,11 @@ inline Tensor handleTensor(const Tensor& self, const Tensor& tensor, std::vector
 }
 
 inline Tensor handleNoneSingleDim(const Tensor& self) {
-  return at::native::unsqueeze(self, 0);
+  return self.unsqueeze(0);
 }
 
 inline Tensor handleEllipsisSingleDim(const Tensor& self) {
-  return at::native::alias(self);
+  return self.alias();
 }
 
 inline Tensor handleIntegerSingleDim(const Tensor& self, int64_t index) {
