@@ -5,7 +5,6 @@
 namespace at {
 namespace indexing {
 
-const Tensor undefined_tensor = Tensor();
 const EllipsisIndexType Ellipsis = EllipsisIndexType();
 
 Slice::Slice() {}
@@ -13,16 +12,10 @@ Slice::Slice() {}
 Slice::Slice(
     int64_t start,
     int64_t stop,
-    int64_t step,
-    const Tensor& start_tensor,
-    const Tensor& stop_tensor,
-    const Tensor& step_tensor)
+    int64_t step)
   : start_(start),
     stop_(stop),
-    step_(step),
-    start_tensor_(start_tensor),
-    stop_tensor_(stop_tensor),
-    step_tensor_(step_tensor) {}
+    step_(step) {}
 
 int64_t Slice::start() const {
   return start_;
@@ -36,30 +29,6 @@ int64_t Slice::step() const {
   return step_;
 }
 
-const Tensor& Slice::start_tensor() const {
-  return start_tensor_;
-}
-
-const Tensor& Slice::stop_tensor() const {
-  return stop_tensor_;
-}
-
-const Tensor& Slice::step_tensor() const {
-  return step_tensor_;
-}
-
-bool Slice::has_start_tensor() const {
-  return start_tensor_.defined();
-}
-
-bool Slice::has_stop_tensor() const {
-  return stop_tensor_.defined();
-}
-
-bool Slice::has_step_tensor() const {
-  return step_tensor_.defined();
-}
-
 std::ostream& operator<<(std::ostream& stream, const Slice& slice) {
   stream << slice.start() << ":" << slice.stop() << ":" << slice.step();
   return stream;
@@ -69,10 +38,7 @@ std::ostream& operator<<(std::ostream& stream, const Slice& slice) {
 Slice unpackSlice(
     c10::optional<int64_t> start_index,
     c10::optional<int64_t> stop_index,
-    c10::optional<int64_t> step_index,
-    const Tensor& start_tensor,
-    const Tensor& stop_tensor,
-    const Tensor& step_tensor) {
+    c10::optional<int64_t> step_index) {
   int64_t start, stop, step;
   if (!step_index.has_value()) {
     step = 1;
@@ -97,7 +63,7 @@ Slice unpackSlice(
   } else {
     stop = stop_index.value();
   }
-  return Slice(start, stop, step, start_tensor, stop_tensor, step_tensor);
+  return Slice(start, stop, step);
 }
 
 TensorIndex::TensorIndex(c10::nullopt_t) : type_(TensorIndexType::None) {}
@@ -107,39 +73,15 @@ TensorIndex::TensorIndex(const char *str) : TensorIndex(at::indexing::Ellipsis) 
     strcmp(str, "...") == 0,
     "Expected \"...\" to represent an ellipsis index, but got \"", str, "\"");
 }
-TensorIndex::TensorIndex(int64_t integer, Tensor tensor)
-    : integer_(integer),
-      tensor_(tensor),
-      type_(TensorIndexType::Integer) {}
+TensorIndex::TensorIndex(int64_t integer) : integer_(integer), type_(TensorIndexType::Integer) {}
 TensorIndex::TensorIndex(int integer) : TensorIndex((int64_t)integer) {}
-TensorIndex::TensorIndex(
-    std::initializer_list<c10::optional<int64_t>> slice,
-    at::ArrayRef<Tensor> slice_tensors)
-    : type_(TensorIndexType::Slice) {
+TensorIndex::TensorIndex(std::initializer_list<c10::optional<int64_t>> slice) : type_(TensorIndexType::Slice) {
   if (slice.size() == 0) {
-    slice_ = unpackSlice(
-      c10::nullopt,
-      c10::nullopt,
-      c10::nullopt,
-      undefined_tensor,
-      undefined_tensor,
-      undefined_tensor);
+    slice_ = unpackSlice(c10::nullopt, c10::nullopt, c10::nullopt);
   } else if (slice.size() == 2) {
-    slice_ = unpackSlice(
-      *slice.begin(),
-      *(slice.begin() + 1),
-      c10::nullopt,
-      slice_tensors.size() > 0 ? slice_tensors[0] : undefined_tensor,
-      slice_tensors.size() > 0 ? slice_tensors[1] : undefined_tensor,
-      undefined_tensor);
+    slice_ = unpackSlice(*slice.begin(), *(slice.begin() + 1), c10::nullopt);
   } else if (slice.size() == 3) {
-    slice_ = unpackSlice(
-      *slice.begin(),
-      *(slice.begin() + 1),
-      *(slice.begin() + 2),
-      slice_tensors.size() > 0 ? slice_tensors[0] : undefined_tensor,
-      slice_tensors.size() > 0 ? slice_tensors[1] : undefined_tensor,
-      slice_tensors.size() > 0 ? slice_tensors[2] : undefined_tensor);
+    slice_ = unpackSlice(*slice.begin(), *(slice.begin() + 1), *(slice.begin() + 2));
   } else {
     TORCH_CHECK_VALUE(
       false,
@@ -160,10 +102,6 @@ bool TensorIndex::is_ellipsis() const {
 
 bool TensorIndex::is_integer() const {
   return type_ == TensorIndexType::Integer;
-}
-
-bool TensorIndex::is_integer_with_tensor() const {
-  return type_ == TensorIndexType::Integer && tensor_.defined();
 }
 
 int64_t TensorIndex::integer() const {
@@ -254,22 +192,9 @@ Tensor applySlicing(const Tensor& self, ArrayRef<TensorIndex> indices, std::vect
   for (int64_t i = 0; i < size; i++) {
     auto& obj = indices[i];
     if (obj.is_integer()) {
-      result = handleInteger(
-        result,
-        dim,
-        obj.integer(),
-        obj.is_integer_with_tensor() ? obj.tensor() : undefined_tensor,
-        i);
+      result = handleInteger(result, dim, obj.integer(), i);
     } else if (obj.is_slice()) {
-      result = handleSlice(
-        result,
-        dim,
-        obj.slice().start(),
-        obj.slice().stop(),
-        obj.slice().step(),
-        obj.slice().start_tensor(),
-        obj.slice().stop_tensor(),
-        obj.slice().step_tensor());
+      result = handleSlice(result, dim, obj.slice().start(), obj.slice().stop(), obj.slice().step());
     } else if (obj.is_ellipsis()) {
       handleEllipsis(self, dim, specified_dims);
     } else if (obj.is_none()) {
@@ -297,16 +222,13 @@ Tensor get_item(const Tensor& self, ArrayRef<TensorIndex> indices) {
     } else if (index.is_ellipsis()) {
       return handleEllipsisSingleDim(self);
     } else if (index.is_integer()) {
-      return handleIntegerSingleDim(self, index.integer(), index.is_integer_with_tensor() ? index.tensor() : undefined_tensor);
+      return handleIntegerSingleDim(self, index.integer());
     } else if (index.is_slice()) {
       return handleSliceSingleDim(
         self,
         index.slice().start(),
         index.slice().stop(),
         index.slice().step(),
-        index.slice().start_tensor(),
-        index.slice().stop_tensor(),
-        index.slice().step_tensor(),
         true);
     }
   }
@@ -344,7 +266,7 @@ void set_item(Tensor& self, ArrayRef<TensorIndex> indices, const Tensor& value) 
       copy_to(handleNoneSingleDim(self), value);
       return;
     } else if (index.is_integer()) {
-      copy_to(handleIntegerSingleDim(self, index.integer(), index.is_integer_with_tensor() ? index.tensor() : undefined_tensor), value);
+      copy_to(handleIntegerSingleDim(self, index.integer()), value);
       return;
     } else if (index.is_slice()) {
       copy_to(handleSliceSingleDim(
@@ -352,9 +274,6 @@ void set_item(Tensor& self, ArrayRef<TensorIndex> indices, const Tensor& value) 
         index.slice().start(),
         index.slice().stop(),
         index.slice().step(),
-        index.slice().start_tensor(),
-        index.slice().stop_tensor(),
-        index.slice().step_tensor(),
         false), value);
       return;
     }
