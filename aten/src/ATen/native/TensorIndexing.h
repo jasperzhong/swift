@@ -491,14 +491,15 @@ inline Tensor handleIntegerSingleDim(const Tensor& self, int64_t index, const Te
   return applySelect(self, 0, index, index_tensor);
 }
 
-inline Tensor handleSliceSingleDimGet(
+inline Tensor handleSliceSingleDim(
   const Tensor& self,
   int64_t start,
   int64_t stop,
   int64_t step,
   const Tensor& start_tensor,
   const Tensor& stop_tensor,
-  const Tensor& step_tensor) {
+  const Tensor& step_tensor,
+  bool is_get) {
   return applySlice(
     self,
     0,
@@ -508,7 +509,7 @@ inline Tensor handleSliceSingleDimGet(
     start_tensor,
     stop_tensor,
     step_tensor,
-    true);
+    /*ensure_view=*/is_get);
 }
 
 // This mirrors `applySlicing` in torch/csrc/autograd/python_variable_indexing.cpp
@@ -596,14 +597,15 @@ inline Tensor get_item(const Tensor& self, const ArrayRef<TensorIndex>& indices)
     } else if (index.is_integer()) {
       return handleIntegerSingleDim(self, index.integer(), index.is_integer_with_tensor() ? index.tensor() : undefined_tensor);
     } else if (index.is_slice()) {
-      return handleSliceSingleDimGet(
+      return handleSliceSingleDim(
         self,
         index.slice().start(),
         index.slice().stop(),
         index.slice().step(),
         index.slice().start_tensor(),
         index.slice().stop_tensor(),
-        index.slice().step_tensor());
+        index.slice().step_tensor(),
+        true);
     }
   }
 
@@ -662,21 +664,21 @@ inline void set_item(Tensor& self, const ArrayRef<TensorIndex>& indices, const T
       copy_to(self, value);
       return;
     } else if (index.is_none() || (index.is_boolean() && index.boolean())) {
-      copy_to(at::unsqueeze(self, 0), value);
+      copy_to(handleNoneSingleDim(self), value);
       return;
     } else if (index.is_integer()) {
-      copy_to(applySelect(self, 0, index.integer(), index.is_integer_with_tensor() ? index.tensor() : undefined_tensor), value);
+      copy_to(handleIntegerSingleDim(self, index.integer(), index.is_integer_with_tensor() ? index.tensor() : undefined_tensor), value);
       return;
     } else if (index.is_slice()) {
-      copy_to(applySlice(
+      copy_to(handleSliceSingleDim(
         self,
-        0,
         index.slice().start(),
         index.slice().stop(),
         index.slice().step(),
         index.slice().start_tensor(),
         index.slice().stop_tensor(),
-        index.slice().step_tensor()), value);
+        index.slice().step_tensor(),
+        false), value);
       return;
     }
   }

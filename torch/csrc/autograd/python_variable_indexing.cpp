@@ -295,14 +295,15 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
     Py_ssize_t start, stop, step;
     Tensor start_tensor, stop_tensor, step_tensor;
     unpackSliceAndExtractTensors(index, start, stop, step, start_tensor, stop_tensor, step_tensor);
-    return wrap(at::indexing::handleSliceSingleDimGet(
+    return wrap(at::indexing::handleSliceSingleDim(
       self_,
       start,
       stop,
       step,
       start_tensor,
       stop_tensor,
-      step_tensor));
+      step_tensor,
+      true));
   }
 
   // wrap index in a tuple if it's not already one
@@ -341,6 +342,57 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
     throw TypeError("Tensor does not support deleting items");
   }
   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
+
+  // OptionalDeviceGuard device_guard(device_of(self_));
+  // Variable value;
+  // // TODO: This qint special case looks very suspicious...
+  // if (isQIntType(self_.scalar_type())) {
+  //   value = valueToTensor(device(kCPU).dtype(kFloat), py_value);
+  // } else {
+  //   value = valueToTensor(self_.options(), py_value);
+  // }
+
+  // // handle simple types: integers, slices, ellipsis, bool
+  // if (index == Py_False) { // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+  //   // do nothing for false (technically we should check the size, but we don't have
+  //   // real 0-sized shapes.
+  //   return 0;
+  // } else if (index == Py_Ellipsis) {
+  //   copy_to(self_, value);
+  //   return 0;
+  // } else if (index == Py_None || index == Py_True) { // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+  //   copy_to(self_.unsqueeze(0), value);
+  //   return 0;
+  // } else if (THPUtils_checkLong(index)) {
+  //   copy_to(applySelect(self_, 0, index), value);
+  //   return 0;
+  // } else if (PySlice_Check(index)) {
+  //   copy_to(applySlice(self_, 0, index), value);
+  //   return 0;
+  // }
+
+  // // wrap index in a tuple if it's not already one
+  // THPObjectPtr holder = wrapTuple(index);
+
+  // variable_list variableIndices;
+  // Variable sliced = applySlicing(self_, holder.get(), variableIndices);
+  // if (variableIndices.empty()) {
+  //   copy_to(sliced, value);
+  //   return 0;
+  // }
+
+  // IntArrayRef slicedValueSizes = slicePrefix1sSize(value.sizes());
+  // torch::autograd::Variable valuesSliced;
+  // if (!value.sizes().equals(slicedValueSizes)) {
+  //   valuesSliced = value.view(slicedValueSizes);
+  // } else {
+  //   valuesSliced = value;
+  // }
+  // {
+  //   pybind11::gil_scoped_release no_gil;
+  //   at::indexing::dispatch_index_put_(sliced, variableIndices, valuesSliced);  
+  // }
+  // return 0;
 
   // yf225 TODO: merge the qint type checking with C++ path
   // yf225 TODO: merge 1-D path for C++ and Python
