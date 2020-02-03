@@ -312,7 +312,7 @@ Tensor Tensor::index(ArrayRef<at::indexing::TensorIndex> indices) const {
   return at::indexing::get_item(*this, indices);
 }
 Tensor Tensor::index(std::initializer_list<at::indexing::TensorIndex> indices) const {
-  return index(ArrayRef<TensorIndex>(indices));
+  return index(ArrayRef<at::indexing::TensorIndex>(indices));
 }
 
 Tensor & Tensor::index_put_(ArrayRef<at::indexing::TensorIndex> indices, Tensor const & rhs) {
@@ -328,13 +328,13 @@ Tensor & Tensor::index_put_(ArrayRef<at::indexing::TensorIndex> indices, Scalar 
   return *this;
 }
 Tensor & Tensor::index_put_(std::initializer_list<at::indexing::TensorIndex> indices, Tensor const & rhs) {
-  return index_put_(ArrayRef<TensorIndex>(indices), rhs);
+  return index_put_(ArrayRef<at::indexing::TensorIndex>(indices), rhs);
 }
 Tensor & Tensor::index_put_(std::initializer_list<at::indexing::TensorIndex> indices, Tensor && rhs) {
-  return index_put_(ArrayRef<TensorIndex>(indices), rhs);
+  return index_put_(ArrayRef<at::indexing::TensorIndex>(indices), rhs);
 }
 Tensor & Tensor::index_put_(std::initializer_list<at::indexing::TensorIndex> indices, Scalar v) {
-  return index_put_(ArrayRef<TensorIndex>(indices), v);
+  return index_put_(ArrayRef<at::indexing::TensorIndex>(indices), v);
 }
 
 } // namespace at
