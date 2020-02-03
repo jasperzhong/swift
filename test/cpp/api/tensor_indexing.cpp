@@ -106,6 +106,30 @@ TEST(TensorIndexingTest, TensorIndex) {
   ASSERT_EQ(c10::str(std::vector<TensorIndex>({{1, 3, 2}})), c10::str("(1:3:2)"));
 }
 
+TEST(TensorIndexingTest, TestAdvancedIndexingWithArrayRefOfTensor) {
+  {
+    torch::Tensor tensor = torch::randn({20, 20});
+    torch::Tensor index = torch::arange(10, kLong).cpu();
+    torch::Tensor result_with_array_ref = tensor.index(at::ArrayRef<Tensor>({index}));
+    torch::Tensor result_with_init_list = tensor.index({index});
+    ASSERT_TRUE(result_with_array_ref.equal(result_with_init_list));
+  }
+  {
+    torch::Tensor tensor = torch::randn({20, 20});
+    torch::Tensor index = torch::arange(10, kLong).cpu();
+    torch::Tensor result_with_array_ref = tensor.index_put_(at::ArrayRef<Tensor>({index}), torch::ones({20}));
+    torch::Tensor result_with_init_list = tensor.index_put_({index}, torch::ones({20}));
+    ASSERT_TRUE(result_with_array_ref.equal(result_with_init_list));
+  }
+  {
+    torch::Tensor tensor = torch::randn({20, 20});
+    torch::Tensor index = torch::arange(10, kLong).cpu();
+    torch::Tensor result_with_array_ref = tensor.index_put_(at::ArrayRef<Tensor>({index}), torch::ones({1, 20}));
+    torch::Tensor result_with_init_list = tensor.index_put_({index}, torch::ones({1, 20}));
+    ASSERT_TRUE(result_with_array_ref.equal(result_with_init_list));
+  }
+}
+
 // TODO: I will remove the Python tests in the comments once the PR is approved.
 
 /*
