@@ -337,7 +337,7 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
     return 0;
   }
 
-  IntArrayRef slicedValueSizes = slicePrefix1sSize(value.sizes());
+  IntArrayRef slicedValueSizes = at::indexing::slicePrefix1sSize(value.sizes());
   torch::autograd::Variable valuesSliced;
   if (!value.sizes().equals(slicedValueSizes)) {
     valuesSliced = value.view(slicedValueSizes);
