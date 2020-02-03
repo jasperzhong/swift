@@ -308,9 +308,6 @@ void set_item(Tensor& self, ArrayRef<TensorIndex> indices, Scalar v) {
 
 } // namespace indexing
 
-Tensor Tensor::index(std::initializer_list<Tensor> indices) const {
-  return index(ArrayRef<Tensor>(indices));
-}
 Tensor Tensor::index(ArrayRef<TensorIndex> indices) const {
   return at::indexing::get_item(*this, indices);
 }
@@ -318,9 +315,6 @@ Tensor Tensor::index(std::initializer_list<TensorIndex> indices) const {
   return index(ArrayRef<TensorIndex>(indices));
 }
 
-Tensor & Tensor::index_put_(std::initializer_list<Tensor> indices, Tensor const & rhs) {
-  return index_put_(ArrayRef<Tensor>(indices), rhs);
-}
 Tensor & Tensor::index_put_(ArrayRef<TensorIndex> indices, Tensor const & rhs) {
   at::indexing::set_item(*this, indices, rhs);
   return *this;

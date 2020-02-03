@@ -1423,7 +1423,6 @@
   variants: function, method
   # NB: This function is special-cased in tools/autograd/gen_variable_type.py
   # NB: The following functions are declared in aten/src/ATen/templates/TensorBody.h and defined in aten/src/ATen/native/TensorIndexing.cpp:
-  # - Tensor Tensor::index(std::initializer_list<Tensor> indices)
   # - Tensor Tensor::index(ArrayRef<TensorIndex> indices)
   # - Tensor Tensor::index(std::initializer_list<TensorIndex> indices)
 
@@ -1443,7 +1442,6 @@
 - func: index_put_(Tensor(a!) self, Tensor?[] indices, Tensor values, bool accumulate=False) -> Tensor(a!)
   variants: function, method
   # NB: The following functions are declared in aten/src/ATen/templates/TensorBody.h and defined in aten/src/ATen/native/TensorIndexing.cpp:
-  # - Tensor & Tensor::index_put_(std::initializer_list<Tensor> indices, Tensor const & rhs)
   # - Tensor & Tensor::index_put_(ArrayRef<TensorIndex> indices, Tensor const & rhs)
   # - Tensor & Tensor::index_put_(ArrayRef<TensorIndex> indices, Tensor && rhs)
   # - Tensor & Tensor::index_put_(ArrayRef<TensorIndex> indices, Scalar v)
