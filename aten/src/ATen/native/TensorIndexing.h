@@ -311,7 +311,7 @@ inline Tensor handleSliceSingleDim(const Tensor& self, int64_t start, int64_t st
 inline Tensor handleDimInMultiDimIndexing(
     const Tensor& prev_dim_result,
     const Tensor& original_tensor,
-    TensorIndex index,
+    const TensorIndex& index,
     int64_t* dim_ptr,
     int64_t* specified_dims_ptr,
     int64_t real_dim,
