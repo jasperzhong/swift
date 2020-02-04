@@ -311,11 +311,11 @@ inline Tensor handleSliceSingleDim(const Tensor& self, int64_t start, int64_t st
 inline Tensor handleDimInMultiDimIndexing(
     const Tensor& prev_dim_result,
     const Tensor& original_tensor,
-    const TensorIndex& index,
+    TensorIndex index,
     int64_t* dim_ptr,
     int64_t* specified_dims_ptr,
     int64_t real_dim,
-    std::vector<Tensor>& outIndices,  // yf225 TODO: should outIndices be pointer as well?
+    std::vector<Tensor>& outIndices,
     bool is_tracing) {
   if (index.is_integer()) {
     return applySelect(prev_dim_result, *dim_ptr, index.integer(), real_dim);

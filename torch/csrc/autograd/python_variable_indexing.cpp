@@ -212,14 +212,11 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
       }
     }
 
-    // Convert Python index to C++ index
-    at::indexing::TensorIndex tensor_index = indexToTensorIndex(self, obj);
-
     // Call C++ indexing function
     result = at::indexing::handleDimInMultiDimIndexing(
       /*prev_dim_result=*/result,
       /*original_tensor=*/self,
-      /*index=*/tensor_index,
+      /*index=*/indexToTensorIndex(self, obj),
       /*dim_ptr=*/&dim,
       /*specified_dims_ptr=*/&specified_dims,
       /*real_dim=*/i,
