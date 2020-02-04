@@ -116,19 +116,19 @@ static inline void unpackSliceAndExtractTensors(
 }
 
 static inline void recordSliceTrace(const Tensor& start_tensor, const Tensor& stop_tensor, const Tensor& step_tensor) {
-  if (torch::jit::tracer::isTracing() && start_tensor.defined()) {
+  if (start_tensor.defined()) {
     torch::jit::tracer::ArgumentStash::stashValue(std::string("start"), 1, start_tensor, torch::jit::IntType::get());
   }
-  if (torch::jit::tracer::isTracing() && stop_tensor.defined()) {
+  if (stop_tensor.defined()) {
     torch::jit::tracer::ArgumentStash::stashValue(std::string("end"), 1, stop_tensor, torch::jit::IntType::get());
   }
-  if (torch::jit::tracer::isTracing() && step_tensor.defined()) {
+  if (step_tensor.defined()) {
     torch::jit::tracer::ArgumentStash::stashValue(std::string("step"), 1, step_tensor, torch::jit::IntType::get());
   }
 }
 
 static inline void recordSelectTrace(const Tensor& index_tensor) {
-  if (torch::jit::tracer::isTracing() && index_tensor.defined()) {
+  if (index_tensor.defined()) {
     torch::jit::tracer::ArgumentStash::stashValue(std::string("index"), 1, index_tensor, torch::jit::IntType::get());
   }
 }
@@ -182,33 +182,35 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
     PyObject* obj = PyTuple_GET_ITEM(index, i); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
 
     // Handle JIT tracing
-    if (THPUtils_checkLong(obj)) {
-      if (THPVariable_Check(obj)) {
-        recordSelectTrace(THPVariable_Unpack(obj));
-      }
-    } else if (PySlice_Check(obj)) {
-      Tensor start_tensor, stop_tensor, step_tensor;
-      PySliceObject* sliceobj = (PySliceObject*)obj;
-      if (THPVariable_Check(sliceobj->start)) {
-        start_tensor = THPVariable_Unpack(sliceobj->start);
-      }
-      if (THPVariable_Check(sliceobj->stop)) {
-        stop_tensor = THPVariable_Unpack(sliceobj->stop);
-      }
-      if (THPVariable_Check(sliceobj->step)) {
-        step_tensor = THPVariable_Unpack(sliceobj->step);
-      }
-      recordSliceTrace(start_tensor, stop_tensor, step_tensor);
-    } else if (THPVariable_Check(obj)) {
-      Tensor tensor = THPVariable_Unpack(obj);
-      auto scalar_type = tensor.scalar_type();
-      if (tensor.dim() == 0 && at::isIntegralType(scalar_type, /*includeBool=*/false) && scalar_type != at::kByte) {
-        recordSelectTrace(tensor);
-      }
-    } else if (obj != Py_Ellipsis && obj != Py_None && !PyBool_Check(obj) && !PySequence_Check(obj)) {
-      auto idx = convertToPythonInt(obj);
-      if (THPVariable_Check(idx)) {
-        recordSelectTrace(THPVariable_Unpack(idx));
+    if (torch::jit::tracer::isTracing()) {
+      if (THPUtils_checkLong(obj)) {
+        if (THPVariable_Check(obj)) {
+          recordSelectTrace(THPVariable_Unpack(obj));
+        }
+      } else if (PySlice_Check(obj)) {
+        Tensor start_tensor, stop_tensor, step_tensor;
+        PySliceObject* sliceobj = (PySliceObject*)obj;
+        if (THPVariable_Check(sliceobj->start)) {
+          start_tensor = THPVariable_Unpack(sliceobj->start);
+        }
+        if (THPVariable_Check(sliceobj->stop)) {
+          stop_tensor = THPVariable_Unpack(sliceobj->stop);
+        }
+        if (THPVariable_Check(sliceobj->step)) {
+          step_tensor = THPVariable_Unpack(sliceobj->step);
+        }
+        recordSliceTrace(start_tensor, stop_tensor, step_tensor);
+      } else if (THPVariable_Check(obj)) {
+        Tensor tensor = THPVariable_Unpack(obj);
+        auto scalar_type = tensor.scalar_type();
+        if (tensor.dim() == 0 && at::isIntegralType(scalar_type, /*includeBool=*/false) && scalar_type != at::kByte) {
+          recordSelectTrace(tensor);
+        }
+      } else if (obj != Py_Ellipsis && obj != Py_None && !PyBool_Check(obj) && !PySequence_Check(obj)) {
+        auto idx = convertToPythonInt(obj);
+        if (THPVariable_Check(idx)) {
+          recordSelectTrace(THPVariable_Unpack(idx));
+        }
       }
     }
 
