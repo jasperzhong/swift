@@ -24,19 +24,19 @@ struct CAFFE2_API Slice final {
   Slice() {}
   Slice(int64_t start, int64_t stop, int64_t step) : start_(start), stop_(stop), step_(step) {}
 
-  inline int64_t start() const {
-    return start_;
-  }
+  // inline int64_t start() const {
+  //   return start_;
+  // }
 
-  inline int64_t stop() const {
-    return stop_;
-  }
+  // inline int64_t stop() const {
+  //   return stop_;
+  // }
 
-  inline int64_t step() const {
-    return step_;
-  }
+  // inline int64_t step() const {
+  //   return step_;
+  // }
 
- private:
+ public:
   int64_t start_;
   int64_t stop_;
   int64_t step_;
@@ -143,47 +143,47 @@ struct CAFFE2_API TensorIndex final {
   // Case 5: Tensor value
   TensorIndex(Tensor tensor) : tensor_(tensor), type_(TensorIndexType::Tensor) {}
 
-  inline bool is_none() const {
-    return type_ == TensorIndexType::None;
-  }
+  // inline bool is_none() const {
+  //   return type_ == TensorIndexType::None;
+  // }
 
-  inline bool is_ellipsis() const {
-    return type_ == TensorIndexType::Ellipsis;
-  }
+  // inline bool is_ellipsis() const {
+  //   return type_ == TensorIndexType::Ellipsis;
+  // }
 
-  inline bool is_integer() const {
-    return type_ == TensorIndexType::Integer;
-  }
+  // inline bool is_integer() const {
+  //   return type_ == TensorIndexType::Integer;
+  // }
 
-  inline int64_t integer() const {
-    return integer_;
-  }
+  // inline int64_t integer() const {
+  //   return integer_;
+  // }
 
-  inline bool is_boolean() const {
-    return type_ == TensorIndexType::Boolean;
-  }
+  // inline bool is_boolean() const {
+  //   return type_ == TensorIndexType::Boolean;
+  // }
 
-  inline bool boolean() const {
-    return boolean_;
-  }
+  // inline bool boolean() const {
+  //   return boolean_;
+  // }
 
-  inline bool is_slice() const {
-    return type_ == TensorIndexType::Slice;
-  }
+  // inline bool is_slice() const {
+  //   return type_ == TensorIndexType::Slice;
+  // }
 
-  inline const Slice& slice() const {
-    return slice_;
-  }
+  // inline const Slice& slice() const {
+  //   return slice_;
+  // }
 
-  inline bool is_tensor() const {
-    return type_ == TensorIndexType::Tensor;
-  }
+  // inline bool is_tensor() const {
+  //   return type_ == TensorIndexType::Tensor;
+  // }
 
-  inline const Tensor& tensor() const {
-    return tensor_;
-  }
+  // inline const Tensor& tensor() const {
+  //   return tensor_;
+  // }
 
- private:
+ public:
   int64_t integer_;
   bool boolean_;
   Slice slice_;
@@ -317,19 +317,20 @@ inline Tensor handleDimInMultiDimIndexing(
     int64_t real_dim,
     std::vector<Tensor>& outIndices,  // yf225 TODO: should outIndices be pointer as well?
     bool is_tracing) {
-  if (index.is_integer()) {
-    return applySelect(prev_dim_result, *dim_ptr, index.integer(), real_dim);
-  } else if (index.is_slice()) {
-    return handleSlice(prev_dim_result, dim_ptr, index.slice().start(), index.slice().stop(), index.slice().step(), /*is_tracing=*/is_tracing);
-  } else if (index.is_ellipsis()) {
+  // yf225 TODO: maybe instead of calling a function on `index`, we must use direct member access like `index.type_ == TensorIndexType::Integer` and `index.integer_`
+  if (index.type_ == TensorIndexType::Integer) {
+    return applySelect(prev_dim_result, *dim_ptr, index.integer_, real_dim);
+  } else if (index.type_ == TensorIndexType::Slice) {
+    return handleSlice(prev_dim_result, dim_ptr, index.slice_.start_, index.slice_.stop_, index.slice_.step_, /*is_tracing=*/is_tracing);
+  } else if (index.type_ == TensorIndexType::Ellipsis) {
     handleEllipsis(original_tensor, dim_ptr, *specified_dims_ptr);
     return prev_dim_result;
-  } else if (index.is_none()) {
+  } else if (index.type_ == TensorIndexType::None) {
     return handleNone(prev_dim_result, dim_ptr);
-  } else if (index.is_boolean()) {
-    return handleBoolean(prev_dim_result, index.boolean(), outIndices, dim_ptr);
-  } else if (index.is_tensor()) {
-    return handleTensor(prev_dim_result, index.tensor(), outIndices, dim_ptr, real_dim);
+  } else if (index.type_ == TensorIndexType::Boolean) {
+    return handleBoolean(prev_dim_result, index.boolean_, outIndices, dim_ptr);
+  } else if (index.type_ == TensorIndexType::Tensor) {
+    return handleTensor(prev_dim_result, index.tensor_, outIndices, dim_ptr, real_dim);
   } else {
     TORCH_INTERNAL_ASSERT(false, "Invalid TensorIndex type");
   }

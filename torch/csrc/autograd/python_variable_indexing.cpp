@@ -182,10 +182,8 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
     PyObject* obj = PyTuple_GET_ITEM(index, i); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
 
     // Handle JIT tracing
-    if (THPUtils_checkLong(obj)) {
-      if (THPVariable_Check(obj)) {
-        recordSelectTrace(THPVariable_Unpack(obj));
-      }
+    if (THPUtils_checkLong(obj) && THPVariable_Check(obj)) {
+      recordSelectTrace(THPVariable_Unpack(obj));
     } else if (PySlice_Check(obj)) {
       Tensor start_tensor, stop_tensor, step_tensor;
       PySliceObject* sliceobj = (PySliceObject*)obj;

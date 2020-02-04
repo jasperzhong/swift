@@ -8,23 +8,23 @@ namespace indexing {
 const EllipsisIndexType Ellipsis = EllipsisIndexType();
 
 std::ostream& operator<<(std::ostream& stream, const Slice& slice) {
-  stream << slice.start() << ":" << slice.stop() << ":" << slice.step();
+  stream << slice.start_ << ":" << slice.stop_ << ":" << slice.step_;
   return stream;
 }
 
 std::ostream& operator<<(std::ostream& stream, const TensorIndex& tensor_index) {
-  if (tensor_index.is_none()) {
+  if (tensor_index.type_ == TensorIndexType::None) {
     stream << "None";
-  } else if (tensor_index.is_ellipsis()) {
+  } else if (tensor_index.type_ == TensorIndexType::Ellipsis) {
     stream << "...";
-  } else if (tensor_index.is_integer()) {
-    stream << tensor_index.integer();
-  } else if (tensor_index.is_boolean()) {
-    stream << std::boolalpha << tensor_index.boolean();
-  } else if (tensor_index.is_slice()) {
-    stream << tensor_index.slice();
-  } else if (tensor_index.is_tensor()) {
-    stream << tensor_index.tensor();
+  } else if (tensor_index.type_ == TensorIndexType::Integer) {
+    stream << tensor_index.integer_;
+  } else if (tensor_index.type_ == TensorIndexType::Boolean) {
+    stream << std::boolalpha << tensor_index.boolean_;
+  } else if (tensor_index.type_ == TensorIndexType::Slice) {
+    stream << tensor_index.slice_;
+  } else if (tensor_index.type_ == TensorIndexType::Tensor) {
+    stream << tensor_index.tensor_;
   }
   return stream;
 }
@@ -45,15 +45,17 @@ int64_t count_specified_dimensions(ArrayRef<TensorIndex> indices) {
   int64_t count = 0;
   size_t size = indices.size();
   for (size_t i = 0; i < size; i++) {
-    auto& obj = indices[i];
-    if (obj.is_tensor()) {
-      auto& tensor = obj.tensor();
+    auto& index = indices[i];
+    if (index.type_ == TensorIndexType::Tensor) {
+      auto& tensor = index.tensor_;
       if (tensor.scalar_type() == kByte || tensor.scalar_type() == kBool) {
         count += tensor.dim();
       } else {
         count++;
       }
-    } else if (!obj.is_none() && !obj.is_ellipsis() && !obj.is_boolean()) {
+    } else if (index.type_ != TensorIndexType::None \
+      && index.type_ != TensorIndexType::Ellipsis \
+      && index.type_ != TensorIndexType::Boolean) {
       count++;
     }
   }
@@ -70,11 +72,11 @@ Tensor applySlicing(const Tensor& self, ArrayRef<TensorIndex> indices, std::vect
 
   Tensor result = self;
   for (int64_t i = 0; i < size; i++) {
-    auto& obj = indices[i];
+    auto& index = indices[i];
     result = handleDimInMultiDimIndexing(
       /*prev_dim_result=*/result,
       /*original_tensor=*/self,
-      /*index=*/obj,
+      /*index=*/index,
       /*dim=*/&dim,
       /*specified_dims=*/&specified_dims,
       /*real_dim=*/i,
@@ -91,18 +93,18 @@ Tensor get_item(const Tensor& self, ArrayRef<TensorIndex> indices) {
   // handle simple types: integers, slices, ellipsis
   if (indices.size() == 1) {
     const TensorIndex& index = indices[0];
-    if (index.is_none()) {
+    if (index.type_ == TensorIndexType::None) {
       return handleNoneSingleDim(self);
-    } else if (index.is_ellipsis()) {
+    } else if (index.type_ == TensorIndexType::Ellipsis) {
       return handleEllipsisSingleDim(self);
-    } else if (index.is_integer()) {
-      return handleIntegerSingleDim(self, index.integer());
-    } else if (index.is_slice()) {
+    } else if (index.type_ == TensorIndexType::Integer) {
+      return handleIntegerSingleDim(self, index.integer_);
+    } else if (index.type_ == TensorIndexType::Slice) {
       return handleSliceSingleDim(
         self,
-        index.slice().start(),
-        index.slice().stop(),
-        index.slice().step(),
+        index.slice_.start_,
+        index.slice_.stop_,
+        index.slice_.step_,
         /*is_get=*/true,
         /*is_tracing=*/false);
     }
@@ -130,25 +132,25 @@ void set_item(Tensor& self, ArrayRef<TensorIndex> indices, const Tensor& value) 
   // handle simple types: integers, slices, ellipsis, bool
   if (indices.size() == 1) {
     const TensorIndex& index = indices[0];
-    if (index.is_boolean() && !index.boolean()) {
+    if (index.type_ == TensorIndexType::Boolean && !index.boolean_) {
       // do nothing for false (technically we should check the size, but we don't have
       // real 0-sized shapes.
       return;
-    } else if (index.is_ellipsis()) {
+    } else if (index.type_ == TensorIndexType::Ellipsis) {
       copy_to(self, value);
       return;
-    } else if (index.is_none() || (index.is_boolean() && index.boolean())) {
+    } else if (index.type_ == TensorIndexType::None || (index.type_ == TensorIndexType::Boolean && index.boolean_)) {
       copy_to(handleNoneSingleDim(self), value);
       return;
-    } else if (index.is_integer()) {
-      copy_to(handleIntegerSingleDim(self, index.integer()), value);
+    } else if (index.type_ == TensorIndexType::Integer) {
+      copy_to(handleIntegerSingleDim(self, index.integer_), value);
       return;
-    } else if (index.is_slice()) {
+    } else if (index.type_ == TensorIndexType::Slice) {
       copy_to(handleSliceSingleDim(
         self,
-        index.slice().start(),
-        index.slice().stop(),
-        index.slice().step(),
+        index.slice_.start_,
+        index.slice_.stop_,
+        index.slice_.step_,
         /*is_get=*/false,
         /*is_tracing=*/false), value);
       return;

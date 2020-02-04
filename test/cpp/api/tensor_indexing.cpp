@@ -12,9 +12,9 @@ using namespace torch::test;
 
 TEST(TensorIndexingTest, Slice) {
   Slice slice(1, 2, 3);
-  ASSERT_EQ(slice.start(), 1);
-  ASSERT_EQ(slice.stop(), 2);
-  ASSERT_EQ(slice.step(), 3);
+  ASSERT_EQ(slice.start_, 1);
+  ASSERT_EQ(slice.stop_, 2);
+  ASSERT_EQ(slice.step_, 3);
 
   ASSERT_EQ(c10::str(slice), "1:2:3");
 }
@@ -22,19 +22,19 @@ TEST(TensorIndexingTest, Slice) {
 TEST(TensorIndexingTest, TensorIndex) {
   {
     std::vector<TensorIndex> indices = {None, "...", Ellipsis, 0, true, {1, None, 2}, torch::tensor({1, 2})};
-    ASSERT_TRUE(indices[0].is_none());
-    ASSERT_TRUE(indices[1].is_ellipsis());
-    ASSERT_TRUE(indices[2].is_ellipsis());
-    ASSERT_TRUE(indices[3].is_integer());
-    ASSERT_TRUE(indices[3].integer() == 0);
-    ASSERT_TRUE(indices[4].is_boolean());
-    ASSERT_TRUE(indices[4].boolean() == true);
-    ASSERT_TRUE(indices[5].is_slice());
-    ASSERT_TRUE(indices[5].slice().start() == 1);
-    ASSERT_TRUE(indices[5].slice().stop() == INDEX_MAX);
-    ASSERT_TRUE(indices[5].slice().step() == 2);
-    ASSERT_TRUE(indices[6].is_tensor());
-    ASSERT_TRUE(torch::equal(indices[6].tensor(), torch::tensor({1, 2})));
+    ASSERT_TRUE(indices[0].type_ == TensorIndexType::None);
+    ASSERT_TRUE(indices[1].type_ == TensorIndexType::Ellipsis);
+    ASSERT_TRUE(indices[2].type_ == TensorIndexType::Ellipsis);
+    ASSERT_TRUE(indices[3].type_ == TensorIndexType::Integer);
+    ASSERT_TRUE(indices[3].integer_ == 0);
+    ASSERT_TRUE(indices[4].type_ == TensorIndexType::Boolean);
+    ASSERT_TRUE(indices[4].boolean_ == true);
+    ASSERT_TRUE(indices[5].type_ == TensorIndexType::Slice);
+    ASSERT_TRUE(indices[5].slice_.start_ == 1);
+    ASSERT_TRUE(indices[5].slice_.stop_ == INDEX_MAX);
+    ASSERT_TRUE(indices[5].slice_.step_ == 2);
+    ASSERT_TRUE(indices[6].type_ == TensorIndexType::Tensor);
+    ASSERT_TRUE(torch::equal(indices[6].tensor_, torch::tensor({1, 2})));
   }
 
   ASSERT_THROWS_WITH(
