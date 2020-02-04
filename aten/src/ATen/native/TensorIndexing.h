@@ -21,12 +21,20 @@ CAFFE2_API extern const EllipsisIndexType Ellipsis;
 
 struct CAFFE2_API Slice final {
  public:
-  Slice();
-  Slice(int64_t start, int64_t stop, int64_t step);
+  Slice() {}
+  Slice(int64_t start, int64_t stop, int64_t step) : start_(start), stop_(stop), step_(step) {}
 
-  int64_t start() const;
-  int64_t stop() const;
-  int64_t step() const;
+  inline int64_t start() const {
+    return start_;
+  }
+
+  inline int64_t stop() const {
+    return stop_;
+  }
+
+  inline int64_t step() const {
+    return step_;
+  }
 
  private:
   int64_t start_;
@@ -35,6 +43,38 @@ struct CAFFE2_API Slice final {
 };
 
 CAFFE2_API std::ostream& operator<<(std::ostream& stream, const Slice& slice);
+
+// This mirrors `__PySlice_Unpack` in torch/csrc/utils/python_compat.h
+inline Slice unpackSlice(
+    c10::optional<int64_t> start_index,
+    c10::optional<int64_t> stop_index,
+    c10::optional<int64_t> step_index) {
+  int64_t start, stop, step;
+  if (!step_index.has_value()) {
+    step = 1;
+  } else {
+    step = step_index.value();
+    TORCH_CHECK_VALUE(step != 0, "slice step cannot be zero");
+
+    // Here step might be -INDEX_MAX-1; in this case we replace it
+    // with -INDEX_MAX.  This doesn't affect the semantics, and it
+    // guards against later undefined behaviour resulting from code that
+    // does "step = -step" as part of a slice reversal.
+    if (step < -INDEX_MAX)
+      step = -INDEX_MAX;
+  }
+  if (!start_index.has_value()) {
+    start = step < 0 ? INDEX_MAX : 0;
+  } else {
+    start = start_index.value();
+  }
+  if (!stop_index.has_value()) {
+    stop = step < 0 ? INDEX_MIN : INDEX_MAX;
+  } else {
+    stop = stop_index.value();
+  }
+  return Slice(start, stop, step);
+}
 
 // `at::indexing::TensorIndex` is used for converting C++ tensor indices such as
 // `{None, "...", Ellipsis, 0, true, {1, None, 2}, torch::tensor({1, 2})}`
@@ -63,15 +103,19 @@ CAFFE2_API std::ostream& operator<<(std::ostream& stream, const Slice& slice);
 // `torch.tensor([1, 2])`) | `torch::tensor({1, 2})`
 struct CAFFE2_API TensorIndex final {
   // Case 1: `at::indexing::None`
-  TensorIndex(c10::nullopt_t);
+  TensorIndex(c10::nullopt_t) : type_(TensorIndexType::None) {}
 
   // Case 2: "..." / `at::indexing::Ellipsis`
-  TensorIndex(at::indexing::EllipsisIndexType);
-  TensorIndex(const char *str);
+  TensorIndex(at::indexing::EllipsisIndexType) : type_(TensorIndexType::Ellipsis) {}
+  TensorIndex(const char *str) : TensorIndex(at::indexing::Ellipsis) {
+    TORCH_CHECK_VALUE(
+      strcmp(str, "...") == 0,
+      "Expected \"...\" to represent an ellipsis index, but got \"", str, "\"");
+  }
 
   // Case 3: Integer value
-  TensorIndex(int64_t integer);
-  TensorIndex(int integer);
+  TensorIndex(int64_t integer) : integer_(integer), type_(TensorIndexType::Integer) {}
+  TensorIndex(int integer) : TensorIndex((int64_t)integer) {}
 
   // Case 4: Boolean value
   template <class T,
@@ -80,25 +124,64 @@ struct CAFFE2_API TensorIndex final {
 
   // Case 5: Slice represented in `{start, stop, step}` form,
   // where `start` / `stop` / `step` can be integer or `at::indexing::None`
-  TensorIndex(std::initializer_list<c10::optional<int64_t>> slice);
+  TensorIndex(std::initializer_list<c10::optional<int64_t>> slice) : type_(TensorIndexType::Slice) {
+    if (slice.size() == 0) {
+      slice_ = unpackSlice(c10::nullopt, c10::nullopt, c10::nullopt);
+    } else if (slice.size() == 2) {
+      slice_ = unpackSlice(*slice.begin(), *(slice.begin() + 1), c10::nullopt);
+    } else if (slice.size() == 3) {
+      slice_ = unpackSlice(*slice.begin(), *(slice.begin() + 1), *(slice.begin() + 2));
+    } else {
+      TORCH_CHECK_VALUE(
+        false,
+        "Expected 0 / 2 / 3 elements in the braced-init-list to represent a slice index, but got ",
+        slice.size(),
+        " element(s)");
+    }
+  }
 
   // Case 5: Tensor value
-  TensorIndex(Tensor tensor);
+  TensorIndex(Tensor tensor) : tensor_(tensor), type_(TensorIndexType::Tensor) {}
 
-  bool is_none() const;
-  bool is_ellipsis() const;
+  inline bool is_none() const {
+    return type_ == TensorIndexType::None;
+  }
 
-  bool is_integer() const;
-  int64_t integer() const;
+  inline bool is_ellipsis() const {
+    return type_ == TensorIndexType::Ellipsis;
+  }
 
-  bool is_boolean() const;
-  bool boolean() const;
+  inline bool is_integer() const {
+    return type_ == TensorIndexType::Integer;
+  }
 
-  bool is_slice() const;
-  const Slice& slice() const;
+  inline int64_t integer() const {
+    return integer_;
+  }
 
-  bool is_tensor() const;
-  const Tensor& tensor() const;
+  inline bool is_boolean() const {
+    return type_ == TensorIndexType::Boolean;
+  }
+
+  inline bool boolean() const {
+    return boolean_;
+  }
+
+  inline bool is_slice() const {
+    return type_ == TensorIndexType::Slice;
+  }
+
+  inline const Slice& slice() const {
+    return slice_;
+  }
+
+  inline bool is_tensor() const {
+    return type_ == TensorIndexType::Tensor;
+  }
+
+  inline const Tensor& tensor() const {
+    return tensor_;
+  }
 
  private:
   int64_t integer_;
@@ -117,8 +200,8 @@ inline Tensor applySlice(
     int64_t start,
     int64_t stop,
     int64_t step,
-    bool ensure_view=false,
-    bool is_tracing=false) {
+    bool ensure_view,
+    bool is_tracing) {
   const auto& length = self.size(dim);
 
   TORCH_CHECK_VALUE(step != 0, "step cannot be zero");
@@ -160,55 +243,51 @@ inline Tensor boolToIndexingTensor(const Tensor& self, bool value) {
   }
 }
 
-inline void recordTensorIndex(const Tensor& tensor, std::vector<Tensor>& outIndices, int64_t& dim) {
+inline void recordTensorIndex(const Tensor& tensor, std::vector<Tensor>& outIndices, int64_t* dim_ptr) {
   // TODO: check scalarType
-  outIndices.resize(dim + 1);
-  outIndices[dim] = tensor;
-  dim++;
+  outIndices.resize(*dim_ptr + 1);
+  outIndices[*dim_ptr] = tensor;
+  (*dim_ptr)++;
 };
 
-inline Tensor handleInteger(const Tensor& self, int64_t& dim, int64_t index, int64_t real_dim) {
-  return applySelect(self, dim, index, real_dim);
-}
-
-inline Tensor handleSlice(const Tensor& self, int64_t& dim, int64_t start, int64_t stop, int64_t step, bool is_tracing=false) {
-  Tensor result = applySlice(self, dim, start, stop, step, /*ensure_view=*/false, /*is_tracing=*/is_tracing);
-  dim++;
+inline Tensor handleSlice(const Tensor& self, int64_t* dim_ptr, int64_t start, int64_t stop, int64_t step, bool is_tracing) {
+  Tensor result = applySlice(self, *dim_ptr, start, stop, step, /*ensure_view=*/false, /*is_tracing=*/is_tracing);
+  (*dim_ptr)++;
   return result;
 }
 
-inline void handleEllipsis(const Tensor& self, int64_t& dim, int64_t specified_dims) {
-  dim += self.dim() - specified_dims;
+inline void handleEllipsis(const Tensor& self, int64_t* dim_ptr, int64_t specified_dims) {
+  (*dim_ptr) += self.dim() - specified_dims;
 }
 
-inline Tensor handleNone(const Tensor& self, int64_t& dim) {
-  Tensor result = self.unsqueeze(dim);
-  dim++;
+inline Tensor handleNone(const Tensor& self, int64_t* dim_ptr) {
+  Tensor result = self.unsqueeze(*dim_ptr);
+  (*dim_ptr)++;
   return result;
 }
 
-inline Tensor handleBoolean(const Tensor& self, bool boolean, std::vector<Tensor>& outIndices, int64_t& dim) {
-  Tensor result = self.unsqueeze(dim);
-  recordTensorIndex(boolToIndexingTensor(result, boolean), outIndices, dim);
+inline Tensor handleBoolean(const Tensor& self, bool boolean, std::vector<Tensor>& outIndices, int64_t* dim_ptr) {
+  Tensor result = self.unsqueeze(*dim_ptr);
+  recordTensorIndex(boolToIndexingTensor(result, boolean), outIndices, dim_ptr);
   return result;
 }
 
-inline Tensor handleTensor(const Tensor& self, const Tensor& tensor, std::vector<Tensor>& outIndices, int64_t& dim, int64_t real_dim) {
+inline Tensor handleTensor(const Tensor& self, const Tensor& tensor, std::vector<Tensor>& outIndices, int64_t* dim_ptr, int64_t real_dim) {
   Tensor result = self;
   auto scalar_type = tensor.scalar_type();
   if (tensor.dim() == 0 && at::isIntegralType(scalar_type, /*includeBool=*/true)) {
     if (scalar_type != at::kByte && scalar_type != at::kBool) {
-      result = applySelect(result, dim, tensor.item<int64_t>(), real_dim);
+      result = applySelect(result, *dim_ptr, tensor.item<int64_t>(), real_dim);
     } else {
-      result = result.unsqueeze(dim);
+      result = result.unsqueeze(*dim_ptr);
       if (scalar_type == at::kBool) {
-        recordTensorIndex(boolToIndexingTensor(result, tensor.item<bool>() != 0), outIndices, dim);
+        recordTensorIndex(boolToIndexingTensor(result, tensor.item<bool>() != 0), outIndices, dim_ptr);
       } else {
-        recordTensorIndex(boolToIndexingTensor(result, tensor.item<uint8_t>() != 0), outIndices, dim);
+        recordTensorIndex(boolToIndexingTensor(result, tensor.item<uint8_t>() != 0), outIndices, dim_ptr);
       }
     }
   } else {
-    recordTensorIndex(tensor, outIndices, dim);
+    recordTensorIndex(tensor, outIndices, dim_ptr);
   }
   return result;
 }
@@ -225,8 +304,35 @@ inline Tensor handleIntegerSingleDim(const Tensor& self, int64_t index) {
   return applySelect(self, 0, index);
 }
 
-inline Tensor handleSliceSingleDim(const Tensor& self, int64_t start, int64_t stop, int64_t step, bool is_get, bool is_tracing=false) {
+inline Tensor handleSliceSingleDim(const Tensor& self, int64_t start, int64_t stop, int64_t step, bool is_get, bool is_tracing) {
   return applySlice(self, 0, start, stop, step, /*ensure_view=*/is_get, /*is_tracing=*/is_tracing);
+}
+
+inline Tensor handleDimInMultiDimIndexing(
+    const Tensor& prev_dim_result,
+    const Tensor& original_tensor,
+    TensorIndex index,
+    int64_t* dim_ptr,
+    int64_t* specified_dims_ptr,
+    int64_t real_dim,
+    std::vector<Tensor>& outIndices,  // yf225 TODO: should outIndices be pointer as well?
+    bool is_tracing) {
+  if (index.is_integer()) {
+    return applySelect(prev_dim_result, *dim_ptr, index.integer(), real_dim);
+  } else if (index.is_slice()) {
+    return handleSlice(prev_dim_result, dim_ptr, index.slice().start(), index.slice().stop(), index.slice().step(), /*is_tracing=*/is_tracing);
+  } else if (index.is_ellipsis()) {
+    handleEllipsis(original_tensor, dim_ptr, *specified_dims_ptr);
+    return prev_dim_result;
+  } else if (index.is_none()) {
+    return handleNone(prev_dim_result, dim_ptr);
+  } else if (index.is_boolean()) {
+    return handleBoolean(prev_dim_result, index.boolean(), outIndices, dim_ptr);
+  } else if (index.is_tensor()) {
+    return handleTensor(prev_dim_result, index.tensor(), outIndices, dim_ptr, real_dim);
+  } else {
+    TORCH_INTERNAL_ASSERT(false, "Invalid TensorIndex type");
+  }
 }
 
 inline std::vector<Tensor> typeConvertIndices(const Tensor& self, const std::vector<Tensor>& indices) {

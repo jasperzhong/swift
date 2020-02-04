@@ -7,122 +7,9 @@ namespace indexing {
 
 const EllipsisIndexType Ellipsis = EllipsisIndexType();
 
-Slice::Slice() {}
-Slice::Slice(int64_t start, int64_t stop, int64_t step) : start_(start), stop_(stop), step_(step) {}
-
-int64_t Slice::start() const {
-  return start_;
-}
-
-int64_t Slice::stop() const {
-  return stop_;
-}
-
-int64_t Slice::step() const {
-  return step_;
-}
-
 std::ostream& operator<<(std::ostream& stream, const Slice& slice) {
   stream << slice.start() << ":" << slice.stop() << ":" << slice.step();
   return stream;
-}
-
-// This mirrors `__PySlice_Unpack` in torch/csrc/utils/python_compat.h
-Slice unpackSlice(
-    c10::optional<int64_t> start_index,
-    c10::optional<int64_t> stop_index,
-    c10::optional<int64_t> step_index) {
-  int64_t start, stop, step;
-  if (!step_index.has_value()) {
-    step = 1;
-  } else {
-    step = step_index.value();
-    TORCH_CHECK_VALUE(step != 0, "slice step cannot be zero");
-
-    // Here step might be -INDEX_MAX-1; in this case we replace it
-    // with -INDEX_MAX.  This doesn't affect the semantics, and it
-    // guards against later undefined behaviour resulting from code that
-    // does "step = -step" as part of a slice reversal.
-    if (step < -INDEX_MAX)
-      step = -INDEX_MAX;
-  }
-  if (!start_index.has_value()) {
-    start = step < 0 ? INDEX_MAX : 0;
-  } else {
-    start = start_index.value();
-  }
-  if (!stop_index.has_value()) {
-    stop = step < 0 ? INDEX_MIN : INDEX_MAX;
-  } else {
-    stop = stop_index.value();
-  }
-  return Slice(start, stop, step);
-}
-
-TensorIndex::TensorIndex(c10::nullopt_t) : type_(TensorIndexType::None) {}
-TensorIndex::TensorIndex(at::indexing::EllipsisIndexType) : type_(TensorIndexType::Ellipsis) {}
-TensorIndex::TensorIndex(const char *str) : TensorIndex(at::indexing::Ellipsis) {
-  TORCH_CHECK_VALUE(
-    strcmp(str, "...") == 0,
-    "Expected \"...\" to represent an ellipsis index, but got \"", str, "\"");
-}
-TensorIndex::TensorIndex(int64_t integer) : integer_(integer), type_(TensorIndexType::Integer) {}
-TensorIndex::TensorIndex(int integer) : TensorIndex((int64_t)integer) {}
-TensorIndex::TensorIndex(std::initializer_list<c10::optional<int64_t>> slice) : type_(TensorIndexType::Slice) {
-  if (slice.size() == 0) {
-    slice_ = unpackSlice(c10::nullopt, c10::nullopt, c10::nullopt);
-  } else if (slice.size() == 2) {
-    slice_ = unpackSlice(*slice.begin(), *(slice.begin() + 1), c10::nullopt);
-  } else if (slice.size() == 3) {
-    slice_ = unpackSlice(*slice.begin(), *(slice.begin() + 1), *(slice.begin() + 2));
-  } else {
-    TORCH_CHECK_VALUE(
-      false,
-      "Expected 0 / 2 / 3 elements in the braced-init-list to represent a slice index, but got ",
-      slice.size(),
-      " element(s)");
-  }
-}
-TensorIndex::TensorIndex(Tensor tensor) : tensor_(tensor), type_(TensorIndexType::Tensor) {}
-
-bool TensorIndex::is_none() const {
-  return type_ == TensorIndexType::None;
-}
-
-bool TensorIndex::is_ellipsis() const {
-  return type_ == TensorIndexType::Ellipsis;
-}
-
-bool TensorIndex::is_integer() const {
-  return type_ == TensorIndexType::Integer;
-}
-
-int64_t TensorIndex::integer() const {
-  return integer_;
-}
-
-bool TensorIndex::is_boolean() const {
-  return type_ == TensorIndexType::Boolean;
-}
-
-bool TensorIndex::boolean() const {
-  return boolean_;
-}
-
-bool TensorIndex::is_slice() const {
-  return type_ == TensorIndexType::Slice;
-}
-
-const Slice& TensorIndex::slice() const {
-  return slice_;
-}
-
-bool TensorIndex::is_tensor() const {
-  return type_ == TensorIndexType::Tensor;
-}
-
-const Tensor& TensorIndex::tensor() const {
-  return tensor_;
 }
 
 std::ostream& operator<<(std::ostream& stream, const TensorIndex& tensor_index) {
@@ -184,21 +71,15 @@ Tensor applySlicing(const Tensor& self, ArrayRef<TensorIndex> indices, std::vect
   Tensor result = self;
   for (int64_t i = 0; i < size; i++) {
     auto& obj = indices[i];
-    if (obj.is_integer()) {
-      result = handleInteger(result, dim, obj.integer(), i);
-    } else if (obj.is_slice()) {
-      result = handleSlice(result, dim, obj.slice().start(), obj.slice().stop(), obj.slice().step());
-    } else if (obj.is_ellipsis()) {
-      handleEllipsis(self, dim, specified_dims);
-    } else if (obj.is_none()) {
-      result = handleNone(result, dim);
-    } else if (obj.is_boolean()) {
-      result = handleBoolean(result, obj.boolean(), outIndices, dim);
-    } else if (obj.is_tensor()) {
-      result = handleTensor(result, obj.tensor(), outIndices, dim, i);
-    } else {
-      TORCH_INTERNAL_ASSERT(false, "Invalid TensorIndex type");
-    }
+    result = handleDimInMultiDimIndexing(
+      /*prev_dim_result=*/result,
+      /*original_tensor=*/self,
+      /*index=*/obj,
+      /*dim=*/&dim,
+      /*specified_dims=*/&specified_dims,
+      /*real_dim=*/i,
+      /*outIndices=*/outIndices,
+      /*is_tracing=*/false);
   }
   return result;
 }
@@ -222,7 +103,8 @@ Tensor get_item(const Tensor& self, ArrayRef<TensorIndex> indices) {
         index.slice().start(),
         index.slice().stop(),
         index.slice().step(),
-        true);
+        /*is_get=*/true,
+        /*is_tracing=*/false);
     }
   }
 
@@ -267,7 +149,8 @@ void set_item(Tensor& self, ArrayRef<TensorIndex> indices, const Tensor& value) 
         index.slice().start(),
         index.slice().stop(),
         index.slice().step(),
-        false), value);
+        /*is_get=*/false,
+        /*is_tracing=*/false), value);
       return;
     }
   }

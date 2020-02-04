@@ -133,6 +133,41 @@ static inline void recordSelectTrace(const Tensor& index_tensor) {
   }
 }
 
+static inline PyObject* convertToPythonInt(PyObject* obj) {
+  auto idx = THPObjectPtr(PyNumber_Index(obj));
+  if (!idx) {
+    PyErr_Clear();
+    invalid_index(obj);
+  }
+  return idx;
+}
+
+static inline at::indexing::TensorIndex indexToTensorIndex(const Variable& self, PyObject* obj) {
+  if (THPUtils_checkLong(obj)) {
+    return at::indexing::TensorIndex(THPUtils_unpackLong(obj));
+  } else if (PySlice_Check(obj)) {
+    Py_ssize_t start, stop, step;
+    if (!THPUtils_unpackSlice(obj, &start, &stop, &step)) {
+      throw python_error();
+    }
+    return at::indexing::TensorIndex({start, stop, step});
+  } else if (obj == Py_Ellipsis) {
+    return at::indexing::TensorIndex(at::indexing::Ellipsis);
+  } else if (obj == Py_None) {
+    return at::indexing::TensorIndex(at::indexing::None);
+  } else if (PyBool_Check(obj)) {
+    return at::indexing::TensorIndex(obj == Py_True);
+  } else if (THPVariable_Check(obj)) {
+    return at::indexing::TensorIndex(THPVariable_Unpack(obj));
+  } else if (PySequence_Check(obj)) {
+    // TODO: Naughty naughty get out of jail free
+    // (Fixing this means I have to fix the call chain though :/)
+    return at::indexing::TensorIndex(sequenceToVariable(legacyExtractDispatchKey(self), obj));
+  } else {
+    return at::indexing::TensorIndex(THPUtils_unpackLong(convertToPythonInt(obj)));
+  }
+}
+
 static inline Variable applySlicing(const Variable& self, PyObject* index, variable_list& outIndices) {
   int64_t size = PyTuple_GET_SIZE(index); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
   int64_t dim = 0;
@@ -145,45 +180,51 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
   Variable result = self;
   for (int64_t i = 0; i < size; i++) {
     PyObject* obj = PyTuple_GET_ITEM(index, i); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+
+    // Handle JIT tracing
     if (THPUtils_checkLong(obj)) {
       if (THPVariable_Check(obj)) {
         recordSelectTrace(THPVariable_Unpack(obj));
       }
-      result = at::indexing::handleInteger(result, dim, THPUtils_unpackLong(obj), i);
     } else if (PySlice_Check(obj)) {
-      Py_ssize_t start, stop, step;
       Tensor start_tensor, stop_tensor, step_tensor;
-      unpackSliceAndExtractTensors(obj, start, stop, step, start_tensor, stop_tensor, step_tensor);
+      PySliceObject* sliceobj = (PySliceObject*)obj;
+      if (THPVariable_Check(sliceobj->start)) {
+        start_tensor = THPVariable_Unpack(sliceobj->start);
+      }
+      if (THPVariable_Check(sliceobj->stop)) {
+        stop_tensor = THPVariable_Unpack(sliceobj->stop);
+      }
+      if (THPVariable_Check(sliceobj->step)) {
+        step_tensor = THPVariable_Unpack(sliceobj->step);
+      }
       recordSliceTrace(start_tensor, stop_tensor, step_tensor);
-      result = at::indexing::handleSlice(result, dim, start, stop, step, torch::jit::tracer::isTracing());
-    } else if (obj == Py_Ellipsis) {
-      at::indexing::handleEllipsis(self, dim, specified_dims);
-    } else if (obj == Py_None) {
-      result = at::indexing::handleNone(result, dim);
-    } else if (PyBool_Check(obj)) {
-      result = at::indexing::handleBoolean(result, obj == Py_True, outIndices, dim);
     } else if (THPVariable_Check(obj)) {
       Tensor tensor = THPVariable_Unpack(obj);
       auto scalar_type = tensor.scalar_type();
       if (tensor.dim() == 0 && at::isIntegralType(scalar_type, /*includeBool=*/false) && scalar_type != at::kByte) {
         recordSelectTrace(tensor);
       }
-      result = at::indexing::handleTensor(result, tensor, outIndices, dim, i);
-    } else if (PySequence_Check(obj)) {
-      // TODO: Naughty naughty get out of jail free
-      // (Fixing this means I have to fix the call chain though :/)
-      at::indexing::recordTensorIndex(sequenceToVariable(legacyExtractDispatchKey(self), obj), outIndices, dim);
-    } else {
-      auto idx = THPObjectPtr(PyNumber_Index(obj));
-      if (!idx) {
-        PyErr_Clear();
-        invalid_index(obj);
+    } else if (obj != Py_Ellipsis && obj != Py_None && !PyBool_Check(obj) && !PySequence_Check(obj)) {
+      auto idx = convertToPythonInt(obj);
+      if (THPVariable_Check(idx)) {
+        recordSelectTrace(THPVariable_Unpack(idx));
       }
-      if (THPVariable_Check(obj)) {
-        recordSelectTrace(THPVariable_Unpack(obj));
-      }
-      result = at::indexing::handleInteger(result, dim, THPUtils_unpackLong(obj), i);
     }
+
+    // Convert Python index to C++ index
+    at::indexing::TensorIndex tensor_index = indexToTensorIndex(self, obj);
+
+    // Call C++ indexing function
+    result = at::indexing::handleDimInMultiDimIndexing(
+      /*prev_dim_result=*/result,
+      /*original_tensor=*/self,
+      /*index=*/tensor_index,
+      /*dim_ptr=*/&dim,
+      /*specified_dims_ptr=*/&specified_dims,
+      /*real_dim=*/i,
+      /*outIndices=*/outIndices,
+      /*is_tracing=*/torch::jit::tracer::isTracing());
   }
   return result;
 }
