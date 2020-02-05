@@ -308,10 +308,38 @@ static inline Tensor handleSliceSingleDim(const Tensor& self, int64_t start, int
   return applySlice(self, 0, start, stop, step, /*ensure_view=*/is_get, /*is_tracing=*/is_tracing);
 }
 
+static inline bool handleSimpleTypesInSingleDimIndexing(
+    const Tensor& self,
+    const TensorIndex& index,
+    bool is_tracing,
+    Tensor& result) {
+  if (index.is_none()) {
+    result = handleNoneSingleDim(self);
+    return true;
+  } else if (index.is_ellipsis()) {
+    result = handleEllipsisSingleDim(self);
+    return true;
+  } else if (index.is_integer()) {
+    result = handleIntegerSingleDim(self, index.integer());
+    return true;
+  } else if (index.is_slice()) {
+    result = handleSliceSingleDim(
+      self,
+      index.slice().start(),
+      index.slice().stop(),
+      index.slice().step(),
+      /*is_get=*/true,
+      /*is_tracing=*/is_tracing);
+    return true;
+  } else {
+    return false;
+  }
+}
+
 static inline Tensor handleDimInMultiDimIndexing(
     const Tensor& prev_dim_result,
     const Tensor& original_tensor,
-    TensorIndex index,
+    const TensorIndex& index,
     int64_t* dim_ptr,
     int64_t* specified_dims_ptr,
     int64_t real_dim,

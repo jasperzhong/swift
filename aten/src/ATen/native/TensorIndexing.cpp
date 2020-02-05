@@ -91,20 +91,10 @@ Tensor get_item(const Tensor& self, ArrayRef<TensorIndex> indices) {
   // handle simple types: integers, slices, ellipsis
   if (indices.size() == 1) {
     const TensorIndex& index = indices[0];
-    if (index.is_none()) {
-      return handleNoneSingleDim(self);
-    } else if (index.is_ellipsis()) {
-      return handleEllipsisSingleDim(self);
-    } else if (index.is_integer()) {
-      return handleIntegerSingleDim(self, index.integer());
-    } else if (index.is_slice()) {
-      return handleSliceSingleDim(
-        self,
-        index.slice().start(),
-        index.slice().stop(),
-        index.slice().step(),
-        /*is_get=*/true,
-        /*is_tracing=*/false);
+    Tensor result;
+    bool is_simple_type = handleSimpleTypesInSingleDimIndexing(self, index, /*is_tracing=*/false, result);
+    if (is_simple_type) {
+      return result;
     }
   }
 
