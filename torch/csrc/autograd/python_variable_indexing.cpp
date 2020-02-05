@@ -172,6 +172,7 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
   int64_t size = PyTuple_GET_SIZE(index); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
   int64_t dim = 0;
   int64_t specified_dims = count_specified_dimensions(index);
+  bool is_tracing = torch::jit::tracer::isTracing();
 
   if (specified_dims > self.dim()) {
     throw IndexError("too many indices for tensor of dimension %d", (int)self.dim());
@@ -182,7 +183,7 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
     PyObject* obj = PyTuple_GET_ITEM(index, i); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
 
     // Handle JIT tracing
-    if (torch::jit::tracer::isTracing()) {
+    if (is_tracing) {
       if (THPUtils_checkLong(obj)) {
         if (THPVariable_Check(obj)) {
           recordSelectTrace(THPVariable_Unpack(obj));
@@ -223,7 +224,7 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
       /*specified_dims_ptr=*/&specified_dims,
       /*real_dim=*/i,
       /*outIndices=*/outIndices,
-      /*is_tracing=*/torch::jit::tracer::isTracing());
+      /*is_tracing=*/is_tracing);
   }
   return result;
 }
