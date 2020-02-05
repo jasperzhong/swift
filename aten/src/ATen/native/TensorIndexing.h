@@ -102,29 +102,54 @@ inline Slice unpackSlice(
 // `1:3:2`                 | `{1, 3, 2}`
 // `torch.tensor([1, 2])`) | `torch::tensor({1, 2})`
 struct CAFFE2_API TensorIndex final {
+  inline void set_none() {
+    type_ = TensorIndexType::None;
+  }
+
   // Case 1: `at::indexing::None`
-  TensorIndex(c10::nullopt_t) : type_(TensorIndexType::None) {}
+  TensorIndex(c10::nullopt_t) {
+    set_none();
+  }
+
+  inline void set_ellipsis() {
+    type_ = TensorIndexType::Ellipsis;
+  }
 
   // Case 2: "..." / `at::indexing::Ellipsis`
-  TensorIndex(at::indexing::EllipsisIndexType) : type_(TensorIndexType::Ellipsis) {}
+  TensorIndex(at::indexing::EllipsisIndexType) {
+    set_ellipsis();
+  }
   TensorIndex(const char *str) : TensorIndex(at::indexing::Ellipsis) {
     TORCH_CHECK_VALUE(
       strcmp(str, "...") == 0,
       "Expected \"...\" to represent an ellipsis index, but got \"", str, "\"");
   }
 
+  inline void set_integer(int64_t integer) {
+    integer_ = integer;
+    type_ = TensorIndexType::Integer;
+  }
+
   // Case 3: Integer value
-  TensorIndex(int64_t integer) : integer_(integer), type_(TensorIndexType::Integer) {}
+  TensorIndex(int64_t integer) {
+    set_integer(integer);
+  }
   TensorIndex(int integer) : TensorIndex((int64_t)integer) {}
+
+  inline void set_boolean(bool boolean) {
+    boolean_ = boolean;
+    type_ = TensorIndexType::Boolean;
+  }
 
   // Case 4: Boolean value
   template <class T,
             class = typename std::enable_if<std::is_same<bool, T>::value>::type >
-  TensorIndex(T boolean) : boolean_(boolean), type_(TensorIndexType::Boolean) {}
+  TensorIndex(T boolean) {
+    set_boolean(boolean);
+  }
 
-  // Case 5: Slice represented in `{start, stop, step}` form,
-  // where `start` / `stop` / `step` can be integer or `at::indexing::None`
-  TensorIndex(std::initializer_list<c10::optional<int64_t>> slice) : type_(TensorIndexType::Slice) {
+  inline void set_slice(std::initializer_list<c10::optional<int64_t>> slice) {
+    type_ = TensorIndexType::Slice;
     if (slice.size() == 0) {
       slice_ = unpackSlice(c10::nullopt, c10::nullopt, c10::nullopt);
     } else if (slice.size() == 2) {
@@ -140,8 +165,21 @@ struct CAFFE2_API TensorIndex final {
     }
   }
 
+  // Case 5: Slice represented in `{start, stop, step}` form,
+  // where `start` / `stop` / `step` can be integer or `at::indexing::None`
+  TensorIndex(std::initializer_list<c10::optional<int64_t>> slice) {
+    set_slice(slice);
+  }
+
+  inline void set_tensor(Tensor tensor) {
+    tensor_ = std::move(tensor);
+    type_ = TensorIndexType::Tensor;
+  }
+
   // Case 5: Tensor value
-  TensorIndex(Tensor tensor) : tensor_(tensor), type_(TensorIndexType::Tensor) {}
+  TensorIndex(Tensor tensor) {
+    set_tensor(tensor);
+  }
 
   inline bool is_none() const {
     return type_ == TensorIndexType::None;
@@ -190,6 +228,8 @@ struct CAFFE2_API TensorIndex final {
   Tensor tensor_;
   TensorIndexType type_;
 };
+
+CAFFE2_API extern TensorIndex tensor_index_tmp;
 
 CAFFE2_API std::ostream& operator<<(std::ostream& stream, const TensorIndex& tensor_index);
 CAFFE2_API std::ostream& operator<<(std::ostream& stream, const std::vector<TensorIndex>& tensor_indices);
