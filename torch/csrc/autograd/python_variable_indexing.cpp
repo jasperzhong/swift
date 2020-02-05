@@ -91,19 +91,11 @@ static inline Variable valueToTensor(c10::TensorOptions options, PyObject* value
     torch::utils::options_to_string(options).c_str());
 }
 
-// yf225 TODO: remove this, but create another function for extracting integers / tensors separately
-static inline void unpackSliceAndExtractTensors(
+static inline void extractTensorsFromSlice(
   PyObject* obj,
-  Py_ssize_t& start,
-  Py_ssize_t& stop,
-  Py_ssize_t& step,
   Tensor& start_tensor,
   Tensor& stop_tensor,
   Tensor& step_tensor) {
-  if (!THPUtils_unpackSlice(obj, &start, &stop, &step)) {
-    throw python_error();
-  }
-
   PySliceObject* sliceobj = (PySliceObject*)obj;
   if (THPVariable_Check(sliceobj->start)) {
     start_tensor = THPVariable_Unpack(sliceobj->start);
@@ -188,16 +180,7 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
         recordSelectTrace(THPVariable_Unpack(obj));
       } else if (PySlice_Check(obj)) {
         Tensor start_tensor, stop_tensor, step_tensor;
-        PySliceObject* sliceobj = (PySliceObject*)obj;
-        if (THPVariable_Check(sliceobj->start)) {
-          start_tensor = THPVariable_Unpack(sliceobj->start);
-        }
-        if (THPVariable_Check(sliceobj->stop)) {
-          stop_tensor = THPVariable_Unpack(sliceobj->stop);
-        }
-        if (THPVariable_Check(sliceobj->step)) {
-          step_tensor = THPVariable_Unpack(sliceobj->step);
-        }
+        extractTensorsFromSlice(obj, start_tensor, stop_tensor, step_tensor);
         recordSliceTrace(start_tensor, stop_tensor, step_tensor);
       } else if (THPVariable_Check(obj)) {
         Tensor tensor = THPVariable_Unpack(obj);
@@ -290,16 +273,7 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
       recordSelectTrace(THPVariable_Unpack(index));
     } else if (PySlice_Check(index)) {
       Tensor start_tensor, stop_tensor, step_tensor;
-      PySliceObject* sliceobj = (PySliceObject*)index;
-      if (THPVariable_Check(sliceobj->start)) {
-        start_tensor = THPVariable_Unpack(sliceobj->start);
-      }
-      if (THPVariable_Check(sliceobj->stop)) {
-        stop_tensor = THPVariable_Unpack(sliceobj->stop);
-      }
-      if (THPVariable_Check(sliceobj->step)) {
-        step_tensor = THPVariable_Unpack(sliceobj->step);
-      }
+      extractTensorsFromSlice(index, start_tensor, stop_tensor, step_tensor);
       recordSliceTrace(start_tensor, stop_tensor, step_tensor);
     }
   }
@@ -355,16 +329,7 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
       recordSelectTrace(THPVariable_Unpack(index));
     } else if (PySlice_Check(index)) {
       Tensor start_tensor, stop_tensor, step_tensor;
-      PySliceObject* sliceobj = (PySliceObject*)index;
-      if (THPVariable_Check(sliceobj->start)) {
-        start_tensor = THPVariable_Unpack(sliceobj->start);
-      }
-      if (THPVariable_Check(sliceobj->stop)) {
-        stop_tensor = THPVariable_Unpack(sliceobj->stop);
-      }
-      if (THPVariable_Check(sliceobj->step)) {
-        step_tensor = THPVariable_Unpack(sliceobj->step);
-      }
+      extractTensorsFromSlice(index, start_tensor, stop_tensor, step_tensor);
       recordSliceTrace(start_tensor, stop_tensor, step_tensor);
     }
   }
