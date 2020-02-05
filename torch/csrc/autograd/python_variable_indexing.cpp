@@ -91,6 +91,7 @@ static inline Variable valueToTensor(c10::TensorOptions options, PyObject* value
     torch::utils::options_to_string(options).c_str());
 }
 
+// yf225 TODO: remove this, but create another function for extracting integers / tensors separately
 static inline void unpackSliceAndExtractTensors(
   PyObject* obj,
   Py_ssize_t& start,
@@ -303,7 +304,10 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
     }
   }
   if (index == Py_None || index == Py_Ellipsis || THPUtils_checkLong(index) || PySlice_Check(index)) {
-    return wrap(at::indexing::handleSimpleTypesInSingleDimIndexingGet(self_, indexToTensorIndex(self_, index), /*is_tracing=*/is_tracing));
+    return wrap(at::indexing::handleSimpleTypesInSingleDimIndexingGet(
+      self_,
+      indexToTensorIndex(self_, index),
+      /*is_tracing=*/is_tracing));
   }
 
   // wrap index in a tuple if it's not already one
@@ -346,29 +350,30 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
   bool is_tracing = torch::jit::tracer::isTracing();
 
   // handle simple types: integers, slices, ellipsis, bool
-  if (index == Py_False) { // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
-    // do nothing for false (technically we should check the size, but we don't have
-    // real 0-sized shapes.
-    return 0;
-  } else if (index == Py_Ellipsis) {
-    at::indexing::copy_to(self_, value);
-    return 0;
-  } else if (index == Py_None || index == Py_True) { // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
-    at::indexing::copy_to(at::indexing::handleNoneSingleDim(self_), value);
-    return 0;
-  } else if (THPUtils_checkLong(index)) {
-    if (THPVariable_Check(index)) {
+  if (is_tracing) {
+    if (THPUtils_checkLong(index) && THPVariable_Check(index)) {
       recordSelectTrace(THPVariable_Unpack(index));
+    } else if (PySlice_Check(index)) {
+      Tensor start_tensor, stop_tensor, step_tensor;
+      PySliceObject* sliceobj = (PySliceObject*)index;
+      if (THPVariable_Check(sliceobj->start)) {
+        start_tensor = THPVariable_Unpack(sliceobj->start);
+      }
+      if (THPVariable_Check(sliceobj->stop)) {
+        stop_tensor = THPVariable_Unpack(sliceobj->stop);
+      }
+      if (THPVariable_Check(sliceobj->step)) {
+        step_tensor = THPVariable_Unpack(sliceobj->step);
+      }
+      recordSliceTrace(start_tensor, stop_tensor, step_tensor);
     }
-    at::indexing::copy_to(at::indexing::handleIntegerSingleDim(self_, THPUtils_unpackLong(index)), value);
-    return 0;
-  } else if (PySlice_Check(index)) {
-    Py_ssize_t start, stop, step;
-    Tensor start_tensor, stop_tensor, step_tensor;
-    unpackSliceAndExtractTensors(index, start, stop, step, start_tensor, stop_tensor, step_tensor);
-    recordSliceTrace(start_tensor, stop_tensor, step_tensor);
-    at::indexing::copy_to(at::indexing::handleSliceSingleDim(
-      self_, start, stop, step, /*is_get=*/false, /*is_tracing=*/is_tracing), value);
+  }
+  if (index == Py_False || index == Py_Ellipsis || index == Py_None || index == Py_True || THPUtils_checkLong(index) || PySlice_Check(index)) {
+    at::indexing::handleSimpleTypesInSingleDimIndexingSet(
+      self_,
+      indexToTensorIndex(self_, index),
+      value,
+      /*is_tracing=*/is_tracing);
     return 0;
   }
 
