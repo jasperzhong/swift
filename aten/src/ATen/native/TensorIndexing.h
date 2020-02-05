@@ -250,6 +250,7 @@ static inline void recordTensorIndex(const Tensor& tensor, std::vector<Tensor>& 
   (*dim_ptr)++;
 };
 
+// yf225 TODO: clean up these `handle*` methods
 static inline Tensor handleSlice(const Tensor& self, int64_t* dim_ptr, int64_t start, int64_t stop, int64_t step, bool is_tracing) {
   Tensor result = applySlice(self, *dim_ptr, start, stop, step, /*ensure_view=*/false, /*is_tracing=*/is_tracing);
   (*dim_ptr)++;
@@ -308,7 +309,7 @@ static inline Tensor handleSliceSingleDim(const Tensor& self, int64_t start, int
   return applySlice(self, 0, start, stop, step, /*ensure_view=*/is_get, /*is_tracing=*/is_tracing);
 }
 
-static inline Tensor handleSimpleTypesInSingleDimIndexing(
+static inline Tensor handleSimpleTypesInSingleDimIndexingGet(
     const Tensor& self,
     const TensorIndex& index,
     bool is_tracing) {
@@ -328,6 +329,58 @@ static inline Tensor handleSimpleTypesInSingleDimIndexing(
       /*is_tracing=*/is_tracing);
   } else {
     TORCH_INTERNAL_ASSERT(false, "Invalid TensorIndex type");
+  }
+}
+
+// To match numpy semantics:
+// As a special case for backwards compatibility,
+// strip away unit dimensions from the left of 'src'
+static inline IntArrayRef slicePrefix1sSize(IntArrayRef sizes) {
+  size_t first_non1_src = sizes.size();
+  for (size_t i = 0; i < sizes.size(); ++i) {
+    if (sizes[i] != 1) {
+      first_non1_src = i;
+      break;
+    }
+  }
+
+  return sizes.slice(first_non1_src);
+}
+
+static inline void copy_to(Tensor dst, const Tensor& src) {
+  Tensor b_src;
+  IntArrayRef sliced_src_sizes = slicePrefix1sSize(src.sizes());
+  std::tie(b_src) = expand_inplace(dst, src.view(sliced_src_sizes), "setitem");
+  dst.copy_(b_src);
+}
+
+static inline void handleSimpleTypesInSingleDimIndexingSet(
+    const Tensor& self,
+    const TensorIndex& index,
+    const Tensor& value,
+    bool is_tracing) {
+  if (index.is_boolean() && !index.boolean()) {
+    // do nothing for false (technically we should check the size, but we don't have
+    // real 0-sized shapes.
+    return;
+  } else if (index.is_ellipsis()) {
+    copy_to(self, value);
+    return;
+  } else if (index.is_none() || (index.is_boolean() && index.boolean())) {
+    copy_to(handleNoneSingleDim(self), value);
+    return;
+  } else if (index.is_integer()) {
+    copy_to(handleIntegerSingleDim(self, index.integer()), value);
+    return;
+  } else if (index.is_slice()) {
+    copy_to(handleSliceSingleDim(
+      self,
+      index.slice().start(),
+      index.slice().stop(),
+      index.slice().step(),
+      /*is_get=*/false,
+      /*is_tracing=*/is_tracing), value);
+    return;
   }
 }
 
@@ -381,28 +434,6 @@ static inline Tensor dispatch_index_put_(Tensor& self, const std::vector<Tensor>
   std::vector<Tensor> converted_indices = typeConvertIndices(self, indices);
   OptionalDeviceGuard device_guard(device_of(self));
   return self.index_put_(converted_indices, value);
-}
-
-// To match numpy semantics:
-// As a special case for backwards compatibility,
-// strip away unit dimensions from the left of 'src'
-static inline IntArrayRef slicePrefix1sSize(IntArrayRef sizes) {
-  size_t first_non1_src = sizes.size();
-  for (size_t i = 0; i < sizes.size(); ++i) {
-    if (sizes[i] != 1) {
-      first_non1_src = i;
-      break;
-    }
-  }
-
-  return sizes.slice(first_non1_src);
-}
-
-static inline void copy_to(Tensor dst, const Tensor& src) {
-  Tensor b_src;
-  IntArrayRef sliced_src_sizes = slicePrefix1sSize(src.sizes());
-  std::tie(b_src) = expand_inplace(dst, src.view(sliced_src_sizes), "setitem");
-  dst.copy_(b_src);
 }
 
 } // namespace indexing

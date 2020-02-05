@@ -183,10 +183,8 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
 
     // Handle JIT tracing
     if (is_tracing) {
-      if (THPUtils_checkLong(obj)) {
-        if (THPVariable_Check(obj)) {
-          recordSelectTrace(THPVariable_Unpack(obj));
-        }
+      if (THPUtils_checkLong(obj) && THPVariable_Check(obj)) {
+        recordSelectTrace(THPVariable_Unpack(obj));
       } else if (PySlice_Check(obj)) {
         Tensor start_tensor, stop_tensor, step_tensor;
         PySliceObject* sliceobj = (PySliceObject*)obj;
@@ -287,10 +285,8 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
 
   // handle simple types: integers, slices, ellipsis
   if (is_tracing) {
-    if (THPUtils_checkLong(index)) {
-      if (THPVariable_Check(index)) {
-        recordSelectTrace(THPVariable_Unpack(index));
-      }
+    if (THPUtils_checkLong(index) && THPVariable_Check(index)) {
+      recordSelectTrace(THPVariable_Unpack(index));
     } else if (PySlice_Check(index)) {
       Tensor start_tensor, stop_tensor, step_tensor;
       PySliceObject* sliceobj = (PySliceObject*)index;
@@ -307,7 +303,7 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
     }
   }
   if (index == Py_None || index == Py_Ellipsis || THPUtils_checkLong(index) || PySlice_Check(index)) {
-    return wrap(at::indexing::handleSimpleTypesInSingleDimIndexing(self_, indexToTensorIndex(self_, index), /*is_tracing=*/is_tracing));
+    return wrap(at::indexing::handleSimpleTypesInSingleDimIndexingGet(self_, indexToTensorIndex(self_, index), /*is_tracing=*/is_tracing));
   }
 
   // wrap index in a tuple if it's not already one

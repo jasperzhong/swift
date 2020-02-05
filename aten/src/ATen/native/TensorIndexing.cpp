@@ -92,7 +92,7 @@ Tensor get_item(const Tensor& self, ArrayRef<TensorIndex> indices) {
   if (indices.size() == 1) {
     const TensorIndex& index = indices[0];
     if (!index.is_boolean() && !index.is_tensor()) {
-      return handleSimpleTypesInSingleDimIndexing(self, index, /*is_tracing=*/false);
+      return handleSimpleTypesInSingleDimIndexingGet(self, index, /*is_tracing=*/false);
     }
   }
 
@@ -118,28 +118,8 @@ void set_item(Tensor& self, ArrayRef<TensorIndex> indices, const Tensor& value) 
   // handle simple types: integers, slices, ellipsis, bool
   if (indices.size() == 1) {
     const TensorIndex& index = indices[0];
-    if (index.is_boolean() && !index.boolean()) {
-      // do nothing for false (technically we should check the size, but we don't have
-      // real 0-sized shapes.
-      return;
-    } else if (index.is_ellipsis()) {
-      copy_to(self, value);
-      return;
-    } else if (index.is_none() || (index.is_boolean() && index.boolean())) {
-      copy_to(handleNoneSingleDim(self), value);
-      return;
-    } else if (index.is_integer()) {
-      copy_to(handleIntegerSingleDim(self, index.integer()), value);
-      return;
-    } else if (index.is_slice()) {
-      copy_to(handleSliceSingleDim(
-        self,
-        index.slice().start(),
-        index.slice().stop(),
-        index.slice().step(),
-        /*is_get=*/false,
-        /*is_tracing=*/false), value);
-      return;
+    if (!index.is_tensor()) {
+      return handleSimpleTypesInSingleDimIndexingSet(self, index, value, /*is_tracing=*/false);
     }
   }
 
