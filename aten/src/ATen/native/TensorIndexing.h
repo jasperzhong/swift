@@ -243,95 +243,6 @@ static inline Tensor boolToIndexingTensor(const Tensor& self, bool value) {
   }
 }
 
-static inline void recordTensorIndex(const Tensor& tensor, std::vector<Tensor>& outIndices, int64_t* dim_ptr) {
-  // TODO: check scalarType
-  outIndices.resize(*dim_ptr + 1);
-  outIndices[*dim_ptr] = tensor;
-  (*dim_ptr)++;
-};
-
-// yf225 TODO: clean up these `handle*` methods
-static inline Tensor handleSlice(const Tensor& self, int64_t* dim_ptr, int64_t start, int64_t stop, int64_t step, bool is_tracing) {
-  Tensor result = applySlice(self, *dim_ptr, start, stop, step, /*ensure_view=*/false, /*is_tracing=*/is_tracing);
-  (*dim_ptr)++;
-  return result;
-}
-
-static inline void handleEllipsis(const Tensor& self, int64_t* dim_ptr, int64_t specified_dims) {
-  (*dim_ptr) += self.dim() - specified_dims;
-}
-
-static inline Tensor handleNone(const Tensor& self, int64_t* dim_ptr) {
-  Tensor result = self.unsqueeze(*dim_ptr);
-  (*dim_ptr)++;
-  return result;
-}
-
-static inline Tensor handleBoolean(const Tensor& self, bool boolean, std::vector<Tensor>& outIndices, int64_t* dim_ptr) {
-  Tensor result = self.unsqueeze(*dim_ptr);
-  recordTensorIndex(boolToIndexingTensor(result, boolean), outIndices, dim_ptr);
-  return result;
-}
-
-static inline Tensor handleTensor(const Tensor& self, const Tensor& tensor, std::vector<Tensor>& outIndices, int64_t* dim_ptr, int64_t real_dim) {
-  Tensor result = self;
-  auto scalar_type = tensor.scalar_type();
-  if (tensor.dim() == 0 && at::isIntegralType(scalar_type, /*includeBool=*/true)) {
-    if (scalar_type != at::kByte && scalar_type != at::kBool) {
-      result = applySelect(result, *dim_ptr, tensor.item<int64_t>(), real_dim);
-    } else {
-      result = result.unsqueeze(*dim_ptr);
-      if (scalar_type == at::kBool) {
-        recordTensorIndex(boolToIndexingTensor(result, tensor.item<bool>() != 0), outIndices, dim_ptr);
-      } else {
-        recordTensorIndex(boolToIndexingTensor(result, tensor.item<uint8_t>() != 0), outIndices, dim_ptr);
-      }
-    }
-  } else {
-    recordTensorIndex(tensor, outIndices, dim_ptr);
-  }
-  return result;
-}
-
-static inline Tensor handleNoneSingleDim(const Tensor& self) {
-  return self.unsqueeze(0);
-}
-
-static inline Tensor handleEllipsisSingleDim(const Tensor& self) {
-  return self.alias();
-}
-
-static inline Tensor handleIntegerSingleDim(const Tensor& self, int64_t index) {
-  return applySelect(self, 0, index);
-}
-
-static inline Tensor handleSliceSingleDim(const Tensor& self, int64_t start, int64_t stop, int64_t step, bool is_get, bool is_tracing) {
-  return applySlice(self, 0, start, stop, step, /*ensure_view=*/is_get, /*is_tracing=*/is_tracing);
-}
-
-static inline Tensor handleSimpleTypesInSingleDimIndexingGet(
-    const Tensor& self,
-    const TensorIndex& index,
-    bool is_tracing) {
-  if (index.is_none()) {
-    return handleNoneSingleDim(self);
-  } else if (index.is_ellipsis()) {
-    return handleEllipsisSingleDim(self);
-  } else if (index.is_integer()) {
-    return handleIntegerSingleDim(self, index.integer());
-  } else if (index.is_slice()) {
-    return handleSliceSingleDim(
-      self,
-      index.slice().start(),
-      index.slice().stop(),
-      index.slice().step(),
-      /*is_get=*/true,
-      /*is_tracing=*/is_tracing);
-  } else {
-    TORCH_INTERNAL_ASSERT(false, "Invalid TensorIndex type");
-  }
-}
-
 // To match numpy semantics:
 // As a special case for backwards compatibility,
 // strip away unit dimensions from the left of 'src'
@@ -354,6 +265,37 @@ static inline void copy_to(Tensor dst, const Tensor& src) {
   dst.copy_(b_src);
 }
 
+static inline void recordTensorIndex(const Tensor& tensor, std::vector<Tensor>& outIndices, int64_t* dim_ptr) {
+  // TODO: check scalarType
+  outIndices.resize(*dim_ptr + 1);
+  outIndices[*dim_ptr] = tensor;
+  (*dim_ptr)++;
+};
+
+static inline Tensor handleSimpleTypesInSingleDimIndexingGet(
+    const Tensor& self,
+    const TensorIndex& index,
+    bool is_tracing) {
+  if (index.is_none()) {
+    return self.unsqueeze(0);
+  } else if (index.is_ellipsis()) {
+    return self.alias();
+  } else if (index.is_integer()) {
+    return applySelect(self, 0, index.integer());
+  } else if (index.is_slice()) {
+    return applySlice(
+      self,
+      0,
+      index.slice().start(),
+      index.slice().stop(),
+      index.slice().step(),
+      /*ensure_view=*/true,
+      /*is_tracing=*/is_tracing);
+  } else {
+    TORCH_INTERNAL_ASSERT(false, "Invalid TensorIndex type");
+  }
+}
+
 static inline void handleSimpleTypesInSingleDimIndexingSet(
     const Tensor& self,
     const TensorIndex& index,
@@ -367,18 +309,19 @@ static inline void handleSimpleTypesInSingleDimIndexingSet(
     copy_to(self, value);
     return;
   } else if (index.is_none() || (index.is_boolean() && index.boolean())) {
-    copy_to(handleNoneSingleDim(self), value);
+    copy_to(self.unsqueeze(0), value);
     return;
   } else if (index.is_integer()) {
-    copy_to(handleIntegerSingleDim(self, index.integer()), value);
+    copy_to(applySelect(self, 0, index.integer()), value);
     return;
   } else if (index.is_slice()) {
-    copy_to(handleSliceSingleDim(
+    copy_to(applySlice(
       self,
+      0,
       index.slice().start(),
       index.slice().stop(),
       index.slice().step(),
-      /*is_get=*/false,
+      /*ensure_view=*/false,
       /*is_tracing=*/is_tracing), value);
     return;
   }
@@ -396,16 +339,46 @@ static inline Tensor handleDimInMultiDimIndexing(
   if (index.is_integer()) {
     return applySelect(prev_dim_result, *dim_ptr, index.integer(), real_dim);
   } else if (index.is_slice()) {
-    return handleSlice(prev_dim_result, dim_ptr, index.slice().start(), index.slice().stop(), index.slice().step(), /*is_tracing=*/is_tracing);
+    Tensor result = applySlice(
+      prev_dim_result,
+      *dim_ptr,
+      index.slice().start(),
+      index.slice().stop(),
+      index.slice().step(),
+      /*ensure_view=*/false,
+      /*is_tracing=*/is_tracing);
+    (*dim_ptr)++;
+    return result;
   } else if (index.is_ellipsis()) {
-    handleEllipsis(original_tensor, dim_ptr, *specified_dims_ptr);
+    (*dim_ptr) += original_tensor.dim() - (*specified_dims_ptr);
     return prev_dim_result;
   } else if (index.is_none()) {
-    return handleNone(prev_dim_result, dim_ptr);
+    Tensor result = prev_dim_result.unsqueeze(*dim_ptr);
+    (*dim_ptr)++;
+    return result;
   } else if (index.is_boolean()) {
-    return handleBoolean(prev_dim_result, index.boolean(), outIndices, dim_ptr);
+    Tensor result = prev_dim_result.unsqueeze(*dim_ptr);
+    recordTensorIndex(boolToIndexingTensor(result, index.boolean()), outIndices, dim_ptr);
+    return result;
   } else if (index.is_tensor()) {
-    return handleTensor(prev_dim_result, index.tensor(), outIndices, dim_ptr, real_dim);
+    Tensor result = prev_dim_result;
+    const Tensor& tensor = index.tensor();
+    auto scalar_type = tensor.scalar_type();
+    if (tensor.dim() == 0 && at::isIntegralType(scalar_type, /*includeBool=*/true)) {
+      if (scalar_type != at::kByte && scalar_type != at::kBool) {
+        result = applySelect(result, *dim_ptr, tensor.item<int64_t>(), real_dim);
+      } else {
+        result = result.unsqueeze(*dim_ptr);
+        if (scalar_type == at::kBool) {
+          recordTensorIndex(boolToIndexingTensor(result, tensor.item<bool>() != 0), outIndices, dim_ptr);
+        } else {
+          recordTensorIndex(boolToIndexingTensor(result, tensor.item<uint8_t>() != 0), outIndices, dim_ptr);
+        }
+      }
+    } else {
+      recordTensorIndex(tensor, outIndices, dim_ptr);
+    }
+    return result;
   } else {
     TORCH_INTERNAL_ASSERT(false, "Invalid TensorIndex type");
   }
