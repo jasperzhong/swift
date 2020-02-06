@@ -6,7 +6,6 @@ namespace at {
 namespace indexing {
 
 const EllipsisIndexType Ellipsis = EllipsisIndexType();
-TensorIndex tensor_index_tmp = TensorIndex(None);
 
 std::ostream& operator<<(std::ostream& stream, const Slice& slice) {
   stream << slice.start() << ":" << slice.stop() << ":" << slice.step();
