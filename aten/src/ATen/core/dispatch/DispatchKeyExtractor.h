@@ -117,12 +117,12 @@ public:
         }
       }
     }
-    return dispatchKeySetToDispatchKey_(backendsWithoutFallthrough, ks);
+    return dispatchKeySetToDispatchKey_(backendsWithoutFallthrough, ks.add(DispatchKey::BackendSelect));
   }
 
   template<class... Args>
   DispatchKey getDispatchKeyUnboxed(DispatchKeySet backendsWithoutFallthrough, const Args&... args) const {
-    auto ks = detail::multi_dispatch_key_set(args...);
+    auto ks = detail::multi_dispatch_key_set(args...).add(DispatchKey::BackendSelect);
     return dispatchKeySetToDispatchKey_(backendsWithoutFallthrough, ks);
   }
 

@@ -2,6 +2,7 @@
 # We process only those factory functions that have 'backend_select' flag in its native_functions.yaml definition.
 
 from code_template import CodeTemplate
+import tensor_options_utils as TOUtils
 
 GENERATED_COMMENT = CodeTemplate(
     "@" + "generated from ${filename}")
@@ -15,7 +16,7 @@ FUNCTION_REGISTRATION = CodeTemplate("""\
 
 FUNCTION_DEFINITION = CodeTemplate("""\
 Tensor ${function_name}(${method_formals}) {
-  DispatchKey key = options.computeDispatchKey();
+  DispatchKey key = TensorOptions::computeDispatchKey(${dispatch_key_args});
   static auto op = c10::Dispatcher::singleton().findSchemaOrThrow("aten::${name}", "${overload_name}");
   return op.callUnboxedWithDispatchKey<${formals_types}>(key, ${type_method_actuals});
 }
@@ -29,7 +30,7 @@ def needs_backend_select(declaration_option):
     if declaration_option['name'].endswith('_like') or declaration_option['name'].startswith('new_'):
         return False
 
-    return any(a.get('dynamic_type') == 'TensorOptions' for a in declaration_option['arguments'])
+    return declaration_option.get('arguments', '') != '' and TOUtils.check_if_factory_method(declaration_option['arguments'])
 
 def register_backend_select_methods(declarations, template_path, file_manager):
     backend_select_method_definitions = []
@@ -46,9 +47,14 @@ def register_backend_select_methods(declarations, template_path, file_manager):
                 func_reg = FUNCTION_REGISTRATION.substitute(schema_string=option['schema_string'],
                                                             function_name=name)
 
+                if TOUtils.check_hack(name):
+                    dispatch_key_args = "dtype, layout, device"
+                else:
+                    dispatch_key_args = "dtype.value_or(ScalarType::Float), layout.value_or(kStrided), device.value_or(kCPU)"
                 method_def = FUNCTION_DEFINITION.substitute(function_name=name,
                                                             method_formals=option['formals_with_defaults'],
                                                             name=option['name'],
+                                                            dispatch_key_args=dispatch_key_args,
                                                             overload_name=option['overload_name'],
                                                             formals_types=option['formals_types_with_return'],
                                                             type_method_actuals=option['type_method_actuals'])
