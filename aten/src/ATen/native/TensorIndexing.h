@@ -4,8 +4,6 @@
 #include <ATen/core/TensorBody.h>
 #include <ATen/ATen.h>
 #include <ATen/ExpandUtils.h>
-#include <ATen/NativeFunctions.h>
-#include <ATen/DeviceGuard.h>
 
 namespace at {
 namespace indexing {
