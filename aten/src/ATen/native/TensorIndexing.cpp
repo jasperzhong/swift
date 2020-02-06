@@ -44,8 +44,7 @@ int64_t count_specified_dimensions(ArrayRef<TensorIndex> indices) {
   // Count the number of indexed dimensions (everything but ellipsis and None)
   int64_t count = 0;
   size_t size = indices.size();
-  for (size_t i = 0; i < size; i++) {
-    auto& obj = indices[i];
+  for (auto& obj : indices) {
     if (obj.is_tensor()) {
       auto& tensor = obj.tensor();
       if (tensor.scalar_type() == kByte || tensor.scalar_type() == kBool) {

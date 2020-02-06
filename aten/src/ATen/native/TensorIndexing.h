@@ -221,7 +221,7 @@ static inline Tensor applySelect(const Tensor& self, int64_t dim, int64_t index,
   TORCH_CHECK_INDEX(
     !(index == 0 && dim == 0 && self.dim() == 0),
     "invalid index of a 0-dim tensor. ",
-    "Use tensor.item() to convert a 0-dim tensor to a number");
+    "Use `tensor.item()` in Python or `tensor.item<T>()` in C++ to convert a 0-dim tensor to a number");
 
   int64_t size = self.size(dim);
   TORCH_CHECK_INDEX(
