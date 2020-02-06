@@ -148,9 +148,9 @@ void set_item(Tensor& self, ArrayRef<TensorIndex> indices, Scalar v) {
 
   // TODO: This qint special case looks very suspicious...
   if (isQIntType(self.scalar_type())) {
-    value = at::native::scalar_tensor(v, device(kCPU).dtype(kFloat));
+    value = at::scalar_tensor(v, device(kCPU).dtype(kFloat));
   } else {
-    value = at::native::scalar_tensor(v, self.options());
+    value = at::scalar_tensor(v, self.options());
   }
 
   return set_item(self, indices, value);
