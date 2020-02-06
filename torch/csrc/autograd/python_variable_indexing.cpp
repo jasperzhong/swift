@@ -262,8 +262,11 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
   OptionalDeviceGuard device_guard(device_of(self_));
   bool is_tracing = torch::jit::tracer::isTracing();
 
-  // handle simple types: integers, slices, ellipsis
-  if (index == Py_None || index == Py_Ellipsis || THPUtils_checkLong(index) || PySlice_Check(index)) {
+  // handle simple types: integers, slices, ellipsis, none
+  if (THPUtils_checkLong(index) \
+    || PySlice_Check(index) \
+    || index == Py_Ellipsis \
+    || index == Py_None) {
     return wrap(at::indexing::handleSimpleTypesInSingleDimIndexingGet(
       self_,
       traceAndConvertPythonIndexToTensorIndex(self_, index, is_tracing),
@@ -309,8 +312,13 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
   }
   bool is_tracing = torch::jit::tracer::isTracing();
 
-  // handle simple types: integers, slices, ellipsis, bool
-  if (index == Py_False || index == Py_Ellipsis || index == Py_None || index == Py_True || THPUtils_checkLong(index) || PySlice_Check(index)) {
+  // handle simple types: integers, slices, ellipsis, none, bool
+  if (THPUtils_checkLong(index) \
+    || PySlice_Check(index) \
+    || index == Py_Ellipsis \
+    || index == Py_None \
+    || index == Py_True \
+    || index == Py_False) {
     at::indexing::handleSimpleTypesInSingleDimIndexingSet(
       self_,
       traceAndConvertPythonIndexToTensorIndex(self_, index, is_tracing),
