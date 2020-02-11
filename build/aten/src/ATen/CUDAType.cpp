@@ -95,10 +95,10 @@ std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>> _cudnn_rnn_backward(const T
     const OptionalDeviceGuard device_guard(device_of(input));
     return at::native::_cudnn_rnn_backward(input, weight, weight_stride0, weight_buf, hx, cx, output, grad_output, grad_hy, grad_cy, mode, hidden_size, num_layers, batch_first, dropout, train, bidirectional, batch_sizes, dropout_state, reserve, output_mask);
 }
-Tensor _cudnn_init_dropout_state(double dropout, bool train, int64_t dropout_seed, const TensorOptions & options) {
+Tensor _cudnn_init_dropout_state(double dropout, bool train, int64_t dropout_seed, ScalarType dtype, Layout layout, Device device, bool pin_memory) {
 
-    const DeviceGuard device_guard(options.device());
-    return at::native::_cudnn_init_dropout_state(dropout, train, dropout_seed, options);
+    const OptionalDeviceGuard device_guard(device);
+    return at::native::_cudnn_init_dropout_state(dropout, train, dropout_seed, dtype, layout, device, pin_memory);
 }
 std::tuple<Tensor,Tensor> _fused_dropout(const Tensor & self, double p, Generator * generator) {
 
@@ -625,15 +625,15 @@ Tensor _embedding_bag_per_sample_weights_backward(const Tensor & grad, const Ten
     const OptionalDeviceGuard device_guard(device_of(grad));
     return at::native::_embedding_bag_per_sample_weights_backward_cuda(grad, weight, indices, offsets, offset2bag, mode);
 }
-Tensor empty(IntArrayRef size, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+Tensor empty(IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<MemoryFormat> memory_format) {
 
-    const DeviceGuard device_guard(options.device());
-    return at::native::empty_cuda(size, options, memory_format);
+    const OptionalDeviceGuard device_guard(device);
+    return at::native::empty_cuda(size, dtype, layout, device, pin_memory, memory_format);
 }
-Tensor empty_strided(IntArrayRef size, IntArrayRef stride, const TensorOptions & options) {
+Tensor empty_strided(IntArrayRef size, IntArrayRef stride, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 
-    const DeviceGuard device_guard(options.device());
-    return at::native::empty_strided_cuda(size, stride, options);
+    const OptionalDeviceGuard device_guard(device);
+    return at::native::empty_strided_cuda(size, stride, dtype, layout, device, pin_memory);
 }
 Tensor & erf_(Tensor & self) {
 
@@ -2195,15 +2195,15 @@ Tensor & tril_out(Tensor & out, const Tensor & self, int64_t diagonal) {
     const OptionalDeviceGuard device_guard(device_of(self));
     return at::native::tril_cuda_out(out, self, diagonal);
 }
-Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options) {
+Tensor tril_indices(int64_t row, int64_t col, int64_t offset, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 
-    const DeviceGuard device_guard(options.device());
-    return at::native::tril_indices_cuda(row, col, offset, options);
+    const OptionalDeviceGuard device_guard(device);
+    return at::native::tril_indices_cuda(row, col, offset, dtype, layout, device, pin_memory);
 }
-Tensor triu_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options) {
+Tensor triu_indices(int64_t row, int64_t col, int64_t offset, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 
-    const DeviceGuard device_guard(options.device());
-    return at::native::triu_indices_cuda(row, col, offset, options);
+    const OptionalDeviceGuard device_guard(device);
+    return at::native::triu_indices_cuda(row, col, offset, dtype, layout, device, pin_memory);
 }
 Tensor trace(const Tensor & self) {
     if (self.has_names()) {
@@ -4813,7 +4813,7 @@ auto registerer = torch::RegisterOperators()
     .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options()
     .schema("aten::_cudnn_init_dropout_state(float dropout, bool train, int dropout_seed, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False) -> Tensor")
-    .impl_unboxedOnlyKernel<Tensor (double, bool, int64_t, const TensorOptions &), &CUDAType::_cudnn_init_dropout_state>(DispatchKey::CUDATensorId)
+    .impl_unboxedOnlyKernel<Tensor (double, bool, int64_t, ScalarType, Layout, Device, bool), &CUDAType::_cudnn_init_dropout_state>(DispatchKey::CUDATensorId)
     .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options()
     .schema("aten::_fused_dropout(Tensor self, float p, Generator? generator=None) -> (Tensor, Tensor)")
@@ -5097,11 +5097,11 @@ auto registerer = torch::RegisterOperators()
     .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options()
     .schema("aten::empty.memory_format(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor")
-    .impl_unboxedOnlyKernel<Tensor (IntArrayRef, const TensorOptions &, c10::optional<MemoryFormat>), &CUDAType::empty>(DispatchKey::CUDATensorId)
+    .impl_unboxedOnlyKernel<Tensor (IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>, c10::optional<MemoryFormat>), &CUDAType::empty>(DispatchKey::CUDATensorId)
     .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options()
     .schema("aten::empty_strided(int[] size, int[] stride, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor")
-    .impl_unboxedOnlyKernel<Tensor (IntArrayRef, IntArrayRef, const TensorOptions &), &CUDAType::empty_strided>(DispatchKey::CUDATensorId)
+    .impl_unboxedOnlyKernel<Tensor (IntArrayRef, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>), &CUDAType::empty_strided>(DispatchKey::CUDATensorId)
     .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options()
     .schema("aten::erf_(Tensor(a!) self) -> Tensor(a!)")
@@ -5857,11 +5857,11 @@ auto registerer = torch::RegisterOperators()
     .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options()
     .schema("aten::tril_indices(int row, int col, int offset=0, *, ScalarType? dtype=long, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor")
-    .impl_unboxedOnlyKernel<Tensor (int64_t, int64_t, int64_t, const TensorOptions &), &CUDAType::tril_indices>(DispatchKey::CUDATensorId)
+    .impl_unboxedOnlyKernel<Tensor (int64_t, int64_t, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>), &CUDAType::tril_indices>(DispatchKey::CUDATensorId)
     .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options()
     .schema("aten::triu_indices(int row, int col, int offset=0, *, ScalarType? dtype=long, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor")
-    .impl_unboxedOnlyKernel<Tensor (int64_t, int64_t, int64_t, const TensorOptions &), &CUDAType::triu_indices>(DispatchKey::CUDATensorId)
+    .impl_unboxedOnlyKernel<Tensor (int64_t, int64_t, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>), &CUDAType::triu_indices>(DispatchKey::CUDATensorId)
     .aliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA))
   .op(torch::RegisterOperators::options()
     .schema("aten::trace(Tensor self) -> Tensor")

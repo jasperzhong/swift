@@ -346,6 +346,9 @@ RegisterOperators reg(
          "aten::_cudnn_init_dropout_state(float dropout, bool train, int dropout_seed, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 3, 7))).toScalarType())
                      .layout((std::move(peek(stack, 4, 7))).toLayout())
@@ -357,10 +360,11 @@ RegisterOperators reg(
              (std::move(peek(stack, 2, 7))).toInt(),
              options);
              #else
-                 auto result_ = torch::_cudnn_init_dropout_state((std::move(peek(stack, 0, 7))).toDouble(),
+                 auto result_ = torch::__cudnn_init_dropout_state((std::move(peek(stack, 0, 7))).toDouble(),
              (std::move(peek(stack, 1, 7))).toBool(),
              (std::move(peek(stack, 2, 7))).toInt(),
-             options);
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 7);
              pack(stack, std::move(result_));
@@ -725,24 +729,28 @@ RegisterOperators reg(
          atenOperatorOptions()
      ),
      Operator(
-         "aten::_sparse_coo_tensor_with_dims(int sparse_dim, int dense_dim, int[] size, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False) -> Tensor",
+         "aten::_sparse_coo_tensor_with_dims(int sparse_dim, int dense_dim, int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=False) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
-                     .dtype((std::move(peek(stack, 3, 7))).toScalarType())
-                     .layout((std::move(peek(stack, 4, 7))).toLayout())
-                     .device((std::move(peek(stack, 5, 7))).toDevice())
-                     .pinned_memory((std::move(peek(stack, 6, 7))).toBool());
+                     .dtype((std::move(peek(stack, 3, 7))).toOptional<ScalarType>())
+                     .layout((std::move(peek(stack, 4, 7))).toOptional<c10::Layout>())
+                     .device((std::move(peek(stack, 5, 7))).toOptional<c10::Device>())
+                     .pinned_memory((std::move(peek(stack, 6, 7))).toOptional<bool>());
              #ifdef USE_STATIC_DISPATCH
                  auto result_ = at::_sparse_coo_tensor_with_dims((std::move(peek(stack, 0, 7))).toInt(),
              (std::move(peek(stack, 1, 7))).toInt(),
              (std::move(peek(stack, 2, 7))).toIntVector(),
              options);
              #else
-                 auto result_ = torch::_sparse_coo_tensor_with_dims((std::move(peek(stack, 0, 7))).toInt(),
+                 auto result_ = torch::__sparse_coo_tensor_with_dims((std::move(peek(stack, 0, 7))).toInt(),
              (std::move(peek(stack, 1, 7))).toInt(),
              (std::move(peek(stack, 2, 7))).toIntVector(),
-             options);
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 7);
              pack(stack, std::move(result_));
@@ -1423,6 +1431,9 @@ RegisterOperators reg(
          "aten::bartlett_window(int window_length, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 1, 5))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 2, 5))).toOptional<c10::Layout>())
@@ -1432,8 +1443,9 @@ RegisterOperators reg(
                  auto result_ = at::bartlett_window((std::move(peek(stack, 0, 5))).toInt(),
              options);
              #else
-                 auto result_ = torch::bartlett_window((std::move(peek(stack, 0, 5))).toInt(),
-             options);
+                 auto result_ = torch::_bartlett_window((std::move(peek(stack, 0, 5))).toInt(),
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 5);
              pack(stack, std::move(result_));
@@ -1445,6 +1457,9 @@ RegisterOperators reg(
          "aten::bartlett_window.periodic(int window_length, bool periodic, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 2, 6))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 3, 6))).toOptional<c10::Layout>())
@@ -1455,9 +1470,10 @@ RegisterOperators reg(
              (std::move(peek(stack, 1, 6))).toBool(),
              options);
              #else
-                 auto result_ = torch::bartlett_window((std::move(peek(stack, 0, 6))).toInt(),
+                 auto result_ = torch::_bartlett_window((std::move(peek(stack, 0, 6))).toInt(),
              (std::move(peek(stack, 1, 6))).toBool(),
-             options);
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 6);
              pack(stack, std::move(result_));
@@ -2406,6 +2422,9 @@ RegisterOperators reg(
          "aten::eye(int n, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 1, 5))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 2, 5))).toOptional<c10::Layout>())
@@ -2415,8 +2434,9 @@ RegisterOperators reg(
                  auto result_ = at::eye((std::move(peek(stack, 0, 5))).toInt(),
              options);
              #else
-                 auto result_ = torch::eye((std::move(peek(stack, 0, 5))).toInt(),
-             options);
+                 auto result_ = torch::_eye((std::move(peek(stack, 0, 5))).toInt(),
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 5);
              pack(stack, std::move(result_));
@@ -2428,6 +2448,9 @@ RegisterOperators reg(
          "aten::eye.m(int n, int m, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 2, 6))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 3, 6))).toOptional<c10::Layout>())
@@ -2438,9 +2461,10 @@ RegisterOperators reg(
              (std::move(peek(stack, 1, 6))).toInt(),
              options);
              #else
-                 auto result_ = torch::eye((std::move(peek(stack, 0, 6))).toInt(),
+                 auto result_ = torch::_eye((std::move(peek(stack, 0, 6))).toInt(),
              (std::move(peek(stack, 1, 6))).toInt(),
-             options);
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 6);
              pack(stack, std::move(result_));
@@ -2663,6 +2687,9 @@ RegisterOperators reg(
          "aten::from_file(str filename, bool? shared=None, int? size=0, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 3, 7))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 4, 7))).toOptional<c10::Layout>())
@@ -2674,10 +2701,11 @@ RegisterOperators reg(
              (std::move(peek(stack, 2, 7))).toOptional<int64_t>(),
              options);
              #else
-                 auto result_ = torch::from_file((std::move(peek(stack, 0, 7))).toStringRef(),
+                 auto result_ = torch::_from_file((std::move(peek(stack, 0, 7))).toStringRef(),
              (std::move(peek(stack, 1, 7))).toOptional<bool>(),
              (std::move(peek(stack, 2, 7))).toOptional<int64_t>(),
-             options);
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 7);
              pack(stack, std::move(result_));
@@ -2835,6 +2863,9 @@ RegisterOperators reg(
          "aten::hamming_window(int window_length, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 1, 5))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 2, 5))).toOptional<c10::Layout>())
@@ -2844,8 +2875,9 @@ RegisterOperators reg(
                  auto result_ = at::hamming_window((std::move(peek(stack, 0, 5))).toInt(),
              options);
              #else
-                 auto result_ = torch::hamming_window((std::move(peek(stack, 0, 5))).toInt(),
-             options);
+                 auto result_ = torch::_hamming_window((std::move(peek(stack, 0, 5))).toInt(),
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 5);
              pack(stack, std::move(result_));
@@ -2857,6 +2889,9 @@ RegisterOperators reg(
          "aten::hamming_window.periodic(int window_length, bool periodic, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 2, 6))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 3, 6))).toOptional<c10::Layout>())
@@ -2867,9 +2902,10 @@ RegisterOperators reg(
              (std::move(peek(stack, 1, 6))).toBool(),
              options);
              #else
-                 auto result_ = torch::hamming_window((std::move(peek(stack, 0, 6))).toInt(),
+                 auto result_ = torch::_hamming_window((std::move(peek(stack, 0, 6))).toInt(),
              (std::move(peek(stack, 1, 6))).toBool(),
-             options);
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 6);
              pack(stack, std::move(result_));
@@ -2881,6 +2917,9 @@ RegisterOperators reg(
          "aten::hamming_window.periodic_alpha(int window_length, bool periodic, float alpha, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 3, 7))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 4, 7))).toOptional<c10::Layout>())
@@ -2892,10 +2931,11 @@ RegisterOperators reg(
              (std::move(peek(stack, 2, 7))).toDouble(),
              options);
              #else
-                 auto result_ = torch::hamming_window((std::move(peek(stack, 0, 7))).toInt(),
+                 auto result_ = torch::_hamming_window((std::move(peek(stack, 0, 7))).toInt(),
              (std::move(peek(stack, 1, 7))).toBool(),
              (std::move(peek(stack, 2, 7))).toDouble(),
-             options);
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 7);
              pack(stack, std::move(result_));
@@ -2907,6 +2947,9 @@ RegisterOperators reg(
          "aten::hamming_window.periodic_alpha_beta(int window_length, bool periodic, float alpha, float beta, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 4, 8))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 5, 8))).toOptional<c10::Layout>())
@@ -2919,11 +2962,12 @@ RegisterOperators reg(
              (std::move(peek(stack, 3, 8))).toDouble(),
              options);
              #else
-                 auto result_ = torch::hamming_window((std::move(peek(stack, 0, 8))).toInt(),
+                 auto result_ = torch::_hamming_window((std::move(peek(stack, 0, 8))).toInt(),
              (std::move(peek(stack, 1, 8))).toBool(),
              (std::move(peek(stack, 2, 8))).toDouble(),
              (std::move(peek(stack, 3, 8))).toDouble(),
-             options);
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 8);
              pack(stack, std::move(result_));
@@ -4143,6 +4187,9 @@ RegisterOperators reg(
          "aten::new_full(Tensor self, int[] size, Scalar fill_value, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 3, 7))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 4, 7))).toOptional<c10::Layout>())
@@ -4321,6 +4368,9 @@ RegisterOperators reg(
          "aten::ones(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 1, 5))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 2, 5))).toOptional<c10::Layout>())
@@ -4330,8 +4380,9 @@ RegisterOperators reg(
                  auto result_ = at::ones((std::move(peek(stack, 0, 5))).toIntVector(),
              options);
              #else
-                 auto result_ = torch::ones((std::move(peek(stack, 0, 5))).toIntVector(),
-             options);
+                 auto result_ = torch::_ones((std::move(peek(stack, 0, 5))).toIntVector(),
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 5);
              pack(stack, std::move(result_));
@@ -4357,6 +4408,9 @@ RegisterOperators reg(
          "aten::ones_like.dtype(Tensor self, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False, MemoryFormat? memory_format=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 1, 6))).toScalarType())
                      .layout((std::move(peek(stack, 2, 6))).toLayout())
@@ -4367,8 +4421,9 @@ RegisterOperators reg(
              options,
              (std::move(peek(stack, 5, 6))).toOptional<c10::MemoryFormat>());
              #else
-                 auto result_ = torch::ones_like((std::move(peek(stack, 0, 6))).toTensor(),
-             options,
+                 auto result_ = torch::_ones_like((std::move(peek(stack, 0, 6))).toTensor(),
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad(),
              (std::move(peek(stack, 5, 6))).toOptional<c10::MemoryFormat>());
              #endif
              drop(stack, 6);
@@ -4603,6 +4658,9 @@ RegisterOperators reg(
          "aten::randint(int high, int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 2, 6))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 3, 6))).toOptional<c10::Layout>())
@@ -4613,9 +4671,10 @@ RegisterOperators reg(
              (std::move(peek(stack, 1, 6))).toIntVector(),
              options);
              #else
-                 auto result_ = torch::randint((std::move(peek(stack, 0, 6))).toInt(),
+                 auto result_ = torch::_randint((std::move(peek(stack, 0, 6))).toInt(),
              (std::move(peek(stack, 1, 6))).toIntVector(),
-             options);
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 6);
              pack(stack, std::move(result_));
@@ -4627,6 +4686,9 @@ RegisterOperators reg(
          "aten::randint.low(int low, int high, int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 3, 7))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 4, 7))).toOptional<c10::Layout>())
@@ -4638,10 +4700,11 @@ RegisterOperators reg(
              (std::move(peek(stack, 2, 7))).toIntVector(),
              options);
              #else
-                 auto result_ = torch::randint((std::move(peek(stack, 0, 7))).toInt(),
+                 auto result_ = torch::_randint((std::move(peek(stack, 0, 7))).toInt(),
              (std::move(peek(stack, 1, 7))).toInt(),
              (std::move(peek(stack, 2, 7))).toIntVector(),
-             options);
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 7);
              pack(stack, std::move(result_));
@@ -4684,6 +4747,9 @@ RegisterOperators reg(
          "aten::randint_like.dtype(Tensor self, int high, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False, MemoryFormat? memory_format=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 2, 7))).toScalarType())
                      .layout((std::move(peek(stack, 3, 7))).toLayout())
@@ -4695,9 +4761,10 @@ RegisterOperators reg(
              options,
              (std::move(peek(stack, 6, 7))).toOptional<c10::MemoryFormat>());
              #else
-                 auto result_ = torch::randint_like((std::move(peek(stack, 0, 7))).toTensor(),
+                 auto result_ = torch::_randint_like((std::move(peek(stack, 0, 7))).toTensor(),
              (std::move(peek(stack, 1, 7))).toInt(),
-             options,
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad(),
              (std::move(peek(stack, 6, 7))).toOptional<c10::MemoryFormat>());
              #endif
              drop(stack, 7);
@@ -4710,6 +4777,9 @@ RegisterOperators reg(
          "aten::randint_like.low_dtype(Tensor self, int low, int high, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False, MemoryFormat? memory_format=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 3, 8))).toScalarType())
                      .layout((std::move(peek(stack, 4, 8))).toLayout())
@@ -4722,10 +4792,11 @@ RegisterOperators reg(
              options,
              (std::move(peek(stack, 7, 8))).toOptional<c10::MemoryFormat>());
              #else
-                 auto result_ = torch::randint_like((std::move(peek(stack, 0, 8))).toTensor(),
+                 auto result_ = torch::_randint_like((std::move(peek(stack, 0, 8))).toTensor(),
              (std::move(peek(stack, 1, 8))).toInt(),
              (std::move(peek(stack, 2, 8))).toInt(),
-             options,
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad(),
              (std::move(peek(stack, 7, 8))).toOptional<c10::MemoryFormat>());
              #endif
              drop(stack, 8);
@@ -4738,6 +4809,9 @@ RegisterOperators reg(
          "aten::randperm(int n, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 1, 5))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 2, 5))).toOptional<c10::Layout>())
@@ -4747,8 +4821,9 @@ RegisterOperators reg(
                  auto result_ = at::randperm((std::move(peek(stack, 0, 5))).toInt(),
              options);
              #else
-                 auto result_ = torch::randperm((std::move(peek(stack, 0, 5))).toInt(),
-             options);
+                 auto result_ = torch::_randperm((std::move(peek(stack, 0, 5))).toInt(),
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 5);
              pack(stack, std::move(result_));
@@ -5440,20 +5515,24 @@ RegisterOperators reg(
          atenOperatorOptions()
      ),
      Operator(
-         "aten::sparse_coo_tensor.size(int[] size, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False) -> Tensor",
+         "aten::sparse_coo_tensor.size(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=False) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
-                     .dtype((std::move(peek(stack, 1, 5))).toScalarType())
-                     .layout((std::move(peek(stack, 2, 5))).toLayout())
-                     .device((std::move(peek(stack, 3, 5))).toDevice())
-                     .pinned_memory((std::move(peek(stack, 4, 5))).toBool());
+                     .dtype((std::move(peek(stack, 1, 5))).toOptional<ScalarType>())
+                     .layout((std::move(peek(stack, 2, 5))).toOptional<c10::Layout>())
+                     .device((std::move(peek(stack, 3, 5))).toOptional<c10::Device>())
+                     .pinned_memory((std::move(peek(stack, 4, 5))).toOptional<bool>());
              #ifdef USE_STATIC_DISPATCH
                  auto result_ = at::sparse_coo_tensor((std::move(peek(stack, 0, 5))).toIntVector(),
              options);
              #else
-                 auto result_ = torch::sparse_coo_tensor((std::move(peek(stack, 0, 5))).toIntVector(),
-             options);
+                 auto result_ = torch::_sparse_coo_tensor((std::move(peek(stack, 0, 5))).toIntVector(),
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 5);
              pack(stack, std::move(result_));
@@ -5465,6 +5544,9 @@ RegisterOperators reg(
          "aten::sparse_coo_tensor.indices(Tensor indices, Tensor values, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 2, 6))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 3, 6))).toOptional<c10::Layout>())
@@ -5475,9 +5557,10 @@ RegisterOperators reg(
              (std::move(peek(stack, 1, 6))).toTensor(),
              options);
              #else
-                 auto result_ = torch::sparse_coo_tensor((std::move(peek(stack, 0, 6))).toTensor(),
+                 auto result_ = torch::_sparse_coo_tensor((std::move(peek(stack, 0, 6))).toTensor(),
              (std::move(peek(stack, 1, 6))).toTensor(),
-             options);
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 6);
              pack(stack, std::move(result_));
@@ -5489,6 +5572,9 @@ RegisterOperators reg(
          "aten::sparse_coo_tensor.indices_size(Tensor indices, Tensor values, int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 3, 7))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 4, 7))).toOptional<c10::Layout>())
@@ -5500,10 +5586,11 @@ RegisterOperators reg(
              (std::move(peek(stack, 2, 7))).toIntVector(),
              options);
              #else
-                 auto result_ = torch::sparse_coo_tensor((std::move(peek(stack, 0, 7))).toTensor(),
+                 auto result_ = torch::_sparse_coo_tensor((std::move(peek(stack, 0, 7))).toTensor(),
              (std::move(peek(stack, 1, 7))).toTensor(),
              (std::move(peek(stack, 2, 7))).toIntVector(),
-             options);
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 7);
              pack(stack, std::move(result_));
@@ -5885,14 +5972,17 @@ RegisterOperators reg(
          atenOperatorOptions()
      ),
      Operator(
-         "aten::to.dtype_layout(Tensor self, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False, bool non_blocking=False, bool copy=False, MemoryFormat? memory_format=None) -> Tensor",
+         "aten::to.dtype_layout(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=False, bool non_blocking=False, bool copy=False, MemoryFormat? memory_format=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
-                     .dtype((std::move(peek(stack, 1, 8))).toScalarType())
-                     .layout((std::move(peek(stack, 2, 8))).toLayout())
-                     .device((std::move(peek(stack, 3, 8))).toDevice())
-                     .pinned_memory((std::move(peek(stack, 4, 8))).toBool());;
+                     .dtype((std::move(peek(stack, 1, 8))).toOptional<ScalarType>())
+                     .layout((std::move(peek(stack, 2, 8))).toOptional<c10::Layout>())
+                     .device((std::move(peek(stack, 3, 8))).toOptional<c10::Device>())
+                     .pinned_memory((std::move(peek(stack, 4, 8))).toOptional<bool>());;
              auto result_ = ((std::move(peek(stack, 0, 8))).toTensor()).to(options,
              (std::move(peek(stack, 5, 8))).toBool(),
              (std::move(peek(stack, 6, 8))).toBool(),
@@ -6266,6 +6356,9 @@ RegisterOperators reg(
          "aten::zeros(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 1, 5))).toOptional<ScalarType>())
                      .layout((std::move(peek(stack, 2, 5))).toOptional<c10::Layout>())
@@ -6275,8 +6368,9 @@ RegisterOperators reg(
                  auto result_ = at::zeros((std::move(peek(stack, 0, 5))).toIntVector(),
              options);
              #else
-                 auto result_ = torch::zeros((std::move(peek(stack, 0, 5))).toIntVector(),
-             options);
+                 auto result_ = torch::_zeros((std::move(peek(stack, 0, 5))).toIntVector(),
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad());
              #endif
              drop(stack, 5);
              pack(stack, std::move(result_));
@@ -6302,6 +6396,9 @@ RegisterOperators reg(
          "aten::zeros_like.dtype(Tensor self, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False, MemoryFormat? memory_format=None) -> Tensor",
          [](Stack & stack) {
          
+             // This is a hack.
+             // Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+             // In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
              const auto options = TensorOptions()
                      .dtype((std::move(peek(stack, 1, 6))).toScalarType())
                      .layout((std::move(peek(stack, 2, 6))).toLayout())
@@ -6312,8 +6409,9 @@ RegisterOperators reg(
              options,
              (std::move(peek(stack, 5, 6))).toOptional<c10::MemoryFormat>());
              #else
-                 auto result_ = torch::zeros_like((std::move(peek(stack, 0, 6))).toTensor(),
-             options,
+                 auto result_ = torch::_zeros_like((std::move(peek(stack, 0, 6))).toTensor(),
+             at::typeMetaToScalarType(options.dtype()),
+             options.layout(), options.device(), options.pinned_memory(), options.requires_grad(),
              (std::move(peek(stack, 5, 6))).toOptional<c10::MemoryFormat>());
              #endif
              drop(stack, 6);
