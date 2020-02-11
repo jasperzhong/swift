@@ -41,6 +41,9 @@ except ImportError:
     from tools.shared.module_loader import import_module
     CodeTemplate = import_module('code_template', 'aten/src/ATen/code_template.py').CodeTemplate
 
+from tools.shared.module_loader import import_module
+TOUtils = import_module('tensor_options_utils', 'aten/src/ATen/tensor_options_utils.py')
+
 #
 # declarations blacklist
 # We skip codegen for these functions, for various reasons.
@@ -216,6 +219,8 @@ UNPACK_METHODS = {
     'c10::optional<DimnameList>': 'toDimnameListOptional',
     'c10::optional<ScalarType>': 'scalartypeOptional',
     'c10::optional<MemoryFormat>': 'memoryformatOptional',
+    'c10::optional<Layout>': 'layoutOptional',
+    'c10::optional<Device>': 'deviceOptional',
     'c10::optional<Scalar>': 'scalarOptional',
     'c10::optional<int64_t>': 'toInt64Optional',
     'c10::optional<bool>': 'toBoolOptional',
@@ -223,6 +228,8 @@ UNPACK_METHODS = {
     'IntArrayRef': 'intlist',
     'Scalar': 'scalar',
     'ScalarType': 'scalartype',
+    'Layout': 'layout',
+    'Device': 'device',
     'Dimname': 'dimname',
     'DimnameList': 'dimnamelist',
     'TensorList': 'tensorlist',
@@ -381,9 +388,13 @@ def get_simple_return_type(declaration):
 def get_dispatch_callee(declaration):
     # format the name of the receiving function or method
     if is_tensor_method(declaration):
+        if TOUtils.check_if_factory_method(declaration['arguments']):
+            return 'self._{}'.format(declaration['name'])
         return 'self.{}'.format(declaration['name'])
     elif is_torch_function(declaration):
         namespace = function_namespace(declaration)
+        if TOUtils.check_if_factory_method(declaration['arguments']):
+            return '{}::_{}'.format(namespace, declaration['name'])
         return '{}::{}'.format(namespace, declaration['name'])
     else:
         raise RuntimeError('could not dispatch, neither namespace function nor Tensor method')
@@ -497,6 +508,30 @@ def emit_single_dispatch(declaration, is_python_method, output_gap=0):
     dispatch_callee = get_dispatch_callee(declaration)
     dispatch_args = get_op_args(declaration, {name: name for name, _ in argmap.items()})
 
+    # This is a hack.
+    # Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+    # In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
+    #
+    # Adding requires_grad to formals and args.
+    if get_factory_info(declaration)[0] and not is_tensor_method(declaration):
+        if 'c10::optional<bool> pin_memory' in lambda_formals:
+            lambda_formals.insert(lambda_formals.index('c10::optional<bool> pin_memory') + 1, 'c10::optional<bool> requires_grad')
+
+        if 'pin_memory' in dispatch_args:
+            dispatch_args.insert(dispatch_args.index('pin_memory') + 1, 'requires_grad')
+
+        if 'pin_memory' in lambda_args:
+            lambda_args.insert(lambda_args.index('pin_memory') + 1, 'requires_grad')
+
+        # This is a hack.
+        # Please see [All schemas in native_functions.yaml that have TensorOptions
+        # should be have optional ScalarType, Layout, Device and pin memory]
+        # In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
+        if TOUtils.check_special_factories(declaration['name']):
+            for arg in dispatch_args:
+                if arg in TOUtils.tensor_options_args:
+                    dispatch_args[dispatch_args.index(arg)] = arg + ".value()"
+
     auto_no_gil = [] if declaration['with_gil'] else ['pybind11::gil_scoped_release no_gil;']
 
     simple_return_type = get_simple_return_type(declaration)
@@ -558,9 +593,8 @@ def handle_python_binding_args(declaration, output_gap):
         return expr
 
     has_output = len(pa['output_args']) == 1
-    tensor_options_arg = get_tensor_options(declaration)
 
-    if tensor_options_arg is not None:
+    if has_tensor_options(declaration):
         # if our op has a tensor options arg, these are its scattered fields.
         # first some checks
         if has_output:
@@ -580,8 +614,9 @@ def handle_python_binding_args(declaration, output_gap):
             raise RuntimeError(
                 '{}: incomplete tensor options args: {}'.
                 format(declaration['name'], [arg['name'] for arg in python_binding_args]))
+
         # generate a gathering initialization of options struct
-        argname = tensor_options_arg['name']
+        argname = "options"
         inits.append(TENSOR_OPTIONS_DECL.substitute({
             'name': argname,
             'dtype': parse_binding_arg('dtype'),
@@ -590,13 +625,33 @@ def handle_python_binding_args(declaration, output_gap):
             'requires_grad': parse_binding_arg('requires_grad'),
             'pin_memory': parse_binding_arg('pin_memory'),
         }))
-        inits.append('torch::utils::maybe_initialize_cuda({});'.format(argname))
-        # and add to op arg map
-        argmap['options'] = {
-            'value': argname,
-            'formal': get_cpp_formal(tensor_options_arg),
-        }
+        inits.append('auto dtype = {0};'.format(parse_binding_arg('dtype')))
+        inits.append('auto layout = {0}.layout;'.format(parse_binding_arg('layout')))
+        inits.append('auto device = {0};'.format(parse_binding_arg('device')))
+        inits.append('auto pin_memory = {0};'.format(parse_binding_arg('pin_memory')))
+        inits.append('auto requires_grad = {0};'.format(parse_binding_arg('requires_grad')))
 
+        inits.append('torch::utils::maybe_initialize_cuda({});'.format(argname))
+        argmap['dtype'] = {
+            'value': 'dtype',
+            'formal': 'c10::optional<ScalarType> dtype',
+        }
+        argmap['device'] = {
+            'value': 'device',
+            'formal': 'c10::optional<Device> device',
+        }
+        argmap['layout'] = {
+            'value': 'layout',
+            'formal': 'c10::optional<Layout> layout',
+        }
+        argmap['pin_memory'] = {
+            'value': 'pin_memory',
+            'formal': 'c10::optional<bool> pin_memory',
+        }
+        argmap['requires_grad'] = {
+            'value': 'requires_grad',
+            'formal': 'c10::optional<bool> requires_grad',
+        }
     else:
         # not the scattered fields of a tensor options - sort of a grab bag
         if 'dtype' in binding_arg_offsets:
@@ -1245,8 +1300,11 @@ def make_python_arglists(declaration, is_python_method):
     # keyword inputs:
     # - filter options. after loading the yaml, an upstream step has gathered dtype,
     #   layout et al into a single tensor options arg. here we reintroduce the originals
-    input_kwargs = [arg for arg in input_kwargs if not is_tensor_options(arg)]
+    if TOUtils.check_if_factory_method(declaration['arguments']):
+        input_kwargs = [a for a in input_kwargs if not a['name'] in TOUtils.tensor_options_args]
 
+    input_kwargs = [arg for arg in input_kwargs if not (arg['name'] in TOUtils.tensor_options_args and
+                                                        TOUtils.check_if_factory_method(declaration['arguments']))]
     # outputs:
     # - coalesce multiple output args into a single 'out' arg w/type TensorList.
     # - force a default. This is so we can use this sig for both out and non-out variants
@@ -1299,24 +1357,24 @@ def dtype_default_type_hack(name):
         return 'None'
 
 
-def make_python_binding_args(declaration):
-    """
-    Given various properties of a declaration, build a set of scattered python binding args.
-    """
-    name = declaration['name']
-    python_binding_arguments = []
+def get_factory_info(declaration):
+    is_factory_or_like_or_new_function = False
     has_tensor_input_arg = False
+
     has_options_arg = False
     for arg in declaration['arguments']:
         if is_output(arg):
             continue
+
+        if arg['name'] == 'requires_grad':
+            raise ValueError("argument named requires_grad not supported")
+
         typename = arg['simple_type']
         if typename in ['Tensor', 'TensorList']:
             has_tensor_input_arg = True
-        elif typename == 'TensorOptions':
+
+        if TOUtils.check_if_factory_method(declaration['arguments']):
             has_options_arg = True
-        if arg['name'] == 'requires_grad':
-            raise ValueError("argument named requires_grad not supported")
 
     has_tensor_return = False
     for ret in declaration['returns']:
@@ -1325,6 +1383,7 @@ def make_python_binding_args(declaration):
             # produce a compile-time error that is obvious
             has_tensor_return = True
 
+    name = declaration['name']
     category_override = declaration['category_override']
     is_like_function = name.endswith('_like') or category_override == 'like'
     is_like_function_with_options = is_like_function and has_options_arg
@@ -1334,8 +1393,20 @@ def make_python_binding_args(declaration):
     is_factory_or_like_or_new_function = has_tensor_return and (is_factory_function or is_like_function or is_new_function)
     is_like_or_new_function_with_options = is_like_function_with_options or is_new_function_with_options
 
+    return is_factory_or_like_or_new_function, is_factory_function, is_like_or_new_function_with_options, has_options_arg
+
+
+# Given various properties of a declaration, build a set of scattered python binding args.
+def make_python_binding_args(declaration):
+    python_binding_arguments = []
+    python_biding_args = get_factory_info(declaration)
+    is_factory_or_like_or_new_function = python_biding_args[0]
+    is_factory_function = python_biding_args[1]
+    is_like_or_new_function_with_options = python_biding_args[2]
+    has_options_arg = python_biding_args[3]
+
     if is_factory_function or has_options_arg:
-        default_type = dtype_default_type_hack(name)
+        default_type = dtype_default_type_hack(declaration['name'])
         py_default_dtype = 'self.scalar_type()' if is_like_or_new_function_with_options else None
         dtype_arg = {
             'default': default_type,
@@ -1411,6 +1482,7 @@ def is_tensor_options(arg):
 def is_scatter(arg):
     return arg.get('scatter_args') is not None
 
+
 def is_output(arg):
     return arg.get('output', False)
 
@@ -1419,19 +1491,8 @@ def has_outputs(declaration):
     return any([is_output(arg) for arg in declaration['arguments']])
 
 
-def get_tensor_options(declaration):
-    args = [arg for arg in declaration['arguments'] if is_tensor_options(arg)]
-    if len(args) == 0:
-        return None
-    if len(args) != 1:
-        raise RuntimeError(
-            '{}: multiple tensor options arguments'.
-            format(declaration['name']))
-    return args[0]
-
-
 def has_tensor_options(declaration):
-    return get_tensor_options(declaration) is not None
+    return TOUtils.check_if_factory_method(declaration['arguments'])
 
 
 def is_tensor_method(declaration):
