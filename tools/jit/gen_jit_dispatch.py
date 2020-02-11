@@ -19,7 +19,9 @@ import yaml
 from itertools import groupby
 from ..autograd.utils import CodeTemplate, YamlLoader, write
 from ..autograd.gen_autograd import load_aten_declarations
-from ..autograd.gen_autograd import RETURNS_VIEWS_OF_INPUT
+
+from tools.shared.module_loader import import_module
+TOUtils = import_module('tensor_options_utils', 'aten/src/ATen/tensor_options_utils.py')
 
 # JIT has a type system of
 # Scalar = int | float | bool # int is the largest int (int64_t),
@@ -149,18 +151,40 @@ auto result_ = (${first}).${name}(
 );
 """)
 CALL_NAMESPACE_WITH_TENSOR_OPTIONS = CodeTemplate("""\
+// This is a hack.
+// Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+// In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
 const auto options = TensorOptions()
         .dtype(${dtype})
         .layout(${layout})
         .device(${device})
         .pinned_memory(${pin_memory});
 #ifdef USE_STATIC_DISPATCH
-    auto result_ = at::${name}(${args_with_tensor_options});
+    auto result_ = at::${name}(${args_with_tensor_options_disp});
 #else
-    auto result_ = torch::${name}(${args_with_tensor_options});
+    auto result_ = torch::_${name}(${args_with_tensor_options});
+#endif
+""")
+CALL_NAMESPACE_WITH_TENSOR_OPTIONS_ARANGE = CodeTemplate("""\
+// This is a hack.
+// Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+// In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
+const auto options = TensorOptions()
+        .dtype(${dtype})
+        .layout(${layout})
+        .device(${device})
+        .pinned_memory(${pin_memory});
+#ifdef USE_STATIC_DISPATCH
+    auto result_ = at::${name}(${args_with_tensor_options_disp});
+#else
+    auto result_ = options.has_dtype() ? torch::_${name}(${args_with_tensor_options}) :
+                                         torch::_${name}(${args_with_tensor_options_nullopt});
 #endif
 """)
 CALL_METHOD_WITH_TENSOR_OPTIONS = CodeTemplate("""\
+// This is a hack.
+// Please see [Add requires_grad to native_functions.yaml and potentially to TensorOptions object]
+// In the tracking issue: https://github.com/pytorch/pytorch/issues/30405
 const auto options = TensorOptions()
         .dtype(${dtype})
         .layout(${layout})
@@ -226,23 +250,9 @@ def is_jit_op(decl):
             all(is_jit_arg(i, arg) for i, arg in enumerate(decl['arguments'])) and
             all(is_jit_arg(i, arg) for i, arg in enumerate(decl['returns'])))
 
-
-def is_tensor_arg(arg):
-    return arg['simple_type'] in {'Tensor', 'TensorList'}
-
-
 def is_sized_intlist_arg(arg):
     """Returns True for arguments declared as IntArrayRef[k], but False for IntArrayRef."""
     return (arg['simple_type'] == 'IntArrayRef') and ('size' in arg)
-
-
-def base_name(decl):
-    name = decl['name']
-    return name[:-1] if decl.get('inplace', False) else name[:-4] if name.endswith('_out') else name
-
-
-def is_view(decl):
-    return base_name(decl) in RETURNS_VIEWS_OF_INPUT
 
 
 def is_out_variant(decl):
@@ -289,24 +299,49 @@ def gen_jit_dispatch(declarations, out, template_path, disable_autograd=False, s
         def pack_arguments(args):
             return ',\n'.join(args)
         is_namespace_function = 'namespace' in decl['method_of']
-        tensor_options_arg_index = decl.get('tensor_options_arg_index', None)
-        if tensor_options_arg_index is not None:
+
+        if TOUtils.check_if_factory_method(decl['arguments']):
+            if 'ScalarType dtype' in decl['formals']:
+                tensor_options_arg_index = decl['formals'].index('ScalarType dtype')
+            if 'c10::optional<ScalarType> dtype' in decl['formals']:
+                tensor_options_arg_index = decl['formals'].index('c10::optional<ScalarType> dtype')
+
             dtype = args[tensor_options_arg_index]
             layout = args[tensor_options_arg_index + 1]
             device = args[tensor_options_arg_index + 2]
             pin_memory = args[tensor_options_arg_index + 3]
-            args_with_tensor_options = args[:tensor_options_arg_index] + \
+
+            args_with_tensor_options_disp = args[:tensor_options_arg_index] + \
                 ['options'] + args[(tensor_options_arg_index + 4):]
+
+            args_with_tensor_options = args[:tensor_options_arg_index] + \
+                ['at::typeMetaToScalarType(options.dtype())',
+                 'options.layout(), options.device(), options.pinned_memory(), options.requires_grad()'] + \
+                args[(tensor_options_arg_index + 4):]
+
             if is_namespace_function:
-                return CALL_NAMESPACE_WITH_TENSOR_OPTIONS.substitute(
-                    name=decl['name'], dtype=dtype, layout=layout,
-                    device=device, pin_memory=pin_memory,
-                    args_with_tensor_options=pack_arguments(args_with_tensor_options))
+                if (decl['name'] == 'arange'):
+                    args_with_tensor_options_nullptr = args_with_tensor_options[:]
+                    index = args_with_tensor_options.index('at::typeMetaToScalarType(options.dtype())')
+                    args_with_tensor_options_nullptr[index] = 'c10::nullopt'
+
+                    return CALL_NAMESPACE_WITH_TENSOR_OPTIONS_ARANGE.substitute(
+                        name=decl['name'], dtype=dtype, layout=layout,
+                        device=device, pin_memory=pin_memory,
+                        args_with_tensor_options=pack_arguments(args_with_tensor_options),
+                        args_with_tensor_options_nullopt=pack_arguments(args_with_tensor_options_nullptr),
+                        args_with_tensor_options_disp=pack_arguments(args_with_tensor_options_disp))
+                else:
+                    return CALL_NAMESPACE_WITH_TENSOR_OPTIONS.substitute(
+                        name=decl['name'], dtype=dtype, layout=layout,
+                        device=device, pin_memory=pin_memory,
+                        args_with_tensor_options=pack_arguments(args_with_tensor_options),
+                        args_with_tensor_options_disp=pack_arguments(args_with_tensor_options_disp))
             else:
                 return CALL_METHOD_WITH_TENSOR_OPTIONS.substitute(
                     name=decl['name'], dtype=dtype, layout=layout,
                     device=device, pin_memory=pin_memory,
-                    args_with_tensor_options=pack_arguments(args_with_tensor_options[1:]),
+                    args_with_tensor_options=pack_arguments(args_with_tensor_options_disp[1:]),
                     first=args_with_tensor_options[0], num_inputs=num_inputs)
         else:
             if is_namespace_function:
@@ -435,7 +470,7 @@ def gen_jit_dispatch(declarations, out, template_path, disable_autograd=False, s
                 el['simple_type'] += '?'
                 el['default'] = 'None'
         if 'default' in arg and arg['default'] == 'at::kLong':
-            tensor_options_expansion[0]['default'] = 'long'
+            tensor_options_expansion[0]['default'] = 'at::kLong'
         if 'kwarg_only' in arg and arg['kwarg_only']:
             for el in tensor_options_expansion:
                 el['kwarg_only'] = True
@@ -480,9 +515,6 @@ def gen_jit_dispatch(declarations, out, template_path, disable_autograd=False, s
         write(out, 'register_aten_ops_%d.cpp' % i, REGISTER_ATEN_OPS_CPP, env)
 
 
-default_map = {'{}': 'None', 'nullptr': 'None', 'c10::nullopt': 'None'}
-
-
 def reorder_out_args(decl):
     first_arg = decl['arguments'][0]
     assert(first_arg['output'])
@@ -493,10 +525,6 @@ def reorder_out_args(decl):
     decl['jit_argument_order'] = [nargs - 1] + list(range(nargs - 1))
 
 
-def is_kwarg_only(a):
-    return a.get('kwarg_only') or a.get('output')
-
-
 #
 # create a clone of these declarations
 # with nullability scrubbed from TensorList arg types
@@ -505,7 +533,7 @@ def is_kwarg_only(a):
 
 NEEDS_HACKED_TWIN_NAMES = [
     "aten::_index_put_impl_",
-    "aten::index.Tensor", 
+    "aten::index.Tensor",
     "aten::index_put",
     "aten::index_put_",
 ]
@@ -514,7 +542,6 @@ def needs_hacked_twin(decl):
     schema_string = decl['schema_string']
     return any([schema_string.startswith(name) for name in NEEDS_HACKED_TWIN_NAMES])
 
-
 def hacked_twin(decl):
     decl_copy = copy.deepcopy(decl)
     decl_copy['schema_string'] = decl['schema_string'].replace('Tensor?[]', 'Tensor[]')
@@ -522,7 +549,6 @@ def hacked_twin(decl):
         if arg['simple_type'] == 'TensorList' and arg.get('is_nullable'):
             arg['is_nullable'] = False
     return decl_copy
-
 
 def signature_without_args(decl):
     name = decl['name'] if not is_out_variant(decl) else decl['name'][:-4]
