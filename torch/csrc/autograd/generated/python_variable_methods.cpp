@@ -40,6 +40,8 @@ using at::Backend;
 using at::Scalar;
 using at::ScalarType;
 using at::Tensor;
+using at::Layout;
+using at::Device;
 using namespace torch::autograd::utils;
 
 namespace torch { namespace autograd {
@@ -6609,12 +6611,17 @@ static PyObject * THPVariable_new_empty(PyObject* self_, PyObject* args, PyObjec
       .layout(_r.layoutWithDefault(2, *torch::getLayout(self.options().backend())).layout)
       .requires_grad(_r.toBool(5))
       .pinned_memory(_r.toBool(4));
+  auto dtype = _r.scalartypeWithDefault(1, self.scalar_type());
+  auto layout = _r.layoutWithDefault(2, *torch::getLayout(self.options().backend())).layout;
+  auto device = _r.deviceWithDefault(3, self.device());
+  auto pin_memory = _r.toBool(4);
+  auto requires_grad = _r.toBool(5);
   torch::utils::maybe_initialize_cuda(options);
-  auto dispatch_new_empty = [](Tensor & self, IntArrayRef size, const TensorOptions & options) -> Tensor {
+  auto dispatch_new_empty = [](Tensor & self, IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) -> Tensor {
     pybind11::gil_scoped_release no_gil;
-    return self.new_empty(size, options);
+    return self._new_empty(size, dtype, layout, device, pin_memory);
   };
-  return wrap(dispatch_new_empty(self, _r.intlist(0), options));
+  return wrap(dispatch_new_empty(self, _r.intlist(0), dtype, layout, device, pin_memory));
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -6638,12 +6645,17 @@ static PyObject * THPVariable_new_full(PyObject* self_, PyObject* args, PyObject
       .layout(_r.layoutWithDefault(3, *torch::getLayout(self.options().backend())).layout)
       .requires_grad(_r.toBool(6))
       .pinned_memory(_r.toBool(5));
+  auto dtype = _r.scalartypeWithDefault(2, self.scalar_type());
+  auto layout = _r.layoutWithDefault(3, *torch::getLayout(self.options().backend())).layout;
+  auto device = _r.deviceWithDefault(4, self.device());
+  auto pin_memory = _r.toBool(5);
+  auto requires_grad = _r.toBool(6);
   torch::utils::maybe_initialize_cuda(options);
-  auto dispatch_new_full = [](Tensor & self, IntArrayRef size, Scalar fill_value, const TensorOptions & options) -> Tensor {
+  auto dispatch_new_full = [](Tensor & self, IntArrayRef size, Scalar fill_value, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) -> Tensor {
     pybind11::gil_scoped_release no_gil;
-    return self.new_full(size, fill_value, options);
+    return self._new_full(size, fill_value, dtype, layout, device, pin_memory);
   };
-  return wrap(dispatch_new_full(self, _r.intlist(0), _r.scalar(1), options));
+  return wrap(dispatch_new_full(self, _r.intlist(0), _r.scalar(1), dtype, layout, device, pin_memory));
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -6667,12 +6679,17 @@ static PyObject * THPVariable_new_zeros(PyObject* self_, PyObject* args, PyObjec
       .layout(_r.layoutWithDefault(2, *torch::getLayout(self.options().backend())).layout)
       .requires_grad(_r.toBool(5))
       .pinned_memory(_r.toBool(4));
+  auto dtype = _r.scalartypeWithDefault(1, self.scalar_type());
+  auto layout = _r.layoutWithDefault(2, *torch::getLayout(self.options().backend())).layout;
+  auto device = _r.deviceWithDefault(3, self.device());
+  auto pin_memory = _r.toBool(4);
+  auto requires_grad = _r.toBool(5);
   torch::utils::maybe_initialize_cuda(options);
-  auto dispatch_new_zeros = [](Tensor & self, IntArrayRef size, const TensorOptions & options) -> Tensor {
+  auto dispatch_new_zeros = [](Tensor & self, IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) -> Tensor {
     pybind11::gil_scoped_release no_gil;
-    return self.new_zeros(size, options);
+    return self._new_zeros(size, dtype, layout, device, pin_memory);
   };
-  return wrap(dispatch_new_zeros(self, _r.intlist(0), options));
+  return wrap(dispatch_new_zeros(self, _r.intlist(0), dtype, layout, device, pin_memory));
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }

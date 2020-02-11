@@ -33,6 +33,7 @@ static inline std::tuple<Tensor,Tensor> _cudnn_ctc_loss(const Tensor & log_probs
 static inline Tensor _cudnn_rnn_flatten_weight(TensorList weight_arr, int64_t weight_stride0, int64_t input_size, int64_t mode, int64_t hidden_size, int64_t num_layers, bool batch_first, bool bidirectional);
 static inline std::tuple<Tensor,Tensor,Tensor,Tensor,Tensor> _cudnn_rnn(const Tensor & input, TensorList weight, int64_t weight_stride0, const Tensor & weight_buf, const Tensor & hx, const Tensor & cx, int64_t mode, int64_t hidden_size, int64_t num_layers, bool batch_first, double dropout, bool train, bool bidirectional, IntArrayRef batch_sizes, const Tensor & dropout_state);
 static inline std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>> _cudnn_rnn_backward(const Tensor & input, TensorList weight, int64_t weight_stride0, const Tensor & weight_buf, const Tensor & hx, const Tensor & cx, const Tensor & output, const Tensor & grad_output, const Tensor & grad_hy, const Tensor & grad_cy, int64_t mode, int64_t hidden_size, int64_t num_layers, bool batch_first, double dropout, bool train, bool bidirectional, IntArrayRef batch_sizes, const Tensor & dropout_state, const Tensor & reserve, std::array<bool,4> output_mask);
+static inline Tensor __cudnn_init_dropout_state(double dropout, bool train, int64_t dropout_seed, ScalarType dtype, Layout layout, Device device, bool pin_memory=false);
 static inline Tensor _cudnn_init_dropout_state(double dropout, bool train, int64_t dropout_seed, const TensorOptions & options);
 static inline int64_t _debug_has_internal_overlap(const Tensor & self);
 static inline std::tuple<Tensor,Tensor> _fused_dropout(const Tensor & self, double p, Generator * generator=nullptr);
@@ -87,8 +88,11 @@ static inline Tensor any(const Tensor & self, int64_t dim, bool keepdim=false);
 static inline Tensor & any_out(Tensor & out, const Tensor & self, int64_t dim, bool keepdim=false);
 static inline Tensor any(const Tensor & self, Dimname dim, bool keepdim=false);
 static inline Tensor & any_out(Tensor & out, const Tensor & self, Dimname dim, bool keepdim=false);
+static inline Tensor _arange(Scalar end, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor arange(Scalar end, const TensorOptions & options={});
+static inline Tensor _arange(Scalar start, Scalar end, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor arange(Scalar start, Scalar end, const TensorOptions & options={});
+static inline Tensor _arange(Scalar start, Scalar end, Scalar step, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor arange(Scalar start, Scalar end, Scalar step, const TensorOptions & options={});
 static inline Tensor & arange_out(Tensor & out, Scalar end);
 static inline Tensor & arange_out(Tensor & out, Scalar start, Scalar end, Scalar step=1);
@@ -106,7 +110,9 @@ static inline Tensor & atan_out(Tensor & out, const Tensor & self);
 static inline Tensor baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta=1, Scalar alpha=1);
 static inline Tensor & _baddbmm_mkl_(Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta=1, Scalar alpha=1);
 static inline Tensor & baddbmm_out(Tensor & out, const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta=1, Scalar alpha=1);
+static inline Tensor _bartlett_window(int64_t window_length, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor bartlett_window(int64_t window_length, const TensorOptions & options={});
+static inline Tensor _bartlett_window(int64_t window_length, bool periodic, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor bartlett_window(int64_t window_length, bool periodic, const TensorOptions & options={});
 static inline Tensor batch_norm(const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & running_mean, const Tensor & running_var, bool training, double momentum, double eps, bool cudnn_enabled);
 static inline std::tuple<Tensor,Tensor,Tensor,Tensor,int64_t> _batch_norm_impl_index(const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & running_mean, const Tensor & running_var, bool training, double momentum, double eps, bool cudnn_enabled);
@@ -132,7 +138,9 @@ static inline Tensor logical_and(const Tensor & self, const Tensor & other);
 static inline Tensor & logical_and_out(Tensor & out, const Tensor & self, const Tensor & other);
 static inline Tensor logical_or(const Tensor & self, const Tensor & other);
 static inline Tensor & logical_or_out(Tensor & out, const Tensor & self, const Tensor & other);
+static inline Tensor _blackman_window(int64_t window_length, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor blackman_window(int64_t window_length, const TensorOptions & options={});
+static inline Tensor _blackman_window(int64_t window_length, bool periodic, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor blackman_window(int64_t window_length, bool periodic, const TensorOptions & options={});
 static inline Tensor bmm(const Tensor & self, const Tensor & mat2);
 static inline Tensor & bmm_out(Tensor & out, const Tensor & self, const Tensor & mat2);
@@ -237,13 +245,19 @@ static inline Tensor _embedding_bag_backward(const Tensor & grad, const Tensor &
 static inline Tensor _embedding_bag_sparse_backward(const Tensor & grad, const Tensor & indices, const Tensor & offsets, const Tensor & offset2bag, const Tensor & bag_size, int64_t num_weights, bool scale_grad_by_freq, int64_t mode, const Tensor & per_sample_weights);
 static inline Tensor _embedding_bag_dense_backward(const Tensor & grad, const Tensor & indices, const Tensor & offsets, const Tensor & offset2bag, const Tensor & bag_size, const Tensor & maximum_indices, int64_t num_weights, bool scale_grad_by_freq, int64_t mode, const Tensor & per_sample_weights);
 static inline Tensor _embedding_bag_per_sample_weights_backward(const Tensor & grad, const Tensor & weight, const Tensor & indices, const Tensor & offsets, const Tensor & offset2bag, int64_t mode);
+static inline Tensor _empty(IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor empty(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options={}, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _empty(IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor empty(IntArrayRef size, const TensorOptions & options={}, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor __empty_affine_quantized(IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt, double scale=1, int64_t zero_point=0, c10::optional<MemoryFormat> memory_format=MemoryFormat::Contiguous);
 static inline Tensor _empty_affine_quantized(IntArrayRef size, const TensorOptions & options={}, double scale=1, int64_t zero_point=0, c10::optional<MemoryFormat> memory_format=MemoryFormat::Contiguous);
+static inline Tensor __empty_per_channel_affine_quantized(IntArrayRef size, const Tensor & scales, const Tensor & zero_points, int64_t axis, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt, c10::optional<MemoryFormat> memory_format=MemoryFormat::Contiguous);
 static inline Tensor _empty_per_channel_affine_quantized(IntArrayRef size, const Tensor & scales, const Tensor & zero_points, int64_t axis, const TensorOptions & options={}, c10::optional<MemoryFormat> memory_format=MemoryFormat::Contiguous);
 static inline Tensor & empty_out(Tensor & out, IntArrayRef size, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor empty_like(const Tensor & self, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _empty_like(const Tensor & self, ScalarType dtype, Layout layout, Device device, bool pin_memory=false, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor empty_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _empty_strided(IntArrayRef size, IntArrayRef stride, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor empty_strided(IntArrayRef size, IntArrayRef stride, const TensorOptions & options={});
 static inline Tensor erf(const Tensor & self);
 static inline Tensor & erf_(Tensor & self);
@@ -257,7 +271,9 @@ static inline Tensor & exp_out(Tensor & out, const Tensor & self);
 static inline Tensor expm1(const Tensor & self);
 static inline Tensor & expm1_(Tensor & self);
 static inline Tensor & expm1_out(Tensor & out, const Tensor & self);
+static inline Tensor _eye(int64_t n, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor eye(int64_t n, const TensorOptions & options={});
+static inline Tensor _eye(int64_t n, int64_t m, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor eye(int64_t n, int64_t m, const TensorOptions & options={});
 static inline Tensor & eye_out(Tensor & out, int64_t n);
 static inline Tensor & eye_out(Tensor & out, int64_t n, int64_t m);
@@ -275,22 +291,32 @@ static inline Tensor floor_divide(const Tensor & input, Scalar other);
 static inline Tensor frac(const Tensor & self);
 static inline Tensor & frac_(Tensor & self);
 static inline Tensor & frac_out(Tensor & out, const Tensor & self);
+static inline Tensor _full(IntArrayRef size, Scalar fill_value, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor full(IntArrayRef size, Scalar fill_value, c10::optional<DimnameList> names, const TensorOptions & options={});
+static inline Tensor _full(IntArrayRef size, Scalar fill_value, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor full(IntArrayRef size, Scalar fill_value, const TensorOptions & options={});
 static inline Tensor & full_out(Tensor & out, IntArrayRef size, Scalar fill_value);
 static inline Tensor full_like(const Tensor & self, Scalar fill_value, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _full_like(const Tensor & self, Scalar fill_value, ScalarType dtype, Layout layout, Device device, bool pin_memory=false, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor full_like(const Tensor & self, Scalar fill_value, const TensorOptions & options, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _from_file(std::string filename, c10::optional<bool> shared=c10::nullopt, c10::optional<int64_t> size=0, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor from_file(std::string filename, c10::optional<bool> shared=c10::nullopt, c10::optional<int64_t> size=0, const TensorOptions & options={});
 static inline Tensor grid_sampler(const Tensor & input, const Tensor & grid, int64_t interpolation_mode, int64_t padding_mode, bool align_corners);
 static inline Tensor grid_sampler_2d(const Tensor & input, const Tensor & grid, int64_t interpolation_mode, int64_t padding_mode, bool align_corners);
 static inline std::tuple<Tensor,Tensor> grid_sampler_2d_backward(const Tensor & grad_output, const Tensor & input, const Tensor & grid, int64_t interpolation_mode, int64_t padding_mode, bool align_corners);
 static inline Tensor grid_sampler_3d(const Tensor & input, const Tensor & grid, int64_t interpolation_mode, int64_t padding_mode, bool align_corners);
 static inline std::tuple<Tensor,Tensor> grid_sampler_3d_backward(const Tensor & grad_output, const Tensor & input, const Tensor & grid, int64_t interpolation_mode, int64_t padding_mode, bool align_corners);
+static inline Tensor _hann_window(int64_t window_length, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor hann_window(int64_t window_length, const TensorOptions & options={});
+static inline Tensor _hann_window(int64_t window_length, bool periodic, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor hann_window(int64_t window_length, bool periodic, const TensorOptions & options={});
+static inline Tensor _hamming_window(int64_t window_length, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor hamming_window(int64_t window_length, const TensorOptions & options={});
+static inline Tensor _hamming_window(int64_t window_length, bool periodic, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor hamming_window(int64_t window_length, bool periodic, const TensorOptions & options={});
+static inline Tensor _hamming_window(int64_t window_length, bool periodic, double alpha, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor hamming_window(int64_t window_length, bool periodic, double alpha, const TensorOptions & options={});
+static inline Tensor _hamming_window(int64_t window_length, bool periodic, double alpha, double beta, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor hamming_window(int64_t window_length, bool periodic, double alpha, double beta, const TensorOptions & options={});
 static inline Tensor hinge_embedding_loss(const Tensor & self, const Tensor & target, double margin=1.0, int64_t reduction=at::Reduction::Mean);
 static inline Tensor ger(const Tensor & self, const Tensor & vec2);
@@ -342,6 +368,7 @@ static inline Tensor fbgemm_linear_fp16_weight_fp32_activation(const Tensor & in
 static inline Tensor fbgemm_linear_fp16_weight(const Tensor & input, const Tensor & packed_weight, const Tensor & bias);
 static inline Tensor fbgemm_pack_quantized_matrix(const Tensor & input);
 static inline Tensor fbgemm_pack_quantized_matrix(const Tensor & input, int64_t K, int64_t N);
+static inline Tensor _linspace(Scalar start, Scalar end, int64_t steps=100, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor linspace(Scalar start, Scalar end, int64_t steps=100, const TensorOptions & options={});
 static inline Tensor & linspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps=100);
 static inline Tensor log(const Tensor & self);
@@ -357,6 +384,7 @@ static inline Tensor log2(const Tensor & self);
 static inline Tensor & log2_(Tensor & self);
 static inline Tensor & log2_out(Tensor & out, const Tensor & self);
 static inline Tensor logdet(const Tensor & self);
+static inline Tensor _logspace(Scalar start, Scalar end, int64_t steps=100, double base=10.0, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor logspace(Scalar start, Scalar end, int64_t steps=100, double base=10.0, const TensorOptions & options={});
 static inline Tensor & logspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps=100, double base=10.0);
 static inline Tensor log_softmax(const Tensor & self, int64_t dim, c10::optional<ScalarType> dtype=c10::nullopt);
@@ -451,10 +479,13 @@ static inline Tensor _nnpack_spatial_convolution(const Tensor & input, const Ten
 static inline std::tuple<Tensor,Tensor,Tensor> _nnpack_spatial_convolution_backward(const Tensor & input, const Tensor & grad_output, const Tensor & weight, IntArrayRef padding, std::array<bool,3> output_mask);
 static inline Tensor _nnpack_spatial_convolution_backward_input(const Tensor & input, const Tensor & grad_output, const Tensor & weight, IntArrayRef padding);
 static inline Tensor _nnpack_spatial_convolution_backward_weight(const Tensor & input, IntArrayRef weightsize, const Tensor & grad_output, IntArrayRef padding);
+static inline Tensor _ones(IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor ones(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options={});
+static inline Tensor _ones(IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor ones(IntArrayRef size, const TensorOptions & options={});
 static inline Tensor & ones_out(Tensor & out, IntArrayRef size);
 static inline Tensor ones_like(const Tensor & self, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _ones_like(const Tensor & self, ScalarType dtype, Layout layout, Device device, bool pin_memory=false, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor ones_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor pairwise_distance(const Tensor & x1, const Tensor & x2, double p=2, double eps=1e-06, bool keepdim=false);
 static inline Tensor cdist(const Tensor & x1, const Tensor & x2, double p=2, c10::optional<int64_t> compute_mode=c10::nullopt);
@@ -466,18 +497,28 @@ static inline Tensor cosine_similarity(const Tensor & x1, const Tensor & x2, int
 static inline Tensor pixel_shuffle(const Tensor & self, int64_t upscale_factor);
 static inline Tensor pinverse(const Tensor & self, double rcond=1e-15);
 static inline Tensor poisson_nll_loss(const Tensor & input, const Tensor & target, bool log_input, bool full, double eps, int64_t reduction);
+static inline Tensor _scalar_tensor(Scalar s, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor scalar_tensor(Scalar s, const TensorOptions & options={});
+static inline Tensor _rand(IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor rand(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options={});
+static inline Tensor _rand(IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor rand(IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, const TensorOptions & options={});
+static inline Tensor _rand(IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor rand(IntArrayRef size, const TensorOptions & options={});
+static inline Tensor _rand(IntArrayRef size, Generator * generator, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor rand(IntArrayRef size, Generator * generator, const TensorOptions & options={});
 static inline Tensor & rand_out(Tensor & out, IntArrayRef size);
 static inline Tensor & rand_out(Tensor & out, IntArrayRef size, Generator * generator);
 static inline Tensor rand_like(const Tensor & self, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _rand_like(const Tensor & self, ScalarType dtype, Layout layout, Device device, bool pin_memory=false, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor rand_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _randint(int64_t high, IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor randint(int64_t high, IntArrayRef size, const TensorOptions & options={});
+static inline Tensor _randint(int64_t high, IntArrayRef size, Generator * generator, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor randint(int64_t high, IntArrayRef size, Generator * generator, const TensorOptions & options={});
+static inline Tensor _randint(int64_t low, int64_t high, IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor randint(int64_t low, int64_t high, IntArrayRef size, const TensorOptions & options={});
+static inline Tensor _randint(int64_t low, int64_t high, IntArrayRef size, Generator * generator, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor randint(int64_t low, int64_t high, IntArrayRef size, Generator * generator, const TensorOptions & options={});
 static inline Tensor & randint_out(Tensor & out, int64_t high, IntArrayRef size);
 static inline Tensor & randint_out(Tensor & out, int64_t high, IntArrayRef size, Generator * generator);
@@ -485,21 +526,32 @@ static inline Tensor & randint_out(Tensor & out, int64_t low, int64_t high, IntA
 static inline Tensor & randint_out(Tensor & out, int64_t low, int64_t high, IntArrayRef size, Generator * generator);
 static inline Tensor randint_like(const Tensor & self, int64_t high, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor randint_like(const Tensor & self, int64_t low, int64_t high, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _randint_like(const Tensor & self, int64_t high, ScalarType dtype, Layout layout, Device device, bool pin_memory=false, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor randint_like(const Tensor & self, int64_t high, const TensorOptions & options, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _randint_like(const Tensor & self, int64_t low, int64_t high, ScalarType dtype, Layout layout, Device device, bool pin_memory=false, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor randint_like(const Tensor & self, int64_t low, int64_t high, const TensorOptions & options, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _randn(IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor randn(IntArrayRef size, const TensorOptions & options={});
+static inline Tensor _randn(IntArrayRef size, Generator * generator, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor randn(IntArrayRef size, Generator * generator, const TensorOptions & options={});
+static inline Tensor _randn(IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor randn(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options={});
+static inline Tensor _randn(IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor randn(IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, const TensorOptions & options={});
 static inline Tensor & randn_out(Tensor & out, IntArrayRef size);
 static inline Tensor & randn_out(Tensor & out, IntArrayRef size, Generator * generator);
 static inline Tensor randn_like(const Tensor & self, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _randn_like(const Tensor & self, ScalarType dtype, Layout layout, Device device, bool pin_memory=false, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor randn_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _randperm(int64_t n, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor randperm(int64_t n, const TensorOptions & options={});
+static inline Tensor _randperm(int64_t n, Generator * generator, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor randperm(int64_t n, Generator * generator, const TensorOptions & options={});
 static inline Tensor & randperm_out(Tensor & out, int64_t n);
 static inline Tensor & randperm_out(Tensor & out, int64_t n, Generator * generator);
+static inline Tensor _range(Scalar start, Scalar end, Scalar step=1, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor range(Scalar start, Scalar end, Scalar step=1, const TensorOptions & options={});
+static inline Tensor _range(Scalar start, Scalar end, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor range(Scalar start, Scalar end, const TensorOptions & options={});
 static inline Tensor & range_out(Tensor & out, Scalar start, Scalar end, Scalar step=1);
 static inline Tensor reciprocal(const Tensor & self);
@@ -641,10 +693,13 @@ static inline Tensor _weight_norm(const Tensor & v, const Tensor & g, int64_t di
 static inline std::tuple<Tensor,Tensor> _weight_norm_cuda_interface(const Tensor & v, const Tensor & g, int64_t dim=0);
 static inline std::tuple<Tensor,Tensor> _weight_norm_cuda_interface_backward(const Tensor & grad_w, const Tensor & saved_v, const Tensor & saved_g, const Tensor & saved_norms, int64_t dim);
 static inline std::tuple<Tensor,Tensor> _weight_norm_differentiable_backward(const Tensor & grad_w, const Tensor & saved_v, const Tensor & saved_g, const Tensor & saved_norms, int64_t dim);
+static inline Tensor _zeros(IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor zeros(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options={});
+static inline Tensor _zeros(IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor zeros(IntArrayRef size, const TensorOptions & options={});
 static inline Tensor & zeros_out(Tensor & out, IntArrayRef size);
 static inline Tensor zeros_like(const Tensor & self, c10::optional<MemoryFormat> memory_format=c10::nullopt);
+static inline Tensor _zeros_like(const Tensor & self, ScalarType dtype, Layout layout, Device device, bool pin_memory=false, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor zeros_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format=c10::nullopt);
 static inline Tensor _standard_gamma_grad(const Tensor & self, const Tensor & output);
 static inline Tensor _standard_gamma(const Tensor & self, Generator * generator=nullptr);
@@ -687,11 +742,17 @@ static inline Tensor rsub(const Tensor & self, Scalar other, Scalar alpha=1);
 static inline Tensor _sparse_addmm(const Tensor & self, const Tensor & sparse, const Tensor & dense, Scalar beta=1, Scalar alpha=1);
 static inline Tensor & addmm_out(Tensor & out, const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta=1, Scalar alpha=1);
 static inline Tensor addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta=1, Scalar alpha=1);
-static inline Tensor sparse_coo_tensor(IntArrayRef size, const TensorOptions & options);
+static inline Tensor _sparse_coo_tensor(IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=false);
+static inline Tensor sparse_coo_tensor(IntArrayRef size, const TensorOptions & options={});
+static inline Tensor _sparse_coo_tensor(const Tensor & indices, const Tensor & values, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor sparse_coo_tensor(const Tensor & indices, const Tensor & values, const TensorOptions & options={});
+static inline Tensor _sparse_coo_tensor(const Tensor & indices, const Tensor & values, IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor sparse_coo_tensor(const Tensor & indices, const Tensor & values, IntArrayRef size, const TensorOptions & options={});
+static inline Tensor __sparse_coo_tensor_unsafe(const Tensor & indices, const Tensor & values, IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor _sparse_coo_tensor_unsafe(const Tensor & indices, const Tensor & values, IntArrayRef size, const TensorOptions & options={});
-static inline Tensor _sparse_coo_tensor_with_dims(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size, const TensorOptions & options);
+static inline Tensor __sparse_coo_tensor_with_dims(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=false);
+static inline Tensor _sparse_coo_tensor_with_dims(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size, const TensorOptions & options={});
+static inline Tensor __sparse_coo_tensor_with_dims_and_tensors(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size, const Tensor & indices, const Tensor & values, ScalarType dtype, Layout layout, Device device, bool pin_memory=false);
 static inline Tensor _sparse_coo_tensor_with_dims_and_tensors(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size, const Tensor & indices, const Tensor & values, const TensorOptions & options);
 static inline Tensor to_dense_backward(const Tensor & grad, const Tensor & input);
 static inline Tensor & hspmm_out(Tensor & out, const Tensor & mat1, const Tensor & mat2);
@@ -802,8 +863,10 @@ static inline Tensor & triu_out(Tensor & out, const Tensor & self, int64_t diago
 static inline Tensor triu(const Tensor & self, int64_t diagonal=0);
 static inline Tensor & tril_out(Tensor & out, const Tensor & self, int64_t diagonal=0);
 static inline Tensor tril(const Tensor & self, int64_t diagonal=0);
-static inline Tensor tril_indices(int64_t row, int64_t col, int64_t offset=0, const TensorOptions & options=at::kLong);
-static inline Tensor triu_indices(int64_t row, int64_t col, int64_t offset=0, const TensorOptions & options=at::kLong);
+static inline Tensor _tril_indices(int64_t row, int64_t col, int64_t offset=0, c10::optional<ScalarType> dtype=at::kLong, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
+static inline Tensor tril_indices(int64_t row, int64_t col, int64_t offset=0, const TensorOptions & options={});
+static inline Tensor _triu_indices(int64_t row, int64_t col, int64_t offset=0, c10::optional<ScalarType> dtype=at::kLong, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
+static inline Tensor triu_indices(int64_t row, int64_t col, int64_t offset=0, const TensorOptions & options={});
 static inline Tensor trace(const Tensor & self);
 static inline Tensor & ne_out(Tensor & out, const Tensor & self, Scalar other);
 static inline Tensor ne(const Tensor & self, Scalar other);
@@ -947,6 +1010,7 @@ static inline Tensor & normal_out(Tensor & out, double mean, const Tensor & std,
 static inline Tensor normal(double mean, const Tensor & std, Generator * generator=nullptr);
 static inline Tensor & normal_out(Tensor & out, const Tensor & mean, const Tensor & std, Generator * generator=nullptr);
 static inline Tensor normal(const Tensor & mean, const Tensor & std, Generator * generator=nullptr);
+static inline Tensor _normal(double mean, double std, IntArrayRef size, Generator * generator=nullptr, c10::optional<ScalarType> dtype=c10::nullopt, c10::optional<Layout> layout=c10::nullopt, c10::optional<Device> device=c10::nullopt, c10::optional<bool> pin_memory=c10::nullopt);
 static inline Tensor normal(double mean, double std, IntArrayRef size, Generator * generator=nullptr, const TensorOptions & options={});
 static inline Tensor & normal_out(Tensor & out, double mean, double std, IntArrayRef size, Generator * generator=nullptr);
 static inline Tensor alias(const Tensor & self);
@@ -1347,8 +1411,7 @@ static inline std::vector<Tensor> align_tensors(TensorList tensors) {
 static inline bool _use_cudnn_ctc_loss(const Tensor & log_probs, const Tensor & targets, IntArrayRef input_lengths, IntArrayRef target_lengths, int64_t blank) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(log_probs, targets),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(log_probs, targets), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_use_cudnn_ctc_loss not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(log_probs, targets)));
@@ -1362,8 +1425,7 @@ static inline bool _use_cudnn_ctc_loss(const Tensor & log_probs, const Tensor & 
 static inline std::tuple<Tensor,Tensor> _cudnn_ctc_loss(const Tensor & log_probs, const Tensor & targets, IntArrayRef input_lengths, IntArrayRef target_lengths, int64_t blank, bool deterministic, bool zero_infinity) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(log_probs, targets),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(log_probs, targets), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_cudnn_ctc_loss not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(log_probs, targets)));
@@ -1377,8 +1439,7 @@ static inline std::tuple<Tensor,Tensor> _cudnn_ctc_loss(const Tensor & log_probs
 static inline Tensor _cudnn_rnn_flatten_weight(TensorList weight_arr, int64_t weight_stride0, int64_t input_size, int64_t mode, int64_t hidden_size, int64_t num_layers, bool batch_first, bool bidirectional) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(weight_arr),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(weight_arr), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_cudnn_rnn_flatten_weight not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(weight_arr)));
@@ -1392,8 +1453,7 @@ static inline Tensor _cudnn_rnn_flatten_weight(TensorList weight_arr, int64_t we
 static inline std::tuple<Tensor,Tensor,Tensor,Tensor,Tensor> _cudnn_rnn(const Tensor & input, TensorList weight, int64_t weight_stride0, const Tensor & weight_buf, const Tensor & hx, const Tensor & cx, int64_t mode, int64_t hidden_size, int64_t num_layers, bool batch_first, double dropout, bool train, bool bidirectional, IntArrayRef batch_sizes, const Tensor & dropout_state) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, weight_buf, hx, cx, dropout_state),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, weight_buf, hx, cx, dropout_state), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_cudnn_rnn not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input, weight, weight_buf, hx, cx, dropout_state)));
@@ -1407,8 +1467,7 @@ static inline std::tuple<Tensor,Tensor,Tensor,Tensor,Tensor> _cudnn_rnn(const Te
 static inline std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>> _cudnn_rnn_backward(const Tensor & input, TensorList weight, int64_t weight_stride0, const Tensor & weight_buf, const Tensor & hx, const Tensor & cx, const Tensor & output, const Tensor & grad_output, const Tensor & grad_hy, const Tensor & grad_cy, int64_t mode, int64_t hidden_size, int64_t num_layers, bool batch_first, double dropout, bool train, bool bidirectional, IntArrayRef batch_sizes, const Tensor & dropout_state, const Tensor & reserve, std::array<bool,4> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, weight_buf, hx, cx, output, grad_output, grad_hy, grad_cy, dropout_state, reserve),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, weight_buf, hx, cx, output, grad_output, grad_hy, grad_cy, dropout_state, reserve), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_cudnn_rnn_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input, weight, weight_buf, hx, cx, output, grad_output, grad_hy, grad_cy, dropout_state, reserve)));
@@ -1419,21 +1478,22 @@ static inline std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>> _cudnn_rnn_ba
     return op.callUnboxed<std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>>, const Tensor &, TensorList, int64_t, const Tensor &, const Tensor &, const Tensor &, const Tensor &, const Tensor &, const Tensor &, const Tensor &, int64_t, int64_t, int64_t, bool, double, bool, bool, IntArrayRef, const Tensor &, const Tensor &, std::array<bool,4>>(input, weight, weight_stride0, weight_buf, hx, cx, output, grad_output, grad_hy, grad_cy, mode, hidden_size, num_layers, batch_first, dropout, train, bidirectional, batch_sizes, dropout_state, reserve, output_mask);
 #endif
 }
-static inline Tensor _cudnn_init_dropout_state(double dropout, bool train, int64_t dropout_seed, const TensorOptions & options) {
+static inline Tensor __cudnn_init_dropout_state(double dropout, bool train, int64_t dropout_seed, ScalarType dtype, Layout layout, Device device, bool pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(options),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
-            AT_ERROR("_cudnn_init_dropout_state not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(options)));
+            AT_ERROR("_cudnn_init_dropout_state not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory)));
     }
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::_cudnn_init_dropout_state", "");
-    return op.callUnboxed<Tensor, double, bool, int64_t, const TensorOptions &>(dropout, train, dropout_seed, options);
+    return op.callUnboxed<Tensor, double, bool, int64_t, ScalarType, Layout, Device, bool>(dropout, train, dropout_seed, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor _cudnn_init_dropout_state(double dropout, bool train, int64_t dropout_seed, const TensorOptions & options) {
+    return __cudnn_init_dropout_state(dropout, train, dropout_seed, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline int64_t _debug_has_internal_overlap(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
@@ -1448,8 +1508,7 @@ static inline int64_t _debug_has_internal_overlap(const Tensor & self) {
 static inline std::tuple<Tensor,Tensor> _fused_dropout(const Tensor & self, double p, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_fused_dropout not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self)));
@@ -1463,8 +1522,7 @@ static inline std::tuple<Tensor,Tensor> _fused_dropout(const Tensor & self, doub
 static inline Tensor _masked_scale(const Tensor & self, const Tensor & mask, double scale) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mask),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mask), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_masked_scale not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, mask)));
@@ -1788,8 +1846,7 @@ static inline std::tuple<Tensor,Tensor> adaptive_max_pool1d(const Tensor & self,
 static inline Tensor add(const Tensor & self, const Tensor & other, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::add(self, other, alpha);
             break;
@@ -1808,8 +1865,7 @@ static inline Tensor add(const Tensor & self, const Tensor & other, Scalar alpha
 static inline Tensor & add_out(Tensor & out, const Tensor & self, const Tensor & other, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::add_out(out, self, other, alpha);
             break;
@@ -1838,8 +1894,7 @@ static inline Tensor add(const Tensor & self, Scalar other, Scalar alpha) {
 static inline Tensor addmv(const Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mat, vec),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mat, vec), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::addmv(self, mat, vec, beta, alpha);
             break;
@@ -1855,8 +1910,7 @@ static inline Tensor addmv(const Tensor & self, const Tensor & mat, const Tensor
 static inline Tensor & addmv_(Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mat, vec),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mat, vec), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::addmv_(self, mat, vec, beta, alpha);
             break;
@@ -1872,8 +1926,7 @@ static inline Tensor & addmv_(Tensor & self, const Tensor & mat, const Tensor & 
 static inline Tensor & addmv_out(Tensor & out, const Tensor & self, const Tensor & mat, const Tensor & vec, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, mat, vec),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, mat, vec), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::addmv_out(out, self, mat, vec, beta, alpha);
             break;
@@ -2016,38 +2069,44 @@ static inline Tensor & any_out(Tensor & out, const Tensor & self, Dimname dim, b
     return op.callUnboxed<Tensor &, Tensor &, const Tensor &, Dimname, bool>(out, self, dim, keepdim);
 #endif
 }
-static inline Tensor arange(Scalar end, const TensorOptions & options) {
+static inline Tensor _arange(Scalar end, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::arange(end, options);
+    return TypeDefault::arange(end, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::arange", "");
-    return op.callUnboxed<Tensor, Scalar, const TensorOptions &>(end, options);
+    return op.callUnboxed<Tensor, Scalar, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(end, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor arange(Scalar start, Scalar end, const TensorOptions & options) {
+inline Tensor arange(Scalar end, const TensorOptions & options) {
+    return _arange(end, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _arange(Scalar start, Scalar end, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::arange(start, end, options);
+    return TypeDefault::arange(start, end, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::arange", "start");
-    return op.callUnboxed<Tensor, Scalar, Scalar, const TensorOptions &>(start, end, options);
+    return op.callUnboxed<Tensor, Scalar, Scalar, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(start, end, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor arange(Scalar start, Scalar end, Scalar step, const TensorOptions & options) {
+inline Tensor arange(Scalar start, Scalar end, const TensorOptions & options) {
+    return _arange(start, end, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _arange(Scalar start, Scalar end, Scalar step, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::arange(start, end, step, options);
+    return TypeDefault::arange(start, end, step, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::arange", "start_step");
-    return op.callUnboxed<Tensor, Scalar, Scalar, Scalar, const TensorOptions &>(start, end, step, options);
+    return op.callUnboxed<Tensor, Scalar, Scalar, Scalar, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(start, end, step, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor arange(Scalar start, Scalar end, Scalar step, const TensorOptions & options) {
+    return _arange(start, end, step, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & arange_out(Tensor & out, Scalar end) {
 #ifdef USE_STATIC_DISPATCH
@@ -2062,8 +2121,7 @@ static inline Tensor & arange_out(Tensor & out, Scalar end) {
 static inline Tensor & arange_out(Tensor & out, Scalar start, Scalar end, Scalar step) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::arange_out(out, start, end, step);
             break;
@@ -2089,8 +2147,7 @@ static inline Tensor _dim_arange(const Tensor & like, int64_t dim) {
 static inline Tensor argmax(const Tensor & self, c10::optional<int64_t> dim, bool keepdim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::argmax(self, dim, keepdim);
             break;
@@ -2106,8 +2163,7 @@ static inline Tensor argmax(const Tensor & self, c10::optional<int64_t> dim, boo
 static inline Tensor argmin(const Tensor & self, c10::optional<int64_t> dim, bool keepdim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::argmin(self, dim, keepdim);
             break;
@@ -2123,8 +2179,7 @@ static inline Tensor argmin(const Tensor & self, c10::optional<int64_t> dim, boo
 static inline Tensor as_strided(const Tensor & self, IntArrayRef size, IntArrayRef stride, c10::optional<int64_t> storage_offset) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::as_strided(self, size, stride, storage_offset);
             break;
@@ -2193,8 +2248,7 @@ static inline Tensor atan(const Tensor & self) {
 static inline Tensor & atan_(Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::atan_(self);
             break;
@@ -2210,8 +2264,7 @@ static inline Tensor & atan_(Tensor & self) {
 static inline Tensor & atan_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::atan_out(out, self);
             break;
@@ -2227,8 +2280,7 @@ static inline Tensor & atan_out(Tensor & out, const Tensor & self) {
 static inline Tensor baddbmm(const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, batch1, batch2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, batch1, batch2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::baddbmm(self, batch1, batch2, beta, alpha);
             break;
@@ -2254,8 +2306,7 @@ static inline Tensor & _baddbmm_mkl_(Tensor & self, const Tensor & batch1, const
 static inline Tensor & baddbmm_out(Tensor & out, const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, batch1, batch2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, batch1, batch2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::baddbmm_out(out, self, batch1, batch2, beta, alpha);
             break;
@@ -2268,27 +2319,31 @@ static inline Tensor & baddbmm_out(Tensor & out, const Tensor & self, const Tens
     return op.callUnboxed<Tensor &, Tensor &, const Tensor &, const Tensor &, const Tensor &, Scalar, Scalar>(out, self, batch1, batch2, beta, alpha);
 #endif
 }
-static inline Tensor bartlett_window(int64_t window_length, const TensorOptions & options) {
+static inline Tensor _bartlett_window(int64_t window_length, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::bartlett_window(window_length, options);
+    return TypeDefault::bartlett_window(window_length, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::bartlett_window", "");
-    return op.callUnboxed<Tensor, int64_t, const TensorOptions &>(window_length, options);
+    return op.callUnboxed<Tensor, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(window_length, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor bartlett_window(int64_t window_length, bool periodic, const TensorOptions & options) {
+inline Tensor bartlett_window(int64_t window_length, const TensorOptions & options) {
+    return _bartlett_window(window_length, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _bartlett_window(int64_t window_length, bool periodic, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::bartlett_window(window_length, periodic, options);
+    return TypeDefault::bartlett_window(window_length, periodic, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::bartlett_window", "periodic");
-    return op.callUnboxed<Tensor, int64_t, bool, const TensorOptions &>(window_length, periodic, options);
+    return op.callUnboxed<Tensor, int64_t, bool, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(window_length, periodic, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor bartlett_window(int64_t window_length, bool periodic, const TensorOptions & options) {
+    return _bartlett_window(window_length, periodic, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor batch_norm(const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & running_mean, const Tensor & running_var, bool training, double momentum, double eps, bool cudnn_enabled) {
 #ifdef USE_STATIC_DISPATCH
@@ -2363,8 +2418,7 @@ static inline Tensor bilinear(const Tensor & input1, const Tensor & input2, cons
 static inline Tensor binary_cross_entropy(const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, target, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, target, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::binary_cross_entropy(self, target, weight, reduction);
             break;
@@ -2380,8 +2434,7 @@ static inline Tensor binary_cross_entropy(const Tensor & self, const Tensor & ta
 static inline Tensor & binary_cross_entropy_out(Tensor & out, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, target, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, target, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::binary_cross_entropy_out(out, self, target, weight, reduction);
             break;
@@ -2397,8 +2450,7 @@ static inline Tensor & binary_cross_entropy_out(Tensor & out, const Tensor & sel
 static inline Tensor binary_cross_entropy_backward(const Tensor & grad_output, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::binary_cross_entropy_backward(grad_output, self, target, weight, reduction);
             break;
@@ -2414,8 +2466,7 @@ static inline Tensor binary_cross_entropy_backward(const Tensor & grad_output, c
 static inline Tensor & binary_cross_entropy_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::binary_cross_entropy_backward_out(grad_input, grad_output, self, target, weight, reduction);
             break;
@@ -2451,8 +2502,7 @@ static inline Tensor binary_cross_entropy_with_logits_backward(const Tensor & gr
 static inline Tensor bincount(const Tensor & self, const Tensor & weights, int64_t minlength) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weights),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weights), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::bincount(self, weights, minlength);
             break;
@@ -2478,8 +2528,7 @@ static inline Tensor bitwise_not(const Tensor & self) {
 static inline Tensor & bitwise_not_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::bitwise_not_out(out, self);
             break;
@@ -2505,8 +2554,7 @@ static inline Tensor logical_not(const Tensor & self) {
 static inline Tensor & logical_not_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::logical_not_out(out, self);
             break;
@@ -2532,8 +2580,7 @@ static inline Tensor logical_xor(const Tensor & self, const Tensor & other) {
 static inline Tensor & logical_xor_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::logical_xor_out(out, self, other);
             break;
@@ -2559,8 +2606,7 @@ static inline Tensor logical_and(const Tensor & self, const Tensor & other) {
 static inline Tensor & logical_and_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::logical_and_out(out, self, other);
             break;
@@ -2586,8 +2632,7 @@ static inline Tensor logical_or(const Tensor & self, const Tensor & other) {
 static inline Tensor & logical_or_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::logical_or_out(out, self, other);
             break;
@@ -2600,33 +2645,36 @@ static inline Tensor & logical_or_out(Tensor & out, const Tensor & self, const T
     return op.callUnboxed<Tensor &, Tensor &, const Tensor &, const Tensor &>(out, self, other);
 #endif
 }
-static inline Tensor blackman_window(int64_t window_length, const TensorOptions & options) {
+static inline Tensor _blackman_window(int64_t window_length, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::blackman_window(window_length, options);
+    return TypeDefault::blackman_window(window_length, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::blackman_window", "");
-    return op.callUnboxed<Tensor, int64_t, const TensorOptions &>(window_length, options);
+    return op.callUnboxed<Tensor, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(window_length, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor blackman_window(int64_t window_length, bool periodic, const TensorOptions & options) {
+inline Tensor blackman_window(int64_t window_length, const TensorOptions & options) {
+    return _blackman_window(window_length, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _blackman_window(int64_t window_length, bool periodic, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::blackman_window(window_length, periodic, options);
+    return TypeDefault::blackman_window(window_length, periodic, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::blackman_window", "periodic");
-    return op.callUnboxed<Tensor, int64_t, bool, const TensorOptions &>(window_length, periodic, options);
+    return op.callUnboxed<Tensor, int64_t, bool, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(window_length, periodic, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor blackman_window(int64_t window_length, bool periodic, const TensorOptions & options) {
+    return _blackman_window(window_length, periodic, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor bmm(const Tensor & self, const Tensor & mat2) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mat2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mat2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::bmm(self, mat2);
             break;
@@ -2642,8 +2690,7 @@ static inline Tensor bmm(const Tensor & self, const Tensor & mat2) {
 static inline Tensor & bmm_out(Tensor & out, const Tensor & self, const Tensor & mat2) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, mat2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, mat2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::bmm_out(out, self, mat2);
             break;
@@ -2729,8 +2776,7 @@ static inline Tensor & ceil_(Tensor & self) {
 static inline Tensor & ceil_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ceil_out(out, self);
             break;
@@ -2766,8 +2812,7 @@ static inline std::vector<Tensor> chunk(const Tensor & self, int64_t chunks, int
 static inline Tensor clamp(const Tensor & self, c10::optional<Scalar> min, c10::optional<Scalar> max) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::clamp(self, min, max);
             break;
@@ -2786,8 +2831,7 @@ static inline Tensor clamp(const Tensor & self, c10::optional<Scalar> min, c10::
 static inline Tensor & clamp_(Tensor & self, c10::optional<Scalar> min, c10::optional<Scalar> max) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::clamp_(self, min, max);
             break;
@@ -2803,8 +2847,7 @@ static inline Tensor & clamp_(Tensor & self, c10::optional<Scalar> min, c10::opt
 static inline Tensor & clamp_out(Tensor & out, const Tensor & self, c10::optional<Scalar> min, c10::optional<Scalar> max) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::clamp_out(out, self, min, max);
             break;
@@ -2830,8 +2873,7 @@ static inline Tensor clamp_max(const Tensor & self, Scalar max) {
 static inline Tensor & clamp_max_(Tensor & self, Scalar max) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::clamp_max_(self, max);
             break;
@@ -2847,8 +2889,7 @@ static inline Tensor & clamp_max_(Tensor & self, Scalar max) {
 static inline Tensor & clamp_max_out(Tensor & out, const Tensor & self, Scalar max) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::clamp_max_out(out, self, max);
             break;
@@ -2874,8 +2915,7 @@ static inline Tensor clamp_min(const Tensor & self, Scalar min) {
 static inline Tensor & clamp_min_(Tensor & self, Scalar min) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::clamp_min_(self, min);
             break;
@@ -2891,8 +2931,7 @@ static inline Tensor & clamp_min_(Tensor & self, Scalar min) {
 static inline Tensor & clamp_min_out(Tensor & out, const Tensor & self, Scalar min) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::clamp_min_out(out, self, min);
             break;
@@ -3068,8 +3107,7 @@ static inline Tensor conv_transpose3d(const Tensor & input, const Tensor & weigh
 static inline Tensor _copy_from(const Tensor & self, const Tensor & dst, bool non_blocking) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, dst),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, dst), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_copy_from not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, dst)));
@@ -3093,8 +3131,7 @@ static inline Tensor cos(const Tensor & self) {
 static inline Tensor & cos_(Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::cos_(self);
             break;
@@ -3110,8 +3147,7 @@ static inline Tensor & cos_(Tensor & self) {
 static inline Tensor & cos_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::cos_out(out, self);
             break;
@@ -3137,8 +3173,7 @@ static inline Tensor cosh(const Tensor & self) {
 static inline Tensor & cosh_(Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::cosh_(self);
             break;
@@ -3154,8 +3189,7 @@ static inline Tensor & cosh_(Tensor & self) {
 static inline Tensor & cosh_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::cosh_out(out, self);
             break;
@@ -3181,8 +3215,7 @@ static inline Tensor cosine_embedding_loss(const Tensor & input1, const Tensor &
 static inline Tensor cudnn_affine_grid_generator(const Tensor & theta, int64_t N, int64_t C, int64_t H, int64_t W) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(theta),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(theta), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_affine_grid_generator not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(theta)));
@@ -3196,8 +3229,7 @@ static inline Tensor cudnn_affine_grid_generator(const Tensor & theta, int64_t N
 static inline Tensor cudnn_affine_grid_generator_backward(const Tensor & grad, int64_t N, int64_t C, int64_t H, int64_t W) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_affine_grid_generator_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad)));
@@ -3211,8 +3243,7 @@ static inline Tensor cudnn_affine_grid_generator_backward(const Tensor & grad, i
 static inline std::tuple<Tensor,Tensor,Tensor,Tensor> cudnn_batch_norm(const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & running_mean, const Tensor & running_var, bool training, double exponential_average_factor, double epsilon) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, bias, running_mean, running_var),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, bias, running_mean, running_var), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_batch_norm not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input, weight, bias, running_mean, running_var)));
@@ -3226,8 +3257,7 @@ static inline std::tuple<Tensor,Tensor,Tensor,Tensor> cudnn_batch_norm(const Ten
 static inline std::tuple<Tensor,Tensor,Tensor> cudnn_batch_norm_backward(const Tensor & input, const Tensor & grad_output, const Tensor & weight, const Tensor & running_mean, const Tensor & running_var, const Tensor & save_mean, const Tensor & save_var, double epsilon, const Tensor & reserveSpace) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, grad_output, weight, running_mean, running_var, save_mean, save_var, reserveSpace),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, grad_output, weight, running_mean, running_var, save_mean, save_var, reserveSpace), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_batch_norm_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input, grad_output, weight, running_mean, running_var, save_mean, save_var, reserveSpace)));
@@ -3241,8 +3271,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> cudnn_batch_norm_backward(const T
 static inline Tensor cudnn_convolution(const Tensor & self, const Tensor & weight, const Tensor & bias, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_convolution not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, weight, bias)));
@@ -3256,8 +3285,7 @@ static inline Tensor cudnn_convolution(const Tensor & self, const Tensor & weigh
 static inline Tensor cudnn_convolution(const Tensor & self, const Tensor & weight, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_convolution not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, weight)));
@@ -3271,8 +3299,7 @@ static inline Tensor cudnn_convolution(const Tensor & self, const Tensor & weigh
 static inline Tensor cudnn_convolution_backward_input(IntArrayRef self_size, const Tensor & grad_output, const Tensor & weight, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_convolution_backward_input not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_output, weight)));
@@ -3286,8 +3313,7 @@ static inline Tensor cudnn_convolution_backward_input(IntArrayRef self_size, con
 static inline std::tuple<Tensor,Tensor> cudnn_convolution_backward(const Tensor & self, const Tensor & grad_output, const Tensor & weight, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic, std::array<bool,2> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grad_output, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grad_output, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_convolution_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, grad_output, weight)));
@@ -3301,8 +3327,7 @@ static inline std::tuple<Tensor,Tensor> cudnn_convolution_backward(const Tensor 
 static inline Tensor cudnn_convolution_backward_weight(IntArrayRef weight_size, const Tensor & grad_output, const Tensor & self, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_convolution_backward_weight not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_output, self)));
@@ -3316,8 +3341,7 @@ static inline Tensor cudnn_convolution_backward_weight(IntArrayRef weight_size, 
 static inline Tensor cudnn_convolution_transpose(const Tensor & self, const Tensor & weight, const Tensor & bias, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_convolution_transpose not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, weight, bias)));
@@ -3331,8 +3355,7 @@ static inline Tensor cudnn_convolution_transpose(const Tensor & self, const Tens
 static inline Tensor cudnn_convolution_transpose(const Tensor & self, const Tensor & weight, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_convolution_transpose not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, weight)));
@@ -3346,8 +3369,7 @@ static inline Tensor cudnn_convolution_transpose(const Tensor & self, const Tens
 static inline std::tuple<Tensor,Tensor> cudnn_convolution_transpose_backward(const Tensor & self, const Tensor & grad_output, const Tensor & weight, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic, std::array<bool,2> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grad_output, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grad_output, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_convolution_transpose_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, grad_output, weight)));
@@ -3361,8 +3383,7 @@ static inline std::tuple<Tensor,Tensor> cudnn_convolution_transpose_backward(con
 static inline Tensor cudnn_convolution_transpose_backward_input(const Tensor & grad_output, const Tensor & weight, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_convolution_transpose_backward_input not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_output, weight)));
@@ -3376,8 +3397,7 @@ static inline Tensor cudnn_convolution_transpose_backward_input(const Tensor & g
 static inline Tensor cudnn_convolution_transpose_backward_weight(IntArrayRef weight_size, const Tensor & grad_output, const Tensor & self, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_convolution_transpose_backward_weight not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_output, self)));
@@ -3391,8 +3411,7 @@ static inline Tensor cudnn_convolution_transpose_backward_weight(IntArrayRef wei
 static inline Tensor cudnn_grid_sampler(const Tensor & self, const Tensor & grid) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grid),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grid), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_grid_sampler not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, grid)));
@@ -3406,8 +3425,7 @@ static inline Tensor cudnn_grid_sampler(const Tensor & self, const Tensor & grid
 static inline std::tuple<Tensor,Tensor> cudnn_grid_sampler_backward(const Tensor & self, const Tensor & grid, const Tensor & grad_output) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grid, grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grid, grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("cudnn_grid_sampler_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, grid, grad_output)));
@@ -3601,8 +3619,7 @@ static inline Tensor ctc_loss(const Tensor & log_probs, const Tensor & targets, 
 static inline std::tuple<Tensor,Tensor> _ctc_loss(const Tensor & log_probs, const Tensor & targets, IntArrayRef input_lengths, IntArrayRef target_lengths, int64_t blank, bool zero_infinity) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(log_probs, targets),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(log_probs, targets), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_ctc_loss(log_probs, targets, input_lengths, target_lengths, blank, zero_infinity);
             break;
@@ -3618,8 +3635,7 @@ static inline std::tuple<Tensor,Tensor> _ctc_loss(const Tensor & log_probs, cons
 static inline Tensor _ctc_loss_backward(const Tensor & grad, const Tensor & log_probs, const Tensor & targets, IntArrayRef input_lengths, IntArrayRef target_lengths, const Tensor & neg_log_likelihood, const Tensor & log_alpha, int64_t blank, bool zero_infinity) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, log_probs, targets, neg_log_likelihood, log_alpha),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, log_probs, targets, neg_log_likelihood, log_alpha), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_ctc_loss_backward(grad, log_probs, targets, input_lengths, target_lengths, neg_log_likelihood, log_alpha, blank, zero_infinity);
             break;
@@ -3685,8 +3701,7 @@ static inline Tensor diagonal(const Tensor & self, Dimname outdim, Dimname dim1,
 static inline Tensor div(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::div(self, other);
             break;
@@ -3705,8 +3720,7 @@ static inline Tensor div(const Tensor & self, const Tensor & other) {
 static inline Tensor & div_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::div_out(out, self, other);
             break;
@@ -3735,8 +3749,7 @@ static inline Tensor div(const Tensor & self, Scalar other) {
 static inline Tensor dot(const Tensor & self, const Tensor & tensor) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, tensor),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, tensor), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::dot(self, tensor);
             break;
@@ -3792,8 +3805,7 @@ static inline Tensor embedding_backward(const Tensor & grad, const Tensor & indi
 static inline Tensor embedding_dense_backward(const Tensor & grad_output, const Tensor & indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::embedding_dense_backward(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq);
             break;
@@ -3809,8 +3821,7 @@ static inline Tensor embedding_dense_backward(const Tensor & grad_output, const 
 static inline Tensor & embedding_renorm_(Tensor & self, const Tensor & indices, double max_norm, double norm_type) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::embedding_renorm_(self, indices, max_norm, norm_type);
             break;
@@ -3846,8 +3857,7 @@ static inline std::tuple<Tensor,Tensor,Tensor,Tensor> embedding_bag(const Tensor
 static inline std::tuple<Tensor,Tensor,Tensor,Tensor> _embedding_bag(const Tensor & weight, const Tensor & indices, const Tensor & offsets, bool scale_grad_by_freq, int64_t mode, bool sparse, const Tensor & per_sample_weights, bool include_last_offset) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(weight, indices, offsets, per_sample_weights),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(weight, indices, offsets, per_sample_weights), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_embedding_bag(weight, indices, offsets, scale_grad_by_freq, mode, sparse, per_sample_weights, include_last_offset);
             break;
@@ -3883,8 +3893,7 @@ static inline Tensor _embedding_bag_sparse_backward(const Tensor & grad, const T
 static inline Tensor _embedding_bag_dense_backward(const Tensor & grad, const Tensor & indices, const Tensor & offsets, const Tensor & offset2bag, const Tensor & bag_size, const Tensor & maximum_indices, int64_t num_weights, bool scale_grad_by_freq, int64_t mode, const Tensor & per_sample_weights) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, indices, offsets, offset2bag, bag_size, maximum_indices, per_sample_weights),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, indices, offsets, offset2bag, bag_size, maximum_indices, per_sample_weights), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_embedding_bag_dense_backward(grad, indices, offsets, offset2bag, bag_size, maximum_indices, num_weights, scale_grad_by_freq, mode, per_sample_weights);
             break;
@@ -3900,8 +3909,7 @@ static inline Tensor _embedding_bag_dense_backward(const Tensor & grad, const Te
 static inline Tensor _embedding_bag_per_sample_weights_backward(const Tensor & grad, const Tensor & weight, const Tensor & indices, const Tensor & offsets, const Tensor & offset2bag, int64_t mode) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, weight, indices, offsets, offset2bag),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, weight, indices, offsets, offset2bag), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_embedding_bag_per_sample_weights_backward(grad, weight, indices, offsets, offset2bag, mode);
             break;
@@ -3914,79 +3922,84 @@ static inline Tensor _embedding_bag_per_sample_weights_backward(const Tensor & g
     return op.callUnboxed<Tensor, const Tensor &, const Tensor &, const Tensor &, const Tensor &, const Tensor &, int64_t>(grad, weight, indices, offsets, offset2bag, mode);
 #endif
 }
-static inline Tensor empty(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+static inline Tensor _empty(IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::empty(size, names, options, memory_format);
+    return TypeDefault::empty(size, names, dtype, layout, device, pin_memory, memory_format);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::empty", "names");
-    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<DimnameList>, const TensorOptions &, c10::optional<MemoryFormat>>(size, names, options, memory_format);
+    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<DimnameList>, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>, c10::optional<MemoryFormat>>(size, names, dtype, layout, device, pin_memory, memory_format);
 #endif
 }
-static inline Tensor empty(IntArrayRef size, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+inline Tensor empty(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+    return _empty(size, names, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
+}
+static inline Tensor _empty(IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(options),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
-            return CPUType::empty(size, options, memory_format);
+            return CPUType::empty(size, dtype, layout, device, pin_memory, memory_format);
             break;
         case Backend::SparseCPU:
-            return SparseCPUType::empty(size, options, memory_format);
+            return SparseCPUType::empty(size, dtype, layout, device, pin_memory, memory_format);
             break;
         default:
-            AT_ERROR("empty not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(options)));
+            AT_ERROR("empty not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory)));
     }
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::empty", "memory_format");
-    return op.callUnboxed<Tensor, IntArrayRef, const TensorOptions &, c10::optional<MemoryFormat>>(size, options, memory_format);
+    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>, c10::optional<MemoryFormat>>(size, dtype, layout, device, pin_memory, memory_format);
 #endif
 }
-static inline Tensor _empty_affine_quantized(IntArrayRef size, const TensorOptions & options, double scale, int64_t zero_point, c10::optional<MemoryFormat> memory_format) {
+inline Tensor empty(IntArrayRef size, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+    return _empty(size, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
+}
+static inline Tensor __empty_affine_quantized(IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, double scale, int64_t zero_point, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(options),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
-            return CPUType::_empty_affine_quantized(size, options, scale, zero_point, memory_format);
+            return CPUType::_empty_affine_quantized(size, dtype, layout, device, pin_memory, scale, zero_point, memory_format);
             break;
         case Backend::QuantizedCPU:
-            return QuantizedCPUType::_empty_affine_quantized(size, options, scale, zero_point, memory_format);
+            return QuantizedCPUType::_empty_affine_quantized(size, dtype, layout, device, pin_memory, scale, zero_point, memory_format);
             break;
         default:
-            AT_ERROR("_empty_affine_quantized not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(options)));
+            AT_ERROR("_empty_affine_quantized not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory)));
     }
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::_empty_affine_quantized", "");
-    return op.callUnboxed<Tensor, IntArrayRef, const TensorOptions &, double, int64_t, c10::optional<MemoryFormat>>(size, options, scale, zero_point, memory_format);
+    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>, double, int64_t, c10::optional<MemoryFormat>>(size, dtype, layout, device, pin_memory, scale, zero_point, memory_format);
 #endif
 }
-static inline Tensor _empty_per_channel_affine_quantized(IntArrayRef size, const Tensor & scales, const Tensor & zero_points, int64_t axis, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+inline Tensor _empty_affine_quantized(IntArrayRef size, const TensorOptions & options, double scale, int64_t zero_point, c10::optional<MemoryFormat> memory_format) {
+    return __empty_affine_quantized(size, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), scale, zero_point, memory_format);
+}
+static inline Tensor __empty_per_channel_affine_quantized(IntArrayRef size, const Tensor & scales, const Tensor & zero_points, int64_t axis, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(scales, zero_points, options),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(scales, zero_points, dtype, layout, device, pin_memory), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
-            return CPUType::_empty_per_channel_affine_quantized(size, scales, zero_points, axis, options, memory_format);
+            return CPUType::_empty_per_channel_affine_quantized(size, scales, zero_points, axis, dtype, layout, device, pin_memory, memory_format);
             break;
         case Backend::QuantizedCPU:
-            return QuantizedCPUType::_empty_per_channel_affine_quantized(size, scales, zero_points, axis, options, memory_format);
+            return QuantizedCPUType::_empty_per_channel_affine_quantized(size, scales, zero_points, axis, dtype, layout, device, pin_memory, memory_format);
             break;
         default:
-            AT_ERROR("_empty_per_channel_affine_quantized not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(scales, zero_points, options)));
+            AT_ERROR("_empty_per_channel_affine_quantized not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(scales, zero_points, dtype, layout, device, pin_memory)));
     }
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(scales, zero_points, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::_empty_per_channel_affine_quantized", "");
-    return op.callUnboxed<Tensor, IntArrayRef, const Tensor &, const Tensor &, int64_t, const TensorOptions &, c10::optional<MemoryFormat>>(size, scales, zero_points, axis, options, memory_format);
+    return op.callUnboxed<Tensor, IntArrayRef, const Tensor &, const Tensor &, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>, c10::optional<MemoryFormat>>(size, scales, zero_points, axis, dtype, layout, device, pin_memory, memory_format);
 #endif
+}
+inline Tensor _empty_per_channel_affine_quantized(IntArrayRef size, const Tensor & scales, const Tensor & zero_points, int64_t axis, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+    return __empty_per_channel_affine_quantized(size, scales, zero_points, axis, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
 }
 static inline Tensor & empty_out(Tensor & out, IntArrayRef size, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
@@ -4008,34 +4021,37 @@ static inline Tensor empty_like(const Tensor & self, c10::optional<MemoryFormat>
     return op.callUnboxed<Tensor, const Tensor &, c10::optional<MemoryFormat>>(self, memory_format);
 #endif
 }
-static inline Tensor empty_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+static inline Tensor _empty_like(const Tensor & self, ScalarType dtype, Layout layout, Device device, bool pin_memory, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::empty_like(self, options, memory_format);
+    return TypeDefault::empty_like(self, dtype, layout, device, pin_memory, memory_format);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(self, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::empty_like", "dtype");
-    return op.callUnboxed<Tensor, const Tensor &, const TensorOptions &, c10::optional<MemoryFormat>>(self, options, memory_format);
+    return op.callUnboxed<Tensor, const Tensor &, ScalarType, Layout, Device, bool, c10::optional<MemoryFormat>>(self, dtype, layout, device, pin_memory, memory_format);
 #endif
 }
-static inline Tensor empty_strided(IntArrayRef size, IntArrayRef stride, const TensorOptions & options) {
+inline Tensor empty_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+    return _empty_like(self, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
+}
+static inline Tensor _empty_strided(IntArrayRef size, IntArrayRef stride, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(options),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
-            return CPUType::empty_strided(size, stride, options);
+            return CPUType::empty_strided(size, stride, dtype, layout, device, pin_memory);
             break;
         default:
-            AT_ERROR("empty_strided not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(options)));
+            AT_ERROR("empty_strided not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory)));
     }
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::empty_strided", "");
-    return op.callUnboxed<Tensor, IntArrayRef, IntArrayRef, const TensorOptions &>(size, stride, options);
+    return op.callUnboxed<Tensor, IntArrayRef, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, stride, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor empty_strided(IntArrayRef size, IntArrayRef stride, const TensorOptions & options) {
+    return _empty_strided(size, stride, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor erf(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
@@ -4050,8 +4066,7 @@ static inline Tensor erf(const Tensor & self) {
 static inline Tensor & erf_(Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::erf_(self);
             break;
@@ -4067,8 +4082,7 @@ static inline Tensor & erf_(Tensor & self) {
 static inline Tensor & erf_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::erf_out(out, self);
             break;
@@ -4094,8 +4108,7 @@ static inline Tensor erfc(const Tensor & self) {
 static inline Tensor & erfc_(Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::erfc_(self);
             break;
@@ -4111,8 +4124,7 @@ static inline Tensor & erfc_(Tensor & self) {
 static inline Tensor & erfc_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::erfc_out(out, self);
             break;
@@ -4138,8 +4150,7 @@ static inline Tensor exp(const Tensor & self) {
 static inline Tensor & exp_(Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::exp_(self);
             break;
@@ -4155,8 +4166,7 @@ static inline Tensor & exp_(Tensor & self) {
 static inline Tensor & exp_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::exp_out(out, self);
             break;
@@ -4192,8 +4202,7 @@ static inline Tensor & expm1_(Tensor & self) {
 static inline Tensor & expm1_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::expm1_out(out, self);
             break;
@@ -4206,33 +4215,36 @@ static inline Tensor & expm1_out(Tensor & out, const Tensor & self) {
     return op.callUnboxed<Tensor &, Tensor &, const Tensor &>(out, self);
 #endif
 }
-static inline Tensor eye(int64_t n, const TensorOptions & options) {
+static inline Tensor _eye(int64_t n, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::eye(n, options);
+    return TypeDefault::eye(n, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::eye", "");
-    return op.callUnboxed<Tensor, int64_t, const TensorOptions &>(n, options);
+    return op.callUnboxed<Tensor, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(n, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor eye(int64_t n, int64_t m, const TensorOptions & options) {
+inline Tensor eye(int64_t n, const TensorOptions & options) {
+    return _eye(n, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _eye(int64_t n, int64_t m, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::eye(n, m, options);
+    return TypeDefault::eye(n, m, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::eye", "m");
-    return op.callUnboxed<Tensor, int64_t, int64_t, const TensorOptions &>(n, m, options);
+    return op.callUnboxed<Tensor, int64_t, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(n, m, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor eye(int64_t n, int64_t m, const TensorOptions & options) {
+    return _eye(n, m, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & eye_out(Tensor & out, int64_t n) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::eye_out(out, n);
             break;
@@ -4248,8 +4260,7 @@ static inline Tensor & eye_out(Tensor & out, int64_t n) {
 static inline Tensor & eye_out(Tensor & out, int64_t n, int64_t m) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::eye_out(out, n, m);
             break;
@@ -4345,8 +4356,7 @@ static inline Tensor & floor_(Tensor & self) {
 static inline Tensor & floor_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::floor_out(out, self);
             break;
@@ -4409,27 +4419,31 @@ static inline Tensor & frac_out(Tensor & out, const Tensor & self) {
     return op.callUnboxed<Tensor &, Tensor &, const Tensor &>(out, self);
 #endif
 }
-static inline Tensor full(IntArrayRef size, Scalar fill_value, c10::optional<DimnameList> names, const TensorOptions & options) {
+static inline Tensor _full(IntArrayRef size, Scalar fill_value, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::full(size, fill_value, names, options);
+    return TypeDefault::full(size, fill_value, names, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::full", "names");
-    return op.callUnboxed<Tensor, IntArrayRef, Scalar, c10::optional<DimnameList>, const TensorOptions &>(size, fill_value, names, options);
+    return op.callUnboxed<Tensor, IntArrayRef, Scalar, c10::optional<DimnameList>, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, fill_value, names, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor full(IntArrayRef size, Scalar fill_value, const TensorOptions & options) {
+inline Tensor full(IntArrayRef size, Scalar fill_value, c10::optional<DimnameList> names, const TensorOptions & options) {
+    return _full(size, fill_value, names, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _full(IntArrayRef size, Scalar fill_value, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::full(size, fill_value, options);
+    return TypeDefault::full(size, fill_value, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::full", "");
-    return op.callUnboxed<Tensor, IntArrayRef, Scalar, const TensorOptions &>(size, fill_value, options);
+    return op.callUnboxed<Tensor, IntArrayRef, Scalar, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, fill_value, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor full(IntArrayRef size, Scalar fill_value, const TensorOptions & options) {
+    return _full(size, fill_value, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & full_out(Tensor & out, IntArrayRef size, Scalar fill_value) {
 #ifdef USE_STATIC_DISPATCH
@@ -4451,34 +4465,37 @@ static inline Tensor full_like(const Tensor & self, Scalar fill_value, c10::opti
     return op.callUnboxed<Tensor, const Tensor &, Scalar, c10::optional<MemoryFormat>>(self, fill_value, memory_format);
 #endif
 }
-static inline Tensor full_like(const Tensor & self, Scalar fill_value, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+static inline Tensor _full_like(const Tensor & self, Scalar fill_value, ScalarType dtype, Layout layout, Device device, bool pin_memory, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::full_like(self, fill_value, options, memory_format);
+    return TypeDefault::full_like(self, fill_value, dtype, layout, device, pin_memory, memory_format);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(self, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::full_like", "dtype");
-    return op.callUnboxed<Tensor, const Tensor &, Scalar, const TensorOptions &, c10::optional<MemoryFormat>>(self, fill_value, options, memory_format);
+    return op.callUnboxed<Tensor, const Tensor &, Scalar, ScalarType, Layout, Device, bool, c10::optional<MemoryFormat>>(self, fill_value, dtype, layout, device, pin_memory, memory_format);
 #endif
 }
-static inline Tensor from_file(std::string filename, c10::optional<bool> shared, c10::optional<int64_t> size, const TensorOptions & options) {
+inline Tensor full_like(const Tensor & self, Scalar fill_value, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+    return _full_like(self, fill_value, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
+}
+static inline Tensor _from_file(std::string filename, c10::optional<bool> shared, c10::optional<int64_t> size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(options),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
-            return CPUType::from_file(filename, shared, size, options);
+            return CPUType::from_file(filename, shared, size, dtype, layout, device, pin_memory);
             break;
         default:
-            AT_ERROR("from_file not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(options)));
+            AT_ERROR("from_file not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory)));
     }
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::from_file", "");
-    return op.callUnboxed<Tensor, std::string, c10::optional<bool>, c10::optional<int64_t>, const TensorOptions &>(filename, shared, size, options);
+    return op.callUnboxed<Tensor, std::string, c10::optional<bool>, c10::optional<int64_t>, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(filename, shared, size, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor from_file(std::string filename, c10::optional<bool> shared, c10::optional<int64_t> size, const TensorOptions & options) {
+    return _from_file(filename, shared, size, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor grid_sampler(const Tensor & input, const Tensor & grid, int64_t interpolation_mode, int64_t padding_mode, bool align_corners) {
 #ifdef USE_STATIC_DISPATCH
@@ -4493,8 +4510,7 @@ static inline Tensor grid_sampler(const Tensor & input, const Tensor & grid, int
 static inline Tensor grid_sampler_2d(const Tensor & input, const Tensor & grid, int64_t interpolation_mode, int64_t padding_mode, bool align_corners) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, grid),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, grid), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::grid_sampler_2d(input, grid, interpolation_mode, padding_mode, align_corners);
             break;
@@ -4510,8 +4526,7 @@ static inline Tensor grid_sampler_2d(const Tensor & input, const Tensor & grid, 
 static inline std::tuple<Tensor,Tensor> grid_sampler_2d_backward(const Tensor & grad_output, const Tensor & input, const Tensor & grid, int64_t interpolation_mode, int64_t padding_mode, bool align_corners) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, input, grid),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, input, grid), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::grid_sampler_2d_backward(grad_output, input, grid, interpolation_mode, padding_mode, align_corners);
             break;
@@ -4527,8 +4542,7 @@ static inline std::tuple<Tensor,Tensor> grid_sampler_2d_backward(const Tensor & 
 static inline Tensor grid_sampler_3d(const Tensor & input, const Tensor & grid, int64_t interpolation_mode, int64_t padding_mode, bool align_corners) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, grid),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, grid), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::grid_sampler_3d(input, grid, interpolation_mode, padding_mode, align_corners);
             break;
@@ -4544,8 +4558,7 @@ static inline Tensor grid_sampler_3d(const Tensor & input, const Tensor & grid, 
 static inline std::tuple<Tensor,Tensor> grid_sampler_3d_backward(const Tensor & grad_output, const Tensor & input, const Tensor & grid, int64_t interpolation_mode, int64_t padding_mode, bool align_corners) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, input, grid),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, input, grid), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::grid_sampler_3d_backward(grad_output, input, grid, interpolation_mode, padding_mode, align_corners);
             break;
@@ -4558,71 +4571,83 @@ static inline std::tuple<Tensor,Tensor> grid_sampler_3d_backward(const Tensor & 
     return op.callUnboxed<std::tuple<Tensor,Tensor>, const Tensor &, const Tensor &, const Tensor &, int64_t, int64_t, bool>(grad_output, input, grid, interpolation_mode, padding_mode, align_corners);
 #endif
 }
-static inline Tensor hann_window(int64_t window_length, const TensorOptions & options) {
+static inline Tensor _hann_window(int64_t window_length, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::hann_window(window_length, options);
+    return TypeDefault::hann_window(window_length, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::hann_window", "");
-    return op.callUnboxed<Tensor, int64_t, const TensorOptions &>(window_length, options);
+    return op.callUnboxed<Tensor, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(window_length, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor hann_window(int64_t window_length, bool periodic, const TensorOptions & options) {
+inline Tensor hann_window(int64_t window_length, const TensorOptions & options) {
+    return _hann_window(window_length, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _hann_window(int64_t window_length, bool periodic, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::hann_window(window_length, periodic, options);
+    return TypeDefault::hann_window(window_length, periodic, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::hann_window", "periodic");
-    return op.callUnboxed<Tensor, int64_t, bool, const TensorOptions &>(window_length, periodic, options);
+    return op.callUnboxed<Tensor, int64_t, bool, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(window_length, periodic, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor hamming_window(int64_t window_length, const TensorOptions & options) {
+inline Tensor hann_window(int64_t window_length, bool periodic, const TensorOptions & options) {
+    return _hann_window(window_length, periodic, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _hamming_window(int64_t window_length, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::hamming_window(window_length, options);
+    return TypeDefault::hamming_window(window_length, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::hamming_window", "");
-    return op.callUnboxed<Tensor, int64_t, const TensorOptions &>(window_length, options);
+    return op.callUnboxed<Tensor, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(window_length, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor hamming_window(int64_t window_length, bool periodic, const TensorOptions & options) {
+inline Tensor hamming_window(int64_t window_length, const TensorOptions & options) {
+    return _hamming_window(window_length, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _hamming_window(int64_t window_length, bool periodic, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::hamming_window(window_length, periodic, options);
+    return TypeDefault::hamming_window(window_length, periodic, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::hamming_window", "periodic");
-    return op.callUnboxed<Tensor, int64_t, bool, const TensorOptions &>(window_length, periodic, options);
+    return op.callUnboxed<Tensor, int64_t, bool, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(window_length, periodic, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor hamming_window(int64_t window_length, bool periodic, double alpha, const TensorOptions & options) {
+inline Tensor hamming_window(int64_t window_length, bool periodic, const TensorOptions & options) {
+    return _hamming_window(window_length, periodic, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _hamming_window(int64_t window_length, bool periodic, double alpha, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::hamming_window(window_length, periodic, alpha, options);
+    return TypeDefault::hamming_window(window_length, periodic, alpha, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::hamming_window", "periodic_alpha");
-    return op.callUnboxed<Tensor, int64_t, bool, double, const TensorOptions &>(window_length, periodic, alpha, options);
+    return op.callUnboxed<Tensor, int64_t, bool, double, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(window_length, periodic, alpha, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor hamming_window(int64_t window_length, bool periodic, double alpha, double beta, const TensorOptions & options) {
+inline Tensor hamming_window(int64_t window_length, bool periodic, double alpha, const TensorOptions & options) {
+    return _hamming_window(window_length, periodic, alpha, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _hamming_window(int64_t window_length, bool periodic, double alpha, double beta, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::hamming_window(window_length, periodic, alpha, beta, options);
+    return TypeDefault::hamming_window(window_length, periodic, alpha, beta, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::hamming_window", "periodic_alpha_beta");
-    return op.callUnboxed<Tensor, int64_t, bool, double, double, const TensorOptions &>(window_length, periodic, alpha, beta, options);
+    return op.callUnboxed<Tensor, int64_t, bool, double, double, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(window_length, periodic, alpha, beta, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor hamming_window(int64_t window_length, bool periodic, double alpha, double beta, const TensorOptions & options) {
+    return _hamming_window(window_length, periodic, alpha, beta, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor hinge_embedding_loss(const Tensor & self, const Tensor & target, double margin, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
@@ -4637,8 +4662,7 @@ static inline Tensor hinge_embedding_loss(const Tensor & self, const Tensor & ta
 static inline Tensor ger(const Tensor & self, const Tensor & vec2) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, vec2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, vec2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ger(self, vec2);
             break;
@@ -4654,8 +4678,7 @@ static inline Tensor ger(const Tensor & self, const Tensor & vec2) {
 static inline Tensor & ger_out(Tensor & out, const Tensor & self, const Tensor & vec2) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, vec2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, vec2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ger_out(out, self, vec2);
             break;
@@ -4721,8 +4744,7 @@ static inline Tensor irfft(const Tensor & self, int64_t signal_ndim, bool normal
 static inline Tensor _fft_with_size(const Tensor & self, int64_t signal_ndim, bool complex_input, bool complex_output, bool inverse, IntArrayRef checked_signal_sizes, bool normalized, bool onesided, IntArrayRef output_sizes) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_fft_with_size(self, signal_ndim, complex_input, complex_output, inverse, checked_signal_sizes, normalized, onesided, output_sizes);
             break;
@@ -4868,8 +4890,7 @@ static inline Tensor & inverse_out(Tensor & out, const Tensor & self) {
 static inline Tensor _inverse_helper(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_inverse_helper(self);
             break;
@@ -4895,8 +4916,7 @@ static inline Tensor isclose(const Tensor & self, const Tensor & other, double r
 static inline Tensor isnan(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::isnan(self);
             break;
@@ -4985,8 +5005,7 @@ static inline Tensor kl_div(const Tensor & self, const Tensor & target, int64_t 
 static inline Tensor kl_div_backward(const Tensor & grad_output, const Tensor & self, const Tensor & target, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::kl_div_backward(grad_output, self, target, reduction);
             break;
@@ -5012,8 +5031,7 @@ static inline std::tuple<Tensor,Tensor> kthvalue(const Tensor & self, int64_t k,
 static inline std::tuple<Tensor &,Tensor &> kthvalue_out(Tensor & values, Tensor & indices, const Tensor & self, int64_t k, int64_t dim, bool keepdim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(values, indices, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(values, indices, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::kthvalue_out(values, indices, self, k, dim, keepdim);
             break;
@@ -5059,8 +5077,7 @@ static inline Tensor layer_norm(const Tensor & input, IntArrayRef normalized_sha
 static inline std::tuple<Tensor,Tensor,Tensor> native_layer_norm(const Tensor & input, const Tensor & weight, const Tensor & bias, int64_t M, int64_t N, double eps) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::native_layer_norm(input, weight, bias, M, N, eps);
             break;
@@ -5076,8 +5093,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> native_layer_norm(const Tensor & 
 static inline std::tuple<Tensor,Tensor,Tensor> native_layer_norm_backward(const Tensor & grad_out, const Tensor & input, const Tensor & mean, const Tensor & rstd, const Tensor & weight, int64_t M, int64_t N, std::array<bool,3> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_out, input, mean, rstd, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_out, input, mean, rstd, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::native_layer_norm_backward(grad_out, input, mean, rstd, weight, M, N, output_mask);
             break;
@@ -5103,8 +5119,7 @@ static inline Tensor linear(const Tensor & input, const Tensor & weight, const T
 static inline Tensor mkldnn_linear(const Tensor & input, const Tensor & weight, const Tensor & bias) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("mkldnn_linear not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input, weight, bias)));
@@ -5195,22 +5210,23 @@ static inline Tensor fbgemm_pack_quantized_matrix(const Tensor & input, int64_t 
     return op.callUnboxed<Tensor, const Tensor &, int64_t, int64_t>(input, K, N);
 #endif
 }
-static inline Tensor linspace(Scalar start, Scalar end, int64_t steps, const TensorOptions & options) {
+static inline Tensor _linspace(Scalar start, Scalar end, int64_t steps, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::linspace(start, end, steps, options);
+    return TypeDefault::linspace(start, end, steps, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::linspace", "");
-    return op.callUnboxed<Tensor, Scalar, Scalar, int64_t, const TensorOptions &>(start, end, steps, options);
+    return op.callUnboxed<Tensor, Scalar, Scalar, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(start, end, steps, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor linspace(Scalar start, Scalar end, int64_t steps, const TensorOptions & options) {
+    return _linspace(start, end, steps, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & linspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::linspace_out(out, start, end, steps);
             break;
@@ -5246,8 +5262,7 @@ static inline Tensor & log_(Tensor & self) {
 static inline Tensor & log_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::log_out(out, self);
             break;
@@ -5283,8 +5298,7 @@ static inline Tensor & log10_(Tensor & self) {
 static inline Tensor & log10_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::log10_out(out, self);
             break;
@@ -5310,8 +5324,7 @@ static inline Tensor log1p(const Tensor & self) {
 static inline Tensor & log1p_(Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::log1p_(self);
             break;
@@ -5330,8 +5343,7 @@ static inline Tensor & log1p_(Tensor & self) {
 static inline Tensor & log1p_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::log1p_out(out, self);
             break;
@@ -5370,8 +5382,7 @@ static inline Tensor & log2_(Tensor & self) {
 static inline Tensor & log2_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::log2_out(out, self);
             break;
@@ -5394,22 +5405,23 @@ static inline Tensor logdet(const Tensor & self) {
     return op.callUnboxed<Tensor, const Tensor &>(self);
 #endif
 }
-static inline Tensor logspace(Scalar start, Scalar end, int64_t steps, double base, const TensorOptions & options) {
+static inline Tensor _logspace(Scalar start, Scalar end, int64_t steps, double base, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::logspace(start, end, steps, base, options);
+    return TypeDefault::logspace(start, end, steps, base, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::logspace", "");
-    return op.callUnboxed<Tensor, Scalar, Scalar, int64_t, double, const TensorOptions &>(start, end, steps, base, options);
+    return op.callUnboxed<Tensor, Scalar, Scalar, int64_t, double, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(start, end, steps, base, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor logspace(Scalar start, Scalar end, int64_t steps, double base, const TensorOptions & options) {
+    return _logspace(start, end, steps, base, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & logspace_out(Tensor & out, Scalar start, Scalar end, int64_t steps, double base) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::logspace_out(out, start, end, steps, base);
             break;
@@ -5445,8 +5457,7 @@ static inline Tensor log_softmax(const Tensor & self, Dimname dim, c10::optional
 static inline Tensor _log_softmax(const Tensor & self, int64_t dim, bool half_to_float) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_log_softmax(self, dim, half_to_float);
             break;
@@ -5462,8 +5473,7 @@ static inline Tensor _log_softmax(const Tensor & self, int64_t dim, bool half_to
 static inline Tensor _log_softmax_backward_data(const Tensor & grad_output, const Tensor & output, int64_t dim, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_log_softmax_backward_data(grad_output, output, dim, self);
             break;
@@ -5669,8 +5679,7 @@ static inline Tensor max_pool2d(const Tensor & self, IntArrayRef kernel_size, In
 static inline Tensor mkldnn_max_pool2d(const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, bool ceil_mode) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("mkldnn_max_pool2d not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self)));
@@ -5684,8 +5693,7 @@ static inline Tensor mkldnn_max_pool2d(const Tensor & self, IntArrayRef kernel_s
 static inline Tensor quantized_max_pool2d(const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, bool ceil_mode) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::QuantizedCPU:
             return QuantizedCPUType::quantized_max_pool2d(self, kernel_size, stride, padding, dilation, ceil_mode);
             break;
@@ -5711,8 +5719,7 @@ static inline Tensor max_pool3d(const Tensor & self, IntArrayRef kernel_size, In
 static inline Tensor mean(const Tensor & self, c10::optional<ScalarType> dtype) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::mean(self, dtype);
             break;
@@ -5731,8 +5738,7 @@ static inline Tensor mean(const Tensor & self, c10::optional<ScalarType> dtype) 
 static inline Tensor mean(const Tensor & self, IntArrayRef dim, bool keepdim, c10::optional<ScalarType> dtype) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::mean(self, dim, keepdim, dtype);
             break;
@@ -5751,8 +5757,7 @@ static inline Tensor mean(const Tensor & self, IntArrayRef dim, bool keepdim, c1
 static inline Tensor & mean_out(Tensor & out, const Tensor & self, IntArrayRef dim, bool keepdim, c10::optional<ScalarType> dtype) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::mean_out(out, self, dim, keepdim, dtype);
             break;
@@ -5931,8 +5936,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> mkldnn_convolution_backward(const
 static inline std::tuple<Tensor,Tensor,Tensor> miopen_batch_norm(const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & running_mean, const Tensor & running_var, bool training, double exponential_average_factor, double epsilon) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, bias, running_mean, running_var),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, bias, running_mean, running_var), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_batch_norm not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input, weight, bias, running_mean, running_var)));
@@ -5946,8 +5950,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> miopen_batch_norm(const Tensor & 
 static inline std::tuple<Tensor,Tensor,Tensor> miopen_batch_norm_backward(const Tensor & input, const Tensor & grad_output, const Tensor & weight, const Tensor & running_mean, const Tensor & running_var, const Tensor & save_mean, const Tensor & save_var, double epsilon) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, grad_output, weight, running_mean, running_var, save_mean, save_var),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, grad_output, weight, running_mean, running_var, save_mean, save_var), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_batch_norm_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input, grad_output, weight, running_mean, running_var, save_mean, save_var)));
@@ -5961,8 +5964,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> miopen_batch_norm_backward(const 
 static inline Tensor miopen_convolution(const Tensor & self, const Tensor & weight, const Tensor & bias, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_convolution not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, weight, bias)));
@@ -5976,8 +5978,7 @@ static inline Tensor miopen_convolution(const Tensor & self, const Tensor & weig
 static inline Tensor miopen_convolution_backward_input(IntArrayRef self_size, const Tensor & grad_output, const Tensor & weight, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_convolution_backward_input not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_output, weight)));
@@ -5991,8 +5992,7 @@ static inline Tensor miopen_convolution_backward_input(IntArrayRef self_size, co
 static inline std::tuple<Tensor,Tensor,Tensor> miopen_convolution_backward(const Tensor & self, const Tensor & grad_output, const Tensor & weight, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic, std::array<bool,3> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grad_output, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grad_output, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_convolution_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, grad_output, weight)));
@@ -6006,8 +6006,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> miopen_convolution_backward(const
 static inline Tensor miopen_convolution_backward_bias(const Tensor & grad_output) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_convolution_backward_bias not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_output)));
@@ -6021,8 +6020,7 @@ static inline Tensor miopen_convolution_backward_bias(const Tensor & grad_output
 static inline Tensor miopen_convolution_backward_weight(IntArrayRef weight_size, const Tensor & grad_output, const Tensor & self, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_convolution_backward_weight not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_output, self)));
@@ -6036,8 +6034,7 @@ static inline Tensor miopen_convolution_backward_weight(IntArrayRef weight_size,
 static inline Tensor miopen_convolution_transpose(const Tensor & self, const Tensor & weight, const Tensor & bias, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_convolution_transpose not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, weight, bias)));
@@ -6051,8 +6048,7 @@ static inline Tensor miopen_convolution_transpose(const Tensor & self, const Ten
 static inline std::tuple<Tensor,Tensor,Tensor> miopen_convolution_transpose_backward(const Tensor & self, const Tensor & grad_output, const Tensor & weight, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic, std::array<bool,3> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grad_output, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grad_output, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_convolution_transpose_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, grad_output, weight)));
@@ -6066,8 +6062,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> miopen_convolution_transpose_back
 static inline Tensor miopen_convolution_transpose_backward_input(const Tensor & grad_output, const Tensor & weight, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_convolution_transpose_backward_input not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_output, weight)));
@@ -6081,8 +6076,7 @@ static inline Tensor miopen_convolution_transpose_backward_input(const Tensor & 
 static inline Tensor miopen_convolution_transpose_backward_weight(IntArrayRef weight_size, const Tensor & grad_output, const Tensor & self, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_convolution_transpose_backward_weight not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_output, self)));
@@ -6096,8 +6090,7 @@ static inline Tensor miopen_convolution_transpose_backward_weight(IntArrayRef we
 static inline Tensor miopen_depthwise_convolution(const Tensor & self, const Tensor & weight, const Tensor & bias, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_depthwise_convolution not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, weight, bias)));
@@ -6111,8 +6104,7 @@ static inline Tensor miopen_depthwise_convolution(const Tensor & self, const Ten
 static inline Tensor miopen_depthwise_convolution_backward_input(IntArrayRef self_size, const Tensor & grad_output, const Tensor & weight, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_depthwise_convolution_backward_input not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_output, weight)));
@@ -6126,8 +6118,7 @@ static inline Tensor miopen_depthwise_convolution_backward_input(IntArrayRef sel
 static inline std::tuple<Tensor,Tensor,Tensor> miopen_depthwise_convolution_backward(const Tensor & self, const Tensor & grad_output, const Tensor & weight, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic, std::array<bool,3> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grad_output, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, grad_output, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_depthwise_convolution_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, grad_output, weight)));
@@ -6141,8 +6132,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> miopen_depthwise_convolution_back
 static inline Tensor miopen_depthwise_convolution_backward_weight(IntArrayRef weight_size, const Tensor & grad_output, const Tensor & self, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_depthwise_convolution_backward_weight not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_output, self)));
@@ -6156,8 +6146,7 @@ static inline Tensor miopen_depthwise_convolution_backward_weight(IntArrayRef we
 static inline std::tuple<Tensor,Tensor,Tensor,Tensor,Tensor> miopen_rnn(const Tensor & input, TensorList weight, int64_t weight_stride0, const Tensor & hx, const Tensor & cx, int64_t mode, int64_t hidden_size, int64_t num_layers, bool batch_first, double dropout, bool train, bool bidirectional, IntArrayRef batch_sizes, const Tensor & dropout_state) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, hx, cx, dropout_state),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, hx, cx, dropout_state), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_rnn not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input, weight, hx, cx, dropout_state)));
@@ -6171,8 +6160,7 @@ static inline std::tuple<Tensor,Tensor,Tensor,Tensor,Tensor> miopen_rnn(const Te
 static inline std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>> miopen_rnn_backward(const Tensor & input, TensorList weight, int64_t weight_stride0, const Tensor & weight_buf, const Tensor & hx, const Tensor & cx, const Tensor & output, const Tensor & grad_output, const Tensor & grad_hy, const Tensor & grad_cy, int64_t mode, int64_t hidden_size, int64_t num_layers, bool batch_first, double dropout, bool train, bool bidirectional, IntArrayRef batch_sizes, const Tensor & dropout_state, const Tensor & reserve, std::array<bool,4> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, weight_buf, hx, cx, output, grad_output, grad_hy, grad_cy, dropout_state, reserve),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, weight_buf, hx, cx, output, grad_output, grad_hy, grad_cy, dropout_state, reserve), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("miopen_rnn_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input, weight, weight_buf, hx, cx, output, grad_output, grad_hy, grad_cy, dropout_state, reserve)));
@@ -6186,8 +6174,7 @@ static inline std::tuple<Tensor,Tensor,Tensor,std::vector<Tensor>> miopen_rnn_ba
 static inline Tensor mm(const Tensor & self, const Tensor & mat2) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mat2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mat2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::mm(self, mat2);
             break;
@@ -6206,8 +6193,7 @@ static inline Tensor mm(const Tensor & self, const Tensor & mat2) {
 static inline Tensor & mm_out(Tensor & out, const Tensor & self, const Tensor & mat2) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, mat2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, mat2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::mm_out(out, self, mat2);
             break;
@@ -6276,8 +6262,7 @@ static inline std::tuple<Tensor &,Tensor &> mode_out(Tensor & values, Tensor & i
 static inline Tensor mul(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::mul(self, other);
             break;
@@ -6296,8 +6281,7 @@ static inline Tensor mul(const Tensor & self, const Tensor & other) {
 static inline Tensor & mul_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::mul_out(out, self, other);
             break;
@@ -6326,8 +6310,7 @@ static inline Tensor mul(const Tensor & self, Scalar other) {
 static inline Tensor mv(const Tensor & self, const Tensor & vec) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, vec),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, vec), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::mv(self, vec);
             break;
@@ -6343,8 +6326,7 @@ static inline Tensor mv(const Tensor & self, const Tensor & vec) {
 static inline Tensor & mv_out(Tensor & out, const Tensor & self, const Tensor & vec) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, vec),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, vec), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::mv_out(out, self, vec);
             break;
@@ -6380,8 +6362,7 @@ static inline Tensor narrow(const Tensor & self, int64_t dim, int64_t start, int
 static inline std::tuple<Tensor,Tensor,Tensor> native_batch_norm(const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & running_mean, const Tensor & running_var, bool training, double momentum, double eps) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, bias, running_mean, running_var),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, bias, running_mean, running_var), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::native_batch_norm(input, weight, bias, running_mean, running_var, training, momentum, eps);
             break;
@@ -6397,8 +6378,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> native_batch_norm(const Tensor & 
 static inline std::tuple<Tensor &,Tensor &,Tensor &> native_batch_norm_out(Tensor & out, Tensor & save_mean, Tensor & save_invstd, const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & running_mean, const Tensor & running_var, bool training, double momentum, double eps) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, save_mean, save_invstd, input, weight, bias, running_mean, running_var),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, save_mean, save_invstd, input, weight, bias, running_mean, running_var), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("native_batch_norm_out not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(out, save_mean, save_invstd, input, weight, bias, running_mean, running_var)));
@@ -6412,8 +6392,7 @@ static inline std::tuple<Tensor &,Tensor &,Tensor &> native_batch_norm_out(Tenso
 static inline std::tuple<Tensor,Tensor> batch_norm_stats(const Tensor & input, double eps) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("batch_norm_stats not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input)));
@@ -6427,8 +6406,7 @@ static inline std::tuple<Tensor,Tensor> batch_norm_stats(const Tensor & input, d
 static inline Tensor batch_norm_elemt(const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & mean, const Tensor & invstd, double eps) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, bias, mean, invstd),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, weight, bias, mean, invstd), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("batch_norm_elemt not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input, weight, bias, mean, invstd)));
@@ -6442,8 +6420,7 @@ static inline Tensor batch_norm_elemt(const Tensor & input, const Tensor & weigh
 static inline Tensor & batch_norm_elemt_out(Tensor & out, const Tensor & input, const Tensor & weight, const Tensor & bias, const Tensor & mean, const Tensor & invstd, double eps) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, input, weight, bias, mean, invstd),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, input, weight, bias, mean, invstd), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("batch_norm_elemt_out not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(out, input, weight, bias, mean, invstd)));
@@ -6457,8 +6434,7 @@ static inline Tensor & batch_norm_elemt_out(Tensor & out, const Tensor & input, 
 static inline std::tuple<Tensor,Tensor> batch_norm_gather_stats(const Tensor & input, const Tensor & mean, const Tensor & invstd, const Tensor & running_mean, const Tensor & running_var, double momentum, double eps, int64_t count) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, mean, invstd, running_mean, running_var),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, mean, invstd, running_mean, running_var), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("batch_norm_gather_stats not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input, mean, invstd, running_mean, running_var)));
@@ -6472,8 +6448,7 @@ static inline std::tuple<Tensor,Tensor> batch_norm_gather_stats(const Tensor & i
 static inline std::tuple<Tensor,Tensor> batch_norm_gather_stats_with_counts(const Tensor & input, const Tensor & mean, const Tensor & invstd, const Tensor & running_mean, const Tensor & running_var, double momentum, double eps, IntArrayRef counts) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, mean, invstd, running_mean, running_var),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, mean, invstd, running_mean, running_var), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("batch_norm_gather_stats_with_counts not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input, mean, invstd, running_mean, running_var)));
@@ -6487,8 +6462,7 @@ static inline std::tuple<Tensor,Tensor> batch_norm_gather_stats_with_counts(cons
 static inline std::tuple<Tensor,Tensor,Tensor> native_batch_norm_backward(const Tensor & grad_out, const Tensor & input, const Tensor & weight, const Tensor & running_mean, const Tensor & running_var, const Tensor & save_mean, const Tensor & save_invstd, bool train, double eps, std::array<bool,3> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_out, input, weight, running_mean, running_var, save_mean, save_invstd),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_out, input, weight, running_mean, running_var, save_mean, save_invstd), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::native_batch_norm_backward(grad_out, input, weight, running_mean, running_var, save_mean, save_invstd, train, eps, output_mask);
             break;
@@ -6504,8 +6478,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> native_batch_norm_backward(const 
 static inline std::tuple<Tensor,Tensor,Tensor,Tensor> batch_norm_backward_reduce(const Tensor & grad_out, const Tensor & input, const Tensor & mean, const Tensor & invstd, const Tensor & weight, bool input_g, bool weight_g, bool bias_g) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_out, input, mean, invstd, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_out, input, mean, invstd, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("batch_norm_backward_reduce not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_out, input, mean, invstd, weight)));
@@ -6519,8 +6492,7 @@ static inline std::tuple<Tensor,Tensor,Tensor,Tensor> batch_norm_backward_reduce
 static inline Tensor batch_norm_backward_elemt(const Tensor & grad_out, const Tensor & input, const Tensor & mean, const Tensor & invstd, const Tensor & weight, const Tensor & mean_dy, const Tensor & mean_dy_xmu) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_out, input, mean, invstd, weight, mean_dy, mean_dy_xmu),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_out, input, mean, invstd, weight, mean_dy, mean_dy_xmu), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("batch_norm_backward_elemt not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_out, input, mean, invstd, weight, mean_dy, mean_dy_xmu)));
@@ -6534,8 +6506,7 @@ static inline Tensor batch_norm_backward_elemt(const Tensor & grad_out, const Te
 static inline std::tuple<Tensor,Tensor> batch_norm_update_stats(const Tensor & input, const Tensor & running_mean, const Tensor & running_var, double momentum) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, running_mean, running_var),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input, running_mean, running_var), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::batch_norm_update_stats(input, running_mean, running_var, momentum);
             break;
@@ -6598,27 +6569,31 @@ static inline Tensor _nnpack_spatial_convolution_backward_weight(const Tensor & 
     return op.callUnboxed<Tensor, const Tensor &, IntArrayRef, const Tensor &, IntArrayRef>(input, weightsize, grad_output, padding);
 #endif
 }
-static inline Tensor ones(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options) {
+static inline Tensor _ones(IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::ones(size, names, options);
+    return TypeDefault::ones(size, names, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::ones", "names");
-    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<DimnameList>, const TensorOptions &>(size, names, options);
+    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<DimnameList>, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, names, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor ones(IntArrayRef size, const TensorOptions & options) {
+inline Tensor ones(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options) {
+    return _ones(size, names, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _ones(IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::ones(size, options);
+    return TypeDefault::ones(size, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::ones", "");
-    return op.callUnboxed<Tensor, IntArrayRef, const TensorOptions &>(size, options);
+    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor ones(IntArrayRef size, const TensorOptions & options) {
+    return _ones(size, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & ones_out(Tensor & out, IntArrayRef size) {
 #ifdef USE_STATIC_DISPATCH
@@ -6640,16 +6615,18 @@ static inline Tensor ones_like(const Tensor & self, c10::optional<MemoryFormat> 
     return op.callUnboxed<Tensor, const Tensor &, c10::optional<MemoryFormat>>(self, memory_format);
 #endif
 }
-static inline Tensor ones_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+static inline Tensor _ones_like(const Tensor & self, ScalarType dtype, Layout layout, Device device, bool pin_memory, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::ones_like(self, options, memory_format);
+    return TypeDefault::ones_like(self, dtype, layout, device, pin_memory, memory_format);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(self, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::ones_like", "dtype");
-    return op.callUnboxed<Tensor, const Tensor &, const TensorOptions &, c10::optional<MemoryFormat>>(self, options, memory_format);
+    return op.callUnboxed<Tensor, const Tensor &, ScalarType, Layout, Device, bool, c10::optional<MemoryFormat>>(self, dtype, layout, device, pin_memory, memory_format);
 #endif
+}
+inline Tensor ones_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+    return _ones_like(self, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
 }
 static inline Tensor pairwise_distance(const Tensor & x1, const Tensor & x2, double p, double eps, bool keepdim) {
 #ifdef USE_STATIC_DISPATCH
@@ -6751,60 +6728,70 @@ static inline Tensor poisson_nll_loss(const Tensor & input, const Tensor & targe
     return op.callUnboxed<Tensor, const Tensor &, const Tensor &, bool, bool, double, int64_t>(input, target, log_input, full, eps, reduction);
 #endif
 }
-static inline Tensor scalar_tensor(Scalar s, const TensorOptions & options) {
+static inline Tensor _scalar_tensor(Scalar s, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::scalar_tensor(s, options);
+    return TypeDefault::scalar_tensor(s, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::scalar_tensor", "");
-    return op.callUnboxed<Tensor, Scalar, const TensorOptions &>(s, options);
+    return op.callUnboxed<Tensor, Scalar, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(s, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor rand(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options) {
+inline Tensor scalar_tensor(Scalar s, const TensorOptions & options) {
+    return _scalar_tensor(s, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _rand(IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::rand(size, names, options);
+    return TypeDefault::rand(size, names, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::rand", "names");
-    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<DimnameList>, const TensorOptions &>(size, names, options);
+    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<DimnameList>, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, names, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor rand(IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, const TensorOptions & options) {
+inline Tensor rand(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options) {
+    return _rand(size, names, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _rand(IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::rand(size, generator, names, options);
+    return TypeDefault::rand(size, generator, names, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::rand", "generator_with_names");
-    return op.callUnboxed<Tensor, IntArrayRef, Generator *, c10::optional<DimnameList>, const TensorOptions &>(size, generator, names, options);
+    return op.callUnboxed<Tensor, IntArrayRef, Generator *, c10::optional<DimnameList>, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, generator, names, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor rand(IntArrayRef size, const TensorOptions & options) {
+inline Tensor rand(IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, const TensorOptions & options) {
+    return _rand(size, generator, names, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _rand(IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::rand(size, options);
+    return TypeDefault::rand(size, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::rand", "");
-    return op.callUnboxed<Tensor, IntArrayRef, const TensorOptions &>(size, options);
+    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor rand(IntArrayRef size, Generator * generator, const TensorOptions & options) {
+inline Tensor rand(IntArrayRef size, const TensorOptions & options) {
+    return _rand(size, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _rand(IntArrayRef size, Generator * generator, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::rand(size, generator, options);
+    return TypeDefault::rand(size, generator, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::rand", "generator");
-    return op.callUnboxed<Tensor, IntArrayRef, Generator *, const TensorOptions &>(size, generator, options);
+    return op.callUnboxed<Tensor, IntArrayRef, Generator *, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, generator, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor rand(IntArrayRef size, Generator * generator, const TensorOptions & options) {
+    return _rand(size, generator, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & rand_out(Tensor & out, IntArrayRef size) {
 #ifdef USE_STATIC_DISPATCH
@@ -6836,60 +6823,70 @@ static inline Tensor rand_like(const Tensor & self, c10::optional<MemoryFormat> 
     return op.callUnboxed<Tensor, const Tensor &, c10::optional<MemoryFormat>>(self, memory_format);
 #endif
 }
-static inline Tensor rand_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+static inline Tensor _rand_like(const Tensor & self, ScalarType dtype, Layout layout, Device device, bool pin_memory, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::rand_like(self, options, memory_format);
+    return TypeDefault::rand_like(self, dtype, layout, device, pin_memory, memory_format);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(self, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::rand_like", "dtype");
-    return op.callUnboxed<Tensor, const Tensor &, const TensorOptions &, c10::optional<MemoryFormat>>(self, options, memory_format);
+    return op.callUnboxed<Tensor, const Tensor &, ScalarType, Layout, Device, bool, c10::optional<MemoryFormat>>(self, dtype, layout, device, pin_memory, memory_format);
 #endif
 }
-static inline Tensor randint(int64_t high, IntArrayRef size, const TensorOptions & options) {
+inline Tensor rand_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+    return _rand_like(self, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
+}
+static inline Tensor _randint(int64_t high, IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randint(high, size, options);
+    return TypeDefault::randint(high, size, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randint", "");
-    return op.callUnboxed<Tensor, int64_t, IntArrayRef, const TensorOptions &>(high, size, options);
+    return op.callUnboxed<Tensor, int64_t, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(high, size, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor randint(int64_t high, IntArrayRef size, Generator * generator, const TensorOptions & options) {
+inline Tensor randint(int64_t high, IntArrayRef size, const TensorOptions & options) {
+    return _randint(high, size, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _randint(int64_t high, IntArrayRef size, Generator * generator, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randint(high, size, generator, options);
+    return TypeDefault::randint(high, size, generator, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randint", "generator");
-    return op.callUnboxed<Tensor, int64_t, IntArrayRef, Generator *, const TensorOptions &>(high, size, generator, options);
+    return op.callUnboxed<Tensor, int64_t, IntArrayRef, Generator *, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(high, size, generator, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor randint(int64_t low, int64_t high, IntArrayRef size, const TensorOptions & options) {
+inline Tensor randint(int64_t high, IntArrayRef size, Generator * generator, const TensorOptions & options) {
+    return _randint(high, size, generator, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _randint(int64_t low, int64_t high, IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randint(low, high, size, options);
+    return TypeDefault::randint(low, high, size, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randint", "low");
-    return op.callUnboxed<Tensor, int64_t, int64_t, IntArrayRef, const TensorOptions &>(low, high, size, options);
+    return op.callUnboxed<Tensor, int64_t, int64_t, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(low, high, size, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor randint(int64_t low, int64_t high, IntArrayRef size, Generator * generator, const TensorOptions & options) {
+inline Tensor randint(int64_t low, int64_t high, IntArrayRef size, const TensorOptions & options) {
+    return _randint(low, high, size, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _randint(int64_t low, int64_t high, IntArrayRef size, Generator * generator, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randint(low, high, size, generator, options);
+    return TypeDefault::randint(low, high, size, generator, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randint", "low_generator");
-    return op.callUnboxed<Tensor, int64_t, int64_t, IntArrayRef, Generator *, const TensorOptions &>(low, high, size, generator, options);
+    return op.callUnboxed<Tensor, int64_t, int64_t, IntArrayRef, Generator *, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(low, high, size, generator, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor randint(int64_t low, int64_t high, IntArrayRef size, Generator * generator, const TensorOptions & options) {
+    return _randint(low, high, size, generator, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & randint_out(Tensor & out, int64_t high, IntArrayRef size) {
 #ifdef USE_STATIC_DISPATCH
@@ -6951,71 +6948,83 @@ static inline Tensor randint_like(const Tensor & self, int64_t low, int64_t high
     return op.callUnboxed<Tensor, const Tensor &, int64_t, int64_t, c10::optional<MemoryFormat>>(self, low, high, memory_format);
 #endif
 }
-static inline Tensor randint_like(const Tensor & self, int64_t high, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+static inline Tensor _randint_like(const Tensor & self, int64_t high, ScalarType dtype, Layout layout, Device device, bool pin_memory, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randint_like(self, high, options, memory_format);
+    return TypeDefault::randint_like(self, high, dtype, layout, device, pin_memory, memory_format);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(self, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randint_like", "dtype");
-    return op.callUnboxed<Tensor, const Tensor &, int64_t, const TensorOptions &, c10::optional<MemoryFormat>>(self, high, options, memory_format);
+    return op.callUnboxed<Tensor, const Tensor &, int64_t, ScalarType, Layout, Device, bool, c10::optional<MemoryFormat>>(self, high, dtype, layout, device, pin_memory, memory_format);
 #endif
 }
-static inline Tensor randint_like(const Tensor & self, int64_t low, int64_t high, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+inline Tensor randint_like(const Tensor & self, int64_t high, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+    return _randint_like(self, high, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
+}
+static inline Tensor _randint_like(const Tensor & self, int64_t low, int64_t high, ScalarType dtype, Layout layout, Device device, bool pin_memory, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randint_like(self, low, high, options, memory_format);
+    return TypeDefault::randint_like(self, low, high, dtype, layout, device, pin_memory, memory_format);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(self, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randint_like", "low_dtype");
-    return op.callUnboxed<Tensor, const Tensor &, int64_t, int64_t, const TensorOptions &, c10::optional<MemoryFormat>>(self, low, high, options, memory_format);
+    return op.callUnboxed<Tensor, const Tensor &, int64_t, int64_t, ScalarType, Layout, Device, bool, c10::optional<MemoryFormat>>(self, low, high, dtype, layout, device, pin_memory, memory_format);
 #endif
 }
-static inline Tensor randn(IntArrayRef size, const TensorOptions & options) {
+inline Tensor randint_like(const Tensor & self, int64_t low, int64_t high, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+    return _randint_like(self, low, high, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
+}
+static inline Tensor _randn(IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randn(size, options);
+    return TypeDefault::randn(size, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randn", "");
-    return op.callUnboxed<Tensor, IntArrayRef, const TensorOptions &>(size, options);
+    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor randn(IntArrayRef size, Generator * generator, const TensorOptions & options) {
+inline Tensor randn(IntArrayRef size, const TensorOptions & options) {
+    return _randn(size, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _randn(IntArrayRef size, Generator * generator, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randn(size, generator, options);
+    return TypeDefault::randn(size, generator, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randn", "generator");
-    return op.callUnboxed<Tensor, IntArrayRef, Generator *, const TensorOptions &>(size, generator, options);
+    return op.callUnboxed<Tensor, IntArrayRef, Generator *, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, generator, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor randn(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options) {
+inline Tensor randn(IntArrayRef size, Generator * generator, const TensorOptions & options) {
+    return _randn(size, generator, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _randn(IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randn(size, names, options);
+    return TypeDefault::randn(size, names, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randn", "names");
-    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<DimnameList>, const TensorOptions &>(size, names, options);
+    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<DimnameList>, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, names, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor randn(IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, const TensorOptions & options) {
+inline Tensor randn(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options) {
+    return _randn(size, names, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _randn(IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randn(size, generator, names, options);
+    return TypeDefault::randn(size, generator, names, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randn", "generator_with_names");
-    return op.callUnboxed<Tensor, IntArrayRef, Generator *, c10::optional<DimnameList>, const TensorOptions &>(size, generator, names, options);
+    return op.callUnboxed<Tensor, IntArrayRef, Generator *, c10::optional<DimnameList>, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, generator, names, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor randn(IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, const TensorOptions & options) {
+    return _randn(size, generator, names, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & randn_out(Tensor & out, IntArrayRef size) {
 #ifdef USE_STATIC_DISPATCH
@@ -7047,38 +7056,44 @@ static inline Tensor randn_like(const Tensor & self, c10::optional<MemoryFormat>
     return op.callUnboxed<Tensor, const Tensor &, c10::optional<MemoryFormat>>(self, memory_format);
 #endif
 }
-static inline Tensor randn_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+static inline Tensor _randn_like(const Tensor & self, ScalarType dtype, Layout layout, Device device, bool pin_memory, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randn_like(self, options, memory_format);
+    return TypeDefault::randn_like(self, dtype, layout, device, pin_memory, memory_format);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(self, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randn_like", "dtype");
-    return op.callUnboxed<Tensor, const Tensor &, const TensorOptions &, c10::optional<MemoryFormat>>(self, options, memory_format);
+    return op.callUnboxed<Tensor, const Tensor &, ScalarType, Layout, Device, bool, c10::optional<MemoryFormat>>(self, dtype, layout, device, pin_memory, memory_format);
 #endif
 }
-static inline Tensor randperm(int64_t n, const TensorOptions & options) {
+inline Tensor randn_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+    return _randn_like(self, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
+}
+static inline Tensor _randperm(int64_t n, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randperm(n, options);
+    return TypeDefault::randperm(n, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randperm", "");
-    return op.callUnboxed<Tensor, int64_t, const TensorOptions &>(n, options);
+    return op.callUnboxed<Tensor, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(n, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor randperm(int64_t n, Generator * generator, const TensorOptions & options) {
+inline Tensor randperm(int64_t n, const TensorOptions & options) {
+    return _randperm(n, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _randperm(int64_t n, Generator * generator, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::randperm(n, generator, options);
+    return TypeDefault::randperm(n, generator, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::randperm", "generator");
-    return op.callUnboxed<Tensor, int64_t, Generator *, const TensorOptions &>(n, generator, options);
+    return op.callUnboxed<Tensor, int64_t, Generator *, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(n, generator, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor randperm(int64_t n, Generator * generator, const TensorOptions & options) {
+    return _randperm(n, generator, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & randperm_out(Tensor & out, int64_t n) {
 #ifdef USE_STATIC_DISPATCH
@@ -7093,8 +7108,7 @@ static inline Tensor & randperm_out(Tensor & out, int64_t n) {
 static inline Tensor & randperm_out(Tensor & out, int64_t n, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::randperm_out(out, n, generator);
             break;
@@ -7107,33 +7121,36 @@ static inline Tensor & randperm_out(Tensor & out, int64_t n, Generator * generat
     return op.callUnboxed<Tensor &, Tensor &, int64_t, Generator *>(out, n, generator);
 #endif
 }
-static inline Tensor range(Scalar start, Scalar end, Scalar step, const TensorOptions & options) {
+static inline Tensor _range(Scalar start, Scalar end, Scalar step, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::range(start, end, step, options);
+    return TypeDefault::range(start, end, step, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::range", "step");
-    return op.callUnboxed<Tensor, Scalar, Scalar, Scalar, const TensorOptions &>(start, end, step, options);
+    return op.callUnboxed<Tensor, Scalar, Scalar, Scalar, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(start, end, step, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor range(Scalar start, Scalar end, const TensorOptions & options) {
+inline Tensor range(Scalar start, Scalar end, Scalar step, const TensorOptions & options) {
+    return _range(start, end, step, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _range(Scalar start, Scalar end, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::range(start, end, options);
+    return TypeDefault::range(start, end, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::range", "");
-    return op.callUnboxed<Tensor, Scalar, Scalar, const TensorOptions &>(start, end, options);
+    return op.callUnboxed<Tensor, Scalar, Scalar, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(start, end, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor range(Scalar start, Scalar end, const TensorOptions & options) {
+    return _range(start, end, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & range_out(Tensor & out, Scalar start, Scalar end, Scalar step) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::range_out(out, start, end, step);
             break;
@@ -7199,8 +7216,7 @@ static inline Tensor & neg_(Tensor & self) {
 static inline Tensor & neg_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::neg_out(out, self);
             break;
@@ -7216,8 +7232,7 @@ static inline Tensor & neg_out(Tensor & out, const Tensor & self) {
 static inline Tensor repeat_interleave(const Tensor & repeats) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(repeats),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(repeats), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::repeat_interleave(repeats);
             break;
@@ -7263,8 +7278,7 @@ static inline Tensor reshape(const Tensor & self, IntArrayRef shape) {
 static inline Tensor _mkldnn_reshape(const Tensor & self, IntArrayRef shape) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_mkldnn_reshape not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self)));
@@ -7298,8 +7312,7 @@ static inline Tensor & round_(Tensor & self) {
 static inline Tensor & round_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::round_out(out, self);
             break;
@@ -7335,8 +7348,7 @@ static inline Tensor & rrelu_(Tensor & self, Scalar lower, Scalar upper, bool tr
 static inline Tensor relu(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::relu(self);
             break;
@@ -7355,8 +7367,7 @@ static inline Tensor relu(const Tensor & self) {
 static inline Tensor & relu_(Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::relu_(self);
             break;
@@ -7375,8 +7386,7 @@ static inline Tensor & relu_(Tensor & self) {
 static inline Tensor prelu(const Tensor & self, const Tensor & weight) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::prelu(self, weight);
             break;
@@ -7392,8 +7402,7 @@ static inline Tensor prelu(const Tensor & self, const Tensor & weight) {
 static inline std::tuple<Tensor,Tensor> prelu_backward(const Tensor & grad_output, const Tensor & self, const Tensor & weight) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::prelu_backward(grad_output, self, weight);
             break;
@@ -7409,8 +7418,7 @@ static inline std::tuple<Tensor,Tensor> prelu_backward(const Tensor & grad_outpu
 static inline Tensor gelu(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::gelu(self);
             break;
@@ -7426,8 +7434,7 @@ static inline Tensor gelu(const Tensor & self) {
 static inline Tensor gelu_backward(const Tensor & grad, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::gelu_backward(grad, self);
             break;
@@ -7483,8 +7490,7 @@ static inline Tensor & rsqrt_(Tensor & self) {
 static inline Tensor & rsqrt_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::rsqrt_out(out, self);
             break;
@@ -7560,8 +7566,7 @@ static inline Tensor & celu_(Tensor & self, Scalar alpha) {
 static inline Tensor sigmoid(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::sigmoid(self);
             break;
@@ -7580,8 +7585,7 @@ static inline Tensor sigmoid(const Tensor & self) {
 static inline Tensor & sigmoid_(Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::sigmoid_(self);
             break;
@@ -7627,8 +7631,7 @@ static inline Tensor & sin_(Tensor & self) {
 static inline Tensor & sin_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::sin_out(out, self);
             break;
@@ -7764,8 +7767,7 @@ static inline Tensor softmax(const Tensor & self, Dimname dim, c10::optional<Sca
 static inline Tensor _softmax(const Tensor & self, int64_t dim, bool half_to_float) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_softmax(self, dim, half_to_float);
             break;
@@ -7781,8 +7783,7 @@ static inline Tensor _softmax(const Tensor & self, int64_t dim, bool half_to_flo
 static inline Tensor _softmax_backward_data(const Tensor & grad_output, const Tensor & output, int64_t dim, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_softmax_backward_data(grad_output, output, dim, self);
             break;
@@ -7858,8 +7859,7 @@ static inline Tensor sspaddmm(const Tensor & self, const Tensor & mat1, const Te
 static inline Tensor & sspaddmm_out(Tensor & out, const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, mat1, mat2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, mat1, mat2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::sspaddmm_out(out, self, mat1, mat2, beta, alpha);
             break;
@@ -8178,8 +8178,7 @@ static inline Tensor tan(const Tensor & self) {
 static inline Tensor & tan_(Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::tan_(self);
             break;
@@ -8195,8 +8194,7 @@ static inline Tensor & tan_(Tensor & self) {
 static inline Tensor & tan_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::tan_out(out, self);
             break;
@@ -8212,8 +8210,7 @@ static inline Tensor & tan_out(Tensor & out, const Tensor & self) {
 static inline Tensor tanh(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::tanh(self);
             break;
@@ -8232,8 +8229,7 @@ static inline Tensor tanh(const Tensor & self) {
 static inline Tensor & tanh_(Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::tanh_(self);
             break;
@@ -8249,8 +8245,7 @@ static inline Tensor & tanh_(Tensor & self) {
 static inline Tensor & tanh_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::tanh_out(out, self);
             break;
@@ -8276,8 +8271,7 @@ static inline Tensor tensordot(const Tensor & self, const Tensor & other, IntArr
 static inline Tensor threshold(const Tensor & self, Scalar threshold, Scalar value) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::threshold(self, threshold, value);
             break;
@@ -8293,8 +8287,7 @@ static inline Tensor threshold(const Tensor & self, Scalar threshold, Scalar val
 static inline Tensor & threshold_(Tensor & self, Scalar threshold, Scalar value) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::threshold_(self, threshold, value);
             break;
@@ -8310,8 +8303,7 @@ static inline Tensor & threshold_(Tensor & self, Scalar threshold, Scalar value)
 static inline Tensor & threshold_out(Tensor & out, const Tensor & self, Scalar threshold, Scalar value) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::threshold_out(out, self, threshold, value);
             break;
@@ -8327,8 +8319,7 @@ static inline Tensor & threshold_out(Tensor & out, const Tensor & self, Scalar t
 static inline Tensor threshold_backward(const Tensor & grad_output, const Tensor & self, Scalar threshold) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::threshold_backward(grad_output, self, threshold);
             break;
@@ -8364,8 +8355,7 @@ static inline Tensor transpose(const Tensor & self, Dimname dim0, Dimname dim1) 
 static inline Tensor _mkldnn_transpose(const Tensor & self, int64_t dim0, int64_t dim1) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_mkldnn_transpose not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self)));
@@ -8379,8 +8369,7 @@ static inline Tensor _mkldnn_transpose(const Tensor & self, int64_t dim0, int64_
 static inline Tensor & _mkldnn_transpose_(Tensor & self, int64_t dim0, int64_t dim1) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_mkldnn_transpose_ not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self)));
@@ -8404,8 +8393,7 @@ static inline Tensor one_hot(const Tensor & self, int64_t num_classes) {
 static inline Tensor flip(const Tensor & self, IntArrayRef dims) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::flip(self, dims);
             break;
@@ -8421,8 +8409,7 @@ static inline Tensor flip(const Tensor & self, IntArrayRef dims) {
 static inline Tensor roll(const Tensor & self, IntArrayRef shifts, IntArrayRef dims) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::roll(self, shifts, dims);
             break;
@@ -8508,8 +8495,7 @@ static inline Tensor & trunc_(Tensor & self) {
 static inline Tensor & trunc_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::trunc_out(out, self);
             break;
@@ -8535,8 +8521,7 @@ static inline bool _has_compatible_shallow_copy_type(const Tensor & self, const 
 static inline std::tuple<Tensor,Tensor> _unique(const Tensor & self, bool sorted, bool return_inverse) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_unique(self, sorted, return_inverse);
             break;
@@ -8552,8 +8537,7 @@ static inline std::tuple<Tensor,Tensor> _unique(const Tensor & self, bool sorted
 static inline std::tuple<Tensor,Tensor,Tensor> unique_dim(const Tensor & self, int64_t dim, bool sorted, bool return_inverse, bool return_counts) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::unique_dim(self, dim, sorted, return_inverse, return_counts);
             break;
@@ -8569,8 +8553,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> unique_dim(const Tensor & self, i
 static inline std::tuple<Tensor,Tensor,Tensor> unique_consecutive(const Tensor & self, bool return_inverse, bool return_counts, c10::optional<int64_t> dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::unique_consecutive(self, return_inverse, return_counts, dim);
             break;
@@ -8586,8 +8569,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> unique_consecutive(const Tensor &
 static inline std::tuple<Tensor,Tensor,Tensor> unique_dim_consecutive(const Tensor & self, int64_t dim, bool return_inverse, bool return_counts) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::unique_dim_consecutive(self, dim, return_inverse, return_counts);
             break;
@@ -8603,8 +8585,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> unique_dim_consecutive(const Tens
 static inline std::tuple<Tensor,Tensor,Tensor> _unique2(const Tensor & self, bool sorted, bool return_inverse, bool return_counts) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_unique2(self, sorted, return_inverse, return_counts);
             break;
@@ -8740,7 +8721,13 @@ static inline std::vector<Tensor> where(const Tensor & condition) {
 static inline Tensor _s_where(const Tensor & condition, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::_s_where(condition, self, other);
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(condition, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+        case Backend::CPU:
+            return CPUType::_s_where(condition, self, other);
+            break;
+        default:
+            AT_ERROR("_s_where not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(condition, self, other)));
+    }
 #else
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::_s_where", "");
@@ -8770,8 +8757,7 @@ static inline Tensor _weight_norm(const Tensor & v, const Tensor & g, int64_t di
 static inline std::tuple<Tensor,Tensor> _weight_norm_cuda_interface(const Tensor & v, const Tensor & g, int64_t dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(v, g),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(v, g), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_weight_norm_cuda_interface not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(v, g)));
@@ -8785,8 +8771,7 @@ static inline std::tuple<Tensor,Tensor> _weight_norm_cuda_interface(const Tensor
 static inline std::tuple<Tensor,Tensor> _weight_norm_cuda_interface_backward(const Tensor & grad_w, const Tensor & saved_v, const Tensor & saved_g, const Tensor & saved_norms, int64_t dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_w, saved_v, saved_g, saved_norms),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_w, saved_v, saved_g, saved_norms), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_weight_norm_cuda_interface_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_w, saved_v, saved_g, saved_norms)));
@@ -8807,27 +8792,31 @@ static inline std::tuple<Tensor,Tensor> _weight_norm_differentiable_backward(con
     return op.callUnboxed<std::tuple<Tensor,Tensor>, const Tensor &, const Tensor &, const Tensor &, const Tensor &, int64_t>(grad_w, saved_v, saved_g, saved_norms, dim);
 #endif
 }
-static inline Tensor zeros(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options) {
+static inline Tensor _zeros(IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::zeros(size, names, options);
+    return TypeDefault::zeros(size, names, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::zeros", "names");
-    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<DimnameList>, const TensorOptions &>(size, names, options);
+    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<DimnameList>, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, names, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor zeros(IntArrayRef size, const TensorOptions & options) {
+inline Tensor zeros(IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options) {
+    return _zeros(size, names, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _zeros(IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::zeros(size, options);
+    return TypeDefault::zeros(size, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::zeros", "");
-    return op.callUnboxed<Tensor, IntArrayRef, const TensorOptions &>(size, options);
+    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor zeros(IntArrayRef size, const TensorOptions & options) {
+    return _zeros(size, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & zeros_out(Tensor & out, IntArrayRef size) {
 #ifdef USE_STATIC_DISPATCH
@@ -8849,22 +8838,23 @@ static inline Tensor zeros_like(const Tensor & self, c10::optional<MemoryFormat>
     return op.callUnboxed<Tensor, const Tensor &, c10::optional<MemoryFormat>>(self, memory_format);
 #endif
 }
-static inline Tensor zeros_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+static inline Tensor _zeros_like(const Tensor & self, ScalarType dtype, Layout layout, Device device, bool pin_memory, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::zeros_like(self, options, memory_format);
+    return TypeDefault::zeros_like(self, dtype, layout, device, pin_memory, memory_format);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(self, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::zeros_like", "dtype");
-    return op.callUnboxed<Tensor, const Tensor &, const TensorOptions &, c10::optional<MemoryFormat>>(self, options, memory_format);
+    return op.callUnboxed<Tensor, const Tensor &, ScalarType, Layout, Device, bool, c10::optional<MemoryFormat>>(self, dtype, layout, device, pin_memory, memory_format);
 #endif
+}
+inline Tensor zeros_like(const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) {
+    return _zeros_like(self, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory(), memory_format);
 }
 static inline Tensor _standard_gamma_grad(const Tensor & self, const Tensor & output) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_standard_gamma_grad(self, output);
             break;
@@ -8880,8 +8870,7 @@ static inline Tensor _standard_gamma_grad(const Tensor & self, const Tensor & ou
 static inline Tensor _standard_gamma(const Tensor & self, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_standard_gamma(self, generator);
             break;
@@ -8897,8 +8886,7 @@ static inline Tensor _standard_gamma(const Tensor & self, Generator * generator)
 static inline Tensor _dirichlet_grad(const Tensor & x, const Tensor & alpha, const Tensor & total) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(x, alpha, total),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(x, alpha, total), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_dirichlet_grad(x, alpha, total);
             break;
@@ -8914,8 +8902,7 @@ static inline Tensor _dirichlet_grad(const Tensor & x, const Tensor & alpha, con
 static inline Tensor _sample_dirichlet(const Tensor & self, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_sample_dirichlet(self, generator);
             break;
@@ -8931,8 +8918,7 @@ static inline Tensor _sample_dirichlet(const Tensor & self, Generator * generato
 static inline Tensor poisson(const Tensor & self, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::poisson(self, generator);
             break;
@@ -8948,8 +8934,7 @@ static inline Tensor poisson(const Tensor & self, Generator * generator) {
 static inline Tensor native_norm(const Tensor & self, Scalar p) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::SparseCPU:
             return SparseCPUType::native_norm(self, p);
             break;
@@ -9005,8 +8990,7 @@ static inline Tensor _sparse_sum(const Tensor & self, IntArrayRef dim, ScalarTyp
 static inline Tensor _sparse_sum_backward(const Tensor & grad, const Tensor & self, IntArrayRef dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::SparseCPU:
             return SparseCPUType::_sparse_sum_backward(grad, self, dim);
             break;
@@ -9192,8 +9176,7 @@ static inline Tensor & nuclear_norm_out(Tensor & out, const Tensor & self, IntAr
 static inline Tensor clone(const Tensor & self, c10::optional<MemoryFormat> memory_format) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::clone(self, memory_format);
             break;
@@ -9225,8 +9208,7 @@ static inline Tensor & resize_as_(Tensor & self, const Tensor & the_template, c1
 static inline Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponent) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::pow_out(out, self, exponent);
             break;
@@ -9245,8 +9227,7 @@ static inline Tensor & pow_out(Tensor & out, const Tensor & self, Scalar exponen
 static inline Tensor pow(const Tensor & self, Scalar exponent) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::pow(self, exponent);
             break;
@@ -9265,8 +9246,7 @@ static inline Tensor pow(const Tensor & self, Scalar exponent) {
 static inline Tensor & zero_(Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::zero_(self);
             break;
@@ -9285,8 +9265,7 @@ static inline Tensor & zero_(Tensor & self) {
 static inline Tensor & sub_out(Tensor & out, const Tensor & self, const Tensor & other, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::sub_out(out, self, other, alpha);
             break;
@@ -9305,8 +9284,7 @@ static inline Tensor & sub_out(Tensor & out, const Tensor & self, const Tensor &
 static inline Tensor sub(const Tensor & self, const Tensor & other, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::sub(self, other, alpha);
             break;
@@ -9365,8 +9343,7 @@ static inline Tensor _sparse_addmm(const Tensor & self, const Tensor & sparse, c
 static inline Tensor & addmm_out(Tensor & out, const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, mat1, mat2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, mat1, mat2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::addmm_out(out, self, mat1, mat2, beta, alpha);
             break;
@@ -9385,8 +9362,7 @@ static inline Tensor & addmm_out(Tensor & out, const Tensor & self, const Tensor
 static inline Tensor addmm(const Tensor & self, const Tensor & mat1, const Tensor & mat2, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mat1, mat2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mat1, mat2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::addmm(self, mat1, mat2, beta, alpha);
             break;
@@ -9402,85 +9378,95 @@ static inline Tensor addmm(const Tensor & self, const Tensor & mat1, const Tenso
     return op.callUnboxed<Tensor, const Tensor &, const Tensor &, const Tensor &, Scalar, Scalar>(self, mat1, mat2, beta, alpha);
 #endif
 }
-static inline Tensor sparse_coo_tensor(IntArrayRef size, const TensorOptions & options) {
+static inline Tensor _sparse_coo_tensor(IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::sparse_coo_tensor(size, options);
+    return TypeDefault::sparse_coo_tensor(size, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::sparse_coo_tensor", "size");
-    return op.callUnboxed<Tensor, IntArrayRef, const TensorOptions &>(size, options);
+    return op.callUnboxed<Tensor, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(size, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor sparse_coo_tensor(const Tensor & indices, const Tensor & values, const TensorOptions & options) {
+inline Tensor sparse_coo_tensor(IntArrayRef size, const TensorOptions & options) {
+    return _sparse_coo_tensor(size, typeMetaToScalarType(options.dtype()), options.layout_opt(), options.device(), options.pinned_memory());
+}
+static inline Tensor _sparse_coo_tensor(const Tensor & indices, const Tensor & values, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::sparse_coo_tensor(indices, values, options);
+    return TypeDefault::sparse_coo_tensor(indices, values, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(indices, values, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::sparse_coo_tensor", "indices");
-    return op.callUnboxed<Tensor, const Tensor &, const Tensor &, const TensorOptions &>(indices, values, options);
+    return op.callUnboxed<Tensor, const Tensor &, const Tensor &, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(indices, values, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor sparse_coo_tensor(const Tensor & indices, const Tensor & values, IntArrayRef size, const TensorOptions & options) {
+inline Tensor sparse_coo_tensor(const Tensor & indices, const Tensor & values, const TensorOptions & options) {
+    return _sparse_coo_tensor(indices, values, typeMetaToScalarType(options.dtype()), options.layout_opt(), options.device(), options.pinned_memory());
+}
+static inline Tensor _sparse_coo_tensor(const Tensor & indices, const Tensor & values, IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::sparse_coo_tensor(indices, values, size, options);
+    return TypeDefault::sparse_coo_tensor(indices, values, size, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(indices, values, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::sparse_coo_tensor", "indices_size");
-    return op.callUnboxed<Tensor, const Tensor &, const Tensor &, IntArrayRef, const TensorOptions &>(indices, values, size, options);
+    return op.callUnboxed<Tensor, const Tensor &, const Tensor &, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(indices, values, size, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor _sparse_coo_tensor_unsafe(const Tensor & indices, const Tensor & values, IntArrayRef size, const TensorOptions & options) {
+inline Tensor sparse_coo_tensor(const Tensor & indices, const Tensor & values, IntArrayRef size, const TensorOptions & options) {
+    return _sparse_coo_tensor(indices, values, size, typeMetaToScalarType(options.dtype()), options.layout_opt(), options.device(), options.pinned_memory());
+}
+static inline Tensor __sparse_coo_tensor_unsafe(const Tensor & indices, const Tensor & values, IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::_sparse_coo_tensor_unsafe(indices, values, size, options);
+    return TypeDefault::_sparse_coo_tensor_unsafe(indices, values, size, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(indices, values, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::_sparse_coo_tensor_unsafe", "");
-    return op.callUnboxed<Tensor, const Tensor &, const Tensor &, IntArrayRef, const TensorOptions &>(indices, values, size, options);
+    return op.callUnboxed<Tensor, const Tensor &, const Tensor &, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(indices, values, size, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor _sparse_coo_tensor_with_dims(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size, const TensorOptions & options) {
+inline Tensor _sparse_coo_tensor_unsafe(const Tensor & indices, const Tensor & values, IntArrayRef size, const TensorOptions & options) {
+    return __sparse_coo_tensor_unsafe(indices, values, size, typeMetaToScalarType(options.dtype()), options.layout_opt(), options.device(), options.pinned_memory());
+}
+static inline Tensor __sparse_coo_tensor_with_dims(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(options),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::SparseCPU:
-            return SparseCPUType::_sparse_coo_tensor_with_dims(sparse_dim, dense_dim, size, options);
+            return SparseCPUType::_sparse_coo_tensor_with_dims(sparse_dim, dense_dim, size, dtype, layout, device, pin_memory);
             break;
         default:
-            AT_ERROR("_sparse_coo_tensor_with_dims not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(options)));
+            AT_ERROR("_sparse_coo_tensor_with_dims not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory)));
     }
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::_sparse_coo_tensor_with_dims", "");
-    return op.callUnboxed<Tensor, int64_t, int64_t, IntArrayRef, const TensorOptions &>(sparse_dim, dense_dim, size, options);
+    return op.callUnboxed<Tensor, int64_t, int64_t, IntArrayRef, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(sparse_dim, dense_dim, size, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor _sparse_coo_tensor_with_dims_and_tensors(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size, const Tensor & indices, const Tensor & values, const TensorOptions & options) {
+inline Tensor _sparse_coo_tensor_with_dims(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size, const TensorOptions & options) {
+    return __sparse_coo_tensor_with_dims(sparse_dim, dense_dim, size, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor __sparse_coo_tensor_with_dims_and_tensors(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size, const Tensor & indices, const Tensor & values, ScalarType dtype, Layout layout, Device device, bool pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(indices, values, options),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(indices, values, dtype, layout, device, pin_memory), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::SparseCPU:
-            return SparseCPUType::_sparse_coo_tensor_with_dims_and_tensors(sparse_dim, dense_dim, size, indices, values, options);
+            return SparseCPUType::_sparse_coo_tensor_with_dims_and_tensors(sparse_dim, dense_dim, size, indices, values, dtype, layout, device, pin_memory);
             break;
         default:
-            AT_ERROR("_sparse_coo_tensor_with_dims_and_tensors not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(indices, values, options)));
+            AT_ERROR("_sparse_coo_tensor_with_dims_and_tensors not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(indices, values, dtype, layout, device, pin_memory)));
     }
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(indices, values, options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::_sparse_coo_tensor_with_dims_and_tensors", "");
-    return op.callUnboxed<Tensor, int64_t, int64_t, IntArrayRef, const Tensor &, const Tensor &, const TensorOptions &>(sparse_dim, dense_dim, size, indices, values, options);
+    return op.callUnboxed<Tensor, int64_t, int64_t, IntArrayRef, const Tensor &, const Tensor &, ScalarType, Layout, Device, bool>(sparse_dim, dense_dim, size, indices, values, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor _sparse_coo_tensor_with_dims_and_tensors(int64_t sparse_dim, int64_t dense_dim, IntArrayRef size, const Tensor & indices, const Tensor & values, const TensorOptions & options) {
+    return __sparse_coo_tensor_with_dims_and_tensors(sparse_dim, dense_dim, size, indices, values, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor to_dense_backward(const Tensor & grad, const Tensor & input) {
 #ifdef USE_STATIC_DISPATCH
@@ -9495,8 +9481,7 @@ static inline Tensor to_dense_backward(const Tensor & grad, const Tensor & input
 static inline Tensor & hspmm_out(Tensor & out, const Tensor & mat1, const Tensor & mat2) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, mat1, mat2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, mat1, mat2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::SparseCPU:
             return SparseCPUType::hspmm_out(out, mat1, mat2);
             break;
@@ -9512,8 +9497,7 @@ static inline Tensor & hspmm_out(Tensor & out, const Tensor & mat1, const Tensor
 static inline Tensor hspmm(const Tensor & mat1, const Tensor & mat2) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(mat1, mat2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(mat1, mat2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::SparseCPU:
             return SparseCPUType::hspmm(mat1, mat2);
             break;
@@ -9529,8 +9513,7 @@ static inline Tensor hspmm(const Tensor & mat1, const Tensor & mat2) {
 static inline Tensor & copy_sparse_to_sparse_(Tensor & self, const Tensor & src, bool non_blocking) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, src),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, src), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::SparseCPU:
             return SparseCPUType::copy_sparse_to_sparse_(self, src, non_blocking);
             break;
@@ -9566,8 +9549,7 @@ static inline std::vector<Tensor> unbind(const Tensor & self, Dimname dim) {
 static inline Tensor mkldnn_reorder_conv2d_weight(const Tensor & self, IntArrayRef padding, IntArrayRef stride, IntArrayRef dilation, int64_t groups) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("mkldnn_reorder_conv2d_weight not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self)));
@@ -9591,8 +9573,7 @@ static inline Tensor to_mkldnn_backward(const Tensor & grad, const Tensor & inpu
 static inline Tensor quantize_per_tensor(const Tensor & self, double scale, int64_t zero_point, ScalarType dtype) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::quantize_per_tensor(self, scale, zero_point, dtype);
             break;
@@ -9608,8 +9589,7 @@ static inline Tensor quantize_per_tensor(const Tensor & self, double scale, int6
 static inline Tensor quantize_per_channel(const Tensor & self, const Tensor & scales, const Tensor & zero_points, int64_t axis, ScalarType dtype) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, scales, zero_points),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, scales, zero_points), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::quantize_per_channel(self, scales, zero_points, axis, dtype);
             break;
@@ -9625,8 +9605,7 @@ static inline Tensor quantize_per_channel(const Tensor & self, const Tensor & sc
 static inline Tensor dequantize(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::QuantizedCPU:
             return QuantizedCPUType::dequantize(self);
             break;
@@ -9642,8 +9621,7 @@ static inline Tensor dequantize(const Tensor & self) {
 static inline double q_scale(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::QuantizedCPU:
             return QuantizedCPUType::q_scale(self);
             break;
@@ -9659,8 +9637,7 @@ static inline double q_scale(const Tensor & self) {
 static inline int64_t q_zero_point(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::QuantizedCPU:
             return QuantizedCPUType::q_zero_point(self);
             break;
@@ -9676,8 +9653,7 @@ static inline int64_t q_zero_point(const Tensor & self) {
 static inline Tensor q_per_channel_scales(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::QuantizedCPU:
             return QuantizedCPUType::q_per_channel_scales(self);
             break;
@@ -9693,8 +9669,7 @@ static inline Tensor q_per_channel_scales(const Tensor & self) {
 static inline Tensor q_per_channel_zero_points(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::QuantizedCPU:
             return QuantizedCPUType::q_per_channel_zero_points(self);
             break;
@@ -9710,8 +9685,7 @@ static inline Tensor q_per_channel_zero_points(const Tensor & self) {
 static inline int64_t q_per_channel_axis(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::QuantizedCPU:
             return QuantizedCPUType::q_per_channel_axis(self);
             break;
@@ -9727,8 +9701,7 @@ static inline int64_t q_per_channel_axis(const Tensor & self) {
 static inline Tensor int_repr(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::QuantizedCPU:
             return QuantizedCPUType::int_repr(self);
             break;
@@ -9744,8 +9717,7 @@ static inline Tensor int_repr(const Tensor & self) {
 static inline Tensor _make_per_tensor_quantized_tensor(const Tensor & self, double scale, int64_t zero_point) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_make_per_tensor_quantized_tensor(self, scale, zero_point);
             break;
@@ -9761,8 +9733,7 @@ static inline Tensor _make_per_tensor_quantized_tensor(const Tensor & self, doub
 static inline Tensor _make_per_channel_quantized_tensor(const Tensor & self, const Tensor & scale, const Tensor & zero_point, int64_t axis) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, scale, zero_point),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, scale, zero_point), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_make_per_channel_quantized_tensor(self, scale, zero_point, axis);
             break;
@@ -9778,8 +9749,7 @@ static inline Tensor _make_per_channel_quantized_tensor(const Tensor & self, con
 static inline Tensor fake_quantize_per_tensor_affine(const Tensor & self, double scale, int64_t zero_point, int64_t quant_min, int64_t quant_max) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fake_quantize_per_tensor_affine(self, scale, zero_point, quant_min, quant_max);
             break;
@@ -9795,8 +9765,7 @@ static inline Tensor fake_quantize_per_tensor_affine(const Tensor & self, double
 static inline Tensor fake_quantize_per_tensor_affine_backward(const Tensor & grad, const Tensor & self, double scale, int64_t zero_point, int64_t quant_min, int64_t quant_max) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fake_quantize_per_tensor_affine_backward(grad, self, scale, zero_point, quant_min, quant_max);
             break;
@@ -9812,8 +9781,7 @@ static inline Tensor fake_quantize_per_tensor_affine_backward(const Tensor & gra
 static inline Tensor fake_quantize_per_channel_affine(const Tensor & self, const Tensor & scale, const Tensor & zero_point, int64_t axis, int64_t quant_min, int64_t quant_max) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, scale, zero_point),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, scale, zero_point), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fake_quantize_per_channel_affine(self, scale, zero_point, axis, quant_min, quant_max);
             break;
@@ -9829,8 +9797,7 @@ static inline Tensor fake_quantize_per_channel_affine(const Tensor & self, const
 static inline Tensor fake_quantize_per_channel_affine_backward(const Tensor & grad, const Tensor & self, const Tensor & scale, const Tensor & zero_point, int64_t axis, int64_t quant_min, int64_t quant_max) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, self, scale, zero_point),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad, self, scale, zero_point), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fake_quantize_per_channel_affine_backward(grad, self, scale, zero_point, axis, quant_min, quant_max);
             break;
@@ -9936,8 +9903,7 @@ static inline ScalarType promote_types(ScalarType type1, ScalarType type2) {
 static inline Scalar _local_scalar_dense(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_local_scalar_dense(self);
             break;
@@ -9953,8 +9919,7 @@ static inline Scalar _local_scalar_dense(const Tensor & self) {
 static inline std::tuple<Tensor,Tensor,Tensor> _thnn_fused_lstm_cell(const Tensor & input_gates, const Tensor & hidden_gates, const Tensor & cx, const Tensor & input_bias, const Tensor & hidden_bias) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input_gates, hidden_gates, cx, input_bias, hidden_bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input_gates, hidden_gates, cx, input_bias, hidden_bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_thnn_fused_lstm_cell not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input_gates, hidden_gates, cx, input_bias, hidden_bias)));
@@ -9968,8 +9933,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> _thnn_fused_lstm_cell(const Tenso
 static inline std::tuple<Tensor,Tensor,Tensor,Tensor,Tensor> _thnn_fused_lstm_cell_backward(const Tensor & grad_hy, const Tensor & grad_cy, const Tensor & cx, const Tensor & cy, const Tensor & workspace, bool has_bias) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_hy, grad_cy, cx, cy, workspace),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_hy, grad_cy, cx, cy, workspace), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_thnn_fused_lstm_cell_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_hy, grad_cy, cx, cy, workspace)));
@@ -9993,8 +9957,7 @@ static inline std::tuple<Tensor,Tensor,Tensor,Tensor,Tensor> _thnn_differentiabl
 static inline std::tuple<Tensor,Tensor> _thnn_fused_gru_cell(const Tensor & input_gates, const Tensor & hidden_gates, const Tensor & hx, const Tensor & input_bias, const Tensor & hidden_bias) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input_gates, hidden_gates, hx, input_bias, hidden_bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(input_gates, hidden_gates, hx, input_bias, hidden_bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_thnn_fused_gru_cell not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(input_gates, hidden_gates, hx, input_bias, hidden_bias)));
@@ -10008,8 +9971,7 @@ static inline std::tuple<Tensor,Tensor> _thnn_fused_gru_cell(const Tensor & inpu
 static inline std::tuple<Tensor,Tensor,Tensor,Tensor,Tensor> _thnn_fused_gru_cell_backward(const Tensor & grad_hy, const Tensor & workspace, bool has_bias) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_hy, workspace),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_hy, workspace), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("_thnn_fused_gru_cell_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_hy, workspace)));
@@ -10413,8 +10375,7 @@ static inline Tensor scatter_add(const Tensor & self, Dimname dim, const Tensor 
 static inline Tensor & bitwise_and_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::bitwise_and_out(out, self, other);
             break;
@@ -10430,8 +10391,7 @@ static inline Tensor & bitwise_and_out(Tensor & out, const Tensor & self, const 
 static inline Tensor & bitwise_and_out(Tensor & out, const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::bitwise_and_out(out, self, other);
             break;
@@ -10487,8 +10447,7 @@ static inline Tensor __and__(const Tensor & self, const Tensor & other) {
 static inline Tensor & bitwise_or_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::bitwise_or_out(out, self, other);
             break;
@@ -10504,8 +10463,7 @@ static inline Tensor & bitwise_or_out(Tensor & out, const Tensor & self, const T
 static inline Tensor & bitwise_or_out(Tensor & out, const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::bitwise_or_out(out, self, other);
             break;
@@ -10561,8 +10519,7 @@ static inline Tensor __or__(const Tensor & self, const Tensor & other) {
 static inline Tensor & bitwise_xor_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::bitwise_xor_out(out, self, other);
             break;
@@ -10578,8 +10535,7 @@ static inline Tensor & bitwise_xor_out(Tensor & out, const Tensor & self, const 
 static inline Tensor & bitwise_xor_out(Tensor & out, const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::bitwise_xor_out(out, self, other);
             break;
@@ -10635,8 +10591,7 @@ static inline Tensor __xor__(const Tensor & self, const Tensor & other) {
 static inline Tensor __lshift__(const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::__lshift__(self, other);
             break;
@@ -10652,8 +10607,7 @@ static inline Tensor __lshift__(const Tensor & self, Scalar other) {
 static inline Tensor __lshift__(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::__lshift__(self, other);
             break;
@@ -10669,8 +10623,7 @@ static inline Tensor __lshift__(const Tensor & self, const Tensor & other) {
 static inline Tensor __rshift__(const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::__rshift__(self, other);
             break;
@@ -10686,8 +10639,7 @@ static inline Tensor __rshift__(const Tensor & self, Scalar other) {
 static inline Tensor __rshift__(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::__rshift__(self, other);
             break;
@@ -10703,8 +10655,7 @@ static inline Tensor __rshift__(const Tensor & self, const Tensor & other) {
 static inline Tensor & addbmm_out(Tensor & out, const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, batch1, batch2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, batch1, batch2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::addbmm_out(out, self, batch1, batch2, beta, alpha);
             break;
@@ -10720,8 +10671,7 @@ static inline Tensor & addbmm_out(Tensor & out, const Tensor & self, const Tenso
 static inline Tensor addbmm(const Tensor & self, const Tensor & batch1, const Tensor & batch2, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, batch1, batch2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, batch1, batch2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::addbmm(self, batch1, batch2, beta, alpha);
             break;
@@ -10737,8 +10687,7 @@ static inline Tensor addbmm(const Tensor & self, const Tensor & batch1, const Te
 static inline Tensor & diag_out(Tensor & out, const Tensor & self, int64_t diagonal) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::diag_out(out, self, diagonal);
             break;
@@ -10754,8 +10703,7 @@ static inline Tensor & diag_out(Tensor & out, const Tensor & self, int64_t diago
 static inline Tensor diag(const Tensor & self, int64_t diagonal) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::diag(self, diagonal);
             break;
@@ -10791,8 +10739,7 @@ static inline Tensor cross(const Tensor & self, const Tensor & other, c10::optio
 static inline Tensor & triu_out(Tensor & out, const Tensor & self, int64_t diagonal) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::triu_out(out, self, diagonal);
             break;
@@ -10818,8 +10765,7 @@ static inline Tensor triu(const Tensor & self, int64_t diagonal) {
 static inline Tensor & tril_out(Tensor & out, const Tensor & self, int64_t diagonal) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::tril_out(out, self, diagonal);
             break;
@@ -10842,47 +10788,48 @@ static inline Tensor tril(const Tensor & self, int64_t diagonal) {
     return op.callUnboxed<Tensor, const Tensor &, int64_t>(self, diagonal);
 #endif
 }
-static inline Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options) {
+static inline Tensor _tril_indices(int64_t row, int64_t col, int64_t offset, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(options),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
-            return CPUType::tril_indices(row, col, offset, options);
+            return CPUType::tril_indices(row, col, offset, dtype, layout, device, pin_memory);
             break;
         default:
-            AT_ERROR("tril_indices not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(options)));
+            AT_ERROR("tril_indices not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory)));
     }
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::tril_indices", "");
-    return op.callUnboxed<Tensor, int64_t, int64_t, int64_t, const TensorOptions &>(row, col, offset, options);
+    return op.callUnboxed<Tensor, int64_t, int64_t, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(row, col, offset, dtype, layout, device, pin_memory);
 #endif
 }
-static inline Tensor triu_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options) {
+inline Tensor tril_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options) {
+    return _tril_indices(row, col, offset, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
+}
+static inline Tensor _triu_indices(int64_t row, int64_t col, int64_t offset, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(options),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
-            return CPUType::triu_indices(row, col, offset, options);
+            return CPUType::triu_indices(row, col, offset, dtype, layout, device, pin_memory);
             break;
         default:
-            AT_ERROR("triu_indices not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(options)));
+            AT_ERROR("triu_indices not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(dtype, layout, device, pin_memory)));
     }
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::triu_indices", "");
-    return op.callUnboxed<Tensor, int64_t, int64_t, int64_t, const TensorOptions &>(row, col, offset, options);
+    return op.callUnboxed<Tensor, int64_t, int64_t, int64_t, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(row, col, offset, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor triu_indices(int64_t row, int64_t col, int64_t offset, const TensorOptions & options) {
+    return _triu_indices(row, col, offset, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor trace(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::trace(self);
             break;
@@ -10898,8 +10845,7 @@ static inline Tensor trace(const Tensor & self) {
 static inline Tensor & ne_out(Tensor & out, const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ne_out(out, self, other);
             break;
@@ -10918,8 +10864,7 @@ static inline Tensor & ne_out(Tensor & out, const Tensor & self, Scalar other) {
 static inline Tensor ne(const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ne(self, other);
             break;
@@ -10938,8 +10883,7 @@ static inline Tensor ne(const Tensor & self, Scalar other) {
 static inline Tensor & ne_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ne_out(out, self, other);
             break;
@@ -10958,8 +10902,7 @@ static inline Tensor & ne_out(Tensor & out, const Tensor & self, const Tensor & 
 static inline Tensor ne(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ne(self, other);
             break;
@@ -10978,8 +10921,7 @@ static inline Tensor ne(const Tensor & self, const Tensor & other) {
 static inline Tensor & eq_out(Tensor & out, const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::eq_out(out, self, other);
             break;
@@ -10998,8 +10940,7 @@ static inline Tensor & eq_out(Tensor & out, const Tensor & self, Scalar other) {
 static inline Tensor eq(const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::eq(self, other);
             break;
@@ -11018,8 +10959,7 @@ static inline Tensor eq(const Tensor & self, Scalar other) {
 static inline Tensor & eq_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::eq_out(out, self, other);
             break;
@@ -11038,8 +10978,7 @@ static inline Tensor & eq_out(Tensor & out, const Tensor & self, const Tensor & 
 static inline Tensor eq(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::eq(self, other);
             break;
@@ -11058,8 +10997,7 @@ static inline Tensor eq(const Tensor & self, const Tensor & other) {
 static inline Tensor & ge_out(Tensor & out, const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ge_out(out, self, other);
             break;
@@ -11078,8 +11016,7 @@ static inline Tensor & ge_out(Tensor & out, const Tensor & self, Scalar other) {
 static inline Tensor ge(const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ge(self, other);
             break;
@@ -11098,8 +11035,7 @@ static inline Tensor ge(const Tensor & self, Scalar other) {
 static inline Tensor & ge_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ge_out(out, self, other);
             break;
@@ -11118,8 +11054,7 @@ static inline Tensor & ge_out(Tensor & out, const Tensor & self, const Tensor & 
 static inline Tensor ge(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ge(self, other);
             break;
@@ -11138,8 +11073,7 @@ static inline Tensor ge(const Tensor & self, const Tensor & other) {
 static inline Tensor & le_out(Tensor & out, const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::le_out(out, self, other);
             break;
@@ -11158,8 +11092,7 @@ static inline Tensor & le_out(Tensor & out, const Tensor & self, Scalar other) {
 static inline Tensor le(const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::le(self, other);
             break;
@@ -11178,8 +11111,7 @@ static inline Tensor le(const Tensor & self, Scalar other) {
 static inline Tensor & le_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::le_out(out, self, other);
             break;
@@ -11198,8 +11130,7 @@ static inline Tensor & le_out(Tensor & out, const Tensor & self, const Tensor & 
 static inline Tensor le(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::le(self, other);
             break;
@@ -11218,8 +11149,7 @@ static inline Tensor le(const Tensor & self, const Tensor & other) {
 static inline Tensor & gt_out(Tensor & out, const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::gt_out(out, self, other);
             break;
@@ -11238,8 +11168,7 @@ static inline Tensor & gt_out(Tensor & out, const Tensor & self, Scalar other) {
 static inline Tensor gt(const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::gt(self, other);
             break;
@@ -11258,8 +11187,7 @@ static inline Tensor gt(const Tensor & self, Scalar other) {
 static inline Tensor & gt_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::gt_out(out, self, other);
             break;
@@ -11278,8 +11206,7 @@ static inline Tensor & gt_out(Tensor & out, const Tensor & self, const Tensor & 
 static inline Tensor gt(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::gt(self, other);
             break;
@@ -11298,8 +11225,7 @@ static inline Tensor gt(const Tensor & self, const Tensor & other) {
 static inline Tensor & lt_out(Tensor & out, const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::lt_out(out, self, other);
             break;
@@ -11318,8 +11244,7 @@ static inline Tensor & lt_out(Tensor & out, const Tensor & self, Scalar other) {
 static inline Tensor lt(const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::lt(self, other);
             break;
@@ -11338,8 +11263,7 @@ static inline Tensor lt(const Tensor & self, Scalar other) {
 static inline Tensor & lt_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::lt_out(out, self, other);
             break;
@@ -11358,8 +11282,7 @@ static inline Tensor & lt_out(Tensor & out, const Tensor & self, const Tensor & 
 static inline Tensor lt(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::lt(self, other);
             break;
@@ -11378,8 +11301,7 @@ static inline Tensor lt(const Tensor & self, const Tensor & other) {
 static inline Tensor & take_out(Tensor & out, const Tensor & self, const Tensor & index) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, index),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, index), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::take_out(out, self, index);
             break;
@@ -11395,8 +11317,7 @@ static inline Tensor & take_out(Tensor & out, const Tensor & self, const Tensor 
 static inline Tensor take(const Tensor & self, const Tensor & index) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, index),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, index), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::take(self, index);
             break;
@@ -11412,8 +11333,7 @@ static inline Tensor take(const Tensor & self, const Tensor & index) {
 static inline Tensor & index_select_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, index),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, index), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::index_select_out(out, self, dim, index);
             break;
@@ -11429,8 +11349,7 @@ static inline Tensor & index_select_out(Tensor & out, const Tensor & self, int64
 static inline Tensor index_select(const Tensor & self, int64_t dim, const Tensor & index) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, index),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, index), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::index_select(self, dim, index);
             break;
@@ -11469,8 +11388,7 @@ static inline Tensor index_select(const Tensor & self, Dimname dim, const Tensor
 static inline Tensor & masked_select_out(Tensor & out, const Tensor & self, const Tensor & mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, mask),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, mask), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::masked_select_out(out, self, mask);
             break;
@@ -11486,8 +11404,7 @@ static inline Tensor & masked_select_out(Tensor & out, const Tensor & self, cons
 static inline Tensor masked_select(const Tensor & self, const Tensor & mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mask),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, mask), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::masked_select(self, mask);
             break;
@@ -11503,8 +11420,7 @@ static inline Tensor masked_select(const Tensor & self, const Tensor & mask) {
 static inline Tensor & nonzero_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::nonzero_out(out, self);
             break;
@@ -11520,8 +11436,7 @@ static inline Tensor & nonzero_out(Tensor & out, const Tensor & self) {
 static inline Tensor nonzero(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::nonzero(self);
             break;
@@ -11547,8 +11462,7 @@ static inline std::vector<Tensor> nonzero_numpy(const Tensor & self) {
 static inline Tensor & gather_out(Tensor & out, const Tensor & self, int64_t dim, const Tensor & index, bool sparse_grad) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, index),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, index), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::gather_out(out, self, dim, index, sparse_grad);
             break;
@@ -11564,8 +11478,7 @@ static inline Tensor & gather_out(Tensor & out, const Tensor & self, int64_t dim
 static inline Tensor gather(const Tensor & self, int64_t dim, const Tensor & index, bool sparse_grad) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, index),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, index), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::gather(self, dim, index, sparse_grad);
             break;
@@ -11651,8 +11564,7 @@ static inline Tensor addcdiv(const Tensor & self, const Tensor & tensor1, const 
 static inline std::tuple<Tensor &,Tensor &> lstsq_out(Tensor & X, Tensor & qr, const Tensor & self, const Tensor & A) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(X, qr, self, A),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(X, qr, self, A), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::lstsq_out(X, qr, self, A);
             break;
@@ -11668,8 +11580,7 @@ static inline std::tuple<Tensor &,Tensor &> lstsq_out(Tensor & X, Tensor & qr, c
 static inline std::tuple<Tensor,Tensor> lstsq(const Tensor & self, const Tensor & A) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, A),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, A), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::lstsq(self, A);
             break;
@@ -11705,8 +11616,7 @@ static inline std::tuple<Tensor,Tensor> triangular_solve(const Tensor & self, co
 static inline std::tuple<Tensor,Tensor> _triangular_solve_helper(const Tensor & self, const Tensor & A, bool upper, bool transpose, bool unitriangular) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, A),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, A), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_triangular_solve_helper(self, A, upper, transpose, unitriangular);
             break;
@@ -11742,8 +11652,7 @@ static inline std::tuple<Tensor,Tensor> symeig(const Tensor & self, bool eigenve
 static inline std::tuple<Tensor,Tensor> _symeig_helper(const Tensor & self, bool eigenvectors, bool upper) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_symeig_helper(self, eigenvectors, upper);
             break;
@@ -11759,8 +11668,7 @@ static inline std::tuple<Tensor,Tensor> _symeig_helper(const Tensor & self, bool
 static inline std::tuple<Tensor &,Tensor &> eig_out(Tensor & e, Tensor & v, const Tensor & self, bool eigenvectors) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(e, v, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(e, v, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::eig_out(e, v, self, eigenvectors);
             break;
@@ -11776,8 +11684,7 @@ static inline std::tuple<Tensor &,Tensor &> eig_out(Tensor & e, Tensor & v, cons
 static inline std::tuple<Tensor,Tensor> eig(const Tensor & self, bool eigenvectors) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::eig(self, eigenvectors);
             break;
@@ -11813,8 +11720,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> svd(const Tensor & self, bool som
 static inline std::tuple<Tensor,Tensor,Tensor> _svd_helper(const Tensor & self, bool some, bool compute_uv) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_svd_helper(self, some, compute_uv);
             break;
@@ -11850,8 +11756,7 @@ static inline Tensor cholesky(const Tensor & self, bool upper) {
 static inline Tensor _cholesky_helper(const Tensor & self, bool upper) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_cholesky_helper(self, upper);
             break;
@@ -11887,8 +11792,7 @@ static inline Tensor cholesky_solve(const Tensor & self, const Tensor & input2, 
 static inline Tensor _cholesky_solve_helper(const Tensor & self, const Tensor & A, bool upper) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, A),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, A), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_cholesky_solve_helper(self, A, upper);
             break;
@@ -11924,8 +11828,7 @@ static inline std::tuple<Tensor &,Tensor &> solve_out(Tensor & solution, Tensor 
 static inline std::tuple<Tensor,Tensor> _solve_helper(const Tensor & self, const Tensor & A) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, A),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, A), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_solve_helper(self, A);
             break;
@@ -11941,8 +11844,7 @@ static inline std::tuple<Tensor,Tensor> _solve_helper(const Tensor & self, const
 static inline Tensor & cholesky_inverse_out(Tensor & out, const Tensor & self, bool upper) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::cholesky_inverse_out(out, self, upper);
             break;
@@ -11958,8 +11860,7 @@ static inline Tensor & cholesky_inverse_out(Tensor & out, const Tensor & self, b
 static inline Tensor cholesky_inverse(const Tensor & self, bool upper) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::cholesky_inverse(self, upper);
             break;
@@ -11995,8 +11896,7 @@ static inline std::tuple<Tensor,Tensor> qr(const Tensor & self, bool some) {
 static inline std::tuple<Tensor,Tensor> _qr_helper(const Tensor & self, bool some) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_qr_helper(self, some);
             break;
@@ -12012,8 +11912,7 @@ static inline std::tuple<Tensor,Tensor> _qr_helper(const Tensor & self, bool som
 static inline std::tuple<Tensor &,Tensor &> geqrf_out(Tensor & a, Tensor & tau, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(a, tau, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(a, tau, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::geqrf_out(a, tau, self);
             break;
@@ -12029,8 +11928,7 @@ static inline std::tuple<Tensor &,Tensor &> geqrf_out(Tensor & a, Tensor & tau, 
 static inline std::tuple<Tensor,Tensor> geqrf(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::geqrf(self);
             break;
@@ -12046,8 +11944,7 @@ static inline std::tuple<Tensor,Tensor> geqrf(const Tensor & self) {
 static inline Tensor & orgqr_out(Tensor & out, const Tensor & self, const Tensor & input2) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, input2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, input2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::orgqr_out(out, self, input2);
             break;
@@ -12063,8 +11960,7 @@ static inline Tensor & orgqr_out(Tensor & out, const Tensor & self, const Tensor
 static inline Tensor orgqr(const Tensor & self, const Tensor & input2) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, input2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, input2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::orgqr(self, input2);
             break;
@@ -12080,8 +11976,7 @@ static inline Tensor orgqr(const Tensor & self, const Tensor & input2) {
 static inline Tensor & ormqr_out(Tensor & out, const Tensor & self, const Tensor & input2, const Tensor & input3, bool left, bool transpose) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, input2, input3),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, input2, input3), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ormqr_out(out, self, input2, input3, left, transpose);
             break;
@@ -12097,8 +11992,7 @@ static inline Tensor & ormqr_out(Tensor & out, const Tensor & self, const Tensor
 static inline Tensor ormqr(const Tensor & self, const Tensor & input2, const Tensor & input3, bool left, bool transpose) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, input2, input3),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, input2, input3), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::ormqr(self, input2, input3, left, transpose);
             break;
@@ -12114,8 +12008,7 @@ static inline Tensor ormqr(const Tensor & self, const Tensor & input2, const Ten
 static inline std::tuple<Tensor,Tensor,Tensor> _lu_with_info(const Tensor & self, bool pivot, bool check_errors) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_lu_with_info(self, pivot, check_errors);
             break;
@@ -12151,8 +12044,7 @@ static inline Tensor lu_solve(const Tensor & self, const Tensor & LU_data, const
 static inline Tensor _lu_solve_helper(const Tensor & self, const Tensor & LU_data, const Tensor & LU_pivots) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, LU_data, LU_pivots),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, LU_data, LU_pivots), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_lu_solve_helper(self, LU_data, LU_pivots);
             break;
@@ -12168,8 +12060,7 @@ static inline Tensor _lu_solve_helper(const Tensor & self, const Tensor & LU_dat
 static inline Tensor & multinomial_out(Tensor & out, const Tensor & self, int64_t num_samples, bool replacement, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::multinomial_out(out, self, num_samples, replacement, generator);
             break;
@@ -12185,8 +12076,7 @@ static inline Tensor & multinomial_out(Tensor & out, const Tensor & self, int64_
 static inline Tensor multinomial(const Tensor & self, int64_t num_samples, bool replacement, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::multinomial(self, num_samples, replacement, generator);
             break;
@@ -12202,8 +12092,7 @@ static inline Tensor multinomial(const Tensor & self, int64_t num_samples, bool 
 static inline std::tuple<Tensor,Tensor> _multinomial_alias_setup(const Tensor & probs) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(probs),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(probs), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_multinomial_alias_setup(probs);
             break;
@@ -12219,8 +12108,7 @@ static inline std::tuple<Tensor,Tensor> _multinomial_alias_setup(const Tensor & 
 static inline Tensor _multinomial_alias_draw(const Tensor & J, const Tensor & q, int64_t num_samples, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(J, q),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(J, q), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_multinomial_alias_draw(J, q, num_samples, generator);
             break;
@@ -12236,8 +12124,7 @@ static inline Tensor _multinomial_alias_draw(const Tensor & J, const Tensor & q,
 static inline Tensor & lgamma_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::lgamma_out(out, self);
             break;
@@ -12253,8 +12140,7 @@ static inline Tensor & lgamma_out(Tensor & out, const Tensor & self) {
 static inline Tensor lgamma(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::lgamma(self);
             break;
@@ -12310,8 +12196,7 @@ static inline Tensor polygamma(int64_t n, const Tensor & self) {
 static inline Tensor erfinv(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::erfinv(self);
             break;
@@ -12327,8 +12212,7 @@ static inline Tensor erfinv(const Tensor & self) {
 static inline Tensor & erfinv_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::erfinv_out(out, self);
             break;
@@ -12354,8 +12238,7 @@ static inline Tensor sign(const Tensor & self) {
 static inline Tensor & sign_out(Tensor & out, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::sign_out(out, self);
             break;
@@ -12371,8 +12254,7 @@ static inline Tensor & sign_out(Tensor & out, const Tensor & self) {
 static inline Tensor dist(const Tensor & self, const Tensor & other, Scalar p) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::dist(self, other, p);
             break;
@@ -12408,8 +12290,7 @@ static inline Tensor atan2(const Tensor & self, const Tensor & other) {
 static inline Tensor & lerp_out(Tensor & out, const Tensor & self, const Tensor & end, Scalar weight) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, end),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, end), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::lerp_out(out, self, end, weight);
             break;
@@ -12425,8 +12306,7 @@ static inline Tensor & lerp_out(Tensor & out, const Tensor & self, const Tensor 
 static inline Tensor & lerp_out(Tensor & out, const Tensor & self, const Tensor & end, const Tensor & weight) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, end, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, end, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::lerp_out(out, self, end, weight);
             break;
@@ -12442,8 +12322,7 @@ static inline Tensor & lerp_out(Tensor & out, const Tensor & self, const Tensor 
 static inline Tensor lerp(const Tensor & self, const Tensor & end, Scalar weight) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, end),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, end), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::lerp(self, end, weight);
             break;
@@ -12459,8 +12338,7 @@ static inline Tensor lerp(const Tensor & self, const Tensor & end, Scalar weight
 static inline Tensor lerp(const Tensor & self, const Tensor & end, const Tensor & weight) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, end, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, end, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::lerp(self, end, weight);
             break;
@@ -12476,8 +12354,7 @@ static inline Tensor lerp(const Tensor & self, const Tensor & end, const Tensor 
 static inline Tensor & histc_out(Tensor & out, const Tensor & self, int64_t bins, Scalar min, Scalar max) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::histc_out(out, self, bins, min, max);
             break;
@@ -12493,8 +12370,7 @@ static inline Tensor & histc_out(Tensor & out, const Tensor & self, int64_t bins
 static inline Tensor histc(const Tensor & self, int64_t bins, Scalar min, Scalar max) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::histc(self, bins, min, max);
             break;
@@ -12510,8 +12386,7 @@ static inline Tensor histc(const Tensor & self, int64_t bins, Scalar min, Scalar
 static inline Tensor & fmod_out(Tensor & out, const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fmod_out(out, self, other);
             break;
@@ -12527,8 +12402,7 @@ static inline Tensor & fmod_out(Tensor & out, const Tensor & self, Scalar other)
 static inline Tensor fmod(const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fmod(self, other);
             break;
@@ -12544,8 +12418,7 @@ static inline Tensor fmod(const Tensor & self, Scalar other) {
 static inline Tensor & fmod_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fmod_out(out, self, other);
             break;
@@ -12561,8 +12434,7 @@ static inline Tensor & fmod_out(Tensor & out, const Tensor & self, const Tensor 
 static inline Tensor fmod(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fmod(self, other);
             break;
@@ -12578,8 +12450,7 @@ static inline Tensor fmod(const Tensor & self, const Tensor & other) {
 static inline Tensor & remainder_out(Tensor & out, const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::remainder_out(out, self, other);
             break;
@@ -12595,8 +12466,7 @@ static inline Tensor & remainder_out(Tensor & out, const Tensor & self, Scalar o
 static inline Tensor remainder(const Tensor & self, Scalar other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::remainder(self, other);
             break;
@@ -12612,8 +12482,7 @@ static inline Tensor remainder(const Tensor & self, Scalar other) {
 static inline Tensor & remainder_out(Tensor & out, const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::remainder_out(out, self, other);
             break;
@@ -12629,8 +12498,7 @@ static inline Tensor & remainder_out(Tensor & out, const Tensor & self, const Te
 static inline Tensor remainder(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::remainder(self, other);
             break;
@@ -12666,8 +12534,7 @@ static inline Tensor min(const Tensor & self, const Tensor & other) {
 static inline Tensor min(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::min(self);
             break;
@@ -12706,8 +12573,7 @@ static inline Tensor max(const Tensor & self, const Tensor & other) {
 static inline Tensor max(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max(self);
             break;
@@ -12726,8 +12592,7 @@ static inline Tensor max(const Tensor & self) {
 static inline Tensor median(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::median(self);
             break;
@@ -12743,8 +12608,7 @@ static inline Tensor median(const Tensor & self) {
 static inline std::tuple<Tensor &,Tensor &> sort_out(Tensor & values, Tensor & indices, const Tensor & self, int64_t dim, bool descending) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(values, indices, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(values, indices, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::sort_out(values, indices, self, dim, descending);
             break;
@@ -12760,8 +12624,7 @@ static inline std::tuple<Tensor &,Tensor &> sort_out(Tensor & values, Tensor & i
 static inline std::tuple<Tensor,Tensor> sort(const Tensor & self, int64_t dim, bool descending) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::sort(self, dim, descending);
             break;
@@ -12820,8 +12683,7 @@ static inline Tensor argsort(const Tensor & self, Dimname dim, bool descending) 
 static inline std::tuple<Tensor &,Tensor &> topk_out(Tensor & values, Tensor & indices, const Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(values, indices, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(values, indices, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::topk_out(values, indices, self, k, dim, largest, sorted);
             break;
@@ -12837,8 +12699,7 @@ static inline std::tuple<Tensor &,Tensor &> topk_out(Tensor & values, Tensor & i
 static inline std::tuple<Tensor,Tensor> topk(const Tensor & self, int64_t k, int64_t dim, bool largest, bool sorted) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::topk(self, k, dim, largest, sorted);
             break;
@@ -12867,8 +12728,7 @@ static inline Tensor all(const Tensor & self) {
 static inline Tensor any(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::any(self);
             break;
@@ -12887,8 +12747,7 @@ static inline Tensor any(const Tensor & self) {
 static inline Tensor & renorm_out(Tensor & out, const Tensor & self, Scalar p, int64_t dim, Scalar maxnorm) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::renorm_out(out, self, p, dim, maxnorm);
             break;
@@ -12904,8 +12763,7 @@ static inline Tensor & renorm_out(Tensor & out, const Tensor & self, Scalar p, i
 static inline Tensor renorm(const Tensor & self, Scalar p, int64_t dim, Scalar maxnorm) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::renorm(self, p, dim, maxnorm);
             break;
@@ -12921,8 +12779,7 @@ static inline Tensor renorm(const Tensor & self, Scalar p, int64_t dim, Scalar m
 static inline bool equal(const Tensor & self, const Tensor & other) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, other), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::equal(self, other);
             break;
@@ -12941,8 +12798,7 @@ static inline bool equal(const Tensor & self, const Tensor & other) {
 static inline Tensor & pow_out(Tensor & out, const Tensor & self, const Tensor & exponent) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, exponent),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, exponent), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::pow_out(out, self, exponent);
             break;
@@ -12958,8 +12814,7 @@ static inline Tensor & pow_out(Tensor & out, const Tensor & self, const Tensor &
 static inline Tensor pow(const Tensor & self, const Tensor & exponent) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, exponent),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, exponent), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::pow(self, exponent);
             break;
@@ -12975,8 +12830,7 @@ static inline Tensor pow(const Tensor & self, const Tensor & exponent) {
 static inline Tensor & pow_out(Tensor & out, Scalar self, const Tensor & exponent) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, exponent),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, exponent), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::pow_out(out, self, exponent);
             break;
@@ -12992,8 +12846,7 @@ static inline Tensor & pow_out(Tensor & out, Scalar self, const Tensor & exponen
 static inline Tensor pow(Scalar self, const Tensor & exponent) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(exponent),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(exponent), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::pow(self, exponent);
             break;
@@ -13009,8 +12862,7 @@ static inline Tensor pow(Scalar self, const Tensor & exponent) {
 static inline Tensor & normal_out(Tensor & out, const Tensor & mean, double std, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, mean),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, mean), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::normal_out(out, mean, std, generator);
             break;
@@ -13026,8 +12878,7 @@ static inline Tensor & normal_out(Tensor & out, const Tensor & mean, double std,
 static inline Tensor normal(const Tensor & mean, double std, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(mean),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(mean), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::normal(mean, std, generator);
             break;
@@ -13043,8 +12894,7 @@ static inline Tensor normal(const Tensor & mean, double std, Generator * generat
 static inline Tensor & normal_out(Tensor & out, double mean, const Tensor & std, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, std),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, std), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::normal_out(out, mean, std, generator);
             break;
@@ -13060,8 +12910,7 @@ static inline Tensor & normal_out(Tensor & out, double mean, const Tensor & std,
 static inline Tensor normal(double mean, const Tensor & std, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(std),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(std), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::normal(mean, std, generator);
             break;
@@ -13077,8 +12926,7 @@ static inline Tensor normal(double mean, const Tensor & std, Generator * generat
 static inline Tensor & normal_out(Tensor & out, const Tensor & mean, const Tensor & std, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, mean, std),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, mean, std), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::normal_out(out, mean, std, generator);
             break;
@@ -13094,8 +12942,7 @@ static inline Tensor & normal_out(Tensor & out, const Tensor & mean, const Tenso
 static inline Tensor normal(const Tensor & mean, const Tensor & std, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(mean, std),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(mean, std), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::normal(mean, std, generator);
             break;
@@ -13108,16 +12955,18 @@ static inline Tensor normal(const Tensor & mean, const Tensor & std, Generator *
     return op.callUnboxed<Tensor, const Tensor &, const Tensor &, Generator *>(mean, std, generator);
 #endif
 }
-static inline Tensor normal(double mean, double std, IntArrayRef size, Generator * generator, const TensorOptions & options) {
+static inline Tensor _normal(double mean, double std, IntArrayRef size, Generator * generator, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    return TypeDefault::normal(mean, std, size, generator, options);
+    return TypeDefault::normal(mean, std, size, generator, dtype, layout, device, pin_memory);
 #else
-    globalLegacyTypeDispatch().initForDispatchKeySet(c10::detail::multi_dispatch_key_set(options));
     static c10::OperatorHandle op = c10::Dispatcher::singleton()
         .findSchemaOrThrow("aten::normal", "float_float");
-    return op.callUnboxed<Tensor, double, double, IntArrayRef, Generator *, const TensorOptions &>(mean, std, size, generator, options);
+    return op.callUnboxed<Tensor, double, double, IntArrayRef, Generator *, c10::optional<ScalarType>, c10::optional<Layout>, c10::optional<Device>, c10::optional<bool>>(mean, std, size, generator, dtype, layout, device, pin_memory);
 #endif
+}
+inline Tensor normal(double mean, double std, IntArrayRef size, Generator * generator, const TensorOptions & options) {
+    return _normal(mean, std, size, generator, typeMetaToScalarType(options.dtype()), options.layout(), options.device(), options.pinned_memory());
 }
 static inline Tensor & normal_out(Tensor & out, double mean, double std, IntArrayRef size, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
@@ -13142,8 +12991,7 @@ static inline Tensor alias(const Tensor & self) {
 static inline Tensor _addr(const Tensor & self, const Tensor & vec1, const Tensor & vec2, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, vec1, vec2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, vec1, vec2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_addr(self, vec1, vec2, beta, alpha);
             break;
@@ -13159,8 +13007,7 @@ static inline Tensor _addr(const Tensor & self, const Tensor & vec1, const Tenso
 static inline Tensor & _addr_(Tensor & self, const Tensor & vec1, const Tensor & vec2, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, vec1, vec2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, vec1, vec2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_addr_(self, vec1, vec2, beta, alpha);
             break;
@@ -13176,8 +13023,7 @@ static inline Tensor & _addr_(Tensor & self, const Tensor & vec1, const Tensor &
 static inline Tensor & _addr_out(Tensor & out, const Tensor & self, const Tensor & vec1, const Tensor & vec2, Scalar beta, Scalar alpha) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, vec1, vec2),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, vec1, vec2), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_addr_out(out, self, vec1, vec2, beta, alpha);
             break;
@@ -13193,8 +13039,7 @@ static inline Tensor & _addr_out(Tensor & out, const Tensor & self, const Tensor
 static inline Tensor & _index_copy_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & source) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, index, source),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, index, source), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_index_copy_(self, dim, index, source);
             break;
@@ -13210,8 +13055,7 @@ static inline Tensor & _index_copy_(Tensor & self, int64_t dim, const Tensor & i
 static inline Tensor _cumsum(const Tensor & self, int64_t dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_cumsum(self, dim);
             break;
@@ -13227,8 +13071,7 @@ static inline Tensor _cumsum(const Tensor & self, int64_t dim) {
 static inline Tensor & _cumsum_out(Tensor & out, const Tensor & self, int64_t dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_cumsum_out(out, self, dim);
             break;
@@ -13244,8 +13087,7 @@ static inline Tensor & _cumsum_out(Tensor & out, const Tensor & self, int64_t di
 static inline Tensor _cumprod(const Tensor & self, int64_t dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_cumprod(self, dim);
             break;
@@ -13261,8 +13103,7 @@ static inline Tensor _cumprod(const Tensor & self, int64_t dim) {
 static inline Tensor & _cumprod_out(Tensor & out, const Tensor & self, int64_t dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_cumprod_out(out, self, dim);
             break;
@@ -13278,8 +13119,7 @@ static inline Tensor & _cumprod_out(Tensor & out, const Tensor & self, int64_t d
 static inline Tensor _var(const Tensor & self, bool unbiased) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_var(self, unbiased);
             break;
@@ -13295,8 +13135,7 @@ static inline Tensor _var(const Tensor & self, bool unbiased) {
 static inline Tensor _std(const Tensor & self, bool unbiased) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_std(self, unbiased);
             break;
@@ -13312,8 +13151,7 @@ static inline Tensor _std(const Tensor & self, bool unbiased) {
 static inline Tensor _cat(TensorList tensors, int64_t dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(tensors),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(tensors), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_cat(tensors, dim);
             break;
@@ -13332,8 +13170,7 @@ static inline Tensor _cat(TensorList tensors, int64_t dim) {
 static inline Tensor & _cat_out(Tensor & out, TensorList tensors, int64_t dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, tensors),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, tensors), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_cat_out(out, tensors, dim);
             break;
@@ -13352,8 +13189,7 @@ static inline Tensor & _cat_out(Tensor & out, TensorList tensors, int64_t dim) {
 static inline std::tuple<Tensor,Tensor> _mode(const Tensor & self, int64_t dim, bool keepdim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_mode(self, dim, keepdim);
             break;
@@ -13369,8 +13205,7 @@ static inline std::tuple<Tensor,Tensor> _mode(const Tensor & self, int64_t dim, 
 static inline std::tuple<Tensor &,Tensor &> _mode_out(Tensor & values, Tensor & indices, const Tensor & self, int64_t dim, bool keepdim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(values, indices, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(values, indices, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_mode_out(values, indices, self, dim, keepdim);
             break;
@@ -13386,8 +13221,7 @@ static inline std::tuple<Tensor &,Tensor &> _mode_out(Tensor & values, Tensor & 
 static inline std::tuple<Tensor,Tensor> _max(const Tensor & self, int64_t dim, bool keepdim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_max(self, dim, keepdim);
             break;
@@ -13403,8 +13237,7 @@ static inline std::tuple<Tensor,Tensor> _max(const Tensor & self, int64_t dim, b
 static inline std::tuple<Tensor &,Tensor &> _max_out(Tensor & max, Tensor & max_indices, const Tensor & self, int64_t dim, bool keepdim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(max, max_indices, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(max, max_indices, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_max_out(max, max_indices, self, dim, keepdim);
             break;
@@ -13420,8 +13253,7 @@ static inline std::tuple<Tensor &,Tensor &> _max_out(Tensor & max, Tensor & max_
 static inline std::tuple<Tensor,Tensor> _min(const Tensor & self, int64_t dim, bool keepdim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_min(self, dim, keepdim);
             break;
@@ -13437,8 +13269,7 @@ static inline std::tuple<Tensor,Tensor> _min(const Tensor & self, int64_t dim, b
 static inline std::tuple<Tensor &,Tensor &> _min_out(Tensor & min, Tensor & min_indices, const Tensor & self, int64_t dim, bool keepdim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(min, min_indices, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(min, min_indices, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_min_out(min, min_indices, self, dim, keepdim);
             break;
@@ -13474,8 +13305,7 @@ static inline Tensor mse_loss(const Tensor & self, const Tensor & target, int64_
 static inline Tensor & mse_loss_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & target, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::mse_loss_backward_out(grad_input, grad_output, self, target, reduction);
             break;
@@ -13491,8 +13321,7 @@ static inline Tensor & mse_loss_backward_out(Tensor & grad_input, const Tensor &
 static inline Tensor mse_loss_backward(const Tensor & grad_output, const Tensor & self, const Tensor & target, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::mse_loss_backward(grad_output, self, target, reduction);
             break;
@@ -13528,8 +13357,7 @@ static inline Tensor l1_loss(const Tensor & self, const Tensor & target, int64_t
 static inline Tensor & l1_loss_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & target, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::l1_loss_backward_out(grad_input, grad_output, self, target, reduction);
             break;
@@ -13555,8 +13383,7 @@ static inline Tensor l1_loss_backward(const Tensor & grad_output, const Tensor &
 static inline Tensor & multi_margin_loss_out(Tensor & out, const Tensor & self, const Tensor & target, Scalar p, Scalar margin, const Tensor & weight, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, target, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, target, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::multi_margin_loss_out(out, self, target, p, margin, weight, reduction);
             break;
@@ -13572,8 +13399,7 @@ static inline Tensor & multi_margin_loss_out(Tensor & out, const Tensor & self, 
 static inline Tensor multi_margin_loss(const Tensor & self, const Tensor & target, Scalar p, Scalar margin, const Tensor & weight, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, target, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, target, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::multi_margin_loss(self, target, p, margin, weight, reduction);
             break;
@@ -13589,8 +13415,7 @@ static inline Tensor multi_margin_loss(const Tensor & self, const Tensor & targe
 static inline Tensor & multi_margin_loss_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & target, Scalar p, Scalar margin, const Tensor & weight, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::multi_margin_loss_backward_out(grad_input, grad_output, self, target, p, margin, weight, reduction);
             break;
@@ -13606,8 +13431,7 @@ static inline Tensor & multi_margin_loss_backward_out(Tensor & grad_input, const
 static inline Tensor multi_margin_loss_backward(const Tensor & grad_output, const Tensor & self, const Tensor & target, Scalar p, Scalar margin, const Tensor & weight, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::multi_margin_loss_backward(grad_output, self, target, p, margin, weight, reduction);
             break;
@@ -13643,8 +13467,7 @@ static inline Tensor multilabel_margin_loss(const Tensor & self, const Tensor & 
 static inline std::tuple<Tensor &,Tensor &> multilabel_margin_loss_forward_out(Tensor & output, Tensor & is_target, const Tensor & self, const Tensor & target, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, is_target, self, target),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, is_target, self, target), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::multilabel_margin_loss_forward_out(output, is_target, self, target, reduction);
             break;
@@ -13660,8 +13483,7 @@ static inline std::tuple<Tensor &,Tensor &> multilabel_margin_loss_forward_out(T
 static inline std::tuple<Tensor,Tensor> multilabel_margin_loss_forward(const Tensor & self, const Tensor & target, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, target),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, target), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::multilabel_margin_loss_forward(self, target, reduction);
             break;
@@ -13677,8 +13499,7 @@ static inline std::tuple<Tensor,Tensor> multilabel_margin_loss_forward(const Ten
 static inline Tensor & multilabel_margin_loss_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & target, int64_t reduction, const Tensor & is_target) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target, is_target),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target, is_target), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::multilabel_margin_loss_backward_out(grad_input, grad_output, self, target, reduction, is_target);
             break;
@@ -13694,8 +13515,7 @@ static inline Tensor & multilabel_margin_loss_backward_out(Tensor & grad_input, 
 static inline Tensor multilabel_margin_loss_backward(const Tensor & grad_output, const Tensor & self, const Tensor & target, int64_t reduction, const Tensor & is_target) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target, is_target),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target, is_target), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::multilabel_margin_loss_backward(grad_output, self, target, reduction, is_target);
             break;
@@ -13731,8 +13551,7 @@ static inline Tensor nll_loss(const Tensor & self, const Tensor & target, const 
 static inline std::tuple<Tensor &,Tensor &> nll_loss_forward_out(Tensor & output, Tensor & total_weight, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, total_weight, self, target, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, total_weight, self, target, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::nll_loss_forward_out(output, total_weight, self, target, weight, reduction, ignore_index);
             break;
@@ -13748,8 +13567,7 @@ static inline std::tuple<Tensor &,Tensor &> nll_loss_forward_out(Tensor & output
 static inline std::tuple<Tensor,Tensor> nll_loss_forward(const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, target, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, target, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::nll_loss_forward(self, target, weight, reduction, ignore_index);
             break;
@@ -13765,8 +13583,7 @@ static inline std::tuple<Tensor,Tensor> nll_loss_forward(const Tensor & self, co
 static inline Tensor & nll_loss_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index, const Tensor & total_weight) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target, weight, total_weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target, weight, total_weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::nll_loss_backward_out(grad_input, grad_output, self, target, weight, reduction, ignore_index, total_weight);
             break;
@@ -13782,8 +13599,7 @@ static inline Tensor & nll_loss_backward_out(Tensor & grad_input, const Tensor &
 static inline Tensor nll_loss_backward(const Tensor & grad_output, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index, const Tensor & total_weight) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target, weight, total_weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target, weight, total_weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::nll_loss_backward(grad_output, self, target, weight, reduction, ignore_index, total_weight);
             break;
@@ -13819,8 +13635,7 @@ static inline Tensor nll_loss2d(const Tensor & self, const Tensor & target, cons
 static inline std::tuple<Tensor &,Tensor &> nll_loss2d_forward_out(Tensor & output, Tensor & total_weight, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, total_weight, self, target, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, total_weight, self, target, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::nll_loss2d_forward_out(output, total_weight, self, target, weight, reduction, ignore_index);
             break;
@@ -13836,8 +13651,7 @@ static inline std::tuple<Tensor &,Tensor &> nll_loss2d_forward_out(Tensor & outp
 static inline std::tuple<Tensor,Tensor> nll_loss2d_forward(const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, target, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, target, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::nll_loss2d_forward(self, target, weight, reduction, ignore_index);
             break;
@@ -13853,8 +13667,7 @@ static inline std::tuple<Tensor,Tensor> nll_loss2d_forward(const Tensor & self, 
 static inline Tensor & nll_loss2d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index, const Tensor & total_weight) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target, weight, total_weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target, weight, total_weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::nll_loss2d_backward_out(grad_input, grad_output, self, target, weight, reduction, ignore_index, total_weight);
             break;
@@ -13870,8 +13683,7 @@ static inline Tensor & nll_loss2d_backward_out(Tensor & grad_input, const Tensor
 static inline Tensor nll_loss2d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & target, const Tensor & weight, int64_t reduction, int64_t ignore_index, const Tensor & total_weight) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target, weight, total_weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, target, weight, total_weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::nll_loss2d_backward(grad_output, self, target, weight, reduction, ignore_index, total_weight);
             break;
@@ -13887,8 +13699,7 @@ static inline Tensor nll_loss2d_backward(const Tensor & grad_output, const Tenso
 static inline Tensor & smooth_l1_loss_out(Tensor & out, const Tensor & self, const Tensor & target, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, target),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, target), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::smooth_l1_loss_out(out, self, target, reduction);
             break;
@@ -13914,8 +13725,7 @@ static inline Tensor smooth_l1_loss(const Tensor & self, const Tensor & target, 
 static inline Tensor & smooth_l1_loss_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & target, int64_t reduction) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, target), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::smooth_l1_loss_backward_out(grad_input, grad_output, self, target, reduction);
             break;
@@ -14001,8 +13811,7 @@ static inline Tensor elu(const Tensor & self, Scalar alpha, Scalar scale, Scalar
 static inline Tensor & elu_backward_out(Tensor & grad_input, const Tensor & grad_output, Scalar alpha, Scalar scale, Scalar input_scale, const Tensor & output) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::elu_backward_out(grad_input, grad_output, alpha, scale, input_scale, output);
             break;
@@ -14038,8 +13847,7 @@ static inline Tensor & elu_(Tensor & self, Scalar alpha, Scalar scale, Scalar in
 static inline Tensor & glu_out(Tensor & out, const Tensor & self, int64_t dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::glu_out(out, self, dim);
             break;
@@ -14055,8 +13863,7 @@ static inline Tensor & glu_out(Tensor & out, const Tensor & self, int64_t dim) {
 static inline Tensor glu(const Tensor & self, int64_t dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::glu(self, dim);
             break;
@@ -14072,8 +13879,7 @@ static inline Tensor glu(const Tensor & self, int64_t dim) {
 static inline Tensor & glu_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, int64_t dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::glu_backward_out(grad_input, grad_output, self, dim);
             break;
@@ -14089,8 +13895,7 @@ static inline Tensor & glu_backward_out(Tensor & grad_input, const Tensor & grad
 static inline Tensor glu_backward(const Tensor & grad_output, const Tensor & self, int64_t dim) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::glu_backward(grad_output, self, dim);
             break;
@@ -14126,8 +13931,7 @@ static inline Tensor hardtanh(const Tensor & self, Scalar min_val, Scalar max_va
 static inline Tensor & hardtanh_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, Scalar min_val, Scalar max_val) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::hardtanh_backward_out(grad_input, grad_output, self, min_val, max_val);
             break;
@@ -14183,8 +13987,7 @@ static inline Tensor leaky_relu(const Tensor & self, Scalar negative_slope) {
 static inline Tensor & leaky_relu_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, Scalar negative_slope) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::leaky_relu_backward_out(grad_input, grad_output, self, negative_slope);
             break;
@@ -14240,8 +14043,7 @@ static inline Tensor log_sigmoid(const Tensor & self) {
 static inline std::tuple<Tensor &,Tensor &> log_sigmoid_forward_out(Tensor & output, Tensor & buffer, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, buffer, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, buffer, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::log_sigmoid_forward_out(output, buffer, self);
             break;
@@ -14257,8 +14059,7 @@ static inline std::tuple<Tensor &,Tensor &> log_sigmoid_forward_out(Tensor & out
 static inline std::tuple<Tensor,Tensor> log_sigmoid_forward(const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::log_sigmoid_forward(self);
             break;
@@ -14274,8 +14075,7 @@ static inline std::tuple<Tensor,Tensor> log_sigmoid_forward(const Tensor & self)
 static inline Tensor & log_sigmoid_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & buffer) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, buffer),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, buffer), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::log_sigmoid_backward_out(grad_input, grad_output, self, buffer);
             break;
@@ -14291,8 +14091,7 @@ static inline Tensor & log_sigmoid_backward_out(Tensor & grad_input, const Tenso
 static inline Tensor log_sigmoid_backward(const Tensor & grad_output, const Tensor & self, const Tensor & buffer) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, buffer),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, buffer), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::log_sigmoid_backward(grad_output, self, buffer);
             break;
@@ -14308,8 +14107,7 @@ static inline Tensor log_sigmoid_backward(const Tensor & grad_output, const Tens
 static inline Tensor & rrelu_with_noise_out(Tensor & out, const Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, noise),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, noise), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::rrelu_with_noise_out(out, self, noise, lower, upper, training, generator);
             break;
@@ -14325,8 +14123,7 @@ static inline Tensor & rrelu_with_noise_out(Tensor & out, const Tensor & self, c
 static inline Tensor rrelu_with_noise(const Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, noise),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, noise), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::rrelu_with_noise(self, noise, lower, upper, training, generator);
             break;
@@ -14342,8 +14139,7 @@ static inline Tensor rrelu_with_noise(const Tensor & self, const Tensor & noise,
 static inline Tensor & rrelu_with_noise_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, noise),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, noise), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::rrelu_with_noise_backward_out(grad_input, grad_output, self, noise, lower, upper, training);
             break;
@@ -14369,8 +14165,7 @@ static inline Tensor rrelu_with_noise_backward(const Tensor & grad_output, const
 static inline Tensor & rrelu_with_noise_(Tensor & self, const Tensor & noise, Scalar lower, Scalar upper, bool training, Generator * generator) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, noise),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, noise), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::rrelu_with_noise_(self, noise, lower, upper, training, generator);
             break;
@@ -14406,8 +14201,7 @@ static inline Tensor softplus(const Tensor & self, Scalar beta, Scalar threshold
 static inline Tensor & softplus_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, Scalar beta, Scalar threshold, const Tensor & output) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::softplus_backward_out(grad_input, grad_output, self, beta, threshold, output);
             break;
@@ -14453,8 +14247,7 @@ static inline Tensor softshrink(const Tensor & self, Scalar lambd) {
 static inline Tensor & softshrink_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, Scalar lambd) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::softshrink_backward_out(grad_input, grad_output, self, lambd);
             break;
@@ -14480,8 +14273,7 @@ static inline Tensor softshrink_backward(const Tensor & grad_output, const Tenso
 static inline Tensor & adaptive_avg_pool2d_out(Tensor & out, const Tensor & self, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_avg_pool2d_out(out, self, output_size);
             break;
@@ -14507,8 +14299,7 @@ static inline Tensor adaptive_avg_pool2d(const Tensor & self, IntArrayRef output
 static inline Tensor mkldnn_adaptive_avg_pool2d(const Tensor & self, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("mkldnn_adaptive_avg_pool2d not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self)));
@@ -14522,8 +14313,7 @@ static inline Tensor mkldnn_adaptive_avg_pool2d(const Tensor & self, IntArrayRef
 static inline Tensor _adaptive_avg_pool2d(const Tensor & self, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_adaptive_avg_pool2d(self, output_size);
             break;
@@ -14542,8 +14332,7 @@ static inline Tensor _adaptive_avg_pool2d(const Tensor & self, IntArrayRef outpu
 static inline Tensor _adaptive_avg_pool2d_backward(const Tensor & grad_output, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::_adaptive_avg_pool2d_backward(grad_output, self);
             break;
@@ -14559,8 +14348,7 @@ static inline Tensor _adaptive_avg_pool2d_backward(const Tensor & grad_output, c
 static inline Tensor & adaptive_avg_pool3d_out(Tensor & out, const Tensor & self, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_avg_pool3d_out(out, self, output_size);
             break;
@@ -14576,8 +14364,7 @@ static inline Tensor & adaptive_avg_pool3d_out(Tensor & out, const Tensor & self
 static inline Tensor adaptive_avg_pool3d(const Tensor & self, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_avg_pool3d(self, output_size);
             break;
@@ -14593,8 +14380,7 @@ static inline Tensor adaptive_avg_pool3d(const Tensor & self, IntArrayRef output
 static inline Tensor & adaptive_avg_pool3d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_avg_pool3d_backward_out(grad_input, grad_output, self);
             break;
@@ -14610,8 +14396,7 @@ static inline Tensor & adaptive_avg_pool3d_backward_out(Tensor & grad_input, con
 static inline Tensor adaptive_avg_pool3d_backward(const Tensor & grad_output, const Tensor & self) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_avg_pool3d_backward(grad_output, self);
             break;
@@ -14627,8 +14412,7 @@ static inline Tensor adaptive_avg_pool3d_backward(const Tensor & grad_output, co
 static inline std::tuple<Tensor &,Tensor &> adaptive_max_pool2d_out(Tensor & out, Tensor & indices, const Tensor & self, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, indices, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, indices, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_max_pool2d_out(out, indices, self, output_size);
             break;
@@ -14644,8 +14428,7 @@ static inline std::tuple<Tensor &,Tensor &> adaptive_max_pool2d_out(Tensor & out
 static inline std::tuple<Tensor,Tensor> adaptive_max_pool2d(const Tensor & self, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_max_pool2d(self, output_size);
             break;
@@ -14661,8 +14444,7 @@ static inline std::tuple<Tensor,Tensor> adaptive_max_pool2d(const Tensor & self,
 static inline Tensor & adaptive_max_pool2d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & indices) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_max_pool2d_backward_out(grad_input, grad_output, self, indices);
             break;
@@ -14678,8 +14460,7 @@ static inline Tensor & adaptive_max_pool2d_backward_out(Tensor & grad_input, con
 static inline Tensor adaptive_max_pool2d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & indices) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_max_pool2d_backward(grad_output, self, indices);
             break;
@@ -14695,8 +14476,7 @@ static inline Tensor adaptive_max_pool2d_backward(const Tensor & grad_output, co
 static inline std::tuple<Tensor &,Tensor &> adaptive_max_pool3d_out(Tensor & out, Tensor & indices, const Tensor & self, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, indices, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, indices, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_max_pool3d_out(out, indices, self, output_size);
             break;
@@ -14712,8 +14492,7 @@ static inline std::tuple<Tensor &,Tensor &> adaptive_max_pool3d_out(Tensor & out
 static inline std::tuple<Tensor,Tensor> adaptive_max_pool3d(const Tensor & self, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_max_pool3d(self, output_size);
             break;
@@ -14729,8 +14508,7 @@ static inline std::tuple<Tensor,Tensor> adaptive_max_pool3d(const Tensor & self,
 static inline Tensor & adaptive_max_pool3d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & indices) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_max_pool3d_backward_out(grad_input, grad_output, self, indices);
             break;
@@ -14746,8 +14524,7 @@ static inline Tensor & adaptive_max_pool3d_backward_out(Tensor & grad_input, con
 static inline Tensor adaptive_max_pool3d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & indices) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::adaptive_max_pool3d_backward(grad_output, self, indices);
             break;
@@ -14763,8 +14540,7 @@ static inline Tensor adaptive_max_pool3d_backward(const Tensor & grad_output, co
 static inline Tensor & avg_pool2d_out(Tensor & out, const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::avg_pool2d_out(out, self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
             break;
@@ -14780,8 +14556,7 @@ static inline Tensor & avg_pool2d_out(Tensor & out, const Tensor & self, IntArra
 static inline Tensor avg_pool2d(const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::avg_pool2d(self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
             break;
@@ -14800,8 +14575,7 @@ static inline Tensor avg_pool2d(const Tensor & self, IntArrayRef kernel_size, In
 static inline Tensor & avg_pool2d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::avg_pool2d_backward_out(grad_input, grad_output, self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
             break;
@@ -14817,8 +14591,7 @@ static inline Tensor & avg_pool2d_backward_out(Tensor & grad_input, const Tensor
 static inline Tensor avg_pool2d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::avg_pool2d_backward(grad_output, self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
             break;
@@ -14834,8 +14607,7 @@ static inline Tensor avg_pool2d_backward(const Tensor & grad_output, const Tenso
 static inline Tensor & avg_pool3d_out(Tensor & out, const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::avg_pool3d_out(out, self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
             break;
@@ -14851,8 +14623,7 @@ static inline Tensor & avg_pool3d_out(Tensor & out, const Tensor & self, IntArra
 static inline Tensor avg_pool3d(const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::avg_pool3d(self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
             break;
@@ -14868,8 +14639,7 @@ static inline Tensor avg_pool3d(const Tensor & self, IntArrayRef kernel_size, In
 static inline Tensor & avg_pool3d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::avg_pool3d_backward_out(grad_input, grad_output, self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
             break;
@@ -14885,8 +14655,7 @@ static inline Tensor & avg_pool3d_backward_out(Tensor & grad_input, const Tensor
 static inline Tensor avg_pool3d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, bool ceil_mode, bool count_include_pad, c10::optional<int64_t> divisor_override) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::avg_pool3d_backward(grad_output, self, kernel_size, stride, padding, ceil_mode, count_include_pad, divisor_override);
             break;
@@ -14902,8 +14671,7 @@ static inline Tensor avg_pool3d_backward(const Tensor & grad_output, const Tenso
 static inline std::tuple<Tensor &,Tensor &> fractional_max_pool2d_out(Tensor & output, Tensor & indices, const Tensor & self, IntArrayRef kernel_size, IntArrayRef output_size, const Tensor & random_samples) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, indices, self, random_samples),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, indices, self, random_samples), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fractional_max_pool2d_out(output, indices, self, kernel_size, output_size, random_samples);
             break;
@@ -14919,8 +14687,7 @@ static inline std::tuple<Tensor &,Tensor &> fractional_max_pool2d_out(Tensor & o
 static inline std::tuple<Tensor,Tensor> fractional_max_pool2d(const Tensor & self, IntArrayRef kernel_size, IntArrayRef output_size, const Tensor & random_samples) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, random_samples),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, random_samples), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fractional_max_pool2d(self, kernel_size, output_size, random_samples);
             break;
@@ -14936,8 +14703,7 @@ static inline std::tuple<Tensor,Tensor> fractional_max_pool2d(const Tensor & sel
 static inline Tensor & fractional_max_pool2d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef kernel_size, IntArrayRef output_size, const Tensor & indices) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fractional_max_pool2d_backward_out(grad_input, grad_output, self, kernel_size, output_size, indices);
             break;
@@ -14953,8 +14719,7 @@ static inline Tensor & fractional_max_pool2d_backward_out(Tensor & grad_input, c
 static inline Tensor fractional_max_pool2d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef kernel_size, IntArrayRef output_size, const Tensor & indices) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fractional_max_pool2d_backward(grad_output, self, kernel_size, output_size, indices);
             break;
@@ -14970,8 +14735,7 @@ static inline Tensor fractional_max_pool2d_backward(const Tensor & grad_output, 
 static inline std::tuple<Tensor &,Tensor &> fractional_max_pool3d_out(Tensor & output, Tensor & indices, const Tensor & self, IntArrayRef kernel_size, IntArrayRef output_size, const Tensor & random_samples) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, indices, self, random_samples),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, indices, self, random_samples), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fractional_max_pool3d_out(output, indices, self, kernel_size, output_size, random_samples);
             break;
@@ -14987,8 +14751,7 @@ static inline std::tuple<Tensor &,Tensor &> fractional_max_pool3d_out(Tensor & o
 static inline std::tuple<Tensor,Tensor> fractional_max_pool3d(const Tensor & self, IntArrayRef kernel_size, IntArrayRef output_size, const Tensor & random_samples) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, random_samples),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, random_samples), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fractional_max_pool3d(self, kernel_size, output_size, random_samples);
             break;
@@ -15004,8 +14767,7 @@ static inline std::tuple<Tensor,Tensor> fractional_max_pool3d(const Tensor & sel
 static inline Tensor & fractional_max_pool3d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef kernel_size, IntArrayRef output_size, const Tensor & indices) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fractional_max_pool3d_backward_out(grad_input, grad_output, self, kernel_size, output_size, indices);
             break;
@@ -15021,8 +14783,7 @@ static inline Tensor & fractional_max_pool3d_backward_out(Tensor & grad_input, c
 static inline Tensor fractional_max_pool3d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef kernel_size, IntArrayRef output_size, const Tensor & indices) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::fractional_max_pool3d_backward(grad_output, self, kernel_size, output_size, indices);
             break;
@@ -15038,8 +14799,7 @@ static inline Tensor fractional_max_pool3d_backward(const Tensor & grad_output, 
 static inline std::tuple<Tensor &,Tensor &> max_pool2d_with_indices_out(Tensor & out, Tensor & indices, const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, bool ceil_mode) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, indices, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, indices, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_pool2d_with_indices_out(out, indices, self, kernel_size, stride, padding, dilation, ceil_mode);
             break;
@@ -15055,8 +14815,7 @@ static inline std::tuple<Tensor &,Tensor &> max_pool2d_with_indices_out(Tensor &
 static inline std::tuple<Tensor,Tensor> max_pool2d_with_indices(const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, bool ceil_mode) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_pool2d_with_indices(self, kernel_size, stride, padding, dilation, ceil_mode);
             break;
@@ -15072,8 +14831,7 @@ static inline std::tuple<Tensor,Tensor> max_pool2d_with_indices(const Tensor & s
 static inline Tensor & max_pool2d_with_indices_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, bool ceil_mode, const Tensor & indices) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_pool2d_with_indices_backward_out(grad_input, grad_output, self, kernel_size, stride, padding, dilation, ceil_mode, indices);
             break;
@@ -15089,8 +14847,7 @@ static inline Tensor & max_pool2d_with_indices_backward_out(Tensor & grad_input,
 static inline Tensor max_pool2d_with_indices_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, bool ceil_mode, const Tensor & indices) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_pool2d_with_indices_backward(grad_output, self, kernel_size, stride, padding, dilation, ceil_mode, indices);
             break;
@@ -15106,8 +14863,7 @@ static inline Tensor max_pool2d_with_indices_backward(const Tensor & grad_output
 static inline std::tuple<Tensor &,Tensor &> max_pool3d_with_indices_out(Tensor & out, Tensor & indices, const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, bool ceil_mode) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, indices, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, indices, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_pool3d_with_indices_out(out, indices, self, kernel_size, stride, padding, dilation, ceil_mode);
             break;
@@ -15123,8 +14879,7 @@ static inline std::tuple<Tensor &,Tensor &> max_pool3d_with_indices_out(Tensor &
 static inline std::tuple<Tensor,Tensor> max_pool3d_with_indices(const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, bool ceil_mode) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_pool3d_with_indices(self, kernel_size, stride, padding, dilation, ceil_mode);
             break;
@@ -15140,8 +14895,7 @@ static inline std::tuple<Tensor,Tensor> max_pool3d_with_indices(const Tensor & s
 static inline Tensor & max_pool3d_with_indices_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, bool ceil_mode, const Tensor & indices) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_pool3d_with_indices_backward_out(grad_input, grad_output, self, kernel_size, stride, padding, dilation, ceil_mode, indices);
             break;
@@ -15157,8 +14911,7 @@ static inline Tensor & max_pool3d_with_indices_backward_out(Tensor & grad_input,
 static inline Tensor max_pool3d_with_indices_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, bool ceil_mode, const Tensor & indices) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_pool3d_with_indices_backward(grad_output, self, kernel_size, stride, padding, dilation, ceil_mode, indices);
             break;
@@ -15174,8 +14927,7 @@ static inline Tensor max_pool3d_with_indices_backward(const Tensor & grad_output
 static inline Tensor & max_unpool2d_out(Tensor & out, const Tensor & self, const Tensor & indices, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_unpool2d_out(out, self, indices, output_size);
             break;
@@ -15191,8 +14943,7 @@ static inline Tensor & max_unpool2d_out(Tensor & out, const Tensor & self, const
 static inline Tensor max_unpool2d(const Tensor & self, const Tensor & indices, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_unpool2d(self, indices, output_size);
             break;
@@ -15208,8 +14959,7 @@ static inline Tensor max_unpool2d(const Tensor & self, const Tensor & indices, I
 static inline Tensor & max_unpool2d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & indices, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_unpool2d_backward_out(grad_input, grad_output, self, indices, output_size);
             break;
@@ -15225,8 +14975,7 @@ static inline Tensor & max_unpool2d_backward_out(Tensor & grad_input, const Tens
 static inline Tensor max_unpool2d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & indices, IntArrayRef output_size) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_unpool2d_backward(grad_output, self, indices, output_size);
             break;
@@ -15242,8 +14991,7 @@ static inline Tensor max_unpool2d_backward(const Tensor & grad_output, const Ten
 static inline Tensor & max_unpool3d_out(Tensor & out, const Tensor & self, const Tensor & indices, IntArrayRef output_size, IntArrayRef stride, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_unpool3d_out(out, self, indices, output_size, stride, padding);
             break;
@@ -15259,8 +15007,7 @@ static inline Tensor & max_unpool3d_out(Tensor & out, const Tensor & self, const
 static inline Tensor max_unpool3d(const Tensor & self, const Tensor & indices, IntArrayRef output_size, IntArrayRef stride, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_unpool3d(self, indices, output_size, stride, padding);
             break;
@@ -15276,8 +15023,7 @@ static inline Tensor max_unpool3d(const Tensor & self, const Tensor & indices, I
 static inline Tensor & max_unpool3d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, const Tensor & indices, IntArrayRef output_size, IntArrayRef stride, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_unpool3d_backward_out(grad_input, grad_output, self, indices, output_size, stride, padding);
             break;
@@ -15293,8 +15039,7 @@ static inline Tensor & max_unpool3d_backward_out(Tensor & grad_input, const Tens
 static inline Tensor max_unpool3d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & indices, IntArrayRef output_size, IntArrayRef stride, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, indices), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::max_unpool3d_backward(grad_output, self, indices, output_size, stride, padding);
             break;
@@ -15310,8 +15055,7 @@ static inline Tensor max_unpool3d_backward(const Tensor & grad_output, const Ten
 static inline Tensor & reflection_pad1d_out(Tensor & out, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::reflection_pad1d_out(out, self, padding);
             break;
@@ -15327,8 +15071,7 @@ static inline Tensor & reflection_pad1d_out(Tensor & out, const Tensor & self, I
 static inline Tensor reflection_pad1d(const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::reflection_pad1d(self, padding);
             break;
@@ -15344,8 +15087,7 @@ static inline Tensor reflection_pad1d(const Tensor & self, IntArrayRef padding) 
 static inline Tensor & reflection_pad1d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::reflection_pad1d_backward_out(grad_input, grad_output, self, padding);
             break;
@@ -15361,8 +15103,7 @@ static inline Tensor & reflection_pad1d_backward_out(Tensor & grad_input, const 
 static inline Tensor reflection_pad1d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::reflection_pad1d_backward(grad_output, self, padding);
             break;
@@ -15378,8 +15119,7 @@ static inline Tensor reflection_pad1d_backward(const Tensor & grad_output, const
 static inline Tensor & reflection_pad2d_out(Tensor & out, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::reflection_pad2d_out(out, self, padding);
             break;
@@ -15395,8 +15135,7 @@ static inline Tensor & reflection_pad2d_out(Tensor & out, const Tensor & self, I
 static inline Tensor reflection_pad2d(const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::reflection_pad2d(self, padding);
             break;
@@ -15412,8 +15151,7 @@ static inline Tensor reflection_pad2d(const Tensor & self, IntArrayRef padding) 
 static inline Tensor & reflection_pad2d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::reflection_pad2d_backward_out(grad_input, grad_output, self, padding);
             break;
@@ -15429,8 +15167,7 @@ static inline Tensor & reflection_pad2d_backward_out(Tensor & grad_input, const 
 static inline Tensor reflection_pad2d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::reflection_pad2d_backward(grad_output, self, padding);
             break;
@@ -15446,8 +15183,7 @@ static inline Tensor reflection_pad2d_backward(const Tensor & grad_output, const
 static inline Tensor & replication_pad1d_out(Tensor & out, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::replication_pad1d_out(out, self, padding);
             break;
@@ -15463,8 +15199,7 @@ static inline Tensor & replication_pad1d_out(Tensor & out, const Tensor & self, 
 static inline Tensor replication_pad1d(const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::replication_pad1d(self, padding);
             break;
@@ -15480,8 +15215,7 @@ static inline Tensor replication_pad1d(const Tensor & self, IntArrayRef padding)
 static inline Tensor & replication_pad1d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::replication_pad1d_backward_out(grad_input, grad_output, self, padding);
             break;
@@ -15497,8 +15231,7 @@ static inline Tensor & replication_pad1d_backward_out(Tensor & grad_input, const
 static inline Tensor replication_pad1d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::replication_pad1d_backward(grad_output, self, padding);
             break;
@@ -15514,8 +15247,7 @@ static inline Tensor replication_pad1d_backward(const Tensor & grad_output, cons
 static inline Tensor & replication_pad2d_out(Tensor & out, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::replication_pad2d_out(out, self, padding);
             break;
@@ -15531,8 +15263,7 @@ static inline Tensor & replication_pad2d_out(Tensor & out, const Tensor & self, 
 static inline Tensor replication_pad2d(const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::replication_pad2d(self, padding);
             break;
@@ -15548,8 +15279,7 @@ static inline Tensor replication_pad2d(const Tensor & self, IntArrayRef padding)
 static inline Tensor & replication_pad2d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::replication_pad2d_backward_out(grad_input, grad_output, self, padding);
             break;
@@ -15565,8 +15295,7 @@ static inline Tensor & replication_pad2d_backward_out(Tensor & grad_input, const
 static inline Tensor replication_pad2d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::replication_pad2d_backward(grad_output, self, padding);
             break;
@@ -15582,8 +15311,7 @@ static inline Tensor replication_pad2d_backward(const Tensor & grad_output, cons
 static inline Tensor & replication_pad3d_out(Tensor & out, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::replication_pad3d_out(out, self, padding);
             break;
@@ -15599,8 +15327,7 @@ static inline Tensor & replication_pad3d_out(Tensor & out, const Tensor & self, 
 static inline Tensor replication_pad3d(const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::replication_pad3d(self, padding);
             break;
@@ -15616,8 +15343,7 @@ static inline Tensor replication_pad3d(const Tensor & self, IntArrayRef padding)
 static inline Tensor & replication_pad3d_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::replication_pad3d_backward_out(grad_input, grad_output, self, padding);
             break;
@@ -15633,8 +15359,7 @@ static inline Tensor & replication_pad3d_backward_out(Tensor & grad_input, const
 static inline Tensor replication_pad3d_backward(const Tensor & grad_output, const Tensor & self, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::replication_pad3d_backward(grad_output, self, padding);
             break;
@@ -15650,8 +15375,7 @@ static inline Tensor replication_pad3d_backward(const Tensor & grad_output, cons
 static inline Tensor & upsample_linear1d_out(Tensor & out, const Tensor & self, IntArrayRef output_size, bool align_corners, c10::optional<double> scales) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_linear1d_out(out, self, output_size, align_corners, scales);
             break;
@@ -15667,8 +15391,7 @@ static inline Tensor & upsample_linear1d_out(Tensor & out, const Tensor & self, 
 static inline Tensor upsample_linear1d(const Tensor & self, IntArrayRef output_size, bool align_corners, c10::optional<double> scales) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_linear1d(self, output_size, align_corners, scales);
             break;
@@ -15684,8 +15407,7 @@ static inline Tensor upsample_linear1d(const Tensor & self, IntArrayRef output_s
 static inline Tensor & upsample_linear1d_backward_out(Tensor & grad_input, const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, bool align_corners, c10::optional<double> scales) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_linear1d_backward_out(grad_input, grad_output, output_size, input_size, align_corners, scales);
             break;
@@ -15701,8 +15423,7 @@ static inline Tensor & upsample_linear1d_backward_out(Tensor & grad_input, const
 static inline Tensor upsample_linear1d_backward(const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, bool align_corners, c10::optional<double> scales) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_linear1d_backward(grad_output, output_size, input_size, align_corners, scales);
             break;
@@ -15718,8 +15439,7 @@ static inline Tensor upsample_linear1d_backward(const Tensor & grad_output, IntA
 static inline Tensor & upsample_bilinear2d_out(Tensor & out, const Tensor & self, IntArrayRef output_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_bilinear2d_out(out, self, output_size, align_corners, scales_h, scales_w);
             break;
@@ -15735,8 +15455,7 @@ static inline Tensor & upsample_bilinear2d_out(Tensor & out, const Tensor & self
 static inline Tensor upsample_bilinear2d(const Tensor & self, IntArrayRef output_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_bilinear2d(self, output_size, align_corners, scales_h, scales_w);
             break;
@@ -15755,8 +15474,7 @@ static inline Tensor upsample_bilinear2d(const Tensor & self, IntArrayRef output
 static inline Tensor & upsample_bilinear2d_backward_out(Tensor & grad_input, const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_bilinear2d_backward_out(grad_input, grad_output, output_size, input_size, align_corners, scales_h, scales_w);
             break;
@@ -15772,8 +15490,7 @@ static inline Tensor & upsample_bilinear2d_backward_out(Tensor & grad_input, con
 static inline Tensor upsample_bilinear2d_backward(const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_bilinear2d_backward(grad_output, output_size, input_size, align_corners, scales_h, scales_w);
             break;
@@ -15789,8 +15506,7 @@ static inline Tensor upsample_bilinear2d_backward(const Tensor & grad_output, In
 static inline Tensor & upsample_bicubic2d_out(Tensor & out, const Tensor & self, IntArrayRef output_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_bicubic2d_out(out, self, output_size, align_corners, scales_h, scales_w);
             break;
@@ -15806,8 +15522,7 @@ static inline Tensor & upsample_bicubic2d_out(Tensor & out, const Tensor & self,
 static inline Tensor upsample_bicubic2d(const Tensor & self, IntArrayRef output_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_bicubic2d(self, output_size, align_corners, scales_h, scales_w);
             break;
@@ -15823,8 +15538,7 @@ static inline Tensor upsample_bicubic2d(const Tensor & self, IntArrayRef output_
 static inline Tensor & upsample_bicubic2d_backward_out(Tensor & grad_input, const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_bicubic2d_backward_out(grad_input, grad_output, output_size, input_size, align_corners, scales_h, scales_w);
             break;
@@ -15840,8 +15554,7 @@ static inline Tensor & upsample_bicubic2d_backward_out(Tensor & grad_input, cons
 static inline Tensor upsample_bicubic2d_backward(const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, bool align_corners, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_bicubic2d_backward(grad_output, output_size, input_size, align_corners, scales_h, scales_w);
             break;
@@ -15857,8 +15570,7 @@ static inline Tensor upsample_bicubic2d_backward(const Tensor & grad_output, Int
 static inline Tensor & upsample_trilinear3d_out(Tensor & out, const Tensor & self, IntArrayRef output_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_trilinear3d_out(out, self, output_size, align_corners, scales_d, scales_h, scales_w);
             break;
@@ -15874,8 +15586,7 @@ static inline Tensor & upsample_trilinear3d_out(Tensor & out, const Tensor & sel
 static inline Tensor upsample_trilinear3d(const Tensor & self, IntArrayRef output_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_trilinear3d(self, output_size, align_corners, scales_d, scales_h, scales_w);
             break;
@@ -15891,8 +15602,7 @@ static inline Tensor upsample_trilinear3d(const Tensor & self, IntArrayRef outpu
 static inline Tensor & upsample_trilinear3d_backward_out(Tensor & grad_input, const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_trilinear3d_backward_out(grad_input, grad_output, output_size, input_size, align_corners, scales_d, scales_h, scales_w);
             break;
@@ -15908,8 +15618,7 @@ static inline Tensor & upsample_trilinear3d_backward_out(Tensor & grad_input, co
 static inline Tensor upsample_trilinear3d_backward(const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, bool align_corners, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_trilinear3d_backward(grad_output, output_size, input_size, align_corners, scales_d, scales_h, scales_w);
             break;
@@ -15925,8 +15634,7 @@ static inline Tensor upsample_trilinear3d_backward(const Tensor & grad_output, I
 static inline Tensor & upsample_nearest1d_out(Tensor & out, const Tensor & self, IntArrayRef output_size, c10::optional<double> scales) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_nearest1d_out(out, self, output_size, scales);
             break;
@@ -15942,8 +15650,7 @@ static inline Tensor & upsample_nearest1d_out(Tensor & out, const Tensor & self,
 static inline Tensor upsample_nearest1d(const Tensor & self, IntArrayRef output_size, c10::optional<double> scales) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_nearest1d(self, output_size, scales);
             break;
@@ -15959,8 +15666,7 @@ static inline Tensor upsample_nearest1d(const Tensor & self, IntArrayRef output_
 static inline Tensor & upsample_nearest1d_backward_out(Tensor & grad_input, const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, c10::optional<double> scales) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_nearest1d_backward_out(grad_input, grad_output, output_size, input_size, scales);
             break;
@@ -15976,8 +15682,7 @@ static inline Tensor & upsample_nearest1d_backward_out(Tensor & grad_input, cons
 static inline Tensor upsample_nearest1d_backward(const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, c10::optional<double> scales) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_nearest1d_backward(grad_output, output_size, input_size, scales);
             break;
@@ -15993,8 +15698,7 @@ static inline Tensor upsample_nearest1d_backward(const Tensor & grad_output, Int
 static inline Tensor & upsample_nearest2d_out(Tensor & out, const Tensor & self, IntArrayRef output_size, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_nearest2d_out(out, self, output_size, scales_h, scales_w);
             break;
@@ -16010,8 +15714,7 @@ static inline Tensor & upsample_nearest2d_out(Tensor & out, const Tensor & self,
 static inline Tensor upsample_nearest2d(const Tensor & self, IntArrayRef output_size, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_nearest2d(self, output_size, scales_h, scales_w);
             break;
@@ -16030,8 +15733,7 @@ static inline Tensor upsample_nearest2d(const Tensor & self, IntArrayRef output_
 static inline Tensor & upsample_nearest2d_backward_out(Tensor & grad_input, const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_nearest2d_backward_out(grad_input, grad_output, output_size, input_size, scales_h, scales_w);
             break;
@@ -16047,8 +15749,7 @@ static inline Tensor & upsample_nearest2d_backward_out(Tensor & grad_input, cons
 static inline Tensor upsample_nearest2d_backward(const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_nearest2d_backward(grad_output, output_size, input_size, scales_h, scales_w);
             break;
@@ -16064,8 +15765,7 @@ static inline Tensor upsample_nearest2d_backward(const Tensor & grad_output, Int
 static inline Tensor & upsample_nearest3d_out(Tensor & out, const Tensor & self, IntArrayRef output_size, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_nearest3d_out(out, self, output_size, scales_d, scales_h, scales_w);
             break;
@@ -16081,8 +15781,7 @@ static inline Tensor & upsample_nearest3d_out(Tensor & out, const Tensor & self,
 static inline Tensor upsample_nearest3d(const Tensor & self, IntArrayRef output_size, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_nearest3d(self, output_size, scales_d, scales_h, scales_w);
             break;
@@ -16098,8 +15797,7 @@ static inline Tensor upsample_nearest3d(const Tensor & self, IntArrayRef output_
 static inline Tensor & upsample_nearest3d_backward_out(Tensor & grad_input, const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_nearest3d_backward_out(grad_input, grad_output, output_size, input_size, scales_d, scales_h, scales_w);
             break;
@@ -16115,8 +15813,7 @@ static inline Tensor & upsample_nearest3d_backward_out(Tensor & grad_input, cons
 static inline Tensor upsample_nearest3d_backward(const Tensor & grad_output, IntArrayRef output_size, IntArrayRef input_size, c10::optional<double> scales_d, c10::optional<double> scales_h, c10::optional<double> scales_w) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::upsample_nearest3d_backward(grad_output, output_size, input_size, scales_d, scales_h, scales_w);
             break;
@@ -16132,8 +15829,7 @@ static inline Tensor upsample_nearest3d_backward(const Tensor & grad_output, Int
 static inline Tensor & sigmoid_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & output) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::sigmoid_backward_out(grad_input, grad_output, output);
             break;
@@ -16159,8 +15855,7 @@ static inline Tensor sigmoid_backward(const Tensor & grad_output, const Tensor &
 static inline Tensor & tanh_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & output) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output, output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::tanh_backward_out(grad_input, grad_output, output);
             break;
@@ -16186,8 +15881,7 @@ static inline Tensor tanh_backward(const Tensor & grad_output, const Tensor & ou
 static inline Tensor & slow_conv_transpose2d_out(Tensor & out, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, const Tensor & bias, IntArrayRef stride, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef dilation) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv_transpose2d_out(out, self, weight, kernel_size, bias, stride, padding, output_padding, dilation);
             break;
@@ -16203,8 +15897,7 @@ static inline Tensor & slow_conv_transpose2d_out(Tensor & out, const Tensor & se
 static inline Tensor slow_conv_transpose2d(const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, const Tensor & bias, IntArrayRef stride, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef dilation) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv_transpose2d(self, weight, kernel_size, bias, stride, padding, output_padding, dilation);
             break;
@@ -16220,8 +15913,7 @@ static inline Tensor slow_conv_transpose2d(const Tensor & self, const Tensor & w
 static inline std::tuple<Tensor &,Tensor &,Tensor &> slow_conv_transpose2d_backward_out(Tensor & grad_input, Tensor & grad_weight, Tensor & grad_bias, const Tensor & grad_output, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef dilation, const Tensor & columns, const Tensor & ones) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_weight, grad_bias, grad_output, self, weight, columns, ones),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_weight, grad_bias, grad_output, self, weight, columns, ones), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv_transpose2d_backward_out(grad_input, grad_weight, grad_bias, grad_output, self, weight, kernel_size, stride, padding, output_padding, dilation, columns, ones);
             break;
@@ -16237,8 +15929,7 @@ static inline std::tuple<Tensor &,Tensor &,Tensor &> slow_conv_transpose2d_backw
 static inline std::tuple<Tensor,Tensor,Tensor> slow_conv_transpose2d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef dilation, const Tensor & columns, const Tensor & ones, std::array<bool,3> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight, columns, ones),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight, columns, ones), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv_transpose2d_backward(grad_output, self, weight, kernel_size, stride, padding, output_padding, dilation, columns, ones, output_mask);
             break;
@@ -16254,8 +15945,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> slow_conv_transpose2d_backward(co
 static inline Tensor & slow_conv_transpose3d_out(Tensor & out, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, const Tensor & bias, IntArrayRef stride, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef dilation) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv_transpose3d_out(out, self, weight, kernel_size, bias, stride, padding, output_padding, dilation);
             break;
@@ -16271,8 +15961,7 @@ static inline Tensor & slow_conv_transpose3d_out(Tensor & out, const Tensor & se
 static inline Tensor slow_conv_transpose3d(const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, const Tensor & bias, IntArrayRef stride, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef dilation) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv_transpose3d(self, weight, kernel_size, bias, stride, padding, output_padding, dilation);
             break;
@@ -16288,8 +15977,7 @@ static inline Tensor slow_conv_transpose3d(const Tensor & self, const Tensor & w
 static inline std::tuple<Tensor &,Tensor &,Tensor &> slow_conv_transpose3d_backward_out(Tensor & grad_input, Tensor & grad_weight, Tensor & grad_bias, const Tensor & grad_output, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef dilation, const Tensor & finput, const Tensor & fgrad_input) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_weight, grad_bias, grad_output, self, weight, finput, fgrad_input),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_weight, grad_bias, grad_output, self, weight, finput, fgrad_input), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv_transpose3d_backward_out(grad_input, grad_weight, grad_bias, grad_output, self, weight, kernel_size, stride, padding, output_padding, dilation, finput, fgrad_input);
             break;
@@ -16305,8 +15993,7 @@ static inline std::tuple<Tensor &,Tensor &,Tensor &> slow_conv_transpose3d_backw
 static inline std::tuple<Tensor,Tensor,Tensor> slow_conv_transpose3d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef output_padding, IntArrayRef dilation, const Tensor & finput, const Tensor & fgrad_input, std::array<bool,3> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight, finput, fgrad_input),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight, finput, fgrad_input), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv_transpose3d_backward(grad_output, self, weight, kernel_size, stride, padding, output_padding, dilation, finput, fgrad_input, output_mask);
             break;
@@ -16342,8 +16029,7 @@ static inline Tensor thnn_conv2d(const Tensor & self, const Tensor & weight, Int
 static inline std::tuple<Tensor &,Tensor &,Tensor &> thnn_conv2d_forward_out(Tensor & output, Tensor & finput, Tensor & fgrad_input, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, const Tensor & bias, IntArrayRef stride, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, finput, fgrad_input, self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, finput, fgrad_input, self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::thnn_conv2d_forward_out(output, finput, fgrad_input, self, weight, kernel_size, bias, stride, padding);
             break;
@@ -16359,8 +16045,7 @@ static inline std::tuple<Tensor &,Tensor &,Tensor &> thnn_conv2d_forward_out(Ten
 static inline std::tuple<Tensor,Tensor,Tensor> thnn_conv2d_forward(const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, const Tensor & bias, IntArrayRef stride, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::thnn_conv2d_forward(self, weight, kernel_size, bias, stride, padding);
             break;
@@ -16376,8 +16061,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> thnn_conv2d_forward(const Tensor 
 static inline std::tuple<Tensor &,Tensor &,Tensor &> thnn_conv2d_backward_out(Tensor & grad_input, Tensor & grad_weight, Tensor & grad_bias, const Tensor & grad_output, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, const Tensor & finput, const Tensor & fgrad_input) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_weight, grad_bias, grad_output, self, weight, finput, fgrad_input),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_weight, grad_bias, grad_output, self, weight, finput, fgrad_input), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::thnn_conv2d_backward_out(grad_input, grad_weight, grad_bias, grad_output, self, weight, kernel_size, stride, padding, finput, fgrad_input);
             break;
@@ -16393,8 +16077,7 @@ static inline std::tuple<Tensor &,Tensor &,Tensor &> thnn_conv2d_backward_out(Te
 static inline std::tuple<Tensor,Tensor,Tensor> thnn_conv2d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, const Tensor & finput, const Tensor & fgrad_input, std::array<bool,3> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight, finput, fgrad_input),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight, finput, fgrad_input), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::thnn_conv2d_backward(grad_output, self, weight, kernel_size, stride, padding, finput, fgrad_input, output_mask);
             break;
@@ -16430,8 +16113,7 @@ static inline Tensor thnn_conv_depthwise2d(const Tensor & self, const Tensor & w
 static inline Tensor & thnn_conv_depthwise2d_forward_out(Tensor & out, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, const Tensor & bias, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("thnn_conv_depthwise2d_forward_out not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(out, self, weight, bias)));
@@ -16445,8 +16127,7 @@ static inline Tensor & thnn_conv_depthwise2d_forward_out(Tensor & out, const Ten
 static inline Tensor thnn_conv_depthwise2d_forward(const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, const Tensor & bias, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("thnn_conv_depthwise2d_forward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(self, weight, bias)));
@@ -16460,8 +16141,7 @@ static inline Tensor thnn_conv_depthwise2d_forward(const Tensor & self, const Te
 static inline std::tuple<Tensor &,Tensor &> thnn_conv_depthwise2d_backward_out(Tensor & grad_input, Tensor & grad_weight, const Tensor & grad_output, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_weight, grad_output, self, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_weight, grad_output, self, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("thnn_conv_depthwise2d_backward_out not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_input, grad_weight, grad_output, self, weight)));
@@ -16475,8 +16155,7 @@ static inline std::tuple<Tensor &,Tensor &> thnn_conv_depthwise2d_backward_out(T
 static inline std::tuple<Tensor,Tensor> thnn_conv_depthwise2d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, std::array<bool,2> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
     
         default:
             AT_ERROR("thnn_conv_depthwise2d_backward not implemented for ", at::toString(c10::detail::multi_dispatch_key_set(grad_output, self, weight)));
@@ -16510,8 +16189,7 @@ static inline Tensor slow_conv3d(const Tensor & self, const Tensor & weight, Int
 static inline std::tuple<Tensor &,Tensor &,Tensor &> slow_conv3d_forward_out(Tensor & output, Tensor & finput, Tensor & fgrad_input, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, const Tensor & bias, IntArrayRef stride, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, finput, fgrad_input, self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(output, finput, fgrad_input, self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv3d_forward_out(output, finput, fgrad_input, self, weight, kernel_size, bias, stride, padding);
             break;
@@ -16527,8 +16205,7 @@ static inline std::tuple<Tensor &,Tensor &,Tensor &> slow_conv3d_forward_out(Ten
 static inline std::tuple<Tensor,Tensor,Tensor> slow_conv3d_forward(const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, const Tensor & bias, IntArrayRef stride, IntArrayRef padding) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv3d_forward(self, weight, kernel_size, bias, stride, padding);
             break;
@@ -16544,8 +16221,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> slow_conv3d_forward(const Tensor 
 static inline std::tuple<Tensor &,Tensor &,Tensor &> slow_conv3d_backward_out(Tensor & grad_input, Tensor & grad_weight, Tensor & grad_bias, const Tensor & grad_output, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, const Tensor & finput, const Tensor & fgrad_input) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_weight, grad_bias, grad_output, self, weight, finput, fgrad_input),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_weight, grad_bias, grad_output, self, weight, finput, fgrad_input), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv3d_backward_out(grad_input, grad_weight, grad_bias, grad_output, self, weight, kernel_size, stride, padding, finput, fgrad_input);
             break;
@@ -16561,8 +16237,7 @@ static inline std::tuple<Tensor &,Tensor &,Tensor &> slow_conv3d_backward_out(Te
 static inline std::tuple<Tensor,Tensor,Tensor> slow_conv3d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, const Tensor & finput, const Tensor & fgrad_input, std::array<bool,3> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight, finput, fgrad_input),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight, finput, fgrad_input), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv3d_backward(grad_output, self, weight, kernel_size, stride, padding, finput, fgrad_input, output_mask);
             break;
@@ -16578,8 +16253,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> slow_conv3d_backward(const Tensor
 static inline Tensor slow_conv_dilated2d(const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, const Tensor & bias, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv_dilated2d(self, weight, kernel_size, bias, stride, padding, dilation);
             break;
@@ -16595,8 +16269,7 @@ static inline Tensor slow_conv_dilated2d(const Tensor & self, const Tensor & wei
 static inline std::tuple<Tensor,Tensor,Tensor> slow_conv_dilated2d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, std::array<bool,3> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv_dilated2d_backward(grad_output, self, weight, kernel_size, stride, padding, dilation, output_mask);
             break;
@@ -16612,8 +16285,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> slow_conv_dilated2d_backward(cons
 static inline Tensor slow_conv_dilated3d(const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, const Tensor & bias, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self, weight, bias), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv_dilated3d(self, weight, kernel_size, bias, stride, padding, dilation);
             break;
@@ -16629,8 +16301,7 @@ static inline Tensor slow_conv_dilated3d(const Tensor & self, const Tensor & wei
 static inline std::tuple<Tensor,Tensor,Tensor> slow_conv_dilated3d_backward(const Tensor & grad_output, const Tensor & self, const Tensor & weight, IntArrayRef kernel_size, IntArrayRef stride, IntArrayRef padding, IntArrayRef dilation, std::array<bool,3> output_mask) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output, self, weight), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::slow_conv_dilated3d_backward(grad_output, self, weight, kernel_size, stride, padding, dilation, output_mask);
             break;
@@ -16646,8 +16317,7 @@ static inline std::tuple<Tensor,Tensor,Tensor> slow_conv_dilated3d_backward(cons
 static inline Tensor & col2im_out(Tensor & out, const Tensor & self, IntArrayRef output_size, IntArrayRef kernel_size, IntArrayRef dilation, IntArrayRef padding, IntArrayRef stride) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::col2im_out(out, self, output_size, kernel_size, dilation, padding, stride);
             break;
@@ -16663,8 +16333,7 @@ static inline Tensor & col2im_out(Tensor & out, const Tensor & self, IntArrayRef
 static inline Tensor col2im(const Tensor & self, IntArrayRef output_size, IntArrayRef kernel_size, IntArrayRef dilation, IntArrayRef padding, IntArrayRef stride) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::col2im(self, output_size, kernel_size, dilation, padding, stride);
             break;
@@ -16680,8 +16349,7 @@ static inline Tensor col2im(const Tensor & self, IntArrayRef output_size, IntArr
 static inline Tensor & col2im_backward_out(Tensor & grad_input, const Tensor & grad_output, IntArrayRef kernel_size, IntArrayRef dilation, IntArrayRef padding, IntArrayRef stride) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::col2im_backward_out(grad_input, grad_output, kernel_size, dilation, padding, stride);
             break;
@@ -16697,8 +16365,7 @@ static inline Tensor & col2im_backward_out(Tensor & grad_input, const Tensor & g
 static inline Tensor col2im_backward(const Tensor & grad_output, IntArrayRef kernel_size, IntArrayRef dilation, IntArrayRef padding, IntArrayRef stride) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::col2im_backward(grad_output, kernel_size, dilation, padding, stride);
             break;
@@ -16714,8 +16381,7 @@ static inline Tensor col2im_backward(const Tensor & grad_output, IntArrayRef ker
 static inline Tensor & im2col_out(Tensor & out, const Tensor & self, IntArrayRef kernel_size, IntArrayRef dilation, IntArrayRef padding, IntArrayRef stride) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(out, self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::im2col_out(out, self, kernel_size, dilation, padding, stride);
             break;
@@ -16731,8 +16397,7 @@ static inline Tensor & im2col_out(Tensor & out, const Tensor & self, IntArrayRef
 static inline Tensor im2col(const Tensor & self, IntArrayRef kernel_size, IntArrayRef dilation, IntArrayRef padding, IntArrayRef stride) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(self), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::im2col(self, kernel_size, dilation, padding, stride);
             break;
@@ -16748,8 +16413,7 @@ static inline Tensor im2col(const Tensor & self, IntArrayRef kernel_size, IntArr
 static inline Tensor & im2col_backward_out(Tensor & grad_input, const Tensor & grad_output, IntArrayRef input_size, IntArrayRef kernel_size, IntArrayRef dilation, IntArrayRef padding, IntArrayRef stride) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_input, grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::im2col_backward_out(grad_input, grad_output, input_size, kernel_size, dilation, padding, stride);
             break;
@@ -16765,8 +16429,7 @@ static inline Tensor & im2col_backward_out(Tensor & grad_input, const Tensor & g
 static inline Tensor im2col_backward(const Tensor & grad_output, IntArrayRef input_size, IntArrayRef kernel_size, IntArrayRef dilation, IntArrayRef padding, IntArrayRef stride) {
 #ifdef USE_STATIC_DISPATCH
     at::AutoNonVariableTypeMode _var_guard(true);
-    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output),
-                                c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
+    switch(dispatchKeyToBackend(c10::impl::dispatchTypeId(c10::detail::multi_dispatch_key_set(grad_output), c10::DispatchKeySet(c10::DispatchKeySet::FULL).remove(DispatchKey::BackendSelect)))) {
         case Backend::CPU:
             return CPUType::im2col_backward(grad_output, input_size, kernel_size, dilation, padding, stride);
             break;

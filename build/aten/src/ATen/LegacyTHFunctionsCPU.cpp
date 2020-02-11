@@ -5907,6 +5907,157 @@ Tensor & _th_uniform_(Tensor & self, double from, double to, Generator * generat
             AT_ERROR("_th_uniform_ not supported on CPUType for ", dispatch_scalar_type);
     }
 }
+Tensor & _th_cat_out(Tensor & self, TensorList tensors, int64_t dim) {
+
+    // DeviceGuard omitted
+    auto dispatch_scalar_type = infer_scalar_type(self);
+    
+    switch (dispatch_scalar_type) {
+        case ScalarType::Bool: {
+            auto self_ = checked_dense_tensor_unwrap(self, "self", 0, "_th_cat_out", false, DeviceType::CPU, dispatch_scalar_type);
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THBoolTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Byte: {
+            auto self_ = checked_dense_tensor_unwrap(self, "self", 0, "_th_cat_out", false, DeviceType::CPU, dispatch_scalar_type);
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THByteTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Char: {
+            auto self_ = checked_dense_tensor_unwrap(self, "self", 0, "_th_cat_out", false, DeviceType::CPU, dispatch_scalar_type);
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THCharTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Double: {
+            auto self_ = checked_dense_tensor_unwrap(self, "self", 0, "_th_cat_out", false, DeviceType::CPU, dispatch_scalar_type);
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THDoubleTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Float: {
+            auto self_ = checked_dense_tensor_unwrap(self, "self", 0, "_th_cat_out", false, DeviceType::CPU, dispatch_scalar_type);
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THFloatTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Int: {
+            auto self_ = checked_dense_tensor_unwrap(self, "self", 0, "_th_cat_out", false, DeviceType::CPU, dispatch_scalar_type);
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THIntTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Long: {
+            auto self_ = checked_dense_tensor_unwrap(self, "self", 0, "_th_cat_out", false, DeviceType::CPU, dispatch_scalar_type);
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THLongTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Short: {
+            auto self_ = checked_dense_tensor_unwrap(self, "self", 0, "_th_cat_out", false, DeviceType::CPU, dispatch_scalar_type);
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THShortTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Half: {
+            auto self_ = checked_dense_tensor_unwrap(self, "self", 0, "_th_cat_out", false, DeviceType::CPU, dispatch_scalar_type);
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THHalfTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::BFloat16: {
+            auto self_ = checked_dense_tensor_unwrap(self, "self", 0, "_th_cat_out", false, DeviceType::CPU, dispatch_scalar_type);
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THBFloat16Tensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        default:
+            AT_ERROR("_th_cat_out not supported on CPUType for ", dispatch_scalar_type);
+    }
+}
+Tensor _th_cat(TensorList tensors, int64_t dim) {
+
+    // DeviceGuard omitted
+    auto dispatch_scalar_type = infer_scalar_type(tensors);
+    auto self_ = c10::make_intrusive<TensorImpl, UndefinedTensorImpl>(c10::Storage(scalarTypeToTypeMeta(dispatch_scalar_type), 0, allocator(), true),DispatchKey::CPUTensorId).release();
+    auto self = Tensor(c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl>::reclaim(self_));
+    switch (dispatch_scalar_type) {
+        case ScalarType::Bool: {
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THBoolTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Byte: {
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THByteTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Char: {
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THCharTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Double: {
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THDoubleTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Float: {
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THFloatTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Int: {
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THIntTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Long: {
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THLongTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Short: {
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THShortTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::Half: {
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THHalfTensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        case ScalarType::BFloat16: {
+            auto tensors_ = checked_dense_tensor_list_unwrap(tensors,"tensors",1, DeviceType::CPU, dispatch_scalar_type);
+            THBFloat16Tensor_catArray(self_, tensors_.data(), tensors_.size(), dim);
+            return self;
+            break;
+        }
+        default:
+            AT_ERROR("_th_cat not supported on CPUType for ", dispatch_scalar_type);
+    }
+}
 Tensor & _thnn_glu_forward_out(Tensor & output, const Tensor & self, int64_t dim) {
     if (output.has_names() || self.has_names()) {
         AT_ERROR(

@@ -135,6 +135,8 @@ std::tuple<Tensor,Tensor> _th_multinomial_alias_setup(const Tensor & probs);
 Tensor & _th_multinomial_alias_draw_out(Tensor & result, const Tensor & q, const Tensor & J, int64_t num_samples, Generator * generator);
 Tensor _th_multinomial_alias_draw(const Tensor & q, const Tensor & J, int64_t num_samples, Generator * generator);
 Tensor & _th_uniform_(Tensor & self, double from, double to, Generator * generator);
+Tensor & _th_cat_out(Tensor & self, TensorList tensors, int64_t dim);
+Tensor _th_cat(TensorList tensors, int64_t dim);
 Tensor & _thnn_glu_forward_out(Tensor & output, const Tensor & self, int64_t dim);
 Tensor _thnn_glu_forward(const Tensor & self, int64_t dim);
 Tensor & _thnn_glu_backward_out(Tensor & grad_input, const Tensor & grad_output, const Tensor & self, int64_t dim);

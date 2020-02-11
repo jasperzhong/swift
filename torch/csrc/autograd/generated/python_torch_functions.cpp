@@ -2159,12 +2159,17 @@ static PyObject * THPVariable__cudnn_init_dropout_state(PyObject* self_, PyObjec
       .layout(_r.layout(4).layout)
       .requires_grad(_r.toBool(7))
       .pinned_memory(_r.toBool(6));
+  auto dtype = _r.scalartype(3);
+  auto layout = _r.layout(4).layout;
+  auto device = _r.device(5);
+  auto pin_memory = _r.toBool(6);
+  auto requires_grad = _r.toBool(7);
   torch::utils::maybe_initialize_cuda(options);
-  auto dispatch__cudnn_init_dropout_state = [](double dropout, bool train, int64_t dropout_seed, const TensorOptions & options) -> Tensor {
+  auto dispatch__cudnn_init_dropout_state = [](double dropout, bool train, int64_t dropout_seed, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
     pybind11::gil_scoped_release no_gil;
-    return torch::_cudnn_init_dropout_state(dropout, train, dropout_seed, options);
+    return torch::__cudnn_init_dropout_state(dropout, train, dropout_seed, dtype.value(), layout.value(), device.value(), pin_memory.value(), requires_grad);
   };
-  return wrap(dispatch__cudnn_init_dropout_state(_r.toDouble(0), _r.toBool(1), _r.toInt64(2), options));
+  return wrap(dispatch__cudnn_init_dropout_state(_r.toDouble(0), _r.toBool(1), _r.toInt64(2), dtype, layout, device, pin_memory, requires_grad));
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -2421,12 +2426,17 @@ static PyObject * THPVariable__empty_affine_quantized(PyObject* self_, PyObject*
       .layout(_r.layout(5).layout)
       .requires_grad(_r.toBool(8))
       .pinned_memory(_r.toBool(7));
+  auto dtype = _r.scalartype(4);
+  auto layout = _r.layout(5).layout;
+  auto device = _r.device(6);
+  auto pin_memory = _r.toBool(7);
+  auto requires_grad = _r.toBool(8);
   torch::utils::maybe_initialize_cuda(options);
-  auto dispatch__empty_affine_quantized = [](IntArrayRef size, const TensorOptions & options, double scale, int64_t zero_point, c10::optional<MemoryFormat> memory_format) -> Tensor {
+  auto dispatch__empty_affine_quantized = [](IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad, double scale, int64_t zero_point, c10::optional<MemoryFormat> memory_format) -> Tensor {
     pybind11::gil_scoped_release no_gil;
-    return torch::_empty_affine_quantized(size, options, scale, zero_point, memory_format);
+    return torch::__empty_affine_quantized(size, dtype, layout, device, pin_memory, requires_grad, scale, zero_point, memory_format);
   };
-  return wrap(dispatch__empty_affine_quantized(_r.intlist(0), options, _r.toDouble(1), _r.toInt64(2), _r.memoryformatOptional(3)));
+  return wrap(dispatch__empty_affine_quantized(_r.intlist(0), dtype, layout, device, pin_memory, requires_grad, _r.toDouble(1), _r.toInt64(2), _r.memoryformatOptional(3)));
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -2451,12 +2461,17 @@ static PyObject * THPVariable__empty_per_channel_affine_quantized(PyObject* self
       .layout(_r.layout(6).layout)
       .requires_grad(_r.toBool(9))
       .pinned_memory(_r.toBool(8));
+  auto dtype = _r.scalartype(5);
+  auto layout = _r.layout(6).layout;
+  auto device = _r.device(7);
+  auto pin_memory = _r.toBool(8);
+  auto requires_grad = _r.toBool(9);
   torch::utils::maybe_initialize_cuda(options);
-  auto dispatch__empty_per_channel_affine_quantized = [](IntArrayRef size, const Tensor & scales, const Tensor & zero_points, int64_t axis, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) -> Tensor {
+  auto dispatch__empty_per_channel_affine_quantized = [](IntArrayRef size, const Tensor & scales, const Tensor & zero_points, int64_t axis, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad, c10::optional<MemoryFormat> memory_format) -> Tensor {
     pybind11::gil_scoped_release no_gil;
-    return torch::_empty_per_channel_affine_quantized(size, scales, zero_points, axis, options, memory_format);
+    return torch::__empty_per_channel_affine_quantized(size, scales, zero_points, axis, dtype, layout, device, pin_memory, requires_grad, memory_format);
   };
-  return wrap(dispatch__empty_per_channel_affine_quantized(_r.intlist(0), _r.tensor(1), _r.tensor(2), _r.toInt64(3), options, _r.memoryformatOptional(4)));
+  return wrap(dispatch__empty_per_channel_affine_quantized(_r.intlist(0), _r.tensor(1), _r.tensor(2), _r.toInt64(3), dtype, layout, device, pin_memory, requires_grad, _r.memoryformatOptional(4)));
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -4919,12 +4934,17 @@ static PyObject * THPVariable_bartlett_window(PyObject* self_, PyObject* args, P
           .layout(_r.layout(2).layout)
           .requires_grad(_r.toBool(5))
           .pinned_memory(_r.toBool(4));
+      auto dtype = _r.scalartype(1);
+      auto layout = _r.layout(2).layout;
+      auto device = _r.device(3);
+      auto pin_memory = _r.toBool(4);
+      auto requires_grad = _r.toBool(5);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_bartlett_window = [](int64_t window_length, const TensorOptions & options) -> Tensor {
+      auto dispatch_bartlett_window = [](int64_t window_length, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::bartlett_window(window_length, options);
+        return torch::_bartlett_window(window_length, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_bartlett_window(_r.toInt64(0), options));
+      return wrap(dispatch_bartlett_window(_r.toInt64(0), dtype, layout, device, pin_memory, requires_grad));
     }
     case 1: {
       // aten::bartlett_window.periodic(int window_length, bool periodic, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
@@ -4934,12 +4954,17 @@ static PyObject * THPVariable_bartlett_window(PyObject* self_, PyObject* args, P
           .layout(_r.layout(3).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartype(2);
+      auto layout = _r.layout(3).layout;
+      auto device = _r.device(4);
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_bartlett_window = [](int64_t window_length, bool periodic, const TensorOptions & options) -> Tensor {
+      auto dispatch_bartlett_window = [](int64_t window_length, bool periodic, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::bartlett_window(window_length, periodic, options);
+        return torch::_bartlett_window(window_length, periodic, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_bartlett_window(_r.toInt64(0), _r.toBool(1), options));
+      return wrap(dispatch_bartlett_window(_r.toInt64(0), _r.toBool(1), dtype, layout, device, pin_memory, requires_grad));
     }
   }
   Py_RETURN_NONE;
@@ -5475,12 +5500,17 @@ static PyObject * THPVariable_blackman_window(PyObject* self_, PyObject* args, P
           .layout(_r.layout(2).layout)
           .requires_grad(_r.toBool(5))
           .pinned_memory(_r.toBool(4));
+      auto dtype = _r.scalartype(1);
+      auto layout = _r.layout(2).layout;
+      auto device = _r.device(3);
+      auto pin_memory = _r.toBool(4);
+      auto requires_grad = _r.toBool(5);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_blackman_window = [](int64_t window_length, const TensorOptions & options) -> Tensor {
+      auto dispatch_blackman_window = [](int64_t window_length, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::blackman_window(window_length, options);
+        return torch::_blackman_window(window_length, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_blackman_window(_r.toInt64(0), options));
+      return wrap(dispatch_blackman_window(_r.toInt64(0), dtype, layout, device, pin_memory, requires_grad));
     }
     case 1: {
       // aten::blackman_window.periodic(int window_length, bool periodic, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
@@ -5490,12 +5520,17 @@ static PyObject * THPVariable_blackman_window(PyObject* self_, PyObject* args, P
           .layout(_r.layout(3).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartype(2);
+      auto layout = _r.layout(3).layout;
+      auto device = _r.device(4);
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_blackman_window = [](int64_t window_length, bool periodic, const TensorOptions & options) -> Tensor {
+      auto dispatch_blackman_window = [](int64_t window_length, bool periodic, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::blackman_window(window_length, periodic, options);
+        return torch::_blackman_window(window_length, periodic, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_blackman_window(_r.toInt64(0), _r.toBool(1), options));
+      return wrap(dispatch_blackman_window(_r.toInt64(0), _r.toBool(1), dtype, layout, device, pin_memory, requires_grad));
     }
   }
   Py_RETURN_NONE;
@@ -7563,12 +7598,17 @@ static PyObject * THPVariable_empty(PyObject* self_, PyObject* args, PyObject* k
           .layout(_r.layout(4).layout)
           .requires_grad(_r.toBool(7))
           .pinned_memory(_r.toBool(6));
+      auto dtype = _r.scalartype(3);
+      auto layout = _r.layout(4).layout;
+      auto device = _r.device(5);
+      auto pin_memory = _r.toBool(6);
+      auto requires_grad = _r.toBool(7);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_empty = [](IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) -> Tensor {
+      auto dispatch_empty = [](IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad, c10::optional<MemoryFormat> memory_format) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::empty(size, names, options, memory_format);
+        return torch::_empty(size, names, dtype, layout, device, pin_memory, requires_grad, memory_format);
       };
-      return wrap(dispatch_empty(_r.intlist(0), names, options, _r.memoryformatOptional(2)));
+      return wrap(dispatch_empty(_r.intlist(0), names, dtype, layout, device, pin_memory, requires_grad, _r.memoryformatOptional(2)));
     }
     case 1: {
       if (_r.isNone(2)) {
@@ -7579,12 +7619,17 @@ static PyObject * THPVariable_empty(PyObject* self_, PyObject* args, PyObject* k
             .layout(_r.layout(4).layout)
             .requires_grad(_r.toBool(7))
             .pinned_memory(_r.toBool(6));
+        auto dtype = _r.scalartype(3);
+        auto layout = _r.layout(4).layout;
+        auto device = _r.device(5);
+        auto pin_memory = _r.toBool(6);
+        auto requires_grad = _r.toBool(7);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_empty = [](IntArrayRef size, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) -> Tensor {
+        auto dispatch_empty = [](IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad, c10::optional<MemoryFormat> memory_format) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::empty(size, options, memory_format);
+          return torch::_empty(size, dtype, layout, device, pin_memory, requires_grad, memory_format);
         };
-        return wrap(dispatch_empty(_r.intlist(0), options, _r.memoryformatOptional(1)));
+        return wrap(dispatch_empty(_r.intlist(0), dtype, layout, device, pin_memory, requires_grad, _r.memoryformatOptional(1)));
       } else {
         // aten::empty.out(int[] size, *, MemoryFormat? memory_format=None, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(2), _r.scalartype(3), _r.isNone(3),
@@ -7627,12 +7672,17 @@ static PyObject * THPVariable_empty_like(PyObject* self_, PyObject* args, PyObje
           .layout(_r.layoutWithDefault(3, *torch::getLayout(self.options().backend())).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartypeWithDefault(2, self.scalar_type());
+      auto layout = _r.layoutWithDefault(3, *torch::getLayout(self.options().backend())).layout;
+      auto device = _r.deviceWithDefault(4, self.device());
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_empty_like = [](const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) -> Tensor {
+      auto dispatch_empty_like = [](const Tensor & self, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad, c10::optional<MemoryFormat> memory_format) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::empty_like(self, options, memory_format);
+        return torch::_empty_like(self, dtype.value(), layout.value(), device.value(), pin_memory.value(), requires_grad, memory_format);
       };
-      return wrap(dispatch_empty_like(self, options, _r.memoryformatOptional(1)));
+      return wrap(dispatch_empty_like(self, dtype, layout, device, pin_memory, requires_grad, _r.memoryformatOptional(1)));
     }
     case 1: {
       // aten::empty_like(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
@@ -7667,12 +7717,17 @@ static PyObject * THPVariable_empty_strided(PyObject* self_, PyObject* args, PyO
       .layout(_r.layout(3).layout)
       .requires_grad(_r.toBool(6))
       .pinned_memory(_r.toBool(5));
+  auto dtype = _r.scalartype(2);
+  auto layout = _r.layout(3).layout;
+  auto device = _r.device(4);
+  auto pin_memory = _r.toBool(5);
+  auto requires_grad = _r.toBool(6);
   torch::utils::maybe_initialize_cuda(options);
-  auto dispatch_empty_strided = [](IntArrayRef size, IntArrayRef stride, const TensorOptions & options) -> Tensor {
+  auto dispatch_empty_strided = [](IntArrayRef size, IntArrayRef stride, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
     pybind11::gil_scoped_release no_gil;
-    return torch::empty_strided(size, stride, options);
+    return torch::_empty_strided(size, stride, dtype, layout, device, pin_memory, requires_grad);
   };
-  return wrap(dispatch_empty_strided(_r.intlist(0), _r.intlist(1), options));
+  return wrap(dispatch_empty_strided(_r.intlist(0), _r.intlist(1), dtype, layout, device, pin_memory, requires_grad));
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -8032,12 +8087,17 @@ static PyObject * THPVariable_eye(PyObject* self_, PyObject* args, PyObject* kwa
             .layout(_r.layout(3).layout)
             .requires_grad(_r.toBool(6))
             .pinned_memory(_r.toBool(5));
+        auto dtype = _r.scalartype(2);
+        auto layout = _r.layout(3).layout;
+        auto device = _r.device(4);
+        auto pin_memory = _r.toBool(5);
+        auto requires_grad = _r.toBool(6);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_eye = [](int64_t n, const TensorOptions & options) -> Tensor {
+        auto dispatch_eye = [](int64_t n, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::eye(n, options);
+          return torch::_eye(n, dtype, layout, device, pin_memory, requires_grad);
         };
-        return wrap(dispatch_eye(_r.toInt64(0), options));
+        return wrap(dispatch_eye(_r.toInt64(0), dtype, layout, device, pin_memory, requires_grad));
       } else {
         // aten::eye.out(int n, *, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(1), _r.scalartype(2), _r.isNone(2),
@@ -8059,12 +8119,17 @@ static PyObject * THPVariable_eye(PyObject* self_, PyObject* args, PyObject* kwa
             .layout(_r.layout(4).layout)
             .requires_grad(_r.toBool(7))
             .pinned_memory(_r.toBool(6));
+        auto dtype = _r.scalartype(3);
+        auto layout = _r.layout(4).layout;
+        auto device = _r.device(5);
+        auto pin_memory = _r.toBool(6);
+        auto requires_grad = _r.toBool(7);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_eye = [](int64_t n, int64_t m, const TensorOptions & options) -> Tensor {
+        auto dispatch_eye = [](int64_t n, int64_t m, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::eye(n, m, options);
+          return torch::_eye(n, m, dtype, layout, device, pin_memory, requires_grad);
         };
-        return wrap(dispatch_eye(_r.toInt64(0), _r.toInt64(1), options));
+        return wrap(dispatch_eye(_r.toInt64(0), _r.toInt64(1), dtype, layout, device, pin_memory, requires_grad));
       } else {
         // aten::eye.m_out(int n, int m, *, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(2), _r.scalartype(3), _r.isNone(3),
@@ -8801,12 +8866,17 @@ static PyObject * THPVariable_from_file(PyObject* self_, PyObject* args, PyObjec
       .layout(_r.layout(4).layout)
       .requires_grad(_r.toBool(7))
       .pinned_memory(_r.toBool(6));
+  auto dtype = _r.scalartype(3);
+  auto layout = _r.layout(4).layout;
+  auto device = _r.device(5);
+  auto pin_memory = _r.toBool(6);
+  auto requires_grad = _r.toBool(7);
   torch::utils::maybe_initialize_cuda(options);
-  auto dispatch_from_file = [](std::string filename, c10::optional<bool> shared, c10::optional<int64_t> size, const TensorOptions & options) -> Tensor {
+  auto dispatch_from_file = [](std::string filename, c10::optional<bool> shared, c10::optional<int64_t> size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
     pybind11::gil_scoped_release no_gil;
-    return torch::from_file(filename, shared, size, options);
+    return torch::_from_file(filename, shared, size, dtype, layout, device, pin_memory, requires_grad);
   };
-  return wrap(dispatch_from_file(_r.string(0), _r.toBoolOptional(1), _r.toInt64Optional(2), options));
+  return wrap(dispatch_from_file(_r.string(0), _r.toBoolOptional(1), _r.toInt64Optional(2), dtype, layout, device, pin_memory, requires_grad));
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -8837,12 +8907,17 @@ static PyObject * THPVariable_full(PyObject* self_, PyObject* args, PyObject* kw
           .layout(_r.layout(4).layout)
           .requires_grad(_r.toBool(7))
           .pinned_memory(_r.toBool(6));
+      auto dtype = _r.scalartype(3);
+      auto layout = _r.layout(4).layout;
+      auto device = _r.device(5);
+      auto pin_memory = _r.toBool(6);
+      auto requires_grad = _r.toBool(7);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_full = [](IntArrayRef size, Scalar fill_value, c10::optional<DimnameList> names, const TensorOptions & options) -> Tensor {
+      auto dispatch_full = [](IntArrayRef size, Scalar fill_value, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::full(size, fill_value, names, options);
+        return torch::_full(size, fill_value, names, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_full(_r.intlist(0), _r.scalar(1), names, options));
+      return wrap(dispatch_full(_r.intlist(0), _r.scalar(1), names, dtype, layout, device, pin_memory, requires_grad));
     }
     case 1: {
       if (_r.isNone(2)) {
@@ -8853,12 +8928,17 @@ static PyObject * THPVariable_full(PyObject* self_, PyObject* args, PyObject* kw
             .layout(_r.layout(4).layout)
             .requires_grad(_r.toBool(7))
             .pinned_memory(_r.toBool(6));
+        auto dtype = _r.scalartype(3);
+        auto layout = _r.layout(4).layout;
+        auto device = _r.device(5);
+        auto pin_memory = _r.toBool(6);
+        auto requires_grad = _r.toBool(7);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_full = [](IntArrayRef size, Scalar fill_value, const TensorOptions & options) -> Tensor {
+        auto dispatch_full = [](IntArrayRef size, Scalar fill_value, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::full(size, fill_value, options);
+          return torch::_full(size, fill_value, dtype, layout, device, pin_memory, requires_grad);
         };
-        return wrap(dispatch_full(_r.intlist(0), _r.scalar(1), options));
+        return wrap(dispatch_full(_r.intlist(0), _r.scalar(1), dtype, layout, device, pin_memory, requires_grad));
       } else {
         // aten::full.out(int[] size, Scalar fill_value, *, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(2), _r.scalartype(3), _r.isNone(3),
@@ -8901,12 +8981,17 @@ static PyObject * THPVariable_full_like(PyObject* self_, PyObject* args, PyObjec
           .layout(_r.layoutWithDefault(4, *torch::getLayout(self.options().backend())).layout)
           .requires_grad(_r.toBool(7))
           .pinned_memory(_r.toBool(6));
+      auto dtype = _r.scalartypeWithDefault(3, self.scalar_type());
+      auto layout = _r.layoutWithDefault(4, *torch::getLayout(self.options().backend())).layout;
+      auto device = _r.deviceWithDefault(5, self.device());
+      auto pin_memory = _r.toBool(6);
+      auto requires_grad = _r.toBool(7);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_full_like = [](const Tensor & self, Scalar fill_value, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) -> Tensor {
+      auto dispatch_full_like = [](const Tensor & self, Scalar fill_value, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad, c10::optional<MemoryFormat> memory_format) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::full_like(self, fill_value, options, memory_format);
+        return torch::_full_like(self, fill_value, dtype.value(), layout.value(), device.value(), pin_memory.value(), requires_grad, memory_format);
       };
-      return wrap(dispatch_full_like(self, _r.scalar(1), options, _r.memoryformatOptional(2)));
+      return wrap(dispatch_full_like(self, _r.scalar(1), dtype, layout, device, pin_memory, requires_grad, _r.memoryformatOptional(2)));
     }
     case 1: {
       // aten::full_like(Tensor self, Scalar fill_value, *, MemoryFormat? memory_format=None) -> Tensor
@@ -9346,12 +9431,17 @@ static PyObject * THPVariable_hamming_window(PyObject* self_, PyObject* args, Py
           .layout(_r.layout(2).layout)
           .requires_grad(_r.toBool(5))
           .pinned_memory(_r.toBool(4));
+      auto dtype = _r.scalartype(1);
+      auto layout = _r.layout(2).layout;
+      auto device = _r.device(3);
+      auto pin_memory = _r.toBool(4);
+      auto requires_grad = _r.toBool(5);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_hamming_window = [](int64_t window_length, const TensorOptions & options) -> Tensor {
+      auto dispatch_hamming_window = [](int64_t window_length, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::hamming_window(window_length, options);
+        return torch::_hamming_window(window_length, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_hamming_window(_r.toInt64(0), options));
+      return wrap(dispatch_hamming_window(_r.toInt64(0), dtype, layout, device, pin_memory, requires_grad));
     }
     case 1: {
       // aten::hamming_window.periodic(int window_length, bool periodic, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
@@ -9361,12 +9451,17 @@ static PyObject * THPVariable_hamming_window(PyObject* self_, PyObject* args, Py
           .layout(_r.layout(3).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartype(2);
+      auto layout = _r.layout(3).layout;
+      auto device = _r.device(4);
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_hamming_window = [](int64_t window_length, bool periodic, const TensorOptions & options) -> Tensor {
+      auto dispatch_hamming_window = [](int64_t window_length, bool periodic, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::hamming_window(window_length, periodic, options);
+        return torch::_hamming_window(window_length, periodic, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_hamming_window(_r.toInt64(0), _r.toBool(1), options));
+      return wrap(dispatch_hamming_window(_r.toInt64(0), _r.toBool(1), dtype, layout, device, pin_memory, requires_grad));
     }
     case 2: {
       // aten::hamming_window.periodic_alpha(int window_length, bool periodic, float alpha, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
@@ -9376,12 +9471,17 @@ static PyObject * THPVariable_hamming_window(PyObject* self_, PyObject* args, Py
           .layout(_r.layout(4).layout)
           .requires_grad(_r.toBool(7))
           .pinned_memory(_r.toBool(6));
+      auto dtype = _r.scalartype(3);
+      auto layout = _r.layout(4).layout;
+      auto device = _r.device(5);
+      auto pin_memory = _r.toBool(6);
+      auto requires_grad = _r.toBool(7);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_hamming_window = [](int64_t window_length, bool periodic, double alpha, const TensorOptions & options) -> Tensor {
+      auto dispatch_hamming_window = [](int64_t window_length, bool periodic, double alpha, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::hamming_window(window_length, periodic, alpha, options);
+        return torch::_hamming_window(window_length, periodic, alpha, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_hamming_window(_r.toInt64(0), _r.toBool(1), _r.toDouble(2), options));
+      return wrap(dispatch_hamming_window(_r.toInt64(0), _r.toBool(1), _r.toDouble(2), dtype, layout, device, pin_memory, requires_grad));
     }
     case 3: {
       // aten::hamming_window.periodic_alpha_beta(int window_length, bool periodic, float alpha, float beta, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
@@ -9391,12 +9491,17 @@ static PyObject * THPVariable_hamming_window(PyObject* self_, PyObject* args, Py
           .layout(_r.layout(5).layout)
           .requires_grad(_r.toBool(8))
           .pinned_memory(_r.toBool(7));
+      auto dtype = _r.scalartype(4);
+      auto layout = _r.layout(5).layout;
+      auto device = _r.device(6);
+      auto pin_memory = _r.toBool(7);
+      auto requires_grad = _r.toBool(8);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_hamming_window = [](int64_t window_length, bool periodic, double alpha, double beta, const TensorOptions & options) -> Tensor {
+      auto dispatch_hamming_window = [](int64_t window_length, bool periodic, double alpha, double beta, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::hamming_window(window_length, periodic, alpha, beta, options);
+        return torch::_hamming_window(window_length, periodic, alpha, beta, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_hamming_window(_r.toInt64(0), _r.toBool(1), _r.toDouble(2), _r.toDouble(3), options));
+      return wrap(dispatch_hamming_window(_r.toInt64(0), _r.toBool(1), _r.toDouble(2), _r.toDouble(3), dtype, layout, device, pin_memory, requires_grad));
     }
   }
   Py_RETURN_NONE;
@@ -9427,12 +9532,17 @@ static PyObject * THPVariable_hann_window(PyObject* self_, PyObject* args, PyObj
           .layout(_r.layout(2).layout)
           .requires_grad(_r.toBool(5))
           .pinned_memory(_r.toBool(4));
+      auto dtype = _r.scalartype(1);
+      auto layout = _r.layout(2).layout;
+      auto device = _r.device(3);
+      auto pin_memory = _r.toBool(4);
+      auto requires_grad = _r.toBool(5);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_hann_window = [](int64_t window_length, const TensorOptions & options) -> Tensor {
+      auto dispatch_hann_window = [](int64_t window_length, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::hann_window(window_length, options);
+        return torch::_hann_window(window_length, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_hann_window(_r.toInt64(0), options));
+      return wrap(dispatch_hann_window(_r.toInt64(0), dtype, layout, device, pin_memory, requires_grad));
     }
     case 1: {
       // aten::hann_window.periodic(int window_length, bool periodic, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
@@ -9442,12 +9552,17 @@ static PyObject * THPVariable_hann_window(PyObject* self_, PyObject* args, PyObj
           .layout(_r.layout(3).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartype(2);
+      auto layout = _r.layout(3).layout;
+      auto device = _r.device(4);
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_hann_window = [](int64_t window_length, bool periodic, const TensorOptions & options) -> Tensor {
+      auto dispatch_hann_window = [](int64_t window_length, bool periodic, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::hann_window(window_length, periodic, options);
+        return torch::_hann_window(window_length, periodic, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_hann_window(_r.toInt64(0), _r.toBool(1), options));
+      return wrap(dispatch_hann_window(_r.toInt64(0), _r.toBool(1), dtype, layout, device, pin_memory, requires_grad));
     }
   }
   Py_RETURN_NONE;
@@ -10463,12 +10578,17 @@ static PyObject * THPVariable_linspace(PyObject* self_, PyObject* args, PyObject
         .layout(_r.layout(5).layout)
         .requires_grad(_r.toBool(8))
         .pinned_memory(_r.toBool(7));
+    auto dtype = _r.scalartype(4);
+    auto layout = _r.layout(5).layout;
+    auto device = _r.device(6);
+    auto pin_memory = _r.toBool(7);
+    auto requires_grad = _r.toBool(8);
     torch::utils::maybe_initialize_cuda(options);
-    auto dispatch_linspace = [](Scalar start, Scalar end, int64_t steps, const TensorOptions & options) -> Tensor {
+    auto dispatch_linspace = [](Scalar start, Scalar end, int64_t steps, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
       pybind11::gil_scoped_release no_gil;
-      return torch::linspace(start, end, steps, options);
+      return torch::_linspace(start, end, steps, dtype, layout, device, pin_memory, requires_grad);
     };
-    return wrap(dispatch_linspace(_r.scalar(0), _r.scalar(1), _r.toInt64(2), options));
+    return wrap(dispatch_linspace(_r.scalar(0), _r.scalar(1), _r.toInt64(2), dtype, layout, device, pin_memory, requires_grad));
   } else {
     // aten::linspace.out(Scalar start, Scalar end, int steps=100, *, Tensor(a!) out) -> Tensor(a!)
     check_out_type_matches(_r.tensor(3), _r.scalartype(4), _r.isNone(4),
@@ -10913,12 +11033,17 @@ static PyObject * THPVariable_logspace(PyObject* self_, PyObject* args, PyObject
         .layout(_r.layout(6).layout)
         .requires_grad(_r.toBool(9))
         .pinned_memory(_r.toBool(8));
+    auto dtype = _r.scalartype(5);
+    auto layout = _r.layout(6).layout;
+    auto device = _r.device(7);
+    auto pin_memory = _r.toBool(8);
+    auto requires_grad = _r.toBool(9);
     torch::utils::maybe_initialize_cuda(options);
-    auto dispatch_logspace = [](Scalar start, Scalar end, int64_t steps, double base, const TensorOptions & options) -> Tensor {
+    auto dispatch_logspace = [](Scalar start, Scalar end, int64_t steps, double base, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
       pybind11::gil_scoped_release no_gil;
-      return torch::logspace(start, end, steps, base, options);
+      return torch::_logspace(start, end, steps, base, dtype, layout, device, pin_memory, requires_grad);
     };
-    return wrap(dispatch_logspace(_r.scalar(0), _r.scalar(1), _r.toInt64(2), _r.toDouble(3), options));
+    return wrap(dispatch_logspace(_r.scalar(0), _r.scalar(1), _r.toInt64(2), _r.toDouble(3), dtype, layout, device, pin_memory, requires_grad));
   } else {
     // aten::logspace.out(Scalar start, Scalar end, int steps=100, float base=10.0, *, Tensor(a!) out) -> Tensor(a!)
     check_out_type_matches(_r.tensor(4), _r.scalartype(5), _r.isNone(5),
@@ -12711,12 +12836,17 @@ static PyObject * THPVariable_normal(PyObject* self_, PyObject* args, PyObject* 
             .layout(_r.layout(6).layout)
             .requires_grad(_r.toBool(9))
             .pinned_memory(_r.toBool(8));
+        auto dtype = _r.scalartype(5);
+        auto layout = _r.layout(6).layout;
+        auto device = _r.device(7);
+        auto pin_memory = _r.toBool(8);
+        auto requires_grad = _r.toBool(9);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_normal = [](double mean, double std, IntArrayRef size, Generator * generator, const TensorOptions & options) -> Tensor {
+        auto dispatch_normal = [](double mean, double std, IntArrayRef size, Generator * generator, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::normal(mean, std, size, generator, options);
+          return torch::_normal(mean, std, size, generator, dtype, layout, device, pin_memory, requires_grad);
         };
-        return wrap(dispatch_normal(_r.toDouble(0), _r.toDouble(1), _r.intlist(2), _r.generator(3), options));
+        return wrap(dispatch_normal(_r.toDouble(0), _r.toDouble(1), _r.intlist(2), _r.generator(3), dtype, layout, device, pin_memory, requires_grad));
       } else {
         // aten::normal.float_float_out(float mean, float std, int[] size, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(4), _r.scalartype(5), _r.isNone(5),
@@ -12815,12 +12945,17 @@ static PyObject * THPVariable_ones(PyObject* self_, PyObject* args, PyObject* kw
           .layout(_r.layout(3).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartype(2);
+      auto layout = _r.layout(3).layout;
+      auto device = _r.device(4);
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_ones = [](IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options) -> Tensor {
+      auto dispatch_ones = [](IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::ones(size, names, options);
+        return torch::_ones(size, names, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_ones(_r.intlist(0), names, options));
+      return wrap(dispatch_ones(_r.intlist(0), names, dtype, layout, device, pin_memory, requires_grad));
     }
     case 1: {
       if (_r.isNone(1)) {
@@ -12831,12 +12966,17 @@ static PyObject * THPVariable_ones(PyObject* self_, PyObject* args, PyObject* kw
             .layout(_r.layout(3).layout)
             .requires_grad(_r.toBool(6))
             .pinned_memory(_r.toBool(5));
+        auto dtype = _r.scalartype(2);
+        auto layout = _r.layout(3).layout;
+        auto device = _r.device(4);
+        auto pin_memory = _r.toBool(5);
+        auto requires_grad = _r.toBool(6);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_ones = [](IntArrayRef size, const TensorOptions & options) -> Tensor {
+        auto dispatch_ones = [](IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::ones(size, options);
+          return torch::_ones(size, dtype, layout, device, pin_memory, requires_grad);
         };
-        return wrap(dispatch_ones(_r.intlist(0), options));
+        return wrap(dispatch_ones(_r.intlist(0), dtype, layout, device, pin_memory, requires_grad));
       } else {
         // aten::ones.out(int[] size, *, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(1), _r.scalartype(2), _r.isNone(2),
@@ -12879,12 +13019,17 @@ static PyObject * THPVariable_ones_like(PyObject* self_, PyObject* args, PyObjec
           .layout(_r.layoutWithDefault(3, *torch::getLayout(self.options().backend())).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartypeWithDefault(2, self.scalar_type());
+      auto layout = _r.layoutWithDefault(3, *torch::getLayout(self.options().backend())).layout;
+      auto device = _r.deviceWithDefault(4, self.device());
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_ones_like = [](const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) -> Tensor {
+      auto dispatch_ones_like = [](const Tensor & self, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad, c10::optional<MemoryFormat> memory_format) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::ones_like(self, options, memory_format);
+        return torch::_ones_like(self, dtype.value(), layout.value(), device.value(), pin_memory.value(), requires_grad, memory_format);
       };
-      return wrap(dispatch_ones_like(self, options, _r.memoryformatOptional(1)));
+      return wrap(dispatch_ones_like(self, dtype, layout, device, pin_memory, requires_grad, _r.memoryformatOptional(1)));
     }
     case 1: {
       // aten::ones_like(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
@@ -13744,12 +13889,17 @@ static PyObject * THPVariable_rand(PyObject* self_, PyObject* args, PyObject* kw
           .layout(_r.layout(3).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartype(2);
+      auto layout = _r.layout(3).layout;
+      auto device = _r.device(4);
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_rand = [](IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options) -> Tensor {
+      auto dispatch_rand = [](IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::rand(size, names, options);
+        return torch::_rand(size, names, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_rand(_r.intlist(0), names, options));
+      return wrap(dispatch_rand(_r.intlist(0), names, dtype, layout, device, pin_memory, requires_grad));
     }
     case 1: {
       // aten::rand.generator_with_names(int[] size, *, Generator? generator, Dimname[]? names, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
@@ -13761,12 +13911,17 @@ static PyObject * THPVariable_rand(PyObject* self_, PyObject* args, PyObject* kw
           .layout(_r.layout(4).layout)
           .requires_grad(_r.toBool(7))
           .pinned_memory(_r.toBool(6));
+      auto dtype = _r.scalartype(3);
+      auto layout = _r.layout(4).layout;
+      auto device = _r.device(5);
+      auto pin_memory = _r.toBool(6);
+      auto requires_grad = _r.toBool(7);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_rand = [](IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, const TensorOptions & options) -> Tensor {
+      auto dispatch_rand = [](IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::rand(size, generator, names, options);
+        return torch::_rand(size, generator, names, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_rand(_r.intlist(0), _r.generator(1), names, options));
+      return wrap(dispatch_rand(_r.intlist(0), _r.generator(1), names, dtype, layout, device, pin_memory, requires_grad));
     }
     case 2: {
       if (_r.isNone(2)) {
@@ -13777,12 +13932,17 @@ static PyObject * THPVariable_rand(PyObject* self_, PyObject* args, PyObject* kw
             .layout(_r.layout(4).layout)
             .requires_grad(_r.toBool(7))
             .pinned_memory(_r.toBool(6));
+        auto dtype = _r.scalartype(3);
+        auto layout = _r.layout(4).layout;
+        auto device = _r.device(5);
+        auto pin_memory = _r.toBool(6);
+        auto requires_grad = _r.toBool(7);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_rand = [](IntArrayRef size, Generator * generator, const TensorOptions & options) -> Tensor {
+        auto dispatch_rand = [](IntArrayRef size, Generator * generator, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::rand(size, generator, options);
+          return torch::_rand(size, generator, dtype, layout, device, pin_memory, requires_grad);
         };
-        return wrap(dispatch_rand(_r.intlist(0), _r.generator(1), options));
+        return wrap(dispatch_rand(_r.intlist(0), _r.generator(1), dtype, layout, device, pin_memory, requires_grad));
       } else {
         // aten::rand.generator_out(int[] size, *, Generator? generator, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(2), _r.scalartype(3), _r.isNone(3),
@@ -13804,12 +13964,17 @@ static PyObject * THPVariable_rand(PyObject* self_, PyObject* args, PyObject* kw
             .layout(_r.layout(3).layout)
             .requires_grad(_r.toBool(6))
             .pinned_memory(_r.toBool(5));
+        auto dtype = _r.scalartype(2);
+        auto layout = _r.layout(3).layout;
+        auto device = _r.device(4);
+        auto pin_memory = _r.toBool(5);
+        auto requires_grad = _r.toBool(6);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_rand = [](IntArrayRef size, const TensorOptions & options) -> Tensor {
+        auto dispatch_rand = [](IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::rand(size, options);
+          return torch::_rand(size, dtype, layout, device, pin_memory, requires_grad);
         };
-        return wrap(dispatch_rand(_r.intlist(0), options));
+        return wrap(dispatch_rand(_r.intlist(0), dtype, layout, device, pin_memory, requires_grad));
       } else {
         // aten::rand.out(int[] size, *, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(1), _r.scalartype(2), _r.isNone(2),
@@ -13852,12 +14017,17 @@ static PyObject * THPVariable_rand_like(PyObject* self_, PyObject* args, PyObjec
           .layout(_r.layoutWithDefault(3, *torch::getLayout(self.options().backend())).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartypeWithDefault(2, self.scalar_type());
+      auto layout = _r.layoutWithDefault(3, *torch::getLayout(self.options().backend())).layout;
+      auto device = _r.deviceWithDefault(4, self.device());
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_rand_like = [](const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) -> Tensor {
+      auto dispatch_rand_like = [](const Tensor & self, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad, c10::optional<MemoryFormat> memory_format) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::rand_like(self, options, memory_format);
+        return torch::_rand_like(self, dtype.value(), layout.value(), device.value(), pin_memory.value(), requires_grad, memory_format);
       };
-      return wrap(dispatch_rand_like(self, options, _r.memoryformatOptional(1)));
+      return wrap(dispatch_rand_like(self, dtype, layout, device, pin_memory, requires_grad, _r.memoryformatOptional(1)));
     }
     case 1: {
       // aten::rand_like(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
@@ -13899,12 +14069,17 @@ static PyObject * THPVariable_randint_like(PyObject* self_, PyObject* args, PyOb
           .layout(_r.layoutWithDefault(4, *torch::getLayout(self.options().backend())).layout)
           .requires_grad(_r.toBool(7))
           .pinned_memory(_r.toBool(6));
+      auto dtype = _r.scalartypeWithDefault(3, self.scalar_type());
+      auto layout = _r.layoutWithDefault(4, *torch::getLayout(self.options().backend())).layout;
+      auto device = _r.deviceWithDefault(5, self.device());
+      auto pin_memory = _r.toBool(6);
+      auto requires_grad = _r.toBool(7);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_randint_like = [](const Tensor & self, int64_t high, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) -> Tensor {
+      auto dispatch_randint_like = [](const Tensor & self, int64_t high, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad, c10::optional<MemoryFormat> memory_format) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::randint_like(self, high, options, memory_format);
+        return torch::_randint_like(self, high, dtype.value(), layout.value(), device.value(), pin_memory.value(), requires_grad, memory_format);
       };
-      return wrap(dispatch_randint_like(self, _r.toInt64(1), options, _r.memoryformatOptional(2)));
+      return wrap(dispatch_randint_like(self, _r.toInt64(1), dtype, layout, device, pin_memory, requires_grad, _r.memoryformatOptional(2)));
     }
     case 1: {
       // aten::randint_like(Tensor self, int high, *, MemoryFormat? memory_format=None) -> Tensor
@@ -13923,12 +14098,17 @@ static PyObject * THPVariable_randint_like(PyObject* self_, PyObject* args, PyOb
           .layout(_r.layoutWithDefault(5, *torch::getLayout(self.options().backend())).layout)
           .requires_grad(_r.toBool(8))
           .pinned_memory(_r.toBool(7));
+      auto dtype = _r.scalartypeWithDefault(4, self.scalar_type());
+      auto layout = _r.layoutWithDefault(5, *torch::getLayout(self.options().backend())).layout;
+      auto device = _r.deviceWithDefault(6, self.device());
+      auto pin_memory = _r.toBool(7);
+      auto requires_grad = _r.toBool(8);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_randint_like = [](const Tensor & self, int64_t low, int64_t high, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) -> Tensor {
+      auto dispatch_randint_like = [](const Tensor & self, int64_t low, int64_t high, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad, c10::optional<MemoryFormat> memory_format) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::randint_like(self, low, high, options, memory_format);
+        return torch::_randint_like(self, low, high, dtype.value(), layout.value(), device.value(), pin_memory.value(), requires_grad, memory_format);
       };
-      return wrap(dispatch_randint_like(self, _r.toInt64(1), _r.toInt64(2), options, _r.memoryformatOptional(3)));
+      return wrap(dispatch_randint_like(self, _r.toInt64(1), _r.toInt64(2), dtype, layout, device, pin_memory, requires_grad, _r.memoryformatOptional(3)));
     }
     case 3: {
       // aten::randint_like.low(Tensor self, int low, int high, *, MemoryFormat? memory_format=None) -> Tensor
@@ -13971,12 +14151,17 @@ static PyObject * THPVariable_randn(PyObject* self_, PyObject* args, PyObject* k
           .layout(_r.layout(3).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartype(2);
+      auto layout = _r.layout(3).layout;
+      auto device = _r.device(4);
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_randn = [](IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options) -> Tensor {
+      auto dispatch_randn = [](IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::randn(size, names, options);
+        return torch::_randn(size, names, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_randn(_r.intlist(0), names, options));
+      return wrap(dispatch_randn(_r.intlist(0), names, dtype, layout, device, pin_memory, requires_grad));
     }
     case 1: {
       // aten::randn.generator_with_names(int[] size, *, Generator? generator, Dimname[]? names, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
@@ -13988,12 +14173,17 @@ static PyObject * THPVariable_randn(PyObject* self_, PyObject* args, PyObject* k
           .layout(_r.layout(4).layout)
           .requires_grad(_r.toBool(7))
           .pinned_memory(_r.toBool(6));
+      auto dtype = _r.scalartype(3);
+      auto layout = _r.layout(4).layout;
+      auto device = _r.device(5);
+      auto pin_memory = _r.toBool(6);
+      auto requires_grad = _r.toBool(7);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_randn = [](IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, const TensorOptions & options) -> Tensor {
+      auto dispatch_randn = [](IntArrayRef size, Generator * generator, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::randn(size, generator, names, options);
+        return torch::_randn(size, generator, names, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_randn(_r.intlist(0), _r.generator(1), names, options));
+      return wrap(dispatch_randn(_r.intlist(0), _r.generator(1), names, dtype, layout, device, pin_memory, requires_grad));
     }
     case 2: {
       if (_r.isNone(2)) {
@@ -14004,12 +14194,17 @@ static PyObject * THPVariable_randn(PyObject* self_, PyObject* args, PyObject* k
             .layout(_r.layout(4).layout)
             .requires_grad(_r.toBool(7))
             .pinned_memory(_r.toBool(6));
+        auto dtype = _r.scalartype(3);
+        auto layout = _r.layout(4).layout;
+        auto device = _r.device(5);
+        auto pin_memory = _r.toBool(6);
+        auto requires_grad = _r.toBool(7);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_randn = [](IntArrayRef size, Generator * generator, const TensorOptions & options) -> Tensor {
+        auto dispatch_randn = [](IntArrayRef size, Generator * generator, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::randn(size, generator, options);
+          return torch::_randn(size, generator, dtype, layout, device, pin_memory, requires_grad);
         };
-        return wrap(dispatch_randn(_r.intlist(0), _r.generator(1), options));
+        return wrap(dispatch_randn(_r.intlist(0), _r.generator(1), dtype, layout, device, pin_memory, requires_grad));
       } else {
         // aten::randn.generator_out(int[] size, *, Generator? generator, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(2), _r.scalartype(3), _r.isNone(3),
@@ -14031,12 +14226,17 @@ static PyObject * THPVariable_randn(PyObject* self_, PyObject* args, PyObject* k
             .layout(_r.layout(3).layout)
             .requires_grad(_r.toBool(6))
             .pinned_memory(_r.toBool(5));
+        auto dtype = _r.scalartype(2);
+        auto layout = _r.layout(3).layout;
+        auto device = _r.device(4);
+        auto pin_memory = _r.toBool(5);
+        auto requires_grad = _r.toBool(6);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_randn = [](IntArrayRef size, const TensorOptions & options) -> Tensor {
+        auto dispatch_randn = [](IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::randn(size, options);
+          return torch::_randn(size, dtype, layout, device, pin_memory, requires_grad);
         };
-        return wrap(dispatch_randn(_r.intlist(0), options));
+        return wrap(dispatch_randn(_r.intlist(0), dtype, layout, device, pin_memory, requires_grad));
       } else {
         // aten::randn.out(int[] size, *, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(1), _r.scalartype(2), _r.isNone(2),
@@ -14079,12 +14279,17 @@ static PyObject * THPVariable_randn_like(PyObject* self_, PyObject* args, PyObje
           .layout(_r.layoutWithDefault(3, *torch::getLayout(self.options().backend())).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartypeWithDefault(2, self.scalar_type());
+      auto layout = _r.layoutWithDefault(3, *torch::getLayout(self.options().backend())).layout;
+      auto device = _r.deviceWithDefault(4, self.device());
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_randn_like = [](const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) -> Tensor {
+      auto dispatch_randn_like = [](const Tensor & self, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad, c10::optional<MemoryFormat> memory_format) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::randn_like(self, options, memory_format);
+        return torch::_randn_like(self, dtype.value(), layout.value(), device.value(), pin_memory.value(), requires_grad, memory_format);
       };
-      return wrap(dispatch_randn_like(self, options, _r.memoryformatOptional(1)));
+      return wrap(dispatch_randn_like(self, dtype, layout, device, pin_memory, requires_grad, _r.memoryformatOptional(1)));
     }
     case 1: {
       // aten::randn_like(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
@@ -14124,12 +14329,17 @@ static PyObject * THPVariable_randperm(PyObject* self_, PyObject* args, PyObject
             .layout(_r.layout(4).layout)
             .requires_grad(_r.toBool(7))
             .pinned_memory(_r.toBool(6));
+        auto dtype = _r.scalartype(3);
+        auto layout = _r.layout(4).layout;
+        auto device = _r.device(5);
+        auto pin_memory = _r.toBool(6);
+        auto requires_grad = _r.toBool(7);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_randperm = [](int64_t n, Generator * generator, const TensorOptions & options) -> Tensor {
+        auto dispatch_randperm = [](int64_t n, Generator * generator, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::randperm(n, generator, options);
+          return torch::_randperm(n, generator, dtype, layout, device, pin_memory, requires_grad);
         };
-        return wrap(dispatch_randperm(_r.toInt64(0), _r.generator(1), options));
+        return wrap(dispatch_randperm(_r.toInt64(0), _r.generator(1), dtype, layout, device, pin_memory, requires_grad));
       } else {
         // aten::randperm.generator_out(int n, *, Generator? generator, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(2), _r.scalartype(3), _r.isNone(3),
@@ -14151,12 +14361,17 @@ static PyObject * THPVariable_randperm(PyObject* self_, PyObject* args, PyObject
             .layout(_r.layout(3).layout)
             .requires_grad(_r.toBool(6))
             .pinned_memory(_r.toBool(5));
+        auto dtype = _r.scalartype(2);
+        auto layout = _r.layout(3).layout;
+        auto device = _r.device(4);
+        auto pin_memory = _r.toBool(5);
+        auto requires_grad = _r.toBool(6);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_randperm = [](int64_t n, const TensorOptions & options) -> Tensor {
+        auto dispatch_randperm = [](int64_t n, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::randperm(n, options);
+          return torch::_randperm(n, dtype, layout, device, pin_memory, requires_grad);
         };
-        return wrap(dispatch_randperm(_r.toInt64(0), options));
+        return wrap(dispatch_randperm(_r.toInt64(0), dtype, layout, device, pin_memory, requires_grad));
       } else {
         // aten::randperm.out(int n, *, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(1), _r.scalartype(2), _r.isNone(2),
@@ -14943,12 +15158,17 @@ static PyObject * THPVariable_scalar_tensor(PyObject* self_, PyObject* args, PyO
       .layout(_r.layout(2).layout)
       .requires_grad(_r.toBool(5))
       .pinned_memory(_r.toBool(4));
+  auto dtype = _r.scalartype(1);
+  auto layout = _r.layout(2).layout;
+  auto device = _r.device(3);
+  auto pin_memory = _r.toBool(4);
+  auto requires_grad = _r.toBool(5);
   torch::utils::maybe_initialize_cuda(options);
-  auto dispatch_scalar_tensor = [](Scalar s, const TensorOptions & options) -> Tensor {
+  auto dispatch_scalar_tensor = [](Scalar s, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
     pybind11::gil_scoped_release no_gil;
-    return torch::scalar_tensor(s, options);
+    return torch::_scalar_tensor(s, dtype, layout, device, pin_memory, requires_grad);
   };
-  return wrap(dispatch_scalar_tensor(_r.scalar(0), options));
+  return wrap(dispatch_scalar_tensor(_r.scalar(0), dtype, layout, device, pin_memory, requires_grad));
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -16665,12 +16885,17 @@ static PyObject * THPVariable_tril_indices(PyObject* self_, PyObject* args, PyOb
       .layout(_r.layout(4).layout)
       .requires_grad(_r.toBool(7))
       .pinned_memory(_r.toBool(6));
+  auto dtype = _r.scalartype(3);
+  auto layout = _r.layout(4).layout;
+  auto device = _r.device(5);
+  auto pin_memory = _r.toBool(6);
+  auto requires_grad = _r.toBool(7);
   torch::utils::maybe_initialize_cuda(options);
-  auto dispatch_tril_indices = [](int64_t row, int64_t col, int64_t offset, const TensorOptions & options) -> Tensor {
+  auto dispatch_tril_indices = [](int64_t row, int64_t col, int64_t offset, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
     pybind11::gil_scoped_release no_gil;
-    return torch::tril_indices(row, col, offset, options);
+    return torch::_tril_indices(row, col, offset, dtype, layout, device, pin_memory, requires_grad);
   };
-  return wrap(dispatch_tril_indices(_r.toInt64(0), _r.toInt64(1), _r.toInt64(2), options));
+  return wrap(dispatch_tril_indices(_r.toInt64(0), _r.toInt64(1), _r.toInt64(2), dtype, layout, device, pin_memory, requires_grad));
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -16750,12 +16975,17 @@ static PyObject * THPVariable_triu_indices(PyObject* self_, PyObject* args, PyOb
       .layout(_r.layout(4).layout)
       .requires_grad(_r.toBool(7))
       .pinned_memory(_r.toBool(6));
+  auto dtype = _r.scalartype(3);
+  auto layout = _r.layout(4).layout;
+  auto device = _r.device(5);
+  auto pin_memory = _r.toBool(6);
+  auto requires_grad = _r.toBool(7);
   torch::utils::maybe_initialize_cuda(options);
-  auto dispatch_triu_indices = [](int64_t row, int64_t col, int64_t offset, const TensorOptions & options) -> Tensor {
+  auto dispatch_triu_indices = [](int64_t row, int64_t col, int64_t offset, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
     pybind11::gil_scoped_release no_gil;
-    return torch::triu_indices(row, col, offset, options);
+    return torch::_triu_indices(row, col, offset, dtype, layout, device, pin_memory, requires_grad);
   };
-  return wrap(dispatch_triu_indices(_r.toInt64(0), _r.toInt64(1), _r.toInt64(2), options));
+  return wrap(dispatch_triu_indices(_r.toInt64(0), _r.toInt64(1), _r.toInt64(2), dtype, layout, device, pin_memory, requires_grad));
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }
@@ -17117,12 +17347,17 @@ static PyObject * THPVariable_zeros(PyObject* self_, PyObject* args, PyObject* k
           .layout(_r.layout(3).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartype(2);
+      auto layout = _r.layout(3).layout;
+      auto device = _r.device(4);
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_zeros = [](IntArrayRef size, c10::optional<DimnameList> names, const TensorOptions & options) -> Tensor {
+      auto dispatch_zeros = [](IntArrayRef size, c10::optional<DimnameList> names, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::zeros(size, names, options);
+        return torch::_zeros(size, names, dtype, layout, device, pin_memory, requires_grad);
       };
-      return wrap(dispatch_zeros(_r.intlist(0), names, options));
+      return wrap(dispatch_zeros(_r.intlist(0), names, dtype, layout, device, pin_memory, requires_grad));
     }
     case 1: {
       if (_r.isNone(1)) {
@@ -17133,12 +17368,17 @@ static PyObject * THPVariable_zeros(PyObject* self_, PyObject* args, PyObject* k
             .layout(_r.layout(3).layout)
             .requires_grad(_r.toBool(6))
             .pinned_memory(_r.toBool(5));
+        auto dtype = _r.scalartype(2);
+        auto layout = _r.layout(3).layout;
+        auto device = _r.device(4);
+        auto pin_memory = _r.toBool(5);
+        auto requires_grad = _r.toBool(6);
         torch::utils::maybe_initialize_cuda(options);
-        auto dispatch_zeros = [](IntArrayRef size, const TensorOptions & options) -> Tensor {
+        auto dispatch_zeros = [](IntArrayRef size, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad) -> Tensor {
           pybind11::gil_scoped_release no_gil;
-          return torch::zeros(size, options);
+          return torch::_zeros(size, dtype, layout, device, pin_memory, requires_grad);
         };
-        return wrap(dispatch_zeros(_r.intlist(0), options));
+        return wrap(dispatch_zeros(_r.intlist(0), dtype, layout, device, pin_memory, requires_grad));
       } else {
         // aten::zeros.out(int[] size, *, Tensor(a!) out) -> Tensor(a!)
         check_out_type_matches(_r.tensor(1), _r.scalartype(2), _r.isNone(2),
@@ -17181,12 +17421,17 @@ static PyObject * THPVariable_zeros_like(PyObject* self_, PyObject* args, PyObje
           .layout(_r.layoutWithDefault(3, *torch::getLayout(self.options().backend())).layout)
           .requires_grad(_r.toBool(6))
           .pinned_memory(_r.toBool(5));
+      auto dtype = _r.scalartypeWithDefault(2, self.scalar_type());
+      auto layout = _r.layoutWithDefault(3, *torch::getLayout(self.options().backend())).layout;
+      auto device = _r.deviceWithDefault(4, self.device());
+      auto pin_memory = _r.toBool(5);
+      auto requires_grad = _r.toBool(6);
       torch::utils::maybe_initialize_cuda(options);
-      auto dispatch_zeros_like = [](const Tensor & self, const TensorOptions & options, c10::optional<MemoryFormat> memory_format) -> Tensor {
+      auto dispatch_zeros_like = [](const Tensor & self, c10::optional<ScalarType> dtype, c10::optional<Layout> layout, c10::optional<Device> device, c10::optional<bool> pin_memory, c10::optional<bool> requires_grad, c10::optional<MemoryFormat> memory_format) -> Tensor {
         pybind11::gil_scoped_release no_gil;
-        return torch::zeros_like(self, options, memory_format);
+        return torch::_zeros_like(self, dtype.value(), layout.value(), device.value(), pin_memory.value(), requires_grad, memory_format);
       };
-      return wrap(dispatch_zeros_like(self, options, _r.memoryformatOptional(1)));
+      return wrap(dispatch_zeros_like(self, dtype, layout, device, pin_memory, requires_grad, _r.memoryformatOptional(1)));
     }
     case 1: {
       // aten::zeros_like(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor

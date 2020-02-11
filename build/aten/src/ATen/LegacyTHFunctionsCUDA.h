@@ -42,7 +42,6 @@ Tensor & _th_index_copy_(Tensor & self, int64_t dim, const Tensor & index, const
 Tensor & _th_take_out(Tensor & result, const Tensor & self, const Tensor & index);
 Tensor _th_take(const Tensor & self, const Tensor & index);
 Tensor & _th_put_(Tensor & self, const Tensor & index, const Tensor & source, bool accumulate);
-Tensor & _th_index_add_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & source);
 Tensor & _th_index_fill_(Tensor & self, int64_t dim, const Tensor & index, Scalar value);
 Tensor & _th_scatter_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & src);
 Tensor & _th_scatter_(Tensor & self, int64_t dim, const Tensor & index, Scalar value);
