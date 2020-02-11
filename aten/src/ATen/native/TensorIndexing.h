@@ -193,6 +193,15 @@ struct CAFFE2_API TensorIndex final {
 CAFFE2_API std::ostream& operator<<(std::ostream& stream, const TensorIndex& tensor_index);
 CAFFE2_API std::ostream& operator<<(std::ostream& stream, const std::vector<TensorIndex>& tensor_indices);
 
+static inline int64_t getTensorSize(const Tensor& self, int64_t dim) {
+  auto device = self.device();
+  if (device == at::kCPU || device == at::kCUDA) {
+    return at::native::size(self, dim);
+  } else {
+    return self.size(dim);
+  }
+}
+
 static inline Tensor applySlice(
     const Tensor& self,
     int64_t dim,
@@ -201,7 +210,7 @@ static inline Tensor applySlice(
     int64_t step,
     bool ensure_view,
     bool is_tracing) {
-  const auto& length = self.size(dim);
+  const auto& length = getTensorSize(self, dim);
 
   TORCH_CHECK_VALUE(step != 0, "step cannot be zero");
   // TODO: implement negative step
@@ -222,7 +231,7 @@ static inline Tensor applySelect(const Tensor& self, int64_t dim, int64_t index,
     "invalid index of a 0-dim tensor. ",
     "Use `tensor.item()` in Python or `tensor.item<T>()` in C++ to convert a 0-dim tensor to a number");
 
-  int64_t size = self.size(dim);
+  int64_t size = getTensorSize(self, dim);
   TORCH_CHECK_INDEX(
     index >= -size && index < size,
     "index ", index, " is out of bounds for dimension ", real_dim, " with size ", size);
@@ -233,12 +242,47 @@ static inline Tensor applySelect(const Tensor& self, int64_t dim, int64_t index,
   return self.select(dim, index);
 }
 
-static inline Tensor boolToIndexingTensor(const Tensor& self, bool value) {
+static inline Tensor boolToIndexingTensorCPUOrCUDA(const Tensor& self, bool value) {
+  // booleans add a dimension of size 1. true indexes this dimension as if 0:, false as empty.
+  if (value) {
+    return at::native::zeros({1}, {}, self.options().dtype(kLong));
+  } else {
+    return at::native::empty({0}, {}, self.options().dtype(kLong));
+  }
+}
+
+static inline Tensor boolToIndexingTensorNonNativeDeviceType(const Tensor& self, bool value) {
   // booleans add a dimension of size 1. true indexes this dimension as if 0:, false as empty.
   if (value) {
     return at::zeros({1}, {}, self.options().dtype(kLong));
   } else {
     return at::empty({0}, {}, self.options().dtype(kLong));
+  }
+}
+
+static inline Tensor boolToIndexingTensor(const Tensor& self, bool value) {
+  auto device = self.options().device();
+  if (device == at::kCPU || device == at::kCUDA) {
+    return boolToIndexingTensorCPUOrCUDA(self, value);
+  } else {
+    return boolToIndexingTensorNonNativeDeviceType(self, value);
+  }
+}
+
+static inline Tensor scalarToTensorCPUOrCUDA(Scalar v, const TensorOptions& options) {
+  return at::native::scalar_tensor(v, options);
+}
+
+static inline Tensor scalarToTensorNonNativeDeviceType(Scalar v, const TensorOptions& options) {
+  return at::scalar_tensor(v, options);
+}
+
+static inline Tensor scalarToTensor(Scalar v, const TensorOptions& options) {
+  auto device = options.device();
+  if (device == at::kCPU || device == at::kCUDA) {
+    return scalarToTensorCPUOrCUDA(v, options);
+  } else {
+    return scalarToTensorNonNativeDeviceType(v, options);
   }
 }
 

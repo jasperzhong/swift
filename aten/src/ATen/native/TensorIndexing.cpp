@@ -129,9 +129,10 @@ void set_item(Tensor& self, ArrayRef<TensorIndex> indices, const Tensor& value) 
     return;
   }
 
-  IntArrayRef slicedValueSizes = slicePrefix1sSize(value.sizes());
+  IntArrayRef valueSizes = value.sizes();
+  IntArrayRef slicedValueSizes = slicePrefix1sSize(valueSizes);
   Tensor valuesSliced;
-  if (!value.sizes().equals(slicedValueSizes)) {
+  if (!valueSizes.equals(slicedValueSizes)) {
     valuesSliced = value.view(slicedValueSizes);
   } else {
     valuesSliced = value;
@@ -148,9 +149,9 @@ void set_item(Tensor& self, ArrayRef<TensorIndex> indices, Scalar v) {
 
   // TODO: This qint special case looks very suspicious...
   if (isQIntType(self.scalar_type())) {
-    value = at::scalar_tensor(v, device(kCPU).dtype(kFloat));
+    value = at::indexing::scalarToTensor(v, device(kCPU).dtype(kFloat));
   } else {
-    value = at::scalar_tensor(v, self.options());
+    value = at::indexing::scalarToTensor(v, self.options());
   }
 
   return set_item(self, indices, value);

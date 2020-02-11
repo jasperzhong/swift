@@ -80,10 +80,10 @@ static inline Variable valueToTensor(c10::TensorOptions options, PyObject* value
   }
   at::AutoNonVariableTypeMode guard;
   if (THPUtils_checkLong(value) || PyBool_Check(value)) {
-    return at::scalar_tensor(Scalar(THPUtils_unpackLong(value)), options);
+    return at::indexing::scalarToTensor(Scalar(THPUtils_unpackLong(value)), options);
   }
   if (PyFloat_Check(value)) {
-    return at::scalar_tensor(Scalar(THPUtils_unpackDouble(value)), options);
+    return at::indexing::scalarToTensor(Scalar(THPUtils_unpackDouble(value)), options);
   }
   throw TypeError(
     "can't assign a %s to a %s",
@@ -186,7 +186,7 @@ static inline Variable applySlicing(const Variable& self, PyObject* index, varia
   int64_t specified_dims = count_specified_dimensions(index);
 
   if (specified_dims > self.dim()) {
-    throw IndexError("too many indices for tensor of dimension %d", (int)self.dim());
+    throw IndexError("too many indices for tensor of dimension %d", (int)(self.dim()));
   }
 
   Variable result = self;
@@ -267,7 +267,7 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
     || PySlice_Check(index) \
     || index == Py_Ellipsis \
     || index == Py_None) {
-    return wrap(at::indexing::handleSimpleTypesInSingleDimIndexingGet(
+    return THPVariable_Wrap(at::indexing::handleSimpleTypesInSingleDimIndexingGet(
       self_,
       traceAndConvertPythonIndexToTensorIndex(self_, index, is_tracing),
       /*is_tracing=*/is_tracing));
@@ -283,11 +283,11 @@ PyObject* THPVariable_getitem(PyObject* self, PyObject* index) {
       // ensure we return a shallow copy for things like x[...]
       sliced = at::alias(sliced);
     }
-    return wrap(sliced);
+    return THPVariable_Wrap(sliced);
   }
 
   // indexing by tensors ("advanced" indexing)
-  return wrap(([&]() {
+  return THPVariable_Wrap(([&]() {
     pybind11::gil_scoped_release no_gil;
     return at::indexing::dispatch_index(sliced, variableIndices);
   })());
@@ -337,9 +337,10 @@ int THPVariable_setitem(PyObject* self, PyObject* index, PyObject* py_value) {
     return 0;
   }
 
-  IntArrayRef slicedValueSizes = at::indexing::slicePrefix1sSize(value.sizes());
+  IntArrayRef valueSizes = value.sizes();
+  IntArrayRef slicedValueSizes = at::indexing::slicePrefix1sSize(valueSizes);
   torch::autograd::Variable valuesSliced;
-  if (!value.sizes().equals(slicedValueSizes)) {
+  if (!valueSizes.equals(slicedValueSizes)) {
     valuesSliced = value.view(slicedValueSizes);
   } else {
     valuesSliced = value;
