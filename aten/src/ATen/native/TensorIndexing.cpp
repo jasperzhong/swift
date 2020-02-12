@@ -100,7 +100,7 @@ Tensor get_item(const Tensor& self, ArrayRef<TensorIndex> indices) {
   if (tensorIndices.empty()) {
     if (sliced.is_same(self)) {
       // ensure we return a shallow copy for things like x[...]
-      sliced = sliced.alias();
+      sliced = at::alias(sliced);
     }
     return sliced;
   }

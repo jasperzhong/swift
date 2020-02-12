@@ -319,11 +319,7 @@ static inline Tensor handleSimpleTypesInSingleDimIndexingGet(
     const Tensor& self,
     const TensorIndex& index,
     bool is_tracing) {
-  if (index.is_none()) {
-    return self.unsqueeze(0);
-  } else if (index.is_ellipsis()) {
-    return self.alias();
-  } else if (index.is_integer()) {
+  if (index.is_integer()) {
     return applySelect(self, 0, index.integer());
   } else if (index.is_slice()) {
     return applySlice(
@@ -334,6 +330,10 @@ static inline Tensor handleSimpleTypesInSingleDimIndexingGet(
       index.slice().step(),
       /*ensure_view=*/true,
       /*is_tracing=*/is_tracing);
+  } else if (index.is_none()) {
+    return self.unsqueeze(0);
+  } else if (index.is_ellipsis()) {
+    return at::alias(self);
   } else {
     TORCH_INTERNAL_ASSERT(false, "Invalid TensorIndex type");
   }
