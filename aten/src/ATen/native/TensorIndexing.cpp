@@ -147,11 +147,14 @@ void set_item(Tensor& self, ArrayRef<TensorIndex> indices, Scalar v) {
   OptionalDeviceGuard device_guard(device_of(self));
   Tensor value;
 
-  // TODO: This qint special case looks very suspicious...
-  if (isQIntType(self.scalar_type())) {
-    value = at::indexing::scalarToTensor(v, device(kCPU).dtype(kFloat));
-  } else {
-    value = at::indexing::scalarToTensor(v, self.options());
+  {
+    at::AutoNonVariableTypeMode guard;
+    // TODO: This qint special case looks very suspicious...
+    if (isQIntType(self.scalar_type())) {
+      value = at::indexing::scalarToTensor(v, device(kCPU).dtype(kFloat));
+    } else {
+      value = at::indexing::scalarToTensor(v, self.options());
+    }
   }
 
   return set_item(self, indices, value);
