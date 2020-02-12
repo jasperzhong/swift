@@ -210,16 +210,13 @@ static inline Tensor applySlice(
     int64_t step,
     bool ensure_view,
     bool is_tracing) {
-  const auto& length = getTensorSize(self, dim);
-
-  TORCH_CHECK_VALUE(step != 0, "step cannot be zero");
   // TODO: implement negative step
-  TORCH_CHECK_VALUE(step >= 0, "negative step not yet supported");
+  TORCH_CHECK_VALUE(step > 0, "step must be greater than zero");
 
   // Skip this optimization if we are tracing, as the trace may be polymorphic
   // over the shape of the `self` tensor, and we still want to record
   // the slice.
-  if (!ensure_view && start == 0 && stop == length && step == 1 && !is_tracing) {
+  if (!ensure_view && start == 0 && stop == getTensorSize(self, dim) && step == 1 && !is_tracing) {
     return self;
   }
   return self.slice(dim, start, stop, step);
