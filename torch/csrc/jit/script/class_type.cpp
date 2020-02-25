@@ -27,11 +27,23 @@ const std::vector<Function*>& ClassType::methods() const {
   return methods_;
 }
 
-size_t ClassType::addAttribute(
-    const std::string& name,
-    TypePtr type,
-    bool is_parameter) {
-  const char* what = is_parameter ? "parameter" : "attribute";
+void ClassType::checkNotExist(const std::string& name, const std::string& what)
+    const {
+  // Check no overlap with existing constants
+  for (size_t i = 0; i < constantNames_.size(); ++i) {
+    TORCH_CHECK(
+        name != constantNames_[i],
+        "attempting to add ",
+        what,
+        " '",
+        name,
+        "' to ",
+        python_str(),
+        " but a constant field of the same name already exists with value ",
+        constantValues_[i]);
+  }
+
+  // Check no overlap with existing attributes
   for (size_t i = 0; i < attributeNames_.size(); ++i) {
     TORCH_CHECK(
         name != attributeNames_[i],
@@ -41,9 +53,17 @@ size_t ClassType::addAttribute(
         name,
         "' to ",
         python_str(),
-        " but a field of the same name already exists with type ",
+        " but an attribute field of the same name already exists with type ",
         attributeTypes_[i]->python_str());
   }
+}
+
+size_t ClassType::addAttribute(
+    const std::string& name,
+    const TypePtr& type,
+    bool is_parameter) {
+  const char* what = is_parameter ? "parameter" : "attribute";
+  checkNotExist(name, what);
   checkNoAny(*this, what, name, type);
 
   size_t slot = attributeNames_.size();
@@ -51,6 +71,14 @@ size_t ClassType::addAttribute(
   attributeTypes_.push_back(type);
   if (is_parameter) {
     TORCH_INTERNAL_ASSERT(is_module(), "adding a parameter to a non module");
+    TORCH_CHECK(
+        (type->kind() == TensorType::Kind) ||
+            (type->kind() == OptionalType::Kind &&
+             type->expect<OptionalType>()->getElementType()->kind() ==
+                 TensorType::Kind) ||
+            (type->kind() == NoneType::Kind),
+        "Expecting parameter to have either None, Tensor or Optional[Tensor] type, but got: ",
+        toString(type));
   }
   if (is_module()) {
     parameterSlots_->push_back(is_parameter);
@@ -62,6 +90,9 @@ void ClassType::unsafeRemoveAttribute(const std::string& name) {
   auto slot = getAttributeSlot(name);
   attributeNames_.erase(attributeNames_.begin() + slot);
   attributeTypes_.erase(attributeTypes_.begin() + slot);
+  if (is_module()) {
+    parameterSlots_->erase(parameterSlots_->begin() + slot);
+  }
 }
 
 void ClassType::addMethod(Function* method) {
@@ -81,6 +112,57 @@ Function* ClassType::getMethod(const std::string& name) const {
     }
   }
   return nullptr;
+}
+
+size_t ClassType::addConstant(const std::string& name, const IValue& value) {
+  checkNotExist(name, "constant");
+  size_t slot = constantNames_.size();
+  constantNames_.push_back(name);
+  constantValues_.push_back(value);
+  return slot;
+}
+
+IValue ClassType::getConstant(const std::string& name) const {
+  const auto& v = findConstant(name);
+  TORCH_CHECK(
+      v.has_value(),
+      python_str(),
+      " does not have a constant field with name '",
+      name,
+      "'");
+  return *v;
+}
+
+IValue ClassType::getConstant(size_t slot) const {
+  TORCH_INTERNAL_ASSERT(constantNames_.size() == constantValues_.size());
+  TORCH_CHECK(
+      slot < constantValues_.size(),
+      python_str(),
+      " does not have a constant slot of index ",
+      slot);
+  return constantValues_[slot];
+}
+
+c10::optional<IValue> ClassType::findConstant(const std::string& name) const {
+  TORCH_INTERNAL_ASSERT(constantNames_.size() == constantValues_.size());
+  size_t pos = 0;
+  for (const auto& c : constantNames_) {
+    if (name == c) {
+      break;
+    }
+    ++pos;
+  }
+
+  if (pos >= constantNames_.size()) {
+    return c10::nullopt;
+  }
+  return constantValues_[pos];
+}
+
+void ClassType::unsafeRemoveConstant(const std::string& name) {
+  auto slot = getConstantSlot(name);
+  constantNames_.erase(constantNames_.begin() + slot);
+  constantValues_.erase(constantValues_.begin() + slot);
 }
 
 std::shared_ptr<CompilationUnit> ClassType::compilation_unit() {
@@ -121,14 +203,14 @@ bool ClassType::isSubtypeOfExt(const TypePtr rhs, std::ostream* why_not) const {
   if (auto iface = rhs->cast<InterfaceType>()) {
     // ClassType is not a subtype of InterfaceType if the InterfaceType is a
     // Module Interface Type but the Class Type is not a Module Class Type
-    if(!is_module() && iface->is_module()) {
-        if (why_not) {
-          *why_not << "Class '" << python_str() << "' is not a subtype of "
-                   << "the module interface '" << rhs->python_str()
-                   << "' , only ScriptModule class can be subtype of module"
-                   << " interface.\n";
-        }
-        return false;
+    if (!is_module() && iface->is_module()) {
+      if (why_not) {
+        *why_not << "Class '" << python_str() << "' is not a subtype of "
+                 << "the module interface '" << rhs->python_str()
+                 << "' , only ScriptModule class can be subtype of module"
+                 << " interface.\n";
+      }
+      return false;
     }
     for (const FunctionSchema& schema : iface->methods()) {
       auto self_method = getMethod(schema.name());

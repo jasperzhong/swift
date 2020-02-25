@@ -56,7 +56,7 @@ void postSetStateValidate(const IValue& v) {
 
 IValue readArchiveAndTensors(
     const std::string& archive_name,
-    c10::optional<ClassResolver> class_resolver,
+    c10::optional<TypeResolver> type_resolver,
     c10::optional<ObjLoader> obj_loader,
     c10::optional<at::Device> device,
     PyTorchStreamReader& stream_reader) {
@@ -87,7 +87,7 @@ IValue readArchiveAndTensors(
 
   Unpickler unpickler(
       reader,
-      class_resolver ? std::move(*class_resolver) : nullptr,
+      type_resolver ? std::move(*type_resolver) : nullptr,
       obj_loader ? std::move(*obj_loader) : nullptr,
       std::move(read_record),
       device);
@@ -134,7 +134,7 @@ class ScriptModuleDeserializer final {
 };
 
 IValue ScriptModuleDeserializer::readArchive(const std::string& archive_name) {
-  auto class_resolver = [&](const c10::QualifiedName& qn) {
+  auto type_resolver = [&](const c10::QualifiedName& qn) {
     auto cls = source_importer_.loadNamedType(qn)->expect<ClassType>();
     return c10::StrongTypePtr(compilation_unit_, std::move(cls));
   };
@@ -145,12 +145,12 @@ IValue ScriptModuleDeserializer::readArchive(const std::string& archive_name) {
   auto obj_loader = [&](at::StrongTypePtr type, IValue input) {
     auto cls = type.type_->expect<at::ClassType>();
     size_t n = cls->numAttributes();
-    if (checkHasValidSetGetState(type.type_)) {
+    if (checkHasValidSetGetState(cls)) {
       auto obj = c10::ivalue::Object::create(type, n);
       // XXX: Do not optimize __setstate__, so that we don't try to
       // specialize the class before it is initialized.
       setGraphExecutorOptimize(false);
-      Function* set_state = type.type_->getMethod("__setstate__");
+      Function* set_state = cls->getMethod("__setstate__");
       // since we are in the middle of unpickling we might still have lists and
       // dicts that do not have accurate tags (e.g. they report they are
       // List[Any]). But we need to run __setstate__ which will check the input
@@ -174,7 +174,7 @@ IValue ScriptModuleDeserializer::readArchive(const std::string& archive_name) {
   };
 
   return readArchiveAndTensors(
-      archive_name, class_resolver, obj_loader, device_, *reader_.get());
+      archive_name, type_resolver, obj_loader, device_, *reader_.get());
 }
 
 script::Module ScriptModuleDeserializer::deserialize(
@@ -245,7 +245,7 @@ script::Module load(
     c10::optional<at::Device> device,
     script::ExtraFilesMap& extra_files) {
   std::unique_ptr<IStreamAdapter> rai =
-      caffe2::make_unique<IStreamAdapter>(&in);
+      std::make_unique<IStreamAdapter>(&in);
   auto module = load(std::move(rai), device, extra_files);
   return module;
 }
@@ -254,7 +254,7 @@ script::Module load(
     const std::string& filename,
     c10::optional<at::Device> device,
     script::ExtraFilesMap& extra_files) {
-  std::unique_ptr<FileAdapter> rai = caffe2::make_unique<FileAdapter>(filename);
+  std::unique_ptr<FileAdapter> rai = std::make_unique<FileAdapter>(filename);
   auto module = load(std::move(rai), device, extra_files);
   return module;
 }
@@ -263,8 +263,30 @@ script::Module load(
     std::unique_ptr<ReadAdapterInterface> rai,
     c10::optional<c10::Device> device,
     script::ExtraFilesMap& extra_files) {
+  // Verify that we're loading a zip archive and not a torch.save pickle archive
+  // (marked by the 0x80 0x02 bytes at the start)
+  uint8_t first_short[2];
+  rai->read(
+      /*pos=*/0,
+      /*buf=*/&first_short,
+      /*n=*/2,
+      /*what=*/"checking archive");
+  if (first_short[0] == 0x80 && first_short[1] == 0x02) {
+    // NB: zip files by spec can start with any data, so technically they might
+    // start with 0x80 0x02, but in practice zip files start with a file entry
+    // which begins with 0x04034b50. Furthermore, PyTorch will never produce zip
+    // files that do not start with the file entry, so it is relatively safe to
+    // perform this check.
+    TORCH_CHECK(
+        false,
+        "`torch::jit::load()` received a file from `torch.save()`, "
+        "but `torch::jit::load()` can only load files"
+        " produced by `torch.jit.save()`");
+  }
+
   auto reader = torch::make_unique<PyTorchStreamReader>(std::move(rai));
   auto cu = std::make_shared<script::CompilationUnit>();
+
   ScriptModuleDeserializer deserializer(std::move(cu), std::move(reader));
   return deserializer.deserialize(device, extra_files);
 }
