@@ -47,7 +47,7 @@ private:
 };
 
 inline bool pointer_equal(at::Tensor first, at::Tensor second) {
-  return first.data_ptr<float>() == second.data_ptr<float>();
+  return first.data_ptr() == second.data_ptr();
 }
 
 // This mirrors the `isinstance(x, torch.Tensor) and isinstance(y, Number)` branch
@@ -60,7 +60,7 @@ AT_FORALL_SCALAR_TYPES_AND3(Bool, Half, BFloat16, TENSOR)
 #undef TENSOR
 
 // This mirrors the `isinstance(x, torch.Tensor) and isinstance(y, torch.Tensor)` branch
-// in `TestCase.assertEqual` in test/common_utils.py
+// in `TestCase.assertEqual` in torch/testing/_internal/common_utils.py
 inline void assert_tensor_equal(at::Tensor a, at::Tensor b, bool allow_inf=false) {
   ASSERT_TRUE(a.sizes() == b.sizes());
   if (a.numel() > 0) {
@@ -85,13 +85,13 @@ inline void assert_tensor_equal(at::Tensor a, at::Tensor b, bool allow_inf=false
         // check that NaNs are in the same locations
         auto nan_mask = torch::isnan(a);
         ASSERT_TRUE(torch::equal(nan_mask, torch::isnan(b)));
-        diff.idx_put_({nan_mask}, 0);
+        diff.index_put_({nan_mask}, 0);
         // inf check if allow_inf=true
         if (allow_inf) {
           auto inf_mask = torch::isinf(a);
           auto inf_sign = inf_mask.sign();
           ASSERT_TRUE(torch::equal(inf_sign, torch::isinf(b).sign()));
-          diff.idx_put_({inf_mask}, 0);
+          diff.index_put_({inf_mask}, 0);
         }
       }
       // TODO: implement abs on CharTensor (int8)
@@ -105,7 +105,7 @@ inline void assert_tensor_equal(at::Tensor a, at::Tensor b, bool allow_inf=false
 }
 
 // This mirrors the `isinstance(x, torch.Tensor) and isinstance(y, torch.Tensor)` branch
-// in `TestCase.assertNotEqual` in test/common_utils.py
+// in `TestCase.assertNotEqual` in torch/testing/_internal/common_utils.py
 inline void assert_tensor_not_equal(at::Tensor x, at::Tensor y) {
   if (x.sizes() != y.sizes()) {
     return;
@@ -119,7 +119,7 @@ inline void assert_tensor_not_equal(at::Tensor x, at::Tensor y) {
     if (diff.is_signed()) {
       diff = diff.abs();
     }
-    diff.idx_put_({nan_mask}, 0);
+    diff.index_put_({nan_mask}, 0);
     // Use `item()` to work around:
     // https://github.com/pytorch/pytorch/issues/22301
     auto max_err = diff.max().item<double>();

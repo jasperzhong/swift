@@ -523,17 +523,14 @@ if(USE_FBGEMM)
       "Turn this warning off by USE_FBGEMM=OFF.")
     set(USE_FBGEMM OFF)
   endif()
-  if(MSVC)
-    message(WARNING
-      "FBGEMM is currently not supported on windows with MSVC. "
-      "Not compiling with FBGEMM. "
-      "Turn this warning off by USE_FBGEMM=OFF.")
-    set(USE_FBGEMM OFF)
-  endif()
   if(USE_FBGEMM AND NOT TARGET fbgemm)
     set(FBGEMM_BUILD_TESTS OFF CACHE BOOL "")
     set(FBGEMM_BUILD_BENCHMARKS OFF CACHE BOOL "")
-    set(FBGEMM_LIBRARY_TYPE "static" CACHE STRING "")
+    if(MSVC AND BUILD_SHARED_LIBS)
+      set(FBGEMM_LIBRARY_TYPE "shared" CACHE STRING "")
+    else()
+      set(FBGEMM_LIBRARY_TYPE "static" CACHE STRING "")
+    endif()
     add_subdirectory("${FBGEMM_SOURCE_DIR}")
     set_property(TARGET fbgemm_generic PROPERTY POSITION_INDEPENDENT_CODE ON)
     set_property(TARGET fbgemm_avx2 PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -802,12 +799,12 @@ if(pybind11_FOUND)
 else()
     message(STATUS "Using third_party/pybind11.")
     set(pybind11_INCLUDE_DIRS ${CMAKE_CURRENT_LIST_DIR}/../third_party/pybind11/include)
+    install(DIRECTORY ${pybind11_INCLUDE_DIRS}
+            DESTINATION ${CMAKE_INSTALL_PREFIX}
+            FILES_MATCHING PATTERN "*.h")
 endif()
 message(STATUS "pybind11 include dirs: " "${pybind11_INCLUDE_DIRS}")
 include_directories(SYSTEM ${pybind11_INCLUDE_DIRS})
-install(DIRECTORY ${pybind11_INCLUDE_DIRS}
-        DESTINATION ${CMAKE_INSTALL_PREFIX}
-        FILES_MATCHING PATTERN "*.h")
 
 # ---[ MPI
 if(USE_MPI)
@@ -965,6 +962,7 @@ if(USE_ROCM)
     list(APPEND HIP_CXX_FLAGS -Wno-implicit-int-float-conversion)
     list(APPEND HIP_CXX_FLAGS -DCAFFE2_USE_MIOPEN)
     list(APPEND HIP_CXX_FLAGS -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)
+    list(APPEND HIP_CXX_FLAGS -std=c++14)
 
     if(CMAKE_BUILD_TYPE MATCHES Debug)
        list(APPEND HIP_CXX_FLAGS -g)
@@ -1144,12 +1142,6 @@ if (CAFFE2_CMAKE_BUILDING_WITH_MAIN_REPO AND NOT INTERN_DISABLE_ONNX)
   if (CAFFE2_LINK_LOCAL_PROTOBUF)
     set(ONNX_PROTO_POST_BUILD_SCRIPT ${PROJECT_SOURCE_DIR}/cmake/ProtoBufPatch.cmake)
   endif()
-  # Set the ONNX_ML flag for ONNX submodule
-  if (DEFINED ENV{ONNX_ML})
-    set(ONNX_ML $ENV{ONNX_ML})
-  else()
-    set(ONNX_ML ON)
-  endif()
   if (ONNX_ML)
     add_definitions(-DONNX_ML=1)
   endif()
@@ -1237,7 +1229,7 @@ if (NOT INTERN_BUILD_MOBILE)
   LIST(APPEND CUDA_NVCC_FLAGS --expt-extended-lambda)
 
   if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    SET(CMAKE_CXX_STANDARD 11)
+    SET(CMAKE_CXX_STANDARD 14)
   endif()
 
   LIST(APPEND CUDA_NVCC_FLAGS ${TORCH_NVCC_FLAGS})
@@ -1440,6 +1432,8 @@ if (NOT INTERN_BUILD_MOBILE)
       ADD_DEFINITIONS(-DHAVE_MALLOC_USABLE_SIZE=1)
     ENDIF(HAVE_MALLOC_USABLE_SIZE)
   ENDIF(UNIX)
+
+  ADD_DEFINITIONS(-DMINIZ_DISABLE_ZIP_READER_CRC32_CHECKS)
 
   # Is __thread supported?
   IF(NOT MSVC)

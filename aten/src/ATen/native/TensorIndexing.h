@@ -13,17 +13,17 @@ enum class TensorIndexType { None, Ellipsis, Integer, Boolean, Slice, Tensor };
 
 constexpr c10::nullopt_t None{c10::nullopt_t::init()};
 
-struct CAFFE2_API EllipsisIndexType { EllipsisIndexType() {} };
+struct CAFFE2_API EllipsisIndexType final { EllipsisIndexType() {} };
 CAFFE2_API extern const EllipsisIndexType Ellipsis;
 
-struct CAFFE2_API Slice {
+struct CAFFE2_API Slice final {
  public:
   Slice();
   Slice(int64_t start, int64_t stop, int64_t step);
 
-  const int64_t& start() const;
-  const int64_t& stop() const;
-  const int64_t& step() const;
+  int64_t start() const;
+  int64_t stop() const;
+  int64_t step() const;
 
  private:
   int64_t start_;
@@ -44,7 +44,7 @@ CAFFE2_API std::ostream& operator<<(std::ostream& stream, const Slice& slice);
 // `None`                  | `at::indexing::None`
 // `Ellipsis`              | `at::indexing::Ellipsis`
 // `...`                   | `"..."`
-// `123`                   | `123`  
+// `123`                   | `123`
 // `True` / `False`        | `true` / `false`
 // `:`                     | `{}` / `{None, None}`
 // `::`                    | `{}` / `{None, None, None}`
@@ -58,7 +58,7 @@ CAFFE2_API std::ostream& operator<<(std::ostream& stream, const Slice& slice);
 // `:3:2`                  | `{None, 3, 2}`
 // `1:3:2`                 | `{1, 3, 2}`
 // `torch.tensor([1, 2])`) | `torch::tensor({1, 2})`
-struct CAFFE2_API TensorIndex {
+struct CAFFE2_API TensorIndex final {
   // Case 1: `at::indexing::None`
   TensorIndex(c10::nullopt_t);
 
@@ -71,7 +71,9 @@ struct CAFFE2_API TensorIndex {
   TensorIndex(int integer);
 
   // Case 4: Boolean value
-  TensorIndex(bool boolean);
+  template <class T,
+            class = typename std::enable_if<std::is_same<bool, T>::value>::type >
+  TensorIndex(T boolean) : boolean_(boolean), type_(TensorIndexType::Boolean) {}
 
   // Case 5: Slice represented in `{start, stop, step}` form,
   // where `start` / `stop` / `step` can be integer or `at::indexing::None`

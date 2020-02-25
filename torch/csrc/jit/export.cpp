@@ -8,7 +8,9 @@
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/instruction.h>
 
+#include <onnx/checker.h>
 #include <onnx/onnx_pb.h>
+#include <onnx/proto_utils.h>
 
 #include <ATen/ATen.h>
 #include <c10/util/Optional.h>
@@ -19,7 +21,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-
+#include <regex>
 namespace torch {
 namespace jit {
 
@@ -89,8 +91,7 @@ void validateBlock(
       bool is_aten_enabled = operator_export_type ==
               onnx_torch::OperatorExportTypes::ONNX_ATEN_FALLBACK ||
           operator_export_type == onnx_torch::OperatorExportTypes::ONNX_ATEN;
-      if (!node->kind().is_onnx() && !node->kind().is_caffe2() &&
-          !is_aten_enabled && !node->mustBeNone()) {
+      if (node->kind().is_aten() && !is_aten_enabled && !node->mustBeNone()) {
         FAIL_EXPORT(
             "Couldn't export operator " + node->kind().toDisplayString() +
             "\n\nDefined at:\n" + getNodeStackTraceString(node));
@@ -109,6 +110,47 @@ void validateGraph(
   EliminateDeadCode(graph->block(), true, DCESideEffectPolicy::ALLOW_DELETING_NODES_WITH_SIDE_EFFECTS);
 }
 
+std::string GetFileRootPath(const std::string& rootPath) {
+    std::string rootPath_ = rootPath;
+    // First, making slash consistent.
+    std::replace(rootPath_.begin(), rootPath_.end(), '\\', '/');
+    // Second, remove trailing slashes, if any
+    std::regex trailer("/+$");
+    std::string root = std::regex_replace(rootPath_, trailer, std::string());
+    std::string folder = root.substr(0, root.find_last_of('/'));
+    if (folder == rootPath_) { // If no root folder specified, select cwd.
+      return std::string(".");
+    }
+    return folder;
+}
+
+std::string GetExternalFileName(const c10::optional<std::string> external_ref) {
+  auto tensorName = external_ref.value();
+  const std::string illegalChars = "\\/:?\"<>|";
+  for (int i = 0; i < tensorName.size(); i++) {
+    if (illegalChars.find(tensorName[i]) != std::string::npos) {
+        tensorName[i] = '_';
+    }
+  }
+  return tensorName;
+}
+
+void CloseFile(FILE* fp) { 
+  fclose(fp);
+}
+
+void CreateExternalFile(const at::Tensor& tensor, const std::string& tensorName,
+                        const std::string& onnx_file_path) {
+  auto folder = GetFileRootPath(onnx_file_path);
+  std::string fullFilePath = folder + "/" + tensorName;
+  std::unique_ptr<FILE, decltype(&CloseFile)> fp(fopen(fullFilePath.c_str(), "wb"),
+                                                 &CloseFile);
+  if (fp == NULL) {
+    throw std::runtime_error(std::string("ONNX export failed. Could not open file or directory: ") + fullFilePath);
+  }
+  fwrite(tensor.data_ptr(), tensor.element_size(), tensor.numel(), fp.get());
+} // fclose() called here through CloseFile(), if FILE* is not a null pointer.
+
 class EncoderBase {
  public:
   EncoderBase(
@@ -121,7 +163,7 @@ class EncoderBase {
 
  protected:
   // Using std::map instead of std::unordered_map for initializers
-  // in EncodeGraph cosntructor so that the order in which initializers
+  // in EncodeGraph constructor so that the order in which initializers
   // get written to the ONNX graph is always the deterministic and
   // predictable. While this is not a ONNX requirement, it is needed
   // for testing purposes in tests that use _export_to_pretty_string()
@@ -133,7 +175,10 @@ class EncoderBase {
         std::map<std::string, at::Tensor>(),
       const std::unordered_map<std::string, std::unordered_map<int64_t, std::string>>& dynamic_axes =
         std::unordered_map<std::string, std::unordered_map<int64_t, std::string>>(),
-      bool keep_initializers_as_inputs = true);
+      bool keep_initializers_as_inputs = true,
+      bool add_node_names = true,
+      bool use_external_data_format = false,
+      const std::string& onnx_file_path = std::string());
 
   void EncodeBlock(
       onnx::GraphProto* graph_proto,
@@ -142,12 +187,17 @@ class EncoderBase {
         std::map<std::string, at::Tensor>(),
       const std::unordered_map<std::string, std::unordered_map<int64_t, std::string>>& dynamic_axes =
         std::unordered_map<std::string, std::unordered_map<int64_t, std::string>>(),
-      bool keep_initializers_as_inputs = true);
+      bool keep_initializers_as_inputs = true,
+      bool add_node_names = true,
+      bool use_external_data_format = false,
+      const std::string& onnx_file_path = std::string());
 
   virtual void EncodeTensor(
       onnx::TensorProto* tensor_proto,
       const at::Tensor& tensor,
-      const c10::optional<std::string> external_ref = {}) = 0;
+      const c10::optional<std::string> external_ref = {},
+      const bool use_external_data_format = false,
+      const std::string& onnx_file_path = std::string()) = 0;
 
   virtual void EncodeIntermediateValueInfo(
       onnx::GraphProto* graph_proto,
@@ -167,9 +217,17 @@ class EncoderBase {
 
   onnx::ModelProto model_proto_;
   size_t num_blocks_;
+  size_t num_op_nodes_;
   onnx_torch::OperatorExportTypes operator_export_type_;
   bool strip_doc_;
   std::set<std::string> domains_;
+
+  // For large models, the parameters can be stored in separate binary files.
+  // This parameter sets a threshold on the number of elements in the parameter
+  // tensor, beyond which the parameter is stored in a separate file (if API
+  // argument use_external_data_format is set to True). This threshold is in place
+  // so as not to create too many external files. 
+  const size_t ParamSizeThresholdForExternalStorage = 1024;
 };
 
 onnx::TensorProto_DataType ATenTypeToOnnxType(at::ScalarType at_type) {
@@ -207,15 +265,16 @@ EncoderBase::EncoderBase(
     onnx_torch::OperatorExportTypes operator_export_type,
     bool strip_doc)
     : num_blocks_(0),
+      num_op_nodes_(0),
       operator_export_type_(operator_export_type),
       strip_doc_(strip_doc) {
   model_proto_.set_producer_name("pytorch");
-  // we pin IR version to version 4 (01/22/2019) instead of using
+  // we pin IR version to version 6 (12/11/2019) instead of using
   // onnx::IR_VERSION. with this change, the test_operators.py will be more
   // stable. only bump it when it's necessary
-  model_proto_.set_ir_version(4);
+  model_proto_.set_ir_version(onnx_torch::IR_VERSION);
   // TODO: set the producer version using appropriate function call
-  model_proto_.set_producer_version("1.3");
+  model_proto_.set_producer_version(onnx_torch::PRODUCER_VERSION);
 }
 
 void EncoderBase::EncodeValueInfo(
@@ -258,8 +317,13 @@ void EncoderBase::EncodeGraph(
     const std::shared_ptr<Graph>& graph,
     const std::map<std::string, at::Tensor>& initializers,
     const std::unordered_map<std::string, std::unordered_map<int64_t, std::string>>& dynamic_axes,
-    bool keep_initializers_as_inputs) {
-  EncodeBlock(graph_proto, graph->block(), initializers, dynamic_axes, keep_initializers_as_inputs);
+    bool keep_initializers_as_inputs,
+    bool add_node_names,
+    bool use_external_data_format,
+    const std::string& onnx_file_path) {
+  EncodeBlock(graph_proto, graph->block(), initializers, dynamic_axes,
+              keep_initializers_as_inputs, add_node_names, use_external_data_format,
+              onnx_file_path);
 }
 
 void EncoderBase::EncodeBlock(
@@ -267,7 +331,10 @@ void EncoderBase::EncodeBlock(
     const Block* block,
     const std::map<std::string, at::Tensor>& initializers,
     const std::unordered_map<std::string, std::unordered_map<int64_t, std::string>>& dynamic_axes,
-    bool keep_initializers_as_inputs) {
+    bool keep_initializers_as_inputs,
+    bool add_node_names,
+    bool use_external_data_format,
+    const std::string& onnx_file_path) {
   AT_ASSERT(graph_proto != nullptr);
   std::string block_name = "torch-jit-export";
   if (num_blocks_) {
@@ -330,8 +397,15 @@ void EncoderBase::EncodeBlock(
       EncodeIntermediateValueInfo(graph_proto, output);
     }
     if (!node->kind().is_onnx()) {
-      p_n->set_domain(node->kind().domainString());
-      domains_.insert(node->kind().domainString());
+      std::string domain;
+      if (node->kind().is_aten() || node->kind().is_caffe2()) {
+        domain = node->kind().domainString();
+      }
+      else {  //  Custom namespace and domain
+        domain = node->kind().ns().toUnqualString();
+      }
+      domains_.insert(domain);
+      p_n->set_domain(domain);
     }
     if (is_raw_export) {
       AT_ASSERT(!node->kind().is_onnx());
@@ -341,6 +415,10 @@ void EncoderBase::EncodeBlock(
           !node->kind().is_attr());
     }
     p_n->set_op_type(node->kind().toUnqualString());
+    if (add_node_names) {
+      p_n->set_name(p_n->op_type() + "_" + std::to_string(num_op_nodes_));
+      num_op_nodes_++;
+    }
     for (auto attr_name : node->attributeNames()) {
       AddAttribute(p_n, node, attr_name);
     }
@@ -382,7 +460,8 @@ void EncoderBase::EncodeBlock(
   for (auto& name_tensor_pair : initializers) {
     auto p = graph_proto->add_initializer();
     p->set_name(name_tensor_pair.first);
-    EncodeTensor(p, name_tensor_pair.second, name_tensor_pair.first);
+    EncodeTensor(p, name_tensor_pair.second, name_tensor_pair.first,
+                 use_external_data_format, onnx_file_path);
   }
 }
 
@@ -460,7 +539,11 @@ class GraphEncoder : public EncoderBase {
       const std::unordered_map<std::string, std::unordered_map<int64_t, std::string>>& dynamic_axes,
       bool defer_weight_export,
       bool strip_doc,
-      bool keep_initializers_as_inputs);
+      bool keep_initializers_as_inputs,
+      const std::map<std::string, int>& custom_opsets,
+      bool add_node_names,
+      bool use_external_data_format,
+      const std::string& onnx_file_path);
 
   RawDataExportMap get_raw_data_export_map() {
     return raw_data_export_map_;
@@ -470,7 +553,9 @@ class GraphEncoder : public EncoderBase {
   void EncodeTensor(
       onnx::TensorProto* tensor_proto,
       const at::Tensor& tensor,
-      const c10::optional<std::string> external_ref = {}) override;
+      const c10::optional<std::string> external_ref = {},
+      const bool use_external_data_format = false,
+      const std::string& onnx_file_path = std::string()) override;
 
   RawDataExportMap raw_data_export_map_;
   bool defer_weight_export_;
@@ -484,7 +569,11 @@ GraphEncoder::GraphEncoder(
     const std::unordered_map<std::string, std::unordered_map<int64_t, std::string>>& dynamic_axes,
     bool defer_weight_export,
     bool strip_doc,
-    bool keep_initializers_as_inputs)
+    bool keep_initializers_as_inputs,
+    const std::map<std::string, int>& custom_opsets,
+    bool add_node_names,
+    bool use_external_data_format,
+    const std::string& onnx_file_path)
     : EncoderBase(operator_export_type, strip_doc),
       defer_weight_export_(defer_weight_export) {
   if (operator_export_type != onnx_torch::OperatorExportTypes::RAW) {
@@ -495,19 +584,36 @@ GraphEncoder::GraphEncoder(
   // This is the version of ONNX operator set we are targeting
   imp->set_version(onnx_opset_version);
 
-  EncodeGraph(model_proto_.mutable_graph(), graph, initializers, dynamic_axes, keep_initializers_as_inputs);
+  EncodeGraph(model_proto_.mutable_graph(), graph, initializers, dynamic_axes,
+              keep_initializers_as_inputs, add_node_names, use_external_data_format,
+              onnx_file_path);
 
   for (const std::string& domain : domains_) {
     auto* opset = model_proto_.add_opset_import();
     opset->set_domain(domain);
-    opset->set_version(0);
+    //  Check if domain version is registered. If not, set to version 1
+    auto it = custom_opsets.find(domain);
+    if (it == custom_opsets.end())
+      opset->set_version(1);
+    else {
+      opset->set_version(it->second);
+    }
+  }
+
+  for (auto const& custom_opset : custom_opsets){
+    if (!std::count(domains_.begin(), domains_.end(), custom_opset.first)) {
+      AT_WARN("Custom opset domain: '", custom_opset.first, "' provided is not used in the model. ",
+      "Please verify custom opset domain names.");
+    }
   }
 }
 
 void GraphEncoder::EncodeTensor(
     onnx::TensorProto* tensor_proto,
     const at::Tensor& tensor,
-    const c10::optional<std::string> external_ref) {
+    const c10::optional<std::string> external_ref,
+    const bool use_external_data_format,
+    const std::string& onnx_file_path) {
   for (auto d : tensor.sizes()) {
     tensor_proto->add_dims(d);
   }
@@ -522,6 +628,11 @@ void GraphEncoder::EncodeTensor(
   else {
     t = tensor.contiguous().cpu();
   }
+  
+  // Either defer_weight_export should be true and external_ref must be present,
+  // or use_external_data_format should be true, not both at the same time. They can
+  // both be false at the same time (for ONNX export for regular model size).
+  AT_ASSERT(!((defer_weight_export_ && external_ref) && use_external_data_format));
   // Add a buffer to the raw_data_export_map for the caller to dump into an
   // external data store. If external_ref is not specified, we instead dump
   // the contiguous data into the protobuf itself
@@ -534,8 +645,22 @@ void GraphEncoder::EncodeTensor(
     tensor_proto->set_raw_data("__EXTERNAL");
   } else {
     AT_ASSERT(t.is_contiguous());
-    tensor_proto->set_raw_data(std::string(
+    size_t tensorSize = static_cast<size_t>(std::accumulate(std::begin(tensor.sizes()), 
+                        std::end(tensor.sizes()), static_cast<int64_t>(1), std::multiplies<int64_t>()));
+    if (use_external_data_format && tensorSize > ParamSizeThresholdForExternalStorage) {
+      AT_ASSERT(!onnx_file_path.empty());
+      AT_ASSERT((external_ref != c10::nullopt) && (external_ref.value() == tensor_proto->name()));
+      auto tensorName = GetExternalFileName(external_ref);
+      CreateExternalFile(t, tensorName, onnx_file_path);      
+      onnx::StringStringEntryProto* location = tensor_proto->mutable_external_data()->Add();
+      location->set_key("location");
+      location->set_value(tensorName);
+      tensor_proto->set_data_location(onnx::TensorProto_DataLocation_EXTERNAL);
+    }
+    else {
+      tensor_proto->set_raw_data(std::string(
         static_cast<char*>(t.data_ptr()), t.element_size() * t.numel()));
+    }
   }
 }
 
@@ -723,7 +848,9 @@ std::string pretty_print_onnx(
     bool defer_weight_export,
     ::torch::onnx::OperatorExportTypes operator_export_type,
     bool google_printer,
-    bool keep_initializers_as_inputs) {
+    bool keep_initializers_as_inputs,
+    const std::map<std::string, int>& custom_opsets,
+    bool add_node_names) {
   auto graph_encoder = GraphEncoder(
       graph,
       onnx_opset_version,
@@ -732,7 +859,11 @@ std::string pretty_print_onnx(
       std::unordered_map<std::string, std::unordered_map<int64_t, std::string>>{},
       defer_weight_export,
       true,
-      keep_initializers_as_inputs);
+      keep_initializers_as_inputs,
+      custom_opsets,
+      add_node_names,
+      false,
+      std::string());
   if (google_printer) {
     return graph_encoder.get_model_proto().DebugString();
   }
@@ -752,7 +883,11 @@ std::tuple<std::string, RawDataExportMap> export_onnx(
     bool defer_weight_export,
     ::torch::onnx::OperatorExportTypes operator_export_type,
     bool strip_doc_string,
-    bool keep_initializers_as_inputs) {
+    bool keep_initializers_as_inputs,
+    const std::map<std::string, int>& custom_opsets,
+    bool add_node_names,
+    bool use_external_data_format,
+    const std::string& onnx_file_path) {
   auto graph_encoder = GraphEncoder(
       graph,
       onnx_opset_version,
@@ -761,10 +896,51 @@ std::tuple<std::string, RawDataExportMap> export_onnx(
       dynamic_axes,
       defer_weight_export,
       strip_doc_string,
-      keep_initializers_as_inputs);
+      keep_initializers_as_inputs,
+      custom_opsets,
+      add_node_names,
+      use_external_data_format,
+      onnx_file_path);
   return std::make_tuple(
       graph_encoder.get_model_proto().SerializeAsString(),
       graph_encoder.get_raw_data_export_map());
+}
+
+void check_onnx_proto(const std::string& proto_string) {
+    onnx::ModelProto model;
+    if (!ParseProtoFromBytes(&model, proto_string.c_str(), proto_string.size())) {
+        throw std::runtime_error("Invalid ONNX proto string.");
+        return;
+    }
+    onnx::checker::check_model(model);
+}
+
+namespace {
+void export_opnames(const script::Module& m, std::set<std::string>& opnames) {
+  for (const auto& method : m.get_methods()) {
+    const auto& func = method.function();
+    for (const auto& node : func.graph()->nodes()) {
+      auto schema = node->maybeSchema();
+      if (schema) {
+        auto opname = schema->operator_name();
+        std::string namestr = opname.name;
+        if (!opname.overload_name.empty()) {
+          namestr += "." + opname.overload_name;
+        }
+        opnames.emplace(namestr);
+      }
+    }
+  }
+  for (const auto& sub_m : m.children()) {
+    export_opnames(sub_m, opnames);
+  }
+}
+} // namespace
+
+std::vector<std::string> export_opnames(const script::Module& m) {
+  std::set<std::string> names;
+  export_opnames(m, names);
+  return std::vector<std::string>(names.begin(), names.end());
 }
 
 } // namespace jit

@@ -1,6 +1,7 @@
 #include <ATen/ATen.h>
 #include <ATen/quantized/Quantizer.h>
 #include <c10/core/Allocator.h>
+#include <c10/core/CPUAllocator.h>
 #include <ATen/Dispatch.h>
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/TensorFactories.h>
@@ -65,14 +66,15 @@ void checkZeroPoint(std::string fn_name, int64_t zero_point) {
 }
 
 template <typename T>
-void checkZeroPoints(std::string fn_name, std::vector<int64_t> zero_points) {
-  for (size_t i = 0; i < zero_points.size(); ++i) {
-    TORCH_CHECK(zero_points[i] <= std::numeric_limits<T>::max(),
+void checkZeroPoints(std::string fn_name, Tensor zero_points) {
+  auto zero_points_data = zero_points.data_ptr<int64_t>();
+  for (size_t i = 0; i < zero_points.numel(); ++i) {
+    TORCH_CHECK(zero_points_data[i] <= std::numeric_limits<T>::max(),
                 fn_name,
                 "zero_point",
                 i,
                 "is out of range.");
-    TORCH_CHECK(zero_points[i] >= std::numeric_limits<T>::min(),
+    TORCH_CHECK(zero_points_data[i] >= std::numeric_limits<T>::min(),
                 fn_name,
                 "zero_point",
                 i,
@@ -132,10 +134,9 @@ Tensor quantize_tensor(Tensor rtensor, Tensor qtensor, double scale, int64_t zer
 
 template <typename T>
 inline float dequantize_val(double scale, int64_t zero_point, T value) {
-  fbgemm::TensorQuantizationParams qparams = {
-    .scale = static_cast<float>(scale),
-    .zero_point = static_cast<int32_t>(zero_point)
-  };
+  fbgemm::TensorQuantizationParams qparams;
+  qparams.scale = static_cast<float>(scale);
+  qparams.zero_point = static_cast<int32_t>(zero_point);
   return fbgemm::Dequantize<typename T::underlying>(value.val_, qparams);
 }
 
@@ -364,8 +365,8 @@ template CAFFE2_API qint32 requantize_val<qint32, qint32>(double, int64_t, doubl
 template <typename T>
 Tensor quantize_tensor_per_channel_affine(Tensor rtensor,
                                           Tensor qtensor,
-                                          const std::vector<double>& scales,
-                                          const std::vector<int64_t>& zero_points,
+                                          Tensor scales,
+                                          Tensor zero_points,
                                           int64_t axis) {
   auto fn_name = "quantize_tensor_per_channel_affine";
   checkFloatCPUTensor(fn_name, rtensor);
@@ -375,9 +376,11 @@ Tensor quantize_tensor_per_channel_affine(Tensor rtensor,
   int64_t batches = size_to_dim_(axis, rtensor.sizes());
   int64_t elements_per_channel = size_from_dim_(axis + 1, rtensor.sizes());
   int64_t channel = rtensor.size(axis);
-  TORCH_CHECK(channel == int64_t(scales.size()),
+  auto scales_data = scales.data_ptr<double>();
+  auto zero_points_data = zero_points.data_ptr<int64_t>();
+  TORCH_CHECK(channel == int64_t(scales.numel()),
               "length of scales must equal to channel");
-  TORCH_CHECK(channel == int64_t(zero_points.size()),
+  TORCH_CHECK(channel == int64_t(zero_points.numel()),
               "length of zero_points must equal to channel");
   const float* rdata = rtensor.data_ptr<float>();
   auto qdata = qtensor.data_ptr<T>();
@@ -385,7 +388,7 @@ Tensor quantize_tensor_per_channel_affine(Tensor rtensor,
     for (auto c = 0; c < channel; ++c) {
       for (auto e = 0; e < elements_per_channel; ++e) {
         auto i = b * channel * elements_per_channel + c * elements_per_channel + e;
-        qdata[i] = quantize_val<T>(scales[c], zero_points[c], rdata[i]);
+        qdata[i] = quantize_val<T>(scales_data[c], zero_points_data[c], rdata[i]);
       }
     }
   }
@@ -395,8 +398,8 @@ Tensor quantize_tensor_per_channel_affine(Tensor rtensor,
 template <typename T>
 Tensor dequantize_tensor_per_channel_affine(Tensor qtensor,
                                             Tensor rtensor,
-                                            const std::vector<double>& scales,
-                                            const std::vector<int64_t>& zero_points,
+                                            Tensor scales,
+                                            Tensor zero_points,
                                             int64_t axis) {
   auto fn_name = "dequantize_tensor_per_channel_affine";
   checkFloatCPUTensor(fn_name, rtensor);
@@ -407,9 +410,11 @@ Tensor dequantize_tensor_per_channel_affine(Tensor qtensor,
   int64_t batches = size_to_dim_(axis, rtensor.sizes());
   int64_t elements_per_channel = size_from_dim_(axis + 1, rtensor.sizes());
   int64_t channel = rtensor.size(axis);
-  TORCH_CHECK(channel == int64_t(scales.size()),
+  auto scales_data = scales.data_ptr<double>();
+  auto zero_points_data = zero_points.data_ptr<int64_t>();
+  TORCH_CHECK(channel == int64_t(scales.numel()),
               "length of scales must equal to channel");
-  TORCH_CHECK(channel == int64_t(zero_points.size()),
+  TORCH_CHECK(channel == int64_t(zero_points.numel()),
               "length of zero_points must equal to channel");
   const auto* qd = qtensor.data_ptr<T>();
   float* rd = rtensor.data_ptr<float>();
@@ -419,7 +424,7 @@ Tensor dequantize_tensor_per_channel_affine(Tensor qtensor,
         auto i = b * channel * elements_per_channel + c * elements_per_channel + e;
         // We need to convert the qint8 value to float to ensure the subtraction
         // subexpression returns a float
-        rd[i] = (static_cast<float>(qd[i].val_) - zero_points[c]) * scales[c];
+        rd[i] = (static_cast<float>(qd[i].val_) - zero_points_data[c]) * scales_data[c];
       }
     }
   }
@@ -432,15 +437,6 @@ QuantizerPtr make_per_tensor_affine_quantizer(
     ScalarType scalar_type) {
   return c10::make_intrusive<PerTensorAffineQuantizer>(scalar_type,
       scale, zero_point);
-}
-
-QuantizerPtr make_per_channel_affine_quantizer(
-    const std::vector<double>& scales,
-    const std::vector<int64_t>& zero_points,
-    int64_t axis,
-    ScalarType scalar_type) {
-  return c10::make_intrusive<PerChannelAffineQuantizer>(scalar_type,
-                                                        scales, zero_points, axis);
 }
 
 QuantizerPtr make_per_channel_affine_quantizer(
@@ -462,13 +458,9 @@ QuantizerPtr make_per_channel_affine_quantizer(
       "zero_points tensor must have integral type");
   Tensor scales_double = scales.to(kDouble).contiguous();
   Tensor zero_points_int64 = zero_points.to(kLong).contiguous();
-  double* scales_data = scales_double.data_ptr<double>();
-  int64_t* zero_points_data = zero_points_int64.data_ptr<int64_t>();
-  std::vector<double> scale_vals(scales_data, scales_data + scales.numel());
-  std::vector<int64_t> zero_point_vals(
-      zero_points_data, zero_points_data + zero_points.numel());
-  return make_per_channel_affine_quantizer(
-      scale_vals, zero_point_vals, axis, scalar_type);
+  return c10::make_intrusive<PerChannelAffineQuantizer>(scalar_type,
+                                                        scales_double, zero_points_int64,
+                                                        axis);
 }
 
 QTensorImpl* get_qtensorimpl(const Tensor& self) {
@@ -479,6 +471,47 @@ QTensorImpl* get_qtensorimpl(const Tensor& self) {
   return static_cast<QTensorImpl*>(self.unsafeGetTensorImpl());
 }
 
+#ifdef USE_PYTORCH_QNNPACK
+
+// QNNPACK can access up to 8 bytes beyond the beginning of the tensor's storage
+// boundary which does trigger ASAN, and can result in a segfault if the memory falls
+// on a different page out of the process's address space.
+// Here we define a custom allocator that allocates the extra storage required to keep
+// this behavior safe.  This same allocator can be used for FBGEMM as well.
+struct QAllocator final : at::Allocator {
+public:
+  virtual ~QAllocator() override = default;
+
+  virtual at::DataPtr allocate(size_t nbytes) const override {
+    Cast memory{c10::alloc_cpu(kGuard + nbytes)};
+    memory.as_byte_ptr += kGuard;
+    return {
+      memory.as_void_ptr,
+      memory.as_void_ptr,
+      &deleter,
+      at::Device(at::DeviceType::CPU)};
+  }
+
+  virtual at::DeleterFnPtr raw_deleter() const override {
+    return deleter;
+  }
+
+  static void deleter(void * const pointer) {
+    const Cast memory{pointer};
+    c10::free_cpu(memory.as_byte_ptr - kGuard);
+  }
+
+ private:
+  static constexpr uint32_t kGuard = 8u;
+
+  union Cast final {
+    void * const as_void_ptr;
+    uint8_t * as_byte_ptr;
+  };
+};
+
+#endif
+
 inline Tensor new_qtensor_cpu(
     IntArrayRef sizes,
     const TensorOptions& options,
@@ -486,8 +519,16 @@ inline Tensor new_qtensor_cpu(
     MemoryFormat memory_format=MemoryFormat::Contiguous) {
   AT_ASSERT(options.device().is_cpu());
 
+  at::Allocator* allocator = at::getCPUAllocator();
+
+#ifdef USE_PYTORCH_QNNPACK
+  if (at::globalContext().qEngine() == at::QEngine::QNNPACK) {
+    static QAllocator qallocator;
+    allocator = &qallocator;
+  }
+#endif
+
   native::check_size_nonnegative(sizes);
-  auto* allocator = at::getCPUAllocator();
   int64_t nelements = at::prod_intlist(sizes);
   auto dtype = options.dtype();
   TORCH_CHECK(isQIntType(typeMetaToScalarType(dtype)),
@@ -499,7 +540,7 @@ inline Tensor new_qtensor_cpu(
       allocator,
       /*resizable=*/true);
   auto tensor = detail::make_tensor<QTensorImpl>(
-      storage, at::TensorTypeSet(at::TensorTypeId::QuantizedCPUTensorId), quantizer);
+      storage, at::DispatchKeySet(at::DispatchKey::QuantizedCPUTensorId), quantizer);
   get_qtensorimpl(tensor)->set_sizes_contiguous(sizes);
   get_qtensorimpl(tensor)->empty_tensor_restride(memory_format);
   return tensor;
