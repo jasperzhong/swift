@@ -1979,16 +1979,16 @@ Tensor det_backward(const Tensor & grad, const Tensor& self, const Tensor& det) 
     Tensor grad_det = at::empty_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
 
     // invertible case
-    grad_det.index_put_(/*indices=*/nonzero_det_indices,
-                        /*value=*/nonsingular_case_backward(grad.index(nonzero_det_indices),
-                                                            self.index(nonzero_det_indices),
-                                                            det.index(nonzero_det_indices)));
+    grad_det.advanced_index_put_(/*indices=*/nonzero_det_indices,
+                        /*value=*/nonsingular_case_backward(grad.advanced_index(nonzero_det_indices),
+                                                            self.advanced_index(nonzero_det_indices),
+                                                            det.advanced_index(nonzero_det_indices)));
 
     // non-invertible case, uses SVD
-    grad_det.index_put_(/*indices=*/zero_det_indices,
-                        /*value=*/singular_case_backward(grad.index(zero_det_indices),
-                                                         self.index(zero_det_indices),
-                                                         det.index(zero_det_indices)));
+    grad_det.advanced_index_put_(/*indices=*/zero_det_indices,
+                        /*value=*/singular_case_backward(grad.advanced_index(zero_det_indices),
+                                                         self.advanced_index(zero_det_indices),
+                                                         det.advanced_index(zero_det_indices)));
 
     return grad_det;
   }
@@ -2029,14 +2029,14 @@ Tensor logdet_backward(const Tensor & grad, const Tensor& self, const Tensor& lo
     Tensor grad_logdet = at::empty_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
 
     // invertible case
-    grad_logdet.index_put_(/*indices=*/finite_logdet_indices,
-                           /*value=*/nonsingular_case_backward(grad.index(finite_logdet_indices),
-                                                               self.index(finite_logdet_indices)));
+    grad_logdet.advanced_index_put_(/*indices=*/finite_logdet_indices,
+                           /*value=*/nonsingular_case_backward(grad.advanced_index(finite_logdet_indices),
+                                                               self.advanced_index(finite_logdet_indices)));
 
     // non-invertible case, uses SVD
-    grad_logdet.index_put_(/*indices=*/neginf_logdet_indices,
-                           /*value=*/singular_case_backward(grad.index(neginf_logdet_indices),
-                                                            self.index(neginf_logdet_indices)));
+    grad_logdet.advanced_index_put_(/*indices=*/neginf_logdet_indices,
+                           /*value=*/singular_case_backward(grad.advanced_index(neginf_logdet_indices),
+                                                            self.advanced_index(neginf_logdet_indices)));
 
     return grad_logdet;
   }
@@ -2081,14 +2081,14 @@ Tensor slogdet_backward(const Tensor& grad_logabsdet,
     Tensor grad_slogdet = at::empty_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
 
     // invertible case
-    grad_slogdet.index_put_(/*indices=*/nonzero_signdet_indices,
-                            /*value=*/nonsingular_case_backward(grad_logabsdet.index(nonzero_signdet_indices),
-                                                                self.index(nonzero_signdet_indices)));
+    grad_slogdet.advanced_index_put_(/*indices=*/nonzero_signdet_indices,
+                            /*value=*/nonsingular_case_backward(grad_logabsdet.advanced_index(nonzero_signdet_indices),
+                                                                self.advanced_index(nonzero_signdet_indices)));
 
     // non-invertible case, uses SVD
-    grad_slogdet.index_put_(/*indices=*/zero_signdet_indices,
-                            /*value=*/singular_case_backward(grad_logabsdet.index(zero_signdet_indices),
-                                                             self.index(zero_signdet_indices)));
+    grad_slogdet.advanced_index_put_(/*indices=*/zero_signdet_indices,
+                            /*value=*/singular_case_backward(grad_logabsdet.advanced_index(zero_signdet_indices),
+                                                             self.advanced_index(zero_signdet_indices)));
 
     return grad_slogdet;
   }

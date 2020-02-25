@@ -504,10 +504,10 @@ def is_kwarg_only(a):
 #
 
 NEEDS_HACKED_TWIN_NAMES = [
-    "aten::_index_put_impl_",
-    "aten::index.Tensor", 
-    "aten::index_put",
-    "aten::index_put_",
+    "aten::_advanced_index_put_impl_",
+    "aten::advanced_index.Tensor", 
+    "aten::advanced_index_put",
+    "aten::advanced_index_put_",
 ]
 
 def needs_hacked_twin(decl):

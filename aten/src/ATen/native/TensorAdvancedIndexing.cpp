@@ -2,8 +2,8 @@
 //
 // This corresponds to "advanced indexing" in NumPy. The two operations are:
 //
-//  index(Tensor self, indices) -> Tensor
-//  index_put_(Tensor self, indices, value, accumulate=false)
+//  advanced_index(Tensor self, indices) -> Tensor
+//  advanced_index_put_(Tensor self, indices, value, accumulate=false)
 //
 // The index is a TensorList containg kLong, kBool or kByte tensors or nulls. Byte
 // tensors (boolean masks) are expanded to long tensors via nonzero(). Null
@@ -24,9 +24,9 @@
 // The code contains two implementations of indexing. The more efficient
 // implementation treats indexing like an elementwise operation over the
 // tensors `result`, `x`, `ind_1`, `ind_2`, etc. This implementation does
-// not work for index_put_ with accumulate=True. The other implementation
+// not work for advanced_index_put_ with accumulate=True. The other implementation
 // combines the indexed tensors into a single linear index that is used
-// with Tensor.put_. This is used for index_put_ with accumulate=True.
+// with Tensor.put_. This is used for advanced_index_put_ with accumulate=True.
 //
 // The more efficient implementation takes the following steps for the
 // above operation:

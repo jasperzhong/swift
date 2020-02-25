@@ -441,11 +441,11 @@
   index: non_differentiable
 
 - name: advanced_index_put_(Tensor(a!) self, Tensor?[] indices, Tensor values, bool accumulate=False) -> Tensor(a!)
-  self: "accumulate ? grad : grad.clone().index_put_(indices, zeros_like(values), false)"
+  self: "accumulate ? grad : grad.clone().advanced_index_put_(indices, zeros_like(values), false)"
   values: grad.index(indices)
 
 - name: _advanced_index_put_impl_(Tensor(a!) self, Tensor?[] indices, Tensor values, bool accumulate=False, bool unsafe=False) -> Tensor(a!)
-  self: "accumulate ? grad : grad.clone().index_put_(indices, zeros_like(values), false)"
+  self: "accumulate ? grad : grad.clone().advanced_index_put_(indices, zeros_like(values), false)"
   values: grad.index(indices)
 
 - name: index_select(Tensor self, int dim, Tensor index) -> Tensor

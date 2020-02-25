@@ -323,7 +323,7 @@ void PrepareIndexPutForONNX(Block* block) {
       PrepareIndexPutForONNX(block);
     }
 
-    if (node->kind() == aten::index_put || node->kind() == aten::index_put_) {
+    if (node->kind() == aten::advanced_index_put || node->kind() == aten::advanced_index_put_) {
       SquashSliceAndSelect(node);
     }
   }
