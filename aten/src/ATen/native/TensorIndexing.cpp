@@ -61,29 +61,29 @@ static inline void set_item(Tensor& self, ArrayRef<TensorIndex> indices, Scalar 
 
 } // namespace indexing
 
-Tensor Tensor::index(ArrayRef<at::indexing::TensorIndex> indices) const {
+Tensor Tensor::index_tmp(ArrayRef<at::indexing::TensorIndex> indices) const {
   OptionalDeviceGuard device_guard(device_of(*this));
   return at::indexing::get_item(*this, indices);
 }
-Tensor Tensor::index(std::initializer_list<at::indexing::TensorIndex> indices) const {
-  return index(ArrayRef<at::indexing::TensorIndex>(indices));
+Tensor Tensor::index_tmp(std::initializer_list<at::indexing::TensorIndex> indices) const {
+  return index_tmp(ArrayRef<at::indexing::TensorIndex>(indices));
 }
 
-Tensor & Tensor::index_put_(ArrayRef<at::indexing::TensorIndex> indices, Tensor const & rhs) {
+Tensor & Tensor::index_put_tmp_(ArrayRef<at::indexing::TensorIndex> indices, Tensor const & rhs) {
   OptionalDeviceGuard device_guard(device_of(*this));
   at::indexing::set_item(*this, indices, rhs);
   return *this;
 }
-Tensor & Tensor::index_put_(ArrayRef<at::indexing::TensorIndex> indices, Scalar v) {
+Tensor & Tensor::index_put_tmp_(ArrayRef<at::indexing::TensorIndex> indices, Scalar v) {
   OptionalDeviceGuard device_guard(device_of(*this));
   at::indexing::set_item(*this, indices, v);
   return *this;
 }
-Tensor & Tensor::index_put_(std::initializer_list<at::indexing::TensorIndex> indices, Tensor const & rhs) {
-  return index_put_(ArrayRef<at::indexing::TensorIndex>(indices), rhs);
+Tensor & Tensor::index_put_tmp_(std::initializer_list<at::indexing::TensorIndex> indices, Tensor const & rhs) {
+  return index_put_tmp_(ArrayRef<at::indexing::TensorIndex>(indices), rhs);
 }
-Tensor & Tensor::index_put_(std::initializer_list<at::indexing::TensorIndex> indices, Scalar v) {
-  return index_put_(ArrayRef<at::indexing::TensorIndex>(indices), v);
+Tensor & Tensor::index_put_tmp_(std::initializer_list<at::indexing::TensorIndex> indices, Scalar v) {
+  return index_put_tmp_(ArrayRef<at::indexing::TensorIndex>(indices), v);
 }
 
 } // namespace at
