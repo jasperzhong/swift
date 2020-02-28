@@ -6,6 +6,12 @@
 #include <torch/csrc/utils/object_ptr.h>
 #include <torch/csrc/utils/pybind.h>
 #include <torch/types.h>
+#include <glog/logging.h>
+
+#include <iostream>
+
+#include "c10/util/Logging.h"
+#include "c10/util/Flags.h"
 
 namespace torch {
 namespace distributed {
@@ -116,6 +122,7 @@ PyObject* dist_autograd_init(PyObject* /* unused */) {
       [](int64_t contextId,
          const std::vector<torch::Tensor>& roots,
          bool retainGraph = false) {
+        std::cerr << "Running dist_autograd.backward() with " << roots.size() << " roots." << std::endl;
         torch::autograd::variable_list variables;
         for (const auto& root : roots) {
           variables.emplace_back(root);

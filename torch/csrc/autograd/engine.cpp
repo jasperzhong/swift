@@ -414,6 +414,7 @@ static variable_list call_pre_hooks(Node& fn, variable_list inputs) {
 }
 
 static variable_list call_post_hooks(Node& fn, variable_list outputs, const variable_list& inputs) {
+  LOG(INFO) << "hcz: calling post hooks for Node: " << fn.name();
   for (const auto& hook : fn.post_hooks()) {
     outputs = (*hook)(outputs, inputs);
   }
@@ -495,6 +496,8 @@ static variable_list call_function(
   }
 
   const auto has_post_hooks = !fn.post_hooks().empty();
+  LOG(ERROR) << "hcz: call_function in engine for node: @" << func << " "
+             << func->name() << " has post hook: " << has_post_hooks;
   variable_list outputs;
 
   {
@@ -737,6 +740,8 @@ void Engine::enqueue_blocked_task_on_cpu(NodeTask task) {
 std::shared_ptr<FutureVariableList> Engine::execute_with_graph_task(
     const std::shared_ptr<GraphTask>& graph_task,
     std::shared_ptr<Node> graph_root) {
+  LOG(INFO) << "Running local engine execute_with_graph_task() with root: @"
+            << graph_root.get();
   std::call_once(start_threads_flag_, &Engine::start_threads, this);
   // Lock mutex for GraphTask.
   std::unique_lock<std::mutex> lock(graph_task->mutex_);

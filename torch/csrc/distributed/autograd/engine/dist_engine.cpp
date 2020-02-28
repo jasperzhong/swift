@@ -183,6 +183,8 @@ std::shared_ptr<rpc::FutureMessage> DistEngine::runEngineAndAccumulateGradients(
     const ContextPtr& autogradContext,
     const std::shared_ptr<Node>& graphRoot,
     const edge_list& outputEdges) {
+  LOG(ERROR) << "DistEngine::runEngineAndAccumulateGradients() with root @"
+             << graphRoot.get() << " name: " << graphRoot->name();
   auto futureGrads = engine_.execute_with_graph_task(
       autogradContext->retrieveGraphTask(), graphRoot);
 
@@ -192,7 +194,8 @@ std::shared_ptr<rpc::FutureMessage> DistEngine::runEngineAndAccumulateGradients(
   auto accumulateGradFuture = std::make_shared<rpc::FutureMessage>();
 
   futureGrads->addCallback(
-      [autogradContext, outputEdges, accumulateGradFuture](
+      [autogradContext, outputEdges, accumulateGradFuture,
+      root_addr = graphRoot.get()](
           const variable_list& grads,
           const c10::optional<torch::utils::FutureError>& error) {
         if (error) {
@@ -200,10 +203,14 @@ std::shared_ptr<rpc::FutureMessage> DistEngine::runEngineAndAccumulateGradients(
           accumulateGradFuture->setError(error->what());
           return;
         }
-
+        LOG(ERROR) << "hcz: Running GraphTask completion callback on "
+                   << grads.size()
+                   << " grads and out edges and root addr: " << root_addr;
         // Accumulate all the gradients in the context.
         TORCH_INTERNAL_ASSERT(grads.size() == outputEdges.size());
         for (size_t i = 0; i < grads.size(); i++) {
+          LOG(ERROR) << "hcz: one edge from root @" << root_addr << ": "
+                     << outputEdges[i].function->name();
           // It is possible that the grad is not defined since a separate
           // invocation of the autograd engine on the same node might actually
           // compute this gradient. Also accumulate grads only for
@@ -301,6 +308,7 @@ void DistEngine::execute(
     int64_t contextId,
     const variable_list& roots,
     bool retainGraph) {
+  LOG(ERROR) << "Running DistEngine::execute() with " << roots.size() << " roots.";
   // Retrieve the context for the given context_id. This will throw if the
   // context_id is invalid.
   auto autogradContext =
