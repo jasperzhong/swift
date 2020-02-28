@@ -493,7 +493,7 @@ Tensor randint(
     IntArrayRef size,
     Generator* generator,
     const TensorOptions& options) {
-  auto result = at::empty(size, options);
+  auto result = at::empty(size, at::dtype(at::kLong).merge_in(options));
   return result.random_(low, high, generator);
 }
 
@@ -529,7 +529,7 @@ Tensor randint_like(
     int64_t high,
     const TensorOptions& options,
     c10::optional<c10::MemoryFormat> optional_memory_format) {
-  auto result = at::empty_like(self, options, optional_memory_format);
+  auto result = at::empty_like(self, at::dtype(at::kLong).merge_in(options), optional_memory_format);
   return result.random_(0, high, nullptr);
 }
 
@@ -539,7 +539,7 @@ Tensor randint_like(
     int64_t high,
     const TensorOptions& options,
     c10::optional<c10::MemoryFormat> optional_memory_format) {
-  auto result = at::empty_like(self, options, optional_memory_format);
+  auto result = at::empty_like(self, at::dtype(at::kLong).merge_in(options), optional_memory_format);
   return result.random_(low, high, nullptr);
 }
 
@@ -614,7 +614,7 @@ Tensor randperm(int64_t n, const TensorOptions& options) {
 }
 
 Tensor randperm(int64_t n, Generator* generator, const TensorOptions& options) {
-  auto tensor = at::empty(n, options);
+  auto tensor = at::empty(n, at::dtype(at::kLong).merge_in(options));
   return at::randperm_out(tensor, n, generator);
 }
 
@@ -657,7 +657,10 @@ Tensor range(
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ triangle ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Tensor tril_indices_cpu(
-    int64_t row, int64_t col, int64_t offset, const TensorOptions& options) {
+    int64_t row, int64_t col, int64_t offset, const TensorOptions& options_) {
+
+  TensorOptions options = options_.dtype(options_.dtype_opt().value_or(scalarTypeToTypeMeta(kLong)));
+
   check_args(row, col, options);
 
   auto tril_size = get_tril_size(row, col, offset);
@@ -702,7 +705,10 @@ Tensor tril_indices_cpu(
 }
 
 Tensor triu_indices_cpu(
-    int64_t row, int64_t col, int64_t offset, const TensorOptions& options) {
+    int64_t row, int64_t col, int64_t offset, const TensorOptions& options_) {
+
+  TensorOptions options = options_.dtype(options_.dtype_opt().value_or(scalarTypeToTypeMeta(kLong)));
+
   check_args(row, col, options);
 
   auto triu_size = row * col - get_tril_size(row, col, offset - 1);
@@ -756,8 +762,10 @@ Tensor& zeros_out(Tensor& result, IntArrayRef size) {
 
 Tensor zeros_like(
     const Tensor& self,
-    const TensorOptions& options,
+    const TensorOptions& options_,
     c10::optional<c10::MemoryFormat> optional_memory_format) {
+  // Resolve options so we can accurately test if it's sparse
+  auto options = self.options().merge_in(options_);
   if (options.layout() == kSparse && self.is_sparse()) {
     auto res = at::empty({0}, options); // to be resized
     res.sparse_resize_and_clear_(
@@ -785,7 +793,11 @@ Tensor bartlett_window(int64_t window_length, const TensorOptions& options) {
 Tensor bartlett_window(
     int64_t window_length,
     bool periodic,
-    const TensorOptions& options) {
+    const TensorOptions& options_) {
+  // Explicitly reify dtype, so that arange doesn't decide
+  // to return us an int64_t tensor (which it is in its rights
+  // to do, since window_length is an integer.)
+  auto options = options_.dtype(options_.dtype());
   window_function_checks("bartlett_window", options, window_length);
   if (window_length == 0) {
     return at::empty({0}, options);
@@ -811,7 +823,11 @@ Tensor blackman_window(int64_t window_length, const TensorOptions& options) {
 Tensor blackman_window(
     int64_t window_length,
     bool periodic,
-    const TensorOptions& options) {
+    const TensorOptions& options_) {
+  // Explicitly reify dtype, so that arange doesn't decide
+  // to return us an int64_t tensor (which it is in its rights
+  // to do, since window_length is an integer.)
+  auto options = options_.dtype(options_.dtype());
   window_function_checks("blackman_window", options, window_length);
   if (window_length == 1) {
     return native::ones({1}, options);
@@ -853,7 +869,11 @@ Tensor hamming_window(
     bool periodic,
     double alpha,
     double beta,
-    const TensorOptions& options) {
+    const TensorOptions& options_) {
+  // Explicitly reify dtype, so that arange doesn't decide
+  // to return us an int64_t tensor (which it is in its rights
+  // to do, since window_length is an integer.)
+  auto options = options_.dtype(options_.dtype());
   window_function_checks("hamming_window", options, window_length);
   if (window_length == 0) {
     return at::empty({0}, options);
