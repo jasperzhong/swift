@@ -102,9 +102,10 @@ void DistEngine::computeDependencies(
   while (!queue.empty()) {
     auto fn = queue.front();
     queue.pop();
-
+    std::string line = fn->name();
     for (const auto& edge : fn->next_edges()) {
       if (auto nextFn = edge.function.get()) {
+        line += "\n    ----> " + nextFn->name();
         dependencies[nextFn] += 1;
         const bool wasInserted = seen.insert(nextFn).second;
         if (wasInserted) {
@@ -137,6 +138,7 @@ void DistEngine::computeDependencies(
         }
       }
     }
+    LOG(ERROR) << "hcz: " << line;
   }
 
   // Now lets compute which functions need to be executed. The algorithm is as
