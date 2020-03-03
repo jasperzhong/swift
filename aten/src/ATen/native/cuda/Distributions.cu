@@ -70,37 +70,55 @@ void poisson_cuda_kernel(
     });
 }
 
+struct curand_uniform_wrapper {
+  curandStatePhilox4_32_10_t &state;
+  __device__ curand_uniform_wrapper(curandStatePhilox4_32_10_t &state): state(state) {}
+  __device__ float operator()() {
+    return curand_uniform(&state);
+  }
+};
+
+struct curand_normal_wrapper {
+  curandStatePhilox4_32_10_t &state;
+  __device__ curand_normal_wrapper(curandStatePhilox4_32_10_t &state): state(state) {}
+  __device__ float operator()() {
+    return curand_normal(&state);
+  }
+};
+
 template <typename scalar_t>
 void gamma_cuda_kernel(
     at::Tensor& ret,
     const at::Tensor& alpha,
     std::pair<uint64_t, uint64_t> seeds) {
   using accscalar_t = at::acc_type<scalar_t, true>;
-  at::cuda::CUDA_tensor_apply2<scalar_t, scalar_t>(
-      ret,
-      alpha,
-      [seeds] __device__(
-          scalar_t & ret_val, const scalar_t& alpha) {
-        curandStatePhilox4_32_10_t state;
-        curand_init(
-            seeds.first,
-            blockIdx.x * blockDim.x + threadIdx.x,
-            seeds.second,
-            &state);
+  at::TensorIterator iter;
+  iter.add_output(ret);
+  iter.add_input(alpha);
+  iter.build();
 
-        auto uniform_lambda = [&state] __device__ () {
-          return curand_uniform(&state);
-        };
-        BaseSampler<accscalar_t, decltype(uniform_lambda)> standard_uniform(uniform_lambda);
+  at::native::gpu_kernel(iter,
+    [seeds] GPU_LAMBDA (scalar_t alpha) {
+      #if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+      curandStatePhilox4_32_10_t state;
+      curand_init(
+          seeds.first,
+          blockIdx.x * blockDim.x + threadIdx.x,
+          seeds.second,
+          &state);
 
-        auto normal_lambda = [&state] __device__ () {
-          return curand_normal(&state);
-        };
-        BaseSampler<accscalar_t, decltype(normal_lambda)> standard_normal(normal_lambda);
-        auto sample = sample_gamma<scalar_t, accscalar_t, decltype(uniform_lambda), decltype(normal_lambda)>(alpha, standard_uniform, standard_normal);
-        auto min_value = std::numeric_limits<scalar_t>::min();
-        ret_val = (min_value > sample) ? min_value : sample;
-      });
+      auto uniform_lambda = curand_uniform_wrapper(state);
+      BaseSampler<accscalar_t, decltype(uniform_lambda)> standard_uniform(uniform_lambda);
+
+      auto normal_lambda = curand_normal_wrapper(state);
+      BaseSampler<accscalar_t, decltype(normal_lambda)> standard_normal(normal_lambda);
+      auto sample = sample_gamma<scalar_t, accscalar_t, decltype(uniform_lambda), decltype(normal_lambda)>(alpha, standard_uniform, standard_normal);
+      auto min_value = std::numeric_limits<scalar_t>::min();
+      return (min_value > sample) ? min_value : sample;
+      #else
+      return alpha;  //useless
+      #endif
+    });
 }
 
 template <typename scalar_t>
