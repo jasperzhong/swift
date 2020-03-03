@@ -50,19 +50,24 @@ void poisson_cuda_kernel(
     at::Tensor& ret,
     const at::Tensor& lambda,
     std::pair<uint64_t, uint64_t> seeds) {
-  at::cuda::CUDA_tensor_apply2<scalar_t, scalar_t>(
-      ret,
-      lambda,
-      [seeds] __device__(
-          scalar_t & ret_val, const scalar_t& lambda) {
-        curandStatePhilox4_32_10_t state;
-        curand_init(
-            seeds.first,
-            blockIdx.x * blockDim.x + threadIdx.x,
-            seeds.second,
-            &state);
-        ret_val = static_cast<scalar_t>(curand_poisson(&state, lambda));
-      });
+  at::TensorIterator iter;
+  iter.add_output(ret);
+  iter.add_input(lambda);
+  iter.build();
+  at::native::gpu_kernel(iter,
+    [seeds] GPU_LAMBDA (scalar_t lambda) -> scalar_t {
+      #if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_HCC__)
+      curandStatePhilox4_32_10_t state;
+      curand_init(
+          seeds.first,
+          blockIdx.x * blockDim.x + threadIdx.x,
+          seeds.second,
+          &state);
+      return static_cast<scalar_t>(curand_poisson(&state, lambda));
+      #else
+      return lambda;  // useless
+      #endif
+    });
 }
 
 template <typename scalar_t>
