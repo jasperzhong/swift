@@ -2488,6 +2488,9 @@ class TestComparatorOps(TestCase):
 #
 # commit 2
 # a, updated to b
+#
+# commit 3
+# a
 
 if __name__ == "__main__":
     run_tests()
