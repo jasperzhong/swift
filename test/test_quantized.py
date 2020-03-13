@@ -1502,7 +1502,7 @@ class TestDynamicQuantizedLinear(TestCase):
 
             # Observe X_fp32 and determine X_scale and X_zero_point, this should match
             # internals of dynamic linear.
-            X_scale, X_zp = _calculate_dynamic_qparams(X_fp32, torch.quint8)
+            X_scale, X_zp = _calculate_dynamic_qparams(X_fp32, torch.quint8, reduce_range=True)
             X_q = torch.quantize_per_tensor(X_fp32, scale=X_scale, zero_point=X_zp, dtype=torch.quint8)
 
             # Weight prepacking operator for dynamic quantized Linear

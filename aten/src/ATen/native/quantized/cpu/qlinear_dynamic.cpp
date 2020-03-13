@@ -70,9 +70,10 @@ class QLinearDynamicInt8 final : public torch::OperatorKernel {
     auto q_params = quant_utils::ChooseQuantizationParams(
         /*min=*/x_min,
         /*max=*/x_max,
-        /*qmin=*/is_signed ? -(1 << (precision - 1)) : 0,
+        /*qmin=*/is_signed ? -(1 << (precision - 1 - 1)) : 0,
         /*qmax=*/
-        is_signed ? ((1 << (precision - 1)) - 1) : (1 << precision) - 1,
+        is_signed ? ((1 << (precision - 1 - 1)) - 1)
+                  : (1 << (precision - 1)) - 1,
         /*preserve_sparsity=*/false);
 
     q_params.precision = precision;
