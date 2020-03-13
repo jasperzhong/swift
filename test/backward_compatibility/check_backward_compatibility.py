@@ -48,6 +48,10 @@ white_list = [
     ('aten::randint_like', datetime.date(2020, 3, 15)),
     ('aten::zeros_like', datetime.date(2020, 3, 15)),
     ('_aten', datetime.date(2020, 4, 1)),
+    ('aten::index_put', datetime.date(2020, 3, 15)),
+    ('aten::index', datetime.date(2020, 3, 15)),
+    ('aten::_index_put_impl', datetime.date(2020, 3, 15)),
+    ('aten::index_put_', datetime.date(2020, 3, 15)),
 ]
 
 
