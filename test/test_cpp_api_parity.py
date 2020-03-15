@@ -21,7 +21,7 @@ parity_table_path = os.path.join(os.path.dirname(__file__), 'cpp_api_parity/pari
 
 parity_table = parse_parity_tracker_table(parity_table_path)
 
-module_tests = sample_module.module_tests + common_nn.module_tests + common_nn.new_module_tests
+module_tests = common_nn.module_tests + common_nn.new_module_tests + sample_module.module_tests
 # criterion_tests = common_nn.criterion_tests + common_nn.new_criterion_tests
 
 # module_tests = [
