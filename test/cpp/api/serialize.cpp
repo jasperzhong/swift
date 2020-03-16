@@ -869,3 +869,24 @@ TEST(SerializeTest, UnserializableSubmoduleIsIgnoredWhenLoadingModule) {
   // serialization.
   ASSERT_EQ(output, 5);
 }
+
+TEST(SerializeTest, SerializeUndefinedTensor) {
+  auto tempfile = c10::make_tempfile();
+
+  auto ivalue = torch::IValue(torch::Tensor());
+
+  ASSERT_TRUE(ivalue.isTensor());
+  ASSERT_FALSE(ivalue.toTensor().defined());
+
+  torch::serialize::OutputArchive output_archive;
+  output_archive.write("value", ivalue);
+  output_archive.save_to(tempfile.name);
+
+  torch::serialize::InputArchive input_archive;
+  input_archive.load_from(tempfile.name);
+  c10::IValue ivalue_out;
+  input_archive.read("value", ivalue_out);
+
+  ASSERT_TRUE(ivalue_out.isTensor());
+  ASSERT_FALSE(ivalue_out.toTensor().defined());
+}
