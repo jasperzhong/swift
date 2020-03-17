@@ -11,8 +11,6 @@ install_ubuntu() {
     apt-get install -y libc++1
     apt-get install -y libc++abi1
 
-    apt-get install -y apt-transport-https
-
     DEB_ROCM_REPO=http://repo.radeon.com/rocm/apt/debian
     # Add rocm repository
     wget -qO - $DEB_ROCM_REPO/rocm.gpg.key | apt-key add -
