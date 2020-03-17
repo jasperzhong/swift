@@ -21,21 +21,21 @@ parity_table_path = os.path.join(os.path.dirname(__file__), 'cpp_api_parity/pari
 
 parity_table = parse_parity_tracker_table(parity_table_path)
 
-module_tests = common_nn.module_tests + common_nn.new_module_tests + sample_module.module_tests
-# criterion_tests = common_nn.criterion_tests + common_nn.new_criterion_tests
+module_tests = common_nn.module_tests
+new_module_tests = common_nn.new_module_tests
+criterion_tests = common_nn.criterion_tests
+new_criterion_tests = common_nn.new_criterion_tests
 
-# module_tests = [
-#     dict(
-#         module_name='Hardtanh',
-#         input_size=(3, 2, 5),
-#         cpp_input_args=['torch::randn({3, 2, 5})'],
-#         reference_fn=lambda i, *_: i.clamp(-1, 1),
-#     )
-# ]
-criterion_tests = [] # yf225 TODO: change back to actual lists
+for test_params_dicts, test_instance_class in [
+  (module_tests, common_nn.ModuleTest),
+  (new_module_tests, common_nn.NewModuleTest),
+  (criterion_tests, common_nn.CriterionTest),
+  (new_criterion_tests, common_nn.NewCriterionTest),
+]:
+  module_impl_check.add_tests(TestCppApiParity, test_params_dicts, test_instance_class, torch_nn_modules, parity_table)
+  # functional_impl_check.add_tests(module_tests, criterion_tests, torch_nn_modules, parity_table)
 
-module_impl_check.add_tests(TestCppApiParity, module_tests, criterion_tests, torch_nn_modules, parity_table)
-# functional_impl_check.add_tests(module_tests, criterion_tests, torch_nn_modules, parity_table)
+module_impl_check.build_cpp_tests(TestCppApiParity)
 
 if __name__ == "__main__":
   common.run_tests()
