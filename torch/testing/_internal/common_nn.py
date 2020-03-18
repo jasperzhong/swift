@@ -412,7 +412,7 @@ def bceloss_weights_no_reduce_scalar_test():
         cpp_options_arg='F::BinaryCrossEntropyFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand({}).to(i0.options())',
         input_fn=lambda: torch.rand(()).clamp_(2.8e-2, 1 - 2.8e-2),
         target_fn=lambda: torch.randn(()).double(),
-        extra_args_fn=lambda: torch.rand(()), # weights
+        extra_args_fn=lambda: (torch.rand(()),), # weights
         cpp_input_args=['torch::rand({}).clamp_(2.8e-2, 1 - 2.8e-2)'],
         cpp_target_args=['torch::randn({}).to(torch::kDouble).to(i0.options())'],
         reference_fn=lambda i, t, weights, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
@@ -626,7 +626,7 @@ def nllloss_no_reduce_weights_test():
         cpp_options_arg='F::NLLLossFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand(10).to(i0.options())',
         input_fn=lambda: torch.rand(15, 10).add(1e-2).log(),
         target_fn=lambda: Variable(torch.Tensor(15).uniform_().mul(10).floor().long()),
-        extra_args_fn=lambda: torch.rand(10), # weight
+        extra_args_fn=lambda: (torch.rand(10),), # weight
         cpp_input_args=['torch::rand({15, 10}).add(1e-2).log()'],
         cpp_target_args=['torch::empty(15).uniform_().mul(10).floor().to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, weight, *_:
@@ -643,7 +643,7 @@ def nllloss_no_reduce_weights_ignore_index_test():
         cpp_options_arg='F::NLLLossFuncOptions().weight(%s).reduction(torch::kNone).ignore_index(2)' % 'torch::rand(10).to(i0.options())',
         input_fn=lambda: torch.rand(15, 10).add(1e-2).log(),
         target_fn=lambda: Variable(torch.Tensor(15).uniform_().mul(10).floor().long()),
-        extra_args_fn=lambda: torch.rand(10),
+        extra_args_fn=lambda: (torch.rand(10),), # weight
         cpp_input_args=['torch::rand({15, 10}).add(1e-2).log()'],
         cpp_target_args=['torch::empty(15).uniform_().mul(10).floor().to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, weight, *_:
@@ -660,7 +660,7 @@ def nllloss_no_reduce_weights_ignore_index_neg_test():
         cpp_options_arg='F::NLLLossFuncOptions().weight(%s).reduction(torch::kNone).ignore_index(-1)' % 'torch::rand(10).to(i0.options())',
         input_fn=lambda: torch.rand(15, 10).add(1e-2).log(),
         target_fn=lambda: Variable(torch.Tensor(15).uniform_().mul(10).floor().long()),
-        extra_args_fn=lambda: torch.rand(10), # weight
+        extra_args_fn=lambda: (torch.rand(10),), # weight
         cpp_input_args=['torch::rand({15, 10}).add(1e-2).log()'],
         cpp_target_args=['torch::empty(15).uniform_().mul(10).floor().to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, weight, *_:
@@ -711,7 +711,7 @@ def nllloss2d_no_reduce_weights_test():
         cpp_options_arg='F::NLLLossFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand(3).to(i0.options())',
         input_fn=lambda: torch.rand(2, 3, 5, 5).log(),
         target_fn=lambda: Variable(torch.rand(2, 5, 5).mul(3).floor().long()),
-        extra_args_fn=lambda: torch.rand(3),
+        extra_args_fn=lambda: (torch.rand(3),), # weight
         cpp_input_args=['torch::rand({2, 3, 5, 5}).log()'],
         cpp_target_args=['torch::rand({2, 5, 5}).mul(3).floor().to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, weight, *_:
@@ -762,7 +762,7 @@ def nlllossNd_no_reduce_weights_test():
         cpp_options_arg='F::NLLLossFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand(3).to(i0.options())',
         input_fn=lambda: torch.rand(2, 3, 5, 5, 2, 2).log(),
         target_fn=lambda: Variable(torch.rand(2, 5, 5, 2, 2).mul(3).floor().long()),
-        extra_args_fn=lambda: torch.rand(3),
+        extra_args_fn=lambda: (torch.rand(3),), # weight
         cpp_input_args=['torch::rand({2, 3, 5, 5, 2, 2}).log()'],
         cpp_target_args=['torch::rand({2, 5, 5, 2, 2}).mul(3).floor().to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, weight, *_:
@@ -951,7 +951,7 @@ def multilabelsoftmarginloss_weights_no_reduce_test():
         cpp_options_arg='F::MultiLabelSoftMarginLossFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand(10).to(i0.options())',
         input_fn=lambda: torch.randn(5, 10),
         target_fn=lambda: torch.rand(5, 10).mul(2).floor(),
-        extra_args_fn=lambda: torch.rand(10), # weights
+        extra_args_fn=lambda: (torch.rand(10),), # weights
         cpp_input_args=['torch::randn({5, 10})'],
         cpp_target_args=['torch::rand({5, 10}).mul(2).floor().to(i0.options())'],
         reference_fn=lambda i, t, weights, *_:
@@ -1062,7 +1062,7 @@ def multimarginloss_weights_no_reduce_test():
         cpp_options_arg='F::MultiMarginLossFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand(10).to(i0.options())',
         input_fn=lambda: torch.randn(5, 10),
         target_fn=lambda: torch.rand(5).mul(8).floor().long(),
-        extra_args_fn=lambda: torch.rand(10), # weights
+        extra_args_fn=lambda: (torch.rand(10),), # weights
         cpp_input_args=['torch::randn({5, 10})'],
         cpp_target_args=['torch::rand(5).mul(8).floor().to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, weights, *_:
