@@ -393,7 +393,7 @@ def bceloss_weights_no_reduce_test():
         cpp_options_arg='F::BinaryCrossEntropyFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand(10).to(i0.options())',
         input_fn=lambda: torch.rand(15, 10).clamp_(2.8e-2, 1 - 2.8e-2),
         target_fn=lambda: Variable(torch.randn(15, 10).gt(0).double()),
-        extra_args_fn=lambda: torch.rand(10), # weights
+        extra_args_fn=lambda: (torch.rand(10),) # weights
         cpp_input_args=['torch::rand({15, 10}).clamp_(2.8e-2, 1 - 2.8e-2)'],
         cpp_target_args=['torch::randn({15, 10}).gt(0).to(torch::kDouble).to(i0.options())'],
         reference_fn=lambda i, t, weights, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
