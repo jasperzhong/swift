@@ -122,8 +122,8 @@ def _test_torch_nn_module_variant(unit_test_class, test_params):
     module = test_params.test_instance.constructor(*test_params.test_instance.constructor_args).to(device)
     inputs = set_python_tensors_requires_grad(convert_to_list(test_params.test_instance._get_input()))
     if is_criterion_test(test_params.test_instance):
-      inputs += convert_to_list(test_params.test_instance._get_target())
-      inputs += convert_to_list(test_params.test_instance.extra_args)
+      inputs = inputs + convert_to_list(test_params.test_instance._get_target())
+      inputs = inputs + convert_to_list(test_params.test_instance.extra_args)
     inputs = move_python_tensors_to_device(inputs, device)
     python_output = module(*inputs)
 

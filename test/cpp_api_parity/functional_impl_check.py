@@ -78,8 +78,8 @@ def _test_torch_nn_functional_variant(unit_test_class, test_params):
     device = test_params.device
     inputs = convert_to_list(test_params.test_instance._get_input()) # yf225 TODO: convert inputs to CUDA device when needed!
     if is_criterion_test(test_params.test_instance):
-      inputs += [test_params.test_instance._get_target()]
-      inputs += convert_to_list(test_params.test_instance.extra_args)
+      inputs = inputs + convert_to_list(test_params.test_instance._get_target())
+      inputs = inputs + convert_to_list(test_params.test_instance.extra_args)
     inputs = move_python_tensors_to_device(inputs, device)
     python_output = test_params.test_instance.constructor()(*inputs)
 
