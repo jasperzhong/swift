@@ -8385,8 +8385,9 @@ for test_params in module_tests + new_module_tests:
         add_test(test, decorator)
 
 for test_params in criterion_tests + new_criterion_tests:
-    name = test_params.pop('module_name')
-    test_params['constructor'] = getattr(nn, name)
+    if 'constructor' not in test_params:
+        name = test_params.pop('module_name')
+        test_params['constructor'] = getattr(nn, name)
     test = NewCriterionTest(**test_params)
     decorator = test_params.pop('decorator', None)
     add_test(test, decorator)
