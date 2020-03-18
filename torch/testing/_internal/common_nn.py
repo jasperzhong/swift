@@ -3694,7 +3694,7 @@ criterion_tests = [
         input_fn=lambda: torch.rand(15, 10).add(1e-2).log(),
         cpp_input_args=['torch::rand({15, 10}).add(1e-2).log()'],
         target_fn=lambda: torch.Tensor(15).uniform_().mul(10 + 1).floor().long() - 1,
-        cpp_target_args=['torch::empty({15}).uniform_().mul(10 + 1).floor().to(torch::kLong) - 1'],
+        cpp_target_args=['torch::empty({15}).uniform_().mul(10 + 1).floor().to(torch::kLong).sub(1)'],
         reference_fn=lambda i, t, m:
             nllloss_reference(i, t, weight=get_weight(m), ignore_index=-1),
         desc='weights_ignore_index_neg',
