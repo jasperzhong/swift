@@ -11,7 +11,7 @@ from cpp_api_parity import torch_nn_functionals
 
 # yf225 TODO: move to common utils?
 devices = ['cpu', 'cuda']
-
+''
 # yf225 TODO: move to common utils?
 TORCH_NN_COMMON_TEST_HARNESS = """
 #include <torch/script.h>
@@ -96,7 +96,7 @@ def _test_torch_nn_functional_variant(unit_test_class, test_params):
 
       # Check that forward outputs are equal
       unit_test_class.assertTrue(
-        torch.equal(python_output, cpp_output),
+        torch.allclose(python_output, cpp_output),
         generate_error_msg("forward output", cpp_output, python_output))
 
     if not test_params.has_parity:

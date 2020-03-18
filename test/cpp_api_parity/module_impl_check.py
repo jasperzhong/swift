@@ -150,7 +150,7 @@ def _test_torch_nn_module_variant(unit_test_class, test_params):
 
       # Check that forward outputs are equal
       unit_test_class.assertTrue(
-        torch.equal(python_output, cpp_output),
+        torch.allclose(python_output, cpp_output),
         generate_error_msg("forward output", cpp_output, python_output))
 
       # Check that module parameter gradients are equal after backward pass
@@ -162,7 +162,7 @@ def _test_torch_nn_module_variant(unit_test_class, test_params):
           key in cpp_grad_dict,
           generate_error_msg("\"Does module have a parameter named `{}`?\"".format(key[:-5]), False, True))
         unit_test_class.assertTrue(
-          torch.equal(python_grad_dict[key], cpp_grad_dict[key]),
+          torch.allclose(python_grad_dict[key], cpp_grad_dict[key]),
           generate_error_msg("gradient of `{}`".format(key[:-5]), cpp_grad_dict[key], python_grad_dict[key]))
 
     if not test_params.has_parity:
