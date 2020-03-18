@@ -388,7 +388,7 @@ def bceloss_weights_no_reduce_test():
         fullname='BCELoss_weights_no_reduce',
         functional_name='binary_cross_entropy',
         constructor=wrap_functional(
-            lambda i, t, weights: F.binary_cross_entropy(i, t.type_as(i),
+            lambda i, t, weights, *_: F.binary_cross_entropy(i, t.type_as(i),
                                              weight=weights.type_as(i), reduction='none')),
         cpp_options_arg='F::BinaryCrossEntropyFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand(10).to(i0.options())',
         input_fn=lambda: torch.rand(15, 10).clamp_(2.8e-2, 1 - 2.8e-2),
