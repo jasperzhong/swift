@@ -109,7 +109,6 @@ def _test_torch_nn_module_variant(unit_test_class, test_params):
 
   # yf225 TODO: move to common utils
   def move_python_tensors_to_device(python_tensors, device):
-    print("python_tensors: ", python_tensors)
     return [tensor.to(device) for tensor in python_tensors]
 
   def test_forward_backward(unit_test_class, test_params):
