@@ -8393,6 +8393,8 @@ for test_params in criterion_tests + new_criterion_tests:
     decorator = test_params.pop('decorator', None)
     add_test(test, decorator)
     if 'check_sum_reduction' in test_params:
+        if 'fullname' in test_params:
+            test_params['fullname'] += '_sum_reduction'
         desc = test_params.get('desc', None)
         test_params['desc'] = 'sum_reduction' if desc is None else desc + '_sum_reduction'
 
