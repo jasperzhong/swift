@@ -6,7 +6,7 @@ from torch.testing._internal.common_cuda import TEST_CUDA
 
 import torch
 import torch.testing._internal.common_nn as common_nn
-from cpp_api_parity.utils import TorchNNTestParams
+from cpp_api_parity.utils import TorchNNModuleTestParams
 from cpp_api_parity import torch_nn_modules
 
 # DO NOW:
@@ -132,7 +132,7 @@ def _test_torch_nn_module_variant(unit_test_class, test_params):
       python_grad_dict[name + "_grad"] = grad
 
     cpp_test_name = '{}_{}'.format(test_params.module_variant_name, 'test_forward_backward')
-    cpp_test_fn = getattr(unit_test_class.cpp_module, cpp_test_name)
+    cpp_test_fn = getattr(unit_test_class.module_impl_check_cpp_module, cpp_test_name)
 
     def run_cpp_test_fn_and_check_output():
       cpp_test_fn(device)
@@ -193,7 +193,7 @@ def _process_test_params_for_module(test_params_dict, module_metadata, device, t
   assert "cpp_input_args" in test_params_dict, \
     "`cpp_input_args` entry must be present in test params dict for {}".format(module_variant_name)
 
-  return TorchNNTestParams(
+  return TorchNNModuleTestParams(
     module_name=module_name,
     module_variant_name=module_variant_name,
     test_instance=test,
@@ -260,7 +260,7 @@ def generate_test_cpp_sources(test_params, template):
 
 torch_nn_test_params_map = {}
 
-def add_torch_nn_module_impl_parity_tests(parity_table, unit_test_class, torch_nn_modules, test_params_dicts, test_instance_class):
+def add_torch_nn_module_impl_parity_tests(parity_table, unit_test_class, test_params_dicts, test_instance_class):
   for test_params_dict in test_params_dicts:
     print()
     # Skip all `torch.nn.functional` tests, since they are handled by another test suite.
@@ -306,11 +306,10 @@ def add_torch_nn_module_impl_parity_tests(parity_table, unit_test_class, torch_n
       add_test(unit_test_class, test_name, test_fn)
 
 
-def add_tests(unit_test_class, test_params_dicts, test_instance_class, torch_nn_modules, parity_table):
+def add_tests(unit_test_class, test_params_dicts, test_instance_class, parity_table):
   add_torch_nn_module_impl_parity_tests(
     parity_table=parity_table,
     unit_test_class=unit_test_class,
-    torch_nn_modules=torch_nn_modules,
     test_params_dicts=test_params_dicts,
     test_instance_class=test_instance_class)
 
@@ -333,4 +332,4 @@ def build_cpp_tests(unit_test_class):
       name='module_impl_check',
       cpp_sources=cpp_sources,
       functions=functions)
-    unit_test_class.cpp_module = cpp_module
+    unit_test_class.module_impl_check_cpp_module = cpp_module
