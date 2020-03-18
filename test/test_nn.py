@@ -8285,6 +8285,7 @@ def add_test(test, decorator=None):
         setattr(TestNN, test_name, fn)
 
     test_name = test.get_name()
+    print("Adding : ", test_name) # yf225 TODO: debug
     add(test_name, lambda self, test=test: test(self))
     cuda_test_name = test_name + '_cuda'
     # With dtype enable, it's good enough to test against three floating types
