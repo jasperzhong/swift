@@ -150,7 +150,7 @@ def is_criterion_test(test_instance):
 
 # yf225 TODO: move to common utils
 def move_cpp_tensors_to_device(cpp_tensors, device):
-  return ["{}.to({})".format(tensor, device) for tensor in cpp_tensors]
+  return ['{}.to("{}")'.format(tensor, device) for tensor in cpp_tensors]
 
 # yf225 TODO: move to common utils?
 # yf225 TODO: we should check in a copy of the generated source code, and then run consistency test (compare old vs. newly generated)

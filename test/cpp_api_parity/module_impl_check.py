@@ -224,11 +224,11 @@ def add_test(unit_test_class, test_name, test_fn):
 
 def set_cpp_tensors_requires_grad(cpp_tensors):
   # yf225 TODO: we need a flag to decide whether to set requires grad (e.g. it doesn't work for long tensors)
-  return ["{}.requires_grad_(true)".format(tensor) for tensor in cpp_tensors]
+  return ['{}.requires_grad_(true)'.format(tensor) for tensor in cpp_tensors]
 
 # yf225 TODO: move to common utils
 def move_cpp_tensors_to_device(cpp_tensors, device):
-  return ["{}.to({})".format(tensor, device) for tensor in cpp_tensors]
+  return ['{}.to("{}")'.format(tensor, device) for tensor in cpp_tensors]
 
 def is_criterion_test(test_instance):
   return isinstance(test_instance, common_nn.CriterionTest) or \
