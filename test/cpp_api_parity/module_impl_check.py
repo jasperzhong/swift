@@ -56,7 +56,7 @@ void ${module_variant_name}_test_forward_backward() {
   torch::manual_seed(0);
 
   ${module_qualified_name} module${cpp_constructor_args};
-  module->to("${device}");
+  module->to(std::string("${device}"));
 
   // Forward pass
   ${cpp_input_args_construction_stmts}
