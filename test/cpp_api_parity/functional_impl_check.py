@@ -25,7 +25,7 @@ void write_ivalue_to_file(const torch::IValue& ivalue, const std::string& file_p
 """
 
 TORCH_NN_FUNCTIONAL_TEST = Template("""
-void ${functional_variant_name}_test(const std::string& device) {
+void ${functional_variant_name}_test() {
   pybind11::gil_scoped_release no_gil;
 
   namespace F = torch::nn::functional;
@@ -64,6 +64,10 @@ def _test_torch_nn_functional_variant(unit_test_class, test_params):
     else:
       return [tensor for tensor in python_input]
 
+  # yf225 TODO: move to common utils
+  def move_python_tensors_to_device(python_tensors, device):
+    return [tensor.to(device) for tensor in python_tensors]
+
   def do_test(unit_test_class, test_params):
     # NOTE: Because different RNG state would lead to different output,
     # it is crucial for this function to execute the same statements
@@ -76,13 +80,14 @@ def _test_torch_nn_functional_variant(unit_test_class, test_params):
     if is_criterion_test(test_params.test_instance):
       inputs += [test_params.test_instance._get_target()]
       inputs += convert_to_list(test_params.test_instance.extra_args)
+    inputs = move_python_tensors_to_device(inputs, device)
     python_output = test_params.test_instance.constructor()(*inputs)
 
     cpp_test_name = '{}_{}'.format(test_params.functional_variant_name, 'test')
     cpp_test_fn = getattr(unit_test_class.functional_impl_check_cpp_module, cpp_test_name)
 
     def run_cpp_test_fn_and_check_output():
-      cpp_test_fn(device)
+      cpp_test_fn()
       cpp_output = torch.load("{}/{}_forward_output.pt".format(test_params.cpp_output_tmp_folder, test_params.functional_variant_name))
 
       def generate_error_msg(name, cpp_value, python_value):
@@ -143,6 +148,10 @@ def is_criterion_test(test_instance):
   return isinstance(test_instance, common_nn.CriterionTest) or \
     isinstance(test_instance, common_nn.NewCriterionTest)
 
+# yf225 TODO: move to common utils
+def move_cpp_tensors_to_device(cpp_tensors, device):
+  return ["{}.to({})".format(tensor, device) for tensor in cpp_tensors]
+
 # yf225 TODO: move to common utils?
 # yf225 TODO: we should check in a copy of the generated source code, and then run consistency test (compare old vs. newly generated)
 def generate_test_cpp_sources(test_params, template):
@@ -157,6 +166,7 @@ def generate_test_cpp_sources(test_params, template):
     cpp_input_args = cpp_input_args + test_params.cpp_target_args
     if test_params.cpp_extra_args:
       cpp_input_args = cpp_input_args + test_params.cpp_extra_args
+  cpp_input_args = move_cpp_tensors_to_device(cpp_input_args, test_params.device)
 
   cpp_input_args_construction_stmts = []
   cpp_input_args_symbols = []

@@ -46,7 +46,7 @@ torch::Tensor _rand_tensor_non_equal(torch::IntArrayRef size) {
 """
 
 TORCH_NN_MODULE_TEST_FORWARD_BACKWARD = Template("""
-void ${module_variant_name}_test_forward_backward(const std::string& device) {
+void ${module_variant_name}_test_forward_backward() {
   pybind11::gil_scoped_release no_gil;
 
   // NOTE: Because different RNG state would lead to different output,
@@ -56,7 +56,7 @@ void ${module_variant_name}_test_forward_backward(const std::string& device) {
   torch::manual_seed(0);
 
   ${module_qualified_name} module${cpp_constructor_args};
-  module->to(device);
+  module->to("${device}");
 
   // Forward pass
   ${cpp_input_args_construction_stmts}
@@ -103,9 +103,13 @@ def _test_torch_nn_module_variant(unit_test_class, test_params):
     else:
       return [tensor for tensor in python_input]
 
-  def set_python_tensors_all_requires_grad(python_tensors):
-    # yf225 TODO: we might also need to cast inputs to CUDA for CUDA tests
+  # yf225 TODO: move to common utils
+  def set_python_tensors_requires_grad(python_tensors):
     return [tensor.requires_grad_(True) if tensor.dtype != torch.long else tensor for tensor in python_tensors]
+
+  # yf225 TODO: move to common utils
+  def move_python_tensors_to_device(python_tensors, device):
+    return [tensor.to(device) for tensor in python_tensors]
 
   def test_forward_backward(unit_test_class, test_params):
     # NOTE: Because different RNG state would lead to different output,
@@ -116,10 +120,11 @@ def _test_torch_nn_module_variant(unit_test_class, test_params):
 
     device = test_params.device
     module = test_params.test_instance.constructor(*test_params.test_instance.constructor_args).to(device)
-    inputs = set_python_tensors_all_requires_grad(convert_to_list(test_params.test_instance._get_input()))
+    inputs = set_python_tensors_requires_grad(convert_to_list(test_params.test_instance._get_input()))
     if is_criterion_test(test_params.test_instance):
-      inputs += [test_params.test_instance._get_target()]
+      inputs += convert_to_list(test_params.test_instance._get_target())
       inputs += convert_to_list(test_params.test_instance.extra_args)
+    inputs = move_python_tensors_to_device(inputs, device)
     python_output = module(*inputs)
 
     python_output.sum().backward()
@@ -135,7 +140,7 @@ def _test_torch_nn_module_variant(unit_test_class, test_params):
     cpp_test_fn = getattr(unit_test_class.module_impl_check_cpp_module, cpp_test_name)
 
     def run_cpp_test_fn_and_check_output():
-      cpp_test_fn(device)
+      cpp_test_fn()
       cpp_output = torch.load("{}/{}_forward_output.pt".format(test_params.cpp_output_tmp_folder, test_params.module_variant_name))
       cpp_grad_dict = torch.load("{}/{}_backward_grad_dict.pt".format(test_params.cpp_output_tmp_folder, test_params.module_variant_name))
 
@@ -217,9 +222,13 @@ def add_test(unit_test_class, test_name, test_fn):
     raise RuntimeError("Found two tests with the same name: " + test_name)
   setattr(unit_test_class, test_name, test_fn)
 
-def set_cpp_tensors_all_requires_grad(cpp_input_args):
+def set_cpp_tensors_requires_grad(cpp_tensors):
   # yf225 TODO: we need a flag to decide whether to set requires grad (e.g. it doesn't work for long tensors)
-  return ["{}.requires_grad_(true)".format(x) for x in cpp_input_args]
+  return ["{}.requires_grad_(true)".format(tensor) for tensor in cpp_tensors]
+
+# yf225 TODO: move to common utils
+def move_cpp_tensors_to_device(cpp_tensors, device):
+  return ["{}.to({})".format(tensor, device) for tensor in cpp_tensors]
 
 def is_criterion_test(test_instance):
   return isinstance(test_instance, common_nn.CriterionTest) or \
@@ -234,13 +243,14 @@ def generate_test_cpp_sources(test_params, template):
 
   cpp_input_args = test_params.cpp_input_args
   if test_params.cpp_input_args_requires_grad:
-    cpp_input_args = set_cpp_tensors_all_requires_grad(cpp_input_args)
+    cpp_input_args = set_cpp_tensors_requires_grad(cpp_input_args)
   if is_criterion_test(test_params.test_instance):
     assert test_params.cpp_target_args is not None, \
       "`cpp_target_args` entry must be present in test params dict for {}".format(test_params.module_variant_name)
     cpp_input_args += test_params.cpp_target_args
     if test_params.cpp_extra_args:
       cpp_input_args += test_params.cpp_extra_args
+  cpp_input_args = move_cpp_tensors_to_device(cpp_input_args, test_params.device)
 
   cpp_input_args_construction_stmts = []
   cpp_input_args_symbols = []
@@ -255,6 +265,7 @@ def generate_test_cpp_sources(test_params, template):
     cpp_input_args_construction_stmts="\n  ".join(cpp_input_args_construction_stmts),
     cpp_input_args_symbols=", ".join(cpp_input_args_symbols),
     cpp_output_tmp_folder=test_params.cpp_output_tmp_folder,
+    device=test_params.device,
   )
   return test_cpp_sources
 
