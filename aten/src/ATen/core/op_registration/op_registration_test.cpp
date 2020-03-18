@@ -1316,6 +1316,19 @@ TEST(NewOperatorRegistrationTest, testBasics) {
   ASSERT_TRUE(Dispatcher::singleton().findSchema({"_test::dummy5", ""}).has_value());
 }
 
+TEST(OperatorRegistrationTest, whenDeregisteringOp_thenHandleBecomesInvalid) {
+  c10::optional<OperatorHandle> handle;
+  {
+    auto registrar = c10::import("_test")
+      .def("dummy(Tensor dummy) -> Tensor");
+    handle = Dispatcher::singleton().findSchema({"_test::dummy", ""});
+    EXPECT_TRUE(handle.has_value());
+    EXPECT_TRUE(handle->isValid());
+  }
+  // Now the RegistrationHandleRAII went out of scope and the op is deregistered
+  EXPECT_FALSE(handle->isValid());
+}
+
 }
 
 #pragma GCC diagnostic pop

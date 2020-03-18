@@ -112,6 +112,11 @@ white_list = [
     ('aten::_conv2d_packed', datetime.date(2020, 4, 1)),
     ('aten::_conv2d_prepack', datetime.date(2020, 4, 1)),
     ('aten::confirmed_by_owner', datetime.date(2020, 3, 17)),
+    ('_aten', datetime.date(2020, 4, 1)),
+    ('aten::index_put', datetime.date(2020, 3, 15)),
+    ('aten::index', datetime.date(2020, 3, 15)),
+    ('aten::_index_put_impl', datetime.date(2020, 3, 15)),
+    ('aten::index_put_', datetime.date(2020, 3, 15)),
 ]
 
 
