@@ -10733,5 +10733,14 @@ class TestNNDeviceType(NNTestCase):
 
 instantiate_device_type_tests(TestNNDeviceType, globals())
 
+# yf225 TODO: debug
+def load_tests(loader, tests, pattern):
+    test_suite = unittest.TestSuite()
+    for test_group in tests:
+        for test in test_group:
+            print(str(test))
+            test_suite.addTest(test)
+    return test_suite
+
 if __name__ == '__main__':
     run_tests()
