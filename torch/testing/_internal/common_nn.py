@@ -2229,9 +2229,11 @@ new_module_tests = [
         input_size=(1, 9, 4, 4),
         cpp_dynamic_args={'i': 'input'},
     ),
+
+
+
 cpp_options_arg='F::InterpolateFuncOptions().size(std::vector<int64_t>({12})).scale_factor(c10::nullopt).mode(torch::kNearest)',
     dict(
-dict(
         functional_name='interpolate',
         constructor=wrap_functional(F.interpolate, size=12, scale_factor=None, mode='nearest'),
         input_size=(1, 2, 4),
