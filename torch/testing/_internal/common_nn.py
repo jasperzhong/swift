@@ -815,7 +815,6 @@ def multilabelmarginloss_0d_no_reduce_test():
         cpp_target_args=['torch::zeros({}).to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, *_:
             loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
-        check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
 
@@ -832,7 +831,6 @@ def multilabelmarginloss_1d_no_reduce_test():
         cpp_target_args=['torch::rand(10).mul(10).floor().to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, *_:
             loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
-        check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
 
@@ -851,7 +849,6 @@ def multilabelmarginloss_index_neg_test():
         cpp_target_args=['torch::clamp(torch::rand({5, 10}).add(-.5).mul(20).floor().to(torch::kLong), /*min=*/-1).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, *_:
             loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
-        check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
 
@@ -869,7 +866,6 @@ def multilabelmarginloss_no_reduce_test():
         cpp_target_args=['torch::rand({5, 10}).mul(10).floor().to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, *_:
             loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
-        check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
 
@@ -887,7 +883,6 @@ def hingeembeddingloss_no_reduce_test():
         cpp_target_args=['torch::randn(10).gt(0).to(torch::kDouble).mul_(2).sub(1).to(i0.options())'],
         reference_fn=lambda i, t, *_:
             loss_reference_fns['HingeEmbeddingLoss'](i, t.type_as(i), reduction='none'),
-        check_sum_reduction=True,
         pickle=False)
 
 
@@ -904,7 +899,6 @@ def hingeembeddingloss_margin_no_reduce_test():
         cpp_target_args=['torch::randn(10).gt(0).to(torch::kDouble).mul_(2).sub(1).to(i0.options())'],
         reference_fn=lambda i, t, *_:
             loss_reference_fns['HingeEmbeddingLoss'](i, t.type_as(i), margin=0.5, reduction='none'),
-        check_sum_reduction=True,
         pickle=False)
 
 
@@ -956,7 +950,6 @@ def multilabelsoftmarginloss_weights_no_reduce_test():
         cpp_target_args=['torch::rand({5, 10}).mul(2).floor().to(i0.options())'],
         reference_fn=lambda i, t, weights, *_:
             (-(t * i.sigmoid().log() + (1 - t) * (-i).sigmoid().log()) * weights).sum(dim=1) / i.size(1),
-        check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
 
@@ -974,7 +967,6 @@ def multimarginloss_no_reduce_test():
         cpp_target_args=['torch::rand(5).mul(8).floor().to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, *_:
             loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
-        check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
 
@@ -992,7 +984,6 @@ def multimarginloss_1d_no_reduce_test():
         cpp_target_args=['torch::rand(1).mul(8).floor().to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, *_:
             loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
-        check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
 
@@ -1010,7 +1001,6 @@ def multimarginloss_1d_input_0d_target_no_reduce_test():
         cpp_target_args=['torch::rand({}).mul(8).floor().to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, *_:
             loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
-        check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
 
@@ -1028,7 +1018,6 @@ def multimarginloss_p_no_reduce_test():
         cpp_target_args=['torch::rand(5).mul(8).floor().to(torch::kLong).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, *_:
             loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), p=2, reduction='none'),
-        check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
 
@@ -1047,7 +1036,6 @@ def multimarginloss_margin_no_reduce_test():
         reference_fn=lambda i, t, *_:
             loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(),
                                                   margin=0.5, reduction='none'),
-        check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
 
@@ -1068,7 +1056,6 @@ def multimarginloss_weights_no_reduce_test():
         reference_fn=lambda i, t, weights, *_:
             loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(),
                                                   weight=weights, reduction='none'),
-        check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
 
@@ -4919,6 +4906,7 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
         self.check_half = kwargs.get('check_half', True)
         self.check_bfloat16 = kwargs.get('check_bfloat16', False)
         self.convert_target = kwargs.get('convert_target', True)
+        self.is_functional = kwargs.get('functional_name', False)
 
     def _do_extra_tests(self, test_case, module, input, target):
         if not self.check_gradgrad:
@@ -4988,8 +4976,12 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
             # dtype can be None, so set precision in this way instead of a precision map
             test_case.assertEqual(cpu_output, gpu_output, 1e-1 if dtype in {torch.half, torch.bfloat16} else 4e-4)
 
-            cpu_gradInput = test_case._backward_criterion(cpu_module, cpu_input, cpu_target, extra_args=extra_args)
-            gpu_gradInput = test_case._backward_criterion(gpu_module, gpu_input, gpu_target, extra_args=extra_args)
+            if self.is_functional:
+                gradOutput = torch.ones(cpu_input.shape)
+            else:
+                gradOutput = torch.ones(())
+            cpu_gradInput = test_case._backward_criterion(cpu_module, cpu_input, cpu_target, gradOutput, extra_args=extra_args)
+            gpu_gradInput = test_case._backward_criterion(gpu_module, gpu_input, gpu_target, gradOutput, extra_args=extra_args)
             test_case.assertEqual(cpu_gradInput, gpu_gradInput, 1e-1 if dtype in {torch.half, torch.bfloat16} else 4e-4)
         except NotImplementedError:
             pass
