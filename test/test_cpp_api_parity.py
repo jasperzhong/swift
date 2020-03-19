@@ -20,6 +20,27 @@ from cpp_api_parity import functional_impl_check, module_impl_check
 # yf225 TODO: our new parity test mechanism is changing the way people write common_nn test dicts a lot...
 # can we enforce some constraints to make writing common_nn test dicts easier / get less questions from people?
 
+# yf225 TODO: 
+# Step 1: add test to test_nn.py to enforce that argument values *change* with different manual seed,
+# (aka. no predefined random constant tensor is allowed! becuase we don't have control of RNG state when generating that random tensor)
+# ```
+# with freeze_rng_state():
+#   torch.manual_seed(0)
+#   constructor_args = self.constructor_args()
+#   input = self._get_input()
+#   target = self._get_target() # only for criterion test
+#   extra_args = self.extra_args()
+#
+#   torch.manual_seed(10)
+#   assert constructor_args != self.constructor_args() # NOTE: check this for every arg in constructor_args
+#   assert input != self._get_input()
+#   assert target != self._get_target() # only for criterion test
+#   assert extra_args != self.extra_args() # NOTE: check this for every arg in constructor_args
+# ```
+#
+# Step 2: ban the use of `constructor=`, and always use `constructor_args_fn` to pass constructor_args
+
+
 class TestCppApiParity(common.TestCase):
   pass
 
