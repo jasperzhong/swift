@@ -4977,9 +4977,9 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
             test_case.assertEqual(cpu_output, gpu_output, 1e-1 if dtype in {torch.half, torch.bfloat16} else 4e-4)
 
             if self.is_functional:
-                gradOutput = torch.ones(cpu_input.shape)
+                gradOutput = torch.randn(cpu_input.shape)
             else:
-                gradOutput = torch.ones(())
+                gradOutput = torch.randn(())
             cpu_gradInput = test_case._backward_criterion(cpu_module, cpu_input, cpu_target, gradOutput, extra_args=extra_args)
             gpu_gradInput = test_case._backward_criterion(gpu_module, gpu_input, gpu_target, gradOutput, extra_args=extra_args)
             test_case.assertEqual(cpu_gradInput, gpu_gradInput, 1e-1 if dtype in {torch.half, torch.bfloat16} else 4e-4)
