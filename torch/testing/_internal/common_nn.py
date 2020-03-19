@@ -3989,7 +3989,6 @@ new_criterion_tests = [
         extra_args=([50, 50, 50], [30, 25, 20]),  # input_lengths, target_lengths
         input_fn=lambda: torch.randn(50, 3, 15).log_softmax(2),
         target_fn=lambda: torch.randint(0, 14, (3, 30), dtype=torch.long),
-        cpp_arg_symbol_map={'input_lengths': 'extra_args_0', 'target_lengths': 'extra_args_1'},  # yf225 TODO: how to best handle this use case?
         reference_fn=lambda i, t, il, tl, m:
             ctcloss_reference(i, t, il, tl, blank=14, reduction=get_reduction(m)),
         check_sum_reduction=True,
