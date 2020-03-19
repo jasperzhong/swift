@@ -66,9 +66,8 @@ def bceloss_weights_no_reduce_scalar_test():
         cpp_constructor='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)',
         input_fn=lambda: torch.rand(()).clamp_(2.8e-2, 1 - 2.8e-2),
         # RHS value format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
-        # NOTE: must be full binding for all dynamic args (i.e. all dynamic args to the functional need to be specified)
-        # Definition of "dynamic args": any args that would have a different value if the random seed is different when those args are created
-        cpp_dynamic_args={'i': 'input', 't': t, 'weights': weights},
+        # NOTE: any var symbol written in the cpp_* fields needs to have a mapping here!
+        cpp_arg_symbol_map={'i': 'input', 't': t, 'weights': weights},
         reference_fn=lambda i, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
         pickle=False,
         skip_cpp_parity_test=False, # yf225 TODO: this is an optional flag
@@ -82,10 +81,25 @@ def fractional_max_pool2d_test(test_case):
         cpp_constructor_args='torch::nn::FractionalMaxPool2dOptions(2).output_ratio(0.5)._random_samples(random_samples)',
         input_size=(1, 3, 5, 7),
         # RHS value format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
-        # NOTE: must be full binding for all dynamic args (i.e. all dynamic args to the module forward need to be specified)
-        # Definition of "dynamic args": any args that would have a different value if the random seed is different when those args are created
-        cpp_dynamic_args={'i': 'input', 'random_samples', random_samples},
+        # NOTE: any var symbol written in the cpp_* fields needs to have a mapping here!
+        cpp_arg_symbol_map={'random_samples', random_samples},
         fullname='FractionalMaxPool2d_ratio')
+
+def fractional_max_pool2d_test(test_case):
+    # notice: no `cpp_arg_symbol_map` here!
+    return dict(
+        module_name='CTCLoss',
+        constructor_args=(14,),  # blank=14
+        cpp_constructor_args='torch::nn::CTCLossOptions().blank(14)',
+        extra_args=([50, 50, 50], [30, 25, 20]),  # input_lengths, target_lengths
+        input_fn=lambda: torch.randn(50, 3, 15).log_softmax(2),
+        target_fn=lambda: torch.randint(0, 14, (3, 30), dtype=torch.long),
+        reference_fn=lambda i, t, il, tl, m:
+            ctcloss_reference(i, t, il, tl, blank=14, reduction=get_reduction(m)),
+        check_sum_reduction=True,
+        check_gradgrad=False,
+        check_half=False,
+    ),
 
 new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
 new_module_tests.append(fractional_max_pool2d_test())
