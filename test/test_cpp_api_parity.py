@@ -71,7 +71,7 @@ def bceloss_weights_no_reduce_scalar_test():
         cpp_dynamic_args={'i': 'input', 't': t, 'weights': weights},
         reference_fn=lambda i, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
         pickle=False,
-        skip_cpp_parity_test=False,
+        skip_cpp_parity_test=False, # yf225 TODO: this is an optional flag
     )
 
 def fractional_max_pool2d_test(test_case):
@@ -84,7 +84,7 @@ def fractional_max_pool2d_test(test_case):
         # RHS value format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
         # NOTE: must be full binding for all dynamic args (i.e. all dynamic args to the module forward need to be specified)
         # Definition of "dynamic args": any args that would have a different value if the random seed is different when those args are created
-        cpp_non_const_args={'i': 'input', 'random_samples', random_samples},
+        cpp_dynamic_args={'i': 'input', 'random_samples', random_samples},
         fullname='FractionalMaxPool2d_ratio')
 
 new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
