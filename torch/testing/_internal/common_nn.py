@@ -4131,8 +4131,8 @@ new_criterion_tests = [
         module_name='NLLLoss',
         constructor_args_fn=lambda: (criterion_weight_rand_3,),
         cpp_constructor_args='torch::nn::NLLLossOptions().weight(weight)',
-        input_fn=lambda: torch.randn(2, 3, 5, 5),
-        target_fn=lambda: torch.rand(2, 5, 5).mul(3).floor().long(),
+        input_size=(2, 3, 5, 5),
+        target=torch.rand(2, 5, 5).mul(3).floor().long(),
         cpp_dynamic_args={'i': 'input', 'target': 'target', 'weight': criterion_weight_rand_3},
         reference_fn=lambda i, t, m:
             loss_reference_fns['NLLLossNd'](i, t, weight=get_weight(m)),
@@ -4258,7 +4258,7 @@ new_criterion_tests = [
         constructor_args_fn=lambda: (criterion_weight_rand_zero_dim,),
         cpp_constructor_args='torch::nn::BCELossOptions().weight(weight)',
         input_fn=lambda: torch.rand(()).clamp_(1e-2, 1 - 1e-2),
-        target_fn=lambda: torch.rand(()).gt(0).to(torch.get_default_dtype()),
+        target_fn=lambda: torch.rand(()).gt(0).double(),
         cpp_dynamic_args={'i': 'input', 'target': 'target', 'weight': criterion_weight_rand_zero_dim},
         reference_fn=lambda i, t, m: -((t * i.log() + (1 - t) * (1 - i).log()) * get_weight(m)).sum() /
             (i.numel() if get_reduction(m) == 'mean' else 1),
@@ -4303,11 +4303,10 @@ new_criterion_tests = [
         module_name='CTCLoss',
         constructor_args=(14,),  # blank=14
         cpp_constructor_args='torch::nn::CTCLossOptions().blank(14)',
-        extra_args=(torch.tensor([50, 50, 50]), torch.tensor([30, 25, 20])),  # input_lengths, target_lengths
-        cpp_extra_args=['torch::tensor({50, 50, 50})', 'torch::tensor({30, 25, 20})'],
+        extra_args=([50, 50, 50], [30, 25, 20]),  # input_lengths, target_lengths
         input_fn=lambda: torch.randn(50, 3, 15).log_softmax(2),
         target_fn=lambda: torch.randint(0, 14, (3, 30), dtype=torch.long),
-        cpp_dynamic_args={'i': 'input', 'target': 'target'},
+        cpp_dynamic_args={'i': 'input', 'target': 'target', 'input_lengths': 'extra_args_0', 'target_lengths': 'extra_args_1'},  # yf225 TODO: how to best handle this use case?
         reference_fn=lambda i, t, il, tl, m:
             ctcloss_reference(i, t, il, tl, blank=14, reduction=get_reduction(m)),
         check_sum_reduction=True,
@@ -4321,12 +4320,10 @@ new_criterion_tests = [
     #     desc='1d_target',
     #     constructor_args=(14,),  # blank=14
     #     cpp_constructor_args='torch::nn::CTCLossOptions().blank(14)',
-    #     extra_args=(torch.tensor([50, 50, 50]), torch.tensor([30, 25, 20])),  # input_lengths, target_lengths
-    #     cpp_extra_args=['torch::tensor({50, 50, 50})', 'torch::tensor({30, 25, 20})'],
+    #     extra_args=([50, 50, 50], [30, 25, 20]),  # input_lengths, target_lengths
     #     input_fn=lambda: torch.randn(50, 3, 15).log_softmax(2),
-    #     cpp_dynamic_args={'i': 'input'},
     #     target_fn=lambda: torch.randint(0, 14, (3, 30), dtype=torch.long),
-    #     cpp_target_args=['torch::randint(0, 14, {3, 30}, torch::kLong)'],
+    #     cpp_dynamic_args={'i': 'input', 'target': 'target', 'input_lengths': 'extra_args_0', 'target_lengths': 'extra_args_1'},  # yf225 TODO: how to best handle this use case?
     #     reference_fn=lambda i, t, il, tl, m:
     #         ctcloss_reference(i, t, il, tl, blank=14, reduction=get_reduction(m)),
     #     check_sum_reduction=True,
@@ -4338,11 +4335,10 @@ new_criterion_tests = [
         desc='2d_int_target',
         constructor_args=(0,),  # blank=0
         cpp_constructor_args='torch::nn::CTCLossOptions().blank(0)',
-        extra_args=(torch.tensor([50, 50, 50]), torch.tensor([30, 25, 20])),  # input_lengths, target_lengths
-        cpp_extra_args=['torch::tensor({50, 50, 50})', 'torch::tensor({30, 25, 20})'],
+        extra_args=([50, 50, 50], [30, 25, 20]),  # input_lengths, target_lengths
         input_fn=lambda: torch.randn(50, 3, 15).log_softmax(2),
         target_fn=lambda: torch.randint(1, 15, (3, 30), dtype=torch.int),
-        cpp_dynamic_args={'i': 'input', 'target': 'target'},
+        cpp_dynamic_args={'i': 'input', 'target': 'target', 'input_lengths': 'extra_args_0', 'target_lengths': 'extra_args_1'},  # yf225 TODO: how to best handle this use case?
         reference_fn=lambda i, t, il, tl, m:
             ctcloss_reference(i, t, il, tl, blank=0, reduction=get_reduction(m)),
         check_sum_reduction=True,
@@ -4356,10 +4352,9 @@ new_criterion_tests = [
         constructor_args=(0,),  # blank=0
         cpp_constructor_args='torch::nn::CTCLossOptions().blank(0)',
         extra_args=(torch.tensor([50, 50, 50]), torch.tensor([30, 25, 20])),  # input_lengths, target_lengths
-        cpp_extra_args=['torch::tensor({50, 50, 50})', 'torch::tensor({30, 25, 20})'],
         input_fn=lambda: torch.randn(50, 3, 15).log_softmax(2),
         target_fn=lambda: torch.randint(1, 15, (3, 30), dtype=torch.int),
-        cpp_dynamic_args={'i': 'input', 'target': 'target'},
+        cpp_dynamic_args={'i': 'input', 'target': 'target', 'input_lengths': 'extra_args_0', 'target_lengths': 'extra_args_1'},  # yf225 TODO: how to best handle this use case?
         reference_fn=lambda i, t, il, tl, m:
             ctcloss_reference(i, t, il, tl, blank=0, reduction=get_reduction(m)),
         check_sum_reduction=True,
@@ -4589,6 +4584,7 @@ class ModuleTest(TestBase):
         self.check_forward_only = kwargs.get('check_forward_only', False)
 
     def __call__(self, test_case):
+        # yf225 TODO: remove these nonsense
         if isinstance(self.constructor_args, tuple):
             module = self.constructor(*self.constructor_args)
         elif isinstance(self.constructor_args, dict):
@@ -5008,7 +5004,7 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
         self.check_half = kwargs.get('check_half', True)
         self.check_bfloat16 = kwargs.get('check_bfloat16', False)
         self.convert_target = kwargs.get('convert_target', True)
-        self.is_functional = kwargs.get('functional_name', False)
+        self.is_functional = kwargs.get('functional_name', False)  # yf225 TODO: remove this nonsense
         self.constructor_args_is_tuple = isinstance(self.constructor_args, tuple)
         assert self.constructor_args_is_tuple or isinstance(self.constructor_args, dict)
 
