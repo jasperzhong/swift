@@ -2010,6 +2010,9 @@ graph(%input, %weight):
                 x = torch.min(x)
                 x = torch.mean(x)
                 x = x.reshape([-1])
+                x = x.view(-1)
+                x = x.transpose(1, 2)
+                x = x.contiguous()
                 x, y = torch.chunk(x, 2)
                 x = F.dropout(x)
                 x = self.dropout(x)
@@ -2033,6 +2036,9 @@ graph(%input, %weight):
                    .check("aten::min") \
                    .check("aten::mean") \
                    .check("aten::reshape") \
+                   .check("aten::view") \
+                   .check("aten::transpose") \
+                   .check("aten::contiguous") \
                    .check("aten::chunk") \
                    .check("prim::ListUnpack") \
                    .check("aten::dropout") \
@@ -2047,6 +2053,9 @@ graph(%input, %weight):
                    .check("aten::min") \
                    .check("aten::mean") \
                    .check("aten::reshape") \
+                   .check("aten::view") \
+                   .check("aten::transpose") \
+                   .check("aten::contiguous") \
                    .check("aten::chunk") \
                    .check("prim::ListUnpack") \
                    .check("aten::dropout") \
