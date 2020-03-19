@@ -308,8 +308,9 @@ def poissonnllloss_no_reduce_test():
         fullname='PoissonNLLLoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.poisson_nll_loss(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::poisson_nll_loss(i, t.type_as(i), F::PoissonNLLLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::poisson_nll_loss(i, t.to(i.options()), F::PoissonNLLLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.rand(10, 10),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_: i.exp() - t.mul(i),
         pickle=False)
 
@@ -320,8 +321,9 @@ def bceloss_no_reduce_test():
         fullname='BCELoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.binary_cross_entropy(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::binary_cross_entropy(i, t.type_as(i), F::BinaryCrossEntropyFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.rand(15, 10).clamp_(2.8e-2, 1 - 2.8e-2),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_: -(t * i.log() + (1 - t) * (1 - i).log()),
         pickle=False,
         precision=7e-4)
@@ -333,8 +335,9 @@ def bceloss_no_reduce_scalar_test():
         fullname='BCELoss_no_reduce_scalar',
         constructor=wrap_functional(
             lambda i: F.binary_cross_entropy(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::binary_cross_entropy(i, t.type_as(i), F::BinaryCrossEntropyFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.rand(()).clamp_(2.8e-2, 1 - 2.8e-2),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_: -(t * i.log() + (1 - t) * (1 - i).log()),
         pickle=False)
 
@@ -346,9 +349,10 @@ def bceloss_weights_no_reduce_test():
         fullname='BCELoss_weights_no_reduce',
         constructor=wrap_functional(
             lambda i: F.binary_cross_entropy(i, t.type_as(i),
-                                             weight=weights.type_as(i), reduction='none')),)),
-        cpp_constructor='F::binary_cross_entropy(i, t.type_as(i), F::BinaryCrossEntropyFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand(10).to(i0.options()))',
+                                             weight=weights.type_as(i), reduction='none')),
+        cpp_constructor='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)',
         input_fn=lambda: torch.rand(15, 10).clamp_(2.8e-2, 1 - 2.8e-2),
+        cpp_arg_symbol_map={'i': 'input', 't': t, 'weights', weights},
         reference_fn=lambda i, p, m: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
         pickle=False,
         precision=3e-4
@@ -362,8 +366,9 @@ def bceloss_weights_no_reduce_scalar_test():
         fullname='BCELoss_weights_no_reduce_scalar',
         constructor=wrap_functional(
             lambda i: F.binary_cross_entropy(i, t.type_as(i),
-                                             weight=weights.type_as(i), reduction='none')),)),
-        cpp_constructor='F::binary_cross_entropy(i, t.type_as(i), F::BinaryCrossEntropyFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand({}).to(i0.options()))',
+                                             weight=weights.type_as(i), reduction='none')),
+        cpp_constructor='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)' % 'torch::rand({}).to(i0.options()))',
+        cpp_arg_symbol_map={'i': 'input', 't': t, 'weights', weights},
         input_fn=lambda: torch.rand(()).clamp_(2.8e-2, 1 - 2.8e-2),
         reference_fn=lambda i, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
         pickle=False
@@ -376,9 +381,10 @@ def bce_with_logistic_legacy_enum_test():
     return dict(
         fullname='BCEWithLogitsLoss_legacy_enum',
         constructor=wrap_functional(
-            lambda i: F.binary_cross_entropy_with_logits(i, t.type_as(i), reduce=False
-        cpp_constructor='F::binary_cross_entropy_with_logits(i, t.type_as(i), F::BinaryCrossEntropyWithLogitsFuncOptions().reduction(torch::kNone))',
+            lambda i: F.binary_cross_entropy_with_logits(i, t.type_as(i), reduce=False)),
+        cpp_constructor='F::binary_cross_entropy_with_logits(i, t.to(i.options()), F::BinaryCrossEntropyWithLogitsFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.rand(15, 10).clamp_(2.8e-2, 1 - 2.8e-2),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_: -(t * sigmoid(i).log() + (1 - t) * (1 - sigmoid(i)).log()),
         check_gradgrad=False,
         pickle=False,
@@ -392,8 +398,9 @@ def bce_with_logistic_no_reduce_test():
         fullname='BCEWithLogitsLoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.binary_cross_entropy_with_logits(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::binary_cross_entropy_with_logits(i, t.type_as(i), F::BinaryCrossEntropyWithLogitsFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::binary_cross_entropy_with_logits(i, t.to(i.options()), F::BinaryCrossEntropyWithLogitsFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.rand(15, 10).clamp_(2.8e-2, 1 - 2.8e-2),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_: -(t * sigmoid(i).log() + (1 - t) * (1 - sigmoid(i)).log()),
         check_gradgrad=False,
         pickle=False,
@@ -407,8 +414,9 @@ def bce_with_logistic_no_reduce_scalar_test():
         fullname='BCEWithLogitsLoss_no_reduce_scalar',
         constructor=wrap_functional(
             lambda i: F.binary_cross_entropy_with_logits(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::binary_cross_entropy_with_logits(i, t.type_as(i), F::BinaryCrossEntropyWithLogitsFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::binary_cross_entropy_with_logits(i, t.to(i.options()), F::BinaryCrossEntropyWithLogitsFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.rand(()).clamp_(2.8e-2, 1 - 2.8e-2),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_: -(t * sigmoid(i).log() + (1 - t) * (1 - sigmoid(i)).log()),
         check_gradgrad=False,
         pickle=False
@@ -421,8 +429,9 @@ def kldivloss_with_target_no_reduce_test():
         fullname='KLDivLoss_with_target_no_reduce',
         constructor=wrap_functional(
             lambda t: F.kl_div(i.type_as(t), t, reduction='none')),
-        cpp_constructor='F::kl_div(i.type_as(t), t, F::KLDivFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::kl_div(i.to(t.options()), t, F::KLDivFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.rand(10, 10),
+        cpp_arg_symbol_map={'i': i, 't': 'input'},
         reference_fn=lambda t, *_:
             loss_reference_fns['KLDivLoss'](i.type_as(t), t, reduction='none')),),
         pickle=False)
@@ -434,8 +443,9 @@ def kldivloss_no_reduce_test():
         fullname='KLDivLoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.kl_div(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::kl_div(i, t.type_as(i), F::KLDivFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::kl_div(i, t.to(i.options()), F::KLDivFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.rand(10, 10).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['KLDivLoss'](i, t.type_as(i), reduction='none')),),
         pickle=False,
@@ -448,8 +458,9 @@ def kldivloss_no_reduce_scalar_test():
         fullname='KLDivLoss_no_reduce_scalar',
         constructor=wrap_functional(
             lambda i: F.kl_div(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::kl_div(i, t.type_as(i), F::KLDivFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::kl_div(i, t.to(i.options()), F::KLDivFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.rand(()).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['KLDivLoss'](i, t.type_as(i), reduction='none')),),
         pickle=False)
@@ -461,8 +472,9 @@ def l1loss_no_reduce_test():
         fullname='L1Loss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.l1_loss(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::l1_loss(i, t.type_as(i), F::L1LossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::l1_loss(i, t.to(i.options()), F::L1LossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(2, 3, 4),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_: (i - t.type_as(i)).abs(),
         pickle=False)
 
@@ -473,8 +485,9 @@ def l1loss_no_reduce_scalar_test():
         fullname='L1Loss_no_reduce_scalar',
         constructor=wrap_functional(
             lambda i: F.l1_loss(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::l1_loss(i, t.type_as(i), F::L1LossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::l1_loss(i, t.to(i.options()), F::L1LossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(()),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_: (i - t.type_as(i)).abs(),
         pickle=False)
 
@@ -486,8 +499,9 @@ def mseloss_no_reduce_test():
         fullname='MSELoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.mse_loss(i, target.type_as(i), reduction='none')),
-        cpp_constructor='F::mse_loss(i, target.type_as(i), F::MSELossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::mse_loss(i, target.to(i.options()), F::MSELossFuncOptions().reduction(torch::kNone))',
         input_size=input_size,
+        cpp_arg_symbol_map={'i': 'input', 'target': target},
         reference_fn=lambda i, *_: (i - target).pow(2),
         pickle=False)
 
@@ -499,8 +513,9 @@ def mseloss_no_reduce_scalar_test():
         fullname='MSELoss_no_reduce_scalar',
         constructor=wrap_functional(
             lambda i: F.mse_loss(i, target.type_as(i), reduction='none')),
-        cpp_constructor='F::mse_loss(i, target.type_as(i), F::MSELossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::mse_loss(i, target.to(i.options()), F::MSELossFuncOptions().reduction(torch::kNone))',
         input_size=input_size,
+        cpp_arg_symbol_map={'i': 'input', 'target': target},
         reference_fn=lambda i, *_: (i - target).pow(2),
         pickle=False)
 
@@ -512,8 +527,9 @@ def nllloss_no_reduce_test():
         fullname='NLLLoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs)),
-        cpp_constructor='F::nll_loss(i, t.type_as(i).long(), F::NLLLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::nll_loss(i, t.to(i).long(.options()), F::NLLLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.rand(15, 10).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['NLLLoss'](i, t.type_as(i).long(), **kwargs),
         pickle=False)
@@ -526,8 +542,9 @@ def nllloss_no_reduce_ignore_index_test():
         fullname='NLLLoss_no_reduce_ignore_index',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs)),
-        cpp_constructor='F::nll_loss(i, t.type_as(i).long(), F::NLLLossFuncOptions().ignore_index(2).reduction(torch::kNone))',
+        cpp_constructor='F::nll_loss(i, t.to(i).long(.options()), F::NLLLossFuncOptions().ignore_index(2).reduction(torch::kNone))',
         input_fn=lambda: torch.rand(15, 10).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['NLLLoss'](i, t.type_as(i).long(), **kwargs),
         pickle=False)
@@ -544,8 +561,9 @@ def nllloss_no_reduce_weights_test():
         fullname='NLLLoss_no_reduce_weights',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs(i))),
-        cpp_constructor='F::nll_loss(i, t.type_as(i).long(), F::NLLLossFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand(10).to(i0.options()))',
+        cpp_constructor='F::nll_loss(i, t.to(i).long(.options()), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone)',
         input_fn=lambda: torch.rand(15, 10).add(1e-2).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t, 'weight': weight},
         reference_fn=lambda i, *_:
             loss_reference_fns['NLLLoss'](i, t.type_as(i).long(), **kwargs(i)),
         pickle=False)
@@ -563,8 +581,9 @@ def nllloss_no_reduce_weights_ignore_index_test():
         fullname='NLLLoss_no_reduce_weights_ignore_index',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs(i.data))),
-        cpp_constructor='F::nll_loss(i, t.type_as(i).long(), F::NLLLossFuncOptions().weight(%s).reduction(torch::kNone).ignore_index(2)' % 'torch::rand(10).to(i0.options()))',
+        cpp_constructor='F::nll_loss(i, t.to(i).long(.options()), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone).ignore_index(2)',
         input_fn=lambda: torch.rand(15, 10).add(1e-2).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t, 'weight': weight},
         reference_fn=lambda i, *_:
             loss_reference_fns['NLLLoss'](i, t.type_as(i).long(), **kwargs(i)),
         pickle=False)
@@ -582,8 +601,9 @@ def nllloss_no_reduce_weights_ignore_index_neg_test():
         fullname='NLLLoss_no_reduce_weights_ignore_index_neg',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs(i))),
-        cpp_constructor='F::nll_loss(i, t.type_as(i).long(), F::NLLLossFuncOptions().weight(%s).reduction(torch::kNone).ignore_index(-1)' % 'torch::rand(10).to(i0.options()))',
+        cpp_constructor='F::nll_loss(i, t.to(i).long(.options()), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone).ignore_index(-1)',
         input=torch.rand(15, 10).add(1e-2).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t, 'weight': weight},
         reference_fn=lambda i, *_:
             loss_reference_fns['NLLLoss'](i, t.type_as(i).long(), **kwargs(i)),
         pickle=False)
@@ -596,8 +616,9 @@ def nllloss2d_no_reduce_test():
         fullname='NLLLoss2d_no_reduce',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs)),
-        cpp_constructor='F::nll_loss(i, t.type_as(i).long(), F::NLLLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::nll_loss(i, t.to(i).long(.options()), F::NLLLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.rand(2, 3, 5, 5).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['NLLLossNd'](i, t.type_as(i).long(), **kwargs),
         pickle=False)
@@ -610,8 +631,9 @@ def nllloss2d_no_reduce_ignore_index_test():
         fullname='NLLLoss2d_no_reduce_ignore_index',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs)),
-        cpp_constructor='F::nll_loss(i, t.type_as(i).long(), F::NLLLossFuncOptions().ignore_index(1).reduction(torch::kNone))',
+        cpp_constructor='F::nll_loss(i, t.to(i).long(.options()), F::NLLLossFuncOptions().ignore_index(1).reduction(torch::kNone))',
         input_fn=lambda: torch.rand(2, 3, 5, 5).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['NLLLossNd'](i, t.type_as(i).long(), **kwargs),
         pickle=False)
@@ -628,8 +650,9 @@ def nllloss2d_no_reduce_weights_test():
         fullname='NLLLoss2d_no_reduce_weights',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs(i))),
-        cpp_constructor='F::nll_loss(i, t.type_as(i).long(), F::NLLLossFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand(3).to(i0.options()))',
+        cpp_constructor='F::nll_loss(i, t.to(i).long(.options()), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone)',
         input_fn=lambda: torch.rand(2, 3, 5, 5).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t, 'weight': weight},
         reference_fn=lambda i, *_:
             loss_reference_fns['NLLLossNd'](i, t.type_as(i).long(), **kwargs(i)),
         pickle=False)
@@ -642,8 +665,9 @@ def nlllossNd_no_reduce_test():
         fullname='NLLLossNd_no_reduce',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs)),
-        cpp_constructor='F::nll_loss(i, t.type_as(i).long(), F::NLLLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::nll_loss(i, t.to(i).long(.options()), F::NLLLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.rand(2, 3, 5, 5, 2, 2).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['NLLLossNd'](i, t.type_as(i).long(), **kwargs),
         pickle=False)
@@ -656,8 +680,9 @@ def nlllossNd_no_reduce_ignore_index_test():
         fullname='NLLLossNd_no_reduce_ignore_index',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs)),
-        cpp_constructor='F::nll_loss(i, t.type_as(i).long(), F::NLLLossFuncOptions().ignore_index(1).reduction(torch::kNone))',
+        cpp_constructor='F::nll_loss(i, t.to(i).long(.options()), F::NLLLossFuncOptions().ignore_index(1).reduction(torch::kNone))',
         input_fn=lambda: torch.rand(2, 3, 5, 5, 2, 2).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['NLLLossNd'](i, t.type_as(i).long(), **kwargs),
         pickle=False)
@@ -674,8 +699,9 @@ def nlllossNd_no_reduce_weights_test():
         fullname='NLLLossNd_no_reduce_weights',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs(i))),
-        cpp_constructor='F::nll_loss(i, t.type_as(i).long(), F::NLLLossFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand(3).to(i0.options()))',
+        cpp_constructor='F::nll_loss(i, t.to(i).long(.options()), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone)',
         input_fn=lambda: torch.rand(2, 3, 5, 5, 2, 2).log(),
+        cpp_arg_symbol_map={'i': 'input', 't': t, 'weight': weight},
         reference_fn=lambda i, *_:
             loss_reference_fns['NLLLossNd'](i, t.type_as(i).long(), **kwargs(i)),
         pickle=False)
@@ -687,8 +713,9 @@ def smoothl1loss_no_reduce_test():
         fullname='SmoothL1Loss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.smooth_l1_loss(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::smooth_l1_loss(i, t.type_as(i), F::SmoothL1LossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::smooth_l1_loss(i, t.to(i.options()), F::SmoothL1LossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(2, 3, 4),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['SmoothL1Loss'](i, t.type_as(i), reduction='none')),),
         pickle=False)
@@ -700,8 +727,9 @@ def smoothl1loss_no_reduce_scalar_test():
         fullname='SmoothL1Loss_no_reduce_scalar',
         constructor=wrap_functional(
             lambda i: F.smooth_l1_loss(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::smooth_l1_loss(i, t.type_as(i), F::SmoothL1LossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::smooth_l1_loss(i, t.to(i.options()), F::SmoothL1LossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(()),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['SmoothL1Loss'](i, t.type_as(i), reduction='none')),),
         pickle=False)
@@ -713,8 +741,9 @@ def multilabelmarginloss_0d_no_reduce_test():
         fullname='MultiLabelMarginLoss_0d_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multilabel_margin_loss(i, t.type_as(i).long(), reduction='none')),
-        cpp_constructor='F::multilabel_margin_loss(i, t.type_as(i).long(), F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::multilabel_margin_loss(i, t.to(i).long(.options()), F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(()),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
         check_sum_reduction=True,
@@ -728,8 +757,9 @@ def multilabelmarginloss_1d_no_reduce_test():
         fullname='MultiLabelMarginLoss_1d_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multilabel_margin_loss(i, t.type_as(i).long(), reduction='none')),
-        cpp_constructor='F::multilabel_margin_loss(i, t.type_as(i).long(), F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::multilabel_margin_loss(i, t.to(i).long(.options()), F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(10),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
         check_sum_reduction=True,
@@ -743,8 +773,9 @@ def multilabelmarginloss_index_neg_test():
         fullname='MultiLabelMarginLoss_index_neg',
         constructor=wrap_functional(
             lambda i: F.multilabel_margin_loss(i, t.type_as(i).long(), reduction='none')),
-        cpp_constructor='F::multilabel_margin_loss(i, t.type_as(i).long(), F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::multilabel_margin_loss(i, t.to(i).long(.options()), F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(5, 10),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
         check_sum_reduction=True,
@@ -758,8 +789,9 @@ def multilabelmarginloss_no_reduce_test():
         fullname='MultiLabelMarginLoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multilabel_margin_loss(i, t.type_as(i).long(), reduction='none')),
-        cpp_constructor='F::multilabel_margin_loss(i, t.type_as(i).long(), F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::multilabel_margin_loss(i, t.to(i).long(.options()), F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(5, 10),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
         check_sum_reduction=True,
@@ -773,8 +805,9 @@ def hingeembeddingloss_no_reduce_test():
         fullname='HingeEmbeddingLoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.hinge_embedding_loss(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::hinge_embedding_loss(i, t.type_as(i), F::HingeEmbeddingLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::hinge_embedding_loss(i, t.to(i.options()), F::HingeEmbeddingLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(10),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['HingeEmbeddingLoss'](i, t.type_as(i), reduction='none')),),
         check_sum_reduction=True,
@@ -787,8 +820,9 @@ def hingeembeddingloss_margin_no_reduce_test():
         fullname='HingeEmbeddingLoss_margin_no_reduce',
         constructor=wrap_functional(
             lambda i: F.hinge_embedding_loss(i, t.type_as(i), margin=0.5, reduction='none')),
-        cpp_constructor='F::hinge_embedding_loss(i, t.type_as(i), F::HingeEmbeddingLossFuncOptions().margin(0.5).reduction(torch::kNone))',
+        cpp_constructor='F::hinge_embedding_loss(i, t.to(i.options()), F::HingeEmbeddingLossFuncOptions().margin(0.5).reduction(torch::kNone))',
         input_fn=lambda: torch.randn(10),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['HingeEmbeddingLoss'](i, t.type_as(i), margin=0.5, reduction='none')),),
         check_sum_reduction=True,
@@ -801,8 +835,9 @@ def softmarginloss_no_reduce_test():
         fullname='SoftMarginLoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.soft_margin_loss(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::soft_margin_loss(i, t.type_as(i), F::SoftMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::soft_margin_loss(i, t.to(i.options()), F::SoftMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(5, 5),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['SoftMarginLoss'](i, t.type_as(i), reduction='none')),),
         pickle=False)
@@ -814,8 +849,9 @@ def multilabelsoftmarginloss_no_reduce_test():
         fullname='MultiLabelSoftMarginLoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multilabel_soft_margin_loss(i, t.type_as(i), reduction='none')),
-        cpp_constructor='F::multilabel_soft_margin_loss(i, t.type_as(i), F::MultiLabelSoftMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::multilabel_soft_margin_loss(i, t.to(i.options()), F::MultiLabelSoftMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(5, 10),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             (-(t * i.sigmoid().log() + (1 - t) * (-i).sigmoid().log())).sum(dim=1) / i.size(1),
         check_gradgrad=False,
@@ -829,9 +865,10 @@ def multilabelsoftmarginloss_weights_no_reduce_test():
         fullname='MultiLabelSoftMarginLoss_weights_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multilabel_soft_margin_loss(i, t.type_as(i),
-                                                    weight=weights.type_as(i), reduction='none')),)),
-        cpp_constructor='F::multilabel_soft_margin_loss(i, t.type_as(i), F::MultiLabelSoftMarginLossFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand(10).to(i0.options()))',
+                                                    weight=weights.type_as(i), reduction='none')),
+        cpp_constructor='F::multilabel_soft_margin_loss(i, t.to(i.options()), F::MultiLabelSoftMarginLossFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)',
         input_fn=lambda: torch.randn(5, 10),
+        cpp_arg_symbol_map={'i': 'input', 't': t, 'weights', weights},
         reference_fn=lambda i, *_:
             (-(t * i.sigmoid().log() + (1 - t) * (-i).sigmoid().log()) * weights).sum(dim=1) / i.size(1),
         check_sum_reduction=True,
@@ -845,8 +882,9 @@ def multimarginloss_no_reduce_test():
         fullname='MultiMarginLoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multi_margin_loss(i, t.type_as(i).long(), reduction='none')),
-        cpp_constructor='F::multi_margin_loss(i, t.type_as(i).long(), F::MultiMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::multi_margin_loss(i, t.to(i).long(.options()), F::MultiMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(5, 10),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
         check_sum_reduction=True,
@@ -860,8 +898,9 @@ def multimarginloss_1d_no_reduce_test():
         fullname='MultiMarginLoss_1d_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multi_margin_loss(i, t.type_as(i).long(), reduction='none')),
-        cpp_constructor='F::multi_margin_loss(i, t.type_as(i).long(), F::MultiMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::multi_margin_loss(i, t.to(i).long(.options()), F::MultiMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(10),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
         check_sum_reduction=True,
@@ -875,8 +914,9 @@ def multimarginloss_1d_input_0d_target_no_reduce_test():
         fullname='multimarginloss_1d_input_0d_target_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multi_margin_loss(i, t.type_as(i).long(), reduction='none')),
-        cpp_constructor='F::multi_margin_loss(i, t.type_as(i).long(), F::MultiMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_constructor='F::multi_margin_loss(i, t.to(i).long(.options()), F::MultiMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(10),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
         check_sum_reduction=True,
@@ -890,8 +930,9 @@ def multimarginloss_p_no_reduce_test():
         fullname='MultiMarginLoss_p_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multi_margin_loss(i, t.type_as(i).long(), p=2, reduction='none')),
-        cpp_constructor='F::multi_margin_loss(i, t.type_as(i).long(), F::MultiMarginLossFuncOptions().p(2).reduction(torch::kNone))',
+        cpp_constructor='F::multi_margin_loss(i, t.to(i).long(.options()), F::MultiMarginLossFuncOptions().p(2).reduction(torch::kNone))',
         input_fn=lambda: torch.randn(5, 10).clamp_(1e-2, 1 - 1e-2),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), p=2, reduction='none')),),
         check_sum_reduction=True,
@@ -905,8 +946,9 @@ def multimarginloss_margin_no_reduce_test():
         fullname='MultiMarginLoss_margin_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multi_margin_loss(i, t.type_as(i).long(), margin=0.5, reduction='none')),
-        cpp_constructor='F::multi_margin_loss(i, t.type_as(i).long(), F::MultiMarginLossFuncOptions().margin(0.5).reduction(torch::kNone))',
+        cpp_constructor='F::multi_margin_loss(i, t.to(i).long(.options()), F::MultiMarginLossFuncOptions().margin(0.5).reduction(torch::kNone))',
         input_fn=lambda: torch.randn(5, 10),
+        cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(),
                                                   margin=0.5, reduction='none')),),
@@ -921,15 +963,17 @@ def fractional_max_pool2d_test(test_case):
         return dict(
             constructor=lambda: nn.FractionalMaxPool2d(
                 2, output_ratio=0.5, _random_samples=random_samples),
-            cpp_constructor_args='torch::nn::FractionalMaxPool2dOptions(2).output_ratio(0.5)._random_samples(%s)' % cpp_random_samples,
+            cpp_constructor_args='torch::nn::FractionalMaxPool2dOptions(2).output_ratio(0.5)._random_samples(random_samples)',
             input_size=(1, 3, 5, 7),
+            cpp_arg_symbol_map={'random_samples': random_samples},
             fullname='FractionalMaxPool2d_ratio')
     elif test_case == 'size':
         return dict(
             constructor=lambda: nn.FractionalMaxPool2d((2, 3), output_size=(
                 4, 3), _random_samples=random_samples),
-            cpp_constructor_args='torch::nn::FractionalMaxPool2dOptions({2, 3}).output_size(std::vector<int64_t>({4, 3}))._random_samples(%s)' % cpp_random_samples,
+            cpp_constructor_args='torch::nn::FractionalMaxPool2dOptions({2, 3}).output_size(std::vector<int64_t>({4, 3}))._random_samples(random_samples)',
             input_size=(1, 3, 7, 6),
+            cpp_arg_symbol_map={'random_samples': random_samples},
             fullname='FractionalMaxPool2d_size')
 
 
@@ -939,22 +983,25 @@ def fractional_max_pool3d_test(test_case):
         return dict(
             constructor=lambda: nn.FractionalMaxPool3d(
                 2, output_ratio=0.5, _random_samples=random_samples),
-            cpp_constructor_args='torch::nn::FractionalMaxPool3dOptions(2).output_ratio(0.5)._random_samples(%s)' % cpp_random_samples,
+            cpp_constructor_args='torch::nn::FractionalMaxPool3dOptions(2).output_ratio(0.5)._random_samples(random_samples)',
             input_size=(2, 4, 5, 5, 5),
+            cpp_arg_symbol_map={'random_samples': random_samples},
             fullname='FractionalMaxPool3d_ratio')
     elif test_case == 'size':
         return dict(
             constructor=lambda: nn.FractionalMaxPool3d((2, 2, 2), output_size=(
                 4, 4, 4), _random_samples=random_samples),
-            cpp_constructor_args='torch::nn::FractionalMaxPool3dOptions({2, 2, 2}).output_size(std::vector<int64_t>({4, 4, 4}))._random_samples(%s)' % cpp_random_samples,
+            cpp_constructor_args='torch::nn::FractionalMaxPool3dOptions({2, 2, 2}).output_size(std::vector<int64_t>({4, 4, 4}))._random_samples(random_samples)',
             input_size=(2, 4, 7, 7, 7),
+            cpp_arg_symbol_map={'random_samples': random_samples},
             fullname='FractionalMaxPool3d_size')
     elif test_case == 'asymsize':
         return dict(
             constructor=lambda: nn.FractionalMaxPool3d((4, 2, 3), output_size=(
                 10, 3, 2), _random_samples=random_samples),
-            cpp_constructor_args='torch::nn::FractionalMaxPool3dOptions({4, 2, 3}).output_size(std::vector<int64_t>({10, 3, 2}))._random_samples(%s)' % cpp_random_samples,
+            cpp_constructor_args='torch::nn::FractionalMaxPool3dOptions({4, 2, 3}).output_size(std::vector<int64_t>({10, 3, 2}))._random_samples(random_samples)',
             input_size=(2, 4, 16, 7, 5),
+            cpp_arg_symbol_map={'random_samples': random_samples},
             fullname='FractionalMaxPool3d_asymsize')
 
 
