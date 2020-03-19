@@ -1064,7 +1064,7 @@ def fractional_max_pool2d_test(test_case):
     if test_case == 'ratio':
         return dict(
             module_name='FractionalMaxPool2d',
-            constructor_args_fn=lambda: {kernel_size: 2, output_ratio: 0.5, _random_samples: torch.empty(1, 3, 2).uniform_()},
+            constructor_args_fn=lambda: {'kernel_size': 2, 'output_ratio': 0.5, '_random_samples': torch.empty(1, 3, 2).uniform_()},
             cpp_constructor_args='torch::nn::FractionalMaxPool2dOptions(2).output_ratio(0.5)._random_samples(%s)' % cpp_random_samples,
             input_size=(1, 3, 5, 7),
             cpp_input_args=['torch::randn({1, 3, 5, 7})'],
