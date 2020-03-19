@@ -1061,54 +1061,50 @@ def multimarginloss_weights_no_reduce_test():
 
 def fractional_max_pool2d_test(test_case):
     cpp_random_samples = 'torch::empty({1, 3, 2}).uniform_()'
-    # python_random_samples_fn = lambda: torch.empty(1, 3, 2).uniform_()
-    python_random_samples_fn = lambda: torch.zeros(2, 4, 3) # yf225 TODO debug
     if test_case == 'ratio':
         return dict(
-            constructor=lambda: nn.FractionalMaxPool2d(
-                2, output_ratio=0.5, _random_samples=python_random_samples_fn()),
+            module_name='FractionalMaxPool2d',
+            constructor_args_fn=lambda: (2, None, 0.5, False, torch.empty(1, 3, 2).uniform_()),
             cpp_constructor_args='torch::nn::FractionalMaxPool2dOptions(2).output_ratio(0.5)._random_samples(%s)' % cpp_random_samples,
             input_size=(1, 3, 5, 7),
             cpp_input_args=['torch::randn({1, 3, 5, 7})'],
-            fullname='FractionalMaxPool2d_ratio')
+            desc='ratio')
     elif test_case == 'size':
         return dict(
-            constructor=lambda: nn.FractionalMaxPool2d((2, 3), output_size=(
-                4, 3), _random_samples=python_random_samples_fn()),
+            module_name='FractionalMaxPool2d',
+            constructor_args_fn=lambda: ((2, 3), (4, 3), None, None, torch.empty(1, 3, 2).uniform_()),
             cpp_constructor_args='torch::nn::FractionalMaxPool2dOptions({2, 3}).output_size(std::vector<int64_t>({4, 3}))._random_samples(%s)' % cpp_random_samples,
             input_size=(1, 3, 7, 6),
             cpp_input_args=['torch::randn({1, 3, 7, 6})'],
-            fullname='FractionalMaxPool2d_size')
+            desc='size')
 
 
 def fractional_max_pool3d_test(test_case):
     cpp_random_samples = 'torch::empty({2, 4, 3}).uniform_()'
-    # python_random_samples_fn = lambda: torch.empty(2, 4, 3).uniform_()
-    python_random_samples_fn = lambda: torch.zeros(2, 4, 3) # yf225 TODO debug
     if test_case == 'ratio':
         return dict(
-            constructor=lambda: nn.FractionalMaxPool3d(
-                2, output_ratio=0.5, _random_samples=python_random_samples_fn()),
+            module_name='FractionalMaxPool3d',
+            constructor_args_fn=lambda: (2, None, 0.5, False, torch.empty(2, 4, 3).uniform_()),
             cpp_constructor_args='torch::nn::FractionalMaxPool3dOptions(2).output_ratio(0.5)._random_samples(%s)' % cpp_random_samples,
             input_size=(2, 4, 5, 5, 5),
             cpp_input_args=['torch::randn({2, 4, 5, 5, 5})'],
-            fullname='FractionalMaxPool3d_ratio')
+            desc='ratio')
     elif test_case == 'size':
         return dict(
-            constructor=lambda: nn.FractionalMaxPool3d((2, 2, 2), output_size=(
-                4, 4, 4), _random_samples=python_random_samples_fn()),
+            module_name='FractionalMaxPool3d',
+            constructor_args_fn=lambda: ((2, 2, 2), (4, 4, 4), None, False, torch.empty(2, 4, 3).uniform_()),
             cpp_constructor_args='torch::nn::FractionalMaxPool3dOptions({2, 2, 2}).output_size(std::vector<int64_t>({4, 4, 4}))._random_samples(%s)' % cpp_random_samples,
             input_size=(2, 4, 7, 7, 7),
             cpp_input_args=['torch::randn({2, 4, 7, 7, 7})'],
-            fullname='FractionalMaxPool3d_size')
+            desc='size')
     elif test_case == 'asymsize':
         return dict(
-            constructor=lambda: nn.FractionalMaxPool3d((4, 2, 3), output_size=(
-                10, 3, 2), _random_samples=python_random_samples_fn()),
+            module_name='FractionalMaxPool3d',
+            constructor_args_fn=lambda: ((4, 2, 3), (10, 3, 2), None, False, torch.empty(2, 4, 3).uniform_()),
             cpp_constructor_args='torch::nn::FractionalMaxPool3dOptions({4, 2, 3}).output_size(std::vector<int64_t>({10, 3, 2}))._random_samples(%s)' % cpp_random_samples,
             input_size=(2, 4, 16, 7, 5),
             cpp_input_args=['torch::randn({2, 4, 16, 7, 5})'],
-            fullname='FractionalMaxPool3d_asymsize')
+            desc='asymsize')
 
 
 new_module_tests = [

@@ -17,6 +17,9 @@ from cpp_api_parity import functional_impl_check, module_impl_check
 # 1. Add a new test to a module already supported by C++ API (i.e. parity table has entry for it, and the parity bit is yes)
 # 2. Add a new test for a module that is not supported by C++ API yet
 
+# yf225 TODO: our new parity test mechanism is changing the way people write common_nn test dicts a lot...
+# can we enforce some constraints to make writing common_nn test dicts easier / get less questions from people?
+
 class TestCppApiParity(common.TestCase):
   pass
 
