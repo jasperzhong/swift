@@ -1598,6 +1598,36 @@ graph(%packed_params_module, %a, %a_scale, %a_zero_point, %a_dtype, %r_scale, %r
                        .check("quantized::add_relu") \
                        .run(m.graph_for(data, data))
 
+    def test_quantized_cat(self):
+        """ Note that we to support the case that torch.cat is quantized
+        indepdently, we need to have an observer that works
+        for list of Tensors.
+        """
+        class M(torch.nn.Module):
+            def __init__(self):
+                super(M, self).__init__()
+                self.conv1 = torch.nn.Conv2d(1, 1, 1).float()
+                self.conv2 = torch.nn.Conv2d(1, 1, 1).float()
+
+            def forward(self, x, y):
+                x = self.conv1(x)
+                y = self.conv2(y)
+                return torch.cat([x, y], 1)
+
+        m = torch.jit.script(M().eval())
+        m = prepare_script(m, {'': script_qconfig(default_qconfig)}, True)
+        # two for input of conv and one for output of cat
+        # this also tests the ListConstruct can preserve the observed property so that
+        # torch.cat knows that inputs are observed
+        assert len(attrs_with_prefix(m, '_observer_')) == 3
+        data = torch.randn(1, 1, 10, 10, dtype=torch.float)
+        m(data, data)
+        m = convert_script(m, True)
+
+        FileCheck().check_not("aten::cat") \
+                   .check("quantized::cat") \
+                   .run(m.graph_for(data, data))
+
     def test_foldbn_trivial(self):
         # Test trivial case
         class TestModule(torch.nn.Module):
