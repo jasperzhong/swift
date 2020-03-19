@@ -36,8 +36,11 @@ void ${functional_variant_name}_test() {
   // outputs would not be the same.
   torch::manual_seed(0);
 
-  ${cpp_input_args_construction_stmts}
-  auto cpp_output = F::${functional_name}(${cpp_input_args_symbols}${cpp_options_arg});
+  // yf225 TODO: rename "cpp_output_tmp_folder" -> "cpp_tmp_folder"
+  auto arg_dict = load_ivalue_to_dict("${cpp_output_tmp_folder}/${functional_variant_name}_arg_dict.pt")
+
+  ${cpp_args_construction_stmts}
+  auto cpp_output = ${cpp_constructor};
 
   // Save the output into a file to be compared in Python later
   write_ivalue_to_file(
@@ -117,34 +120,13 @@ def _process_test_params_for_functional(test_params_dict, functional_metadata, d
   test = test_instance_class(**test_params_dict)
   # yf225 TODO: can we remove the magic number `5` here?
   functional_variant_name = test.get_name()[5:] + (('_' + device) if device != 'cpu' else '')    
-  assert "cpp_input_args" in test_params_dict, \
-    "`cpp_input_args` entry must be present in test params dict for {}".format(functional_variant_name)
 
   return TorchNNFunctionalTestParams(
     functional_name=functional_name,
     functional_variant_name=functional_variant_name,
     test_instance=test,
-    cpp_options_arg=test_params_dict.get('cpp_options_arg', ''),
-    cpp_input_args=test_params_dict['cpp_input_args'],
-    cpp_target_args=test_params_dict.get('cpp_target_args', None),
-    cpp_extra_args=test_params_dict.get('cpp_extra_args', None),
-    has_parity=test_params_dict.get('has_parity', True),
-    device=device,
-    cpp_output_tmp_folder=tempfile.mkdtemp(),
-  )
-
-def _process_test_params_for_functional_new_version(test_params_dict, functional_metadata, device, test_instance_class):
-  functional_name = test_params_dict['functional_name']
-  test = test_instance_class(**test_params_dict)
-  # yf225 TODO: can we remove the magic number `5` here?
-  functional_variant_name = test.get_name()[5:] + (('_' + device) if device != 'cpu' else '')    
-
-  return TorchNNFunctionalTestParams(
-    functional_name=functional_name,
-    functional_variant_name=functional_variant_name,
-    test_instance=test,
-    cpp_constructor=test_params_dict.get('cpp_constructor'),
-    cpp_args=test_params_dict.get('cpp_args'),
+    cpp_constructor=test_params_dict['cpp_constructor'],
+    cpp_args=test_params_dict['cpp_args'],
     has_parity=test_params_dict.get('has_parity', True),
     device=device,
     cpp_output_tmp_folder=tempfile.mkdtemp(),
@@ -167,36 +149,23 @@ def is_criterion_test(test_instance):
 
 # yf225 TODO: move to common utils
 def move_cpp_tensors_to_device(cpp_tensors, device):
-  return ['{}.to("{}")'.format(tensor, device) for tensor in cpp_tensors]
+  return ['{}.to("{}")'.format(stmt, device) for stmt in cpp_stmts]
 
 # yf225 TODO: move to common utils?
 # yf225 TODO: we should check in a copy of the generated source code, and then run consistency test (compare old vs. newly generated)
 def generate_test_cpp_sources(test_params, template):
-  cpp_options_arg = test_params.cpp_options_arg
-  if cpp_options_arg != '':
-    cpp_options_arg = ', {}'.format(cpp_options_arg)
-
-  cpp_input_args = test_params.cpp_input_args
-  if is_criterion_test(test_params.test_instance):
-    assert test_params.cpp_target_args is not None, \
-      "`cpp_target_args` entry must be present in test params dict for {}".format(test_params.functional_variant_name)
-    cpp_input_args = cpp_input_args + test_params.cpp_target_args
-    if test_params.cpp_extra_args:
-      cpp_input_args = cpp_input_args + test_params.cpp_extra_args
-  cpp_input_args = move_cpp_tensors_to_device(cpp_input_args, test_params.device)
-
-  cpp_input_args_construction_stmts = []
-  cpp_input_args_symbols = []
-  for i, input_arg in enumerate(cpp_input_args):
-    cpp_input_args_construction_stmts.append("auto i{} = {};".format(i, input_arg))
-    cpp_input_args_symbols.append("i{}".format(i))
+  cpp_args = test_params.cpp_args
+  cpp_args_construction_stmts = []
+  for arg_name, arg_value in cpp_args:
+    cpp_args_construction_stmts.append("auto {} = arg_dict["{}"]".format(arg_name, arg_name))
+  # cpp_args_construction_stmts = set_cpp_tensors_requires_grad(cpp_args_construction_stmts) # yf225 TODO: this only for module test, not functional!
+  cpp_args_construction_stmts = move_cpp_tensors_to_device(cpp_args_construction_stmts, test_params.device)
 
   test_cpp_sources = template.substitute(
     functional_variant_name=test_params.functional_variant_name,
     functional_name=test_params.functional_name,
-    cpp_input_args_construction_stmts="\n  ".join(cpp_input_args_construction_stmts),
-    cpp_input_args_symbols=", ".join(cpp_input_args_symbols),
-    cpp_options_arg=cpp_options_arg,
+    cpp_args_construction_stmts=";\n  ".join(cpp_args_construction_stmts),
+    cpp_constructor=test_params.cpp_constructor,
     cpp_output_tmp_folder=test_params.cpp_output_tmp_folder,
   )
   return test_cpp_sources

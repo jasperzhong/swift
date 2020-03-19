@@ -401,23 +401,39 @@ def bceloss_weights_no_reduce_test():
         precision=3e-4
     )
 
-
 def bceloss_weights_no_reduce_scalar_test():
+    t = torch.randn(()).double()
+    weights = torch.rand(())
     return dict(
         fullname='BCELoss_weights_no_reduce_scalar',
         functional_name='binary_cross_entropy',
         constructor=wrap_functional(
-            lambda i, t, weights: F.binary_cross_entropy(i, t.type_as(i),
+            lambda i: F.binary_cross_entropy(i, t.type_as(i),
                                              weight=weights.type_as(i), reduction='none')),
-        cpp_options_arg='F::BinaryCrossEntropyFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand({}).to(i0.options())',
+        cpp_constructor='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)',
         input_fn=lambda: torch.rand(()).clamp_(2.8e-2, 1 - 2.8e-2),
-        target_fn=lambda: torch.randn(()).double(),
-        extra_args_fn=lambda: (torch.rand(()),), # weights
-        cpp_input_args=['torch::rand({}).clamp_(2.8e-2, 1 - 2.8e-2)'],
-        cpp_target_args=['torch::randn({}).to(torch::kDouble).to(i0.options())'],
-        reference_fn=lambda i, t, weights, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
+        cpp_args={'i': 'input', 't': t, 'weights': weights}, # format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
+        reference_fn=lambda i, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
         pickle=False
     )
+
+# yf225 TODO: trying to revert to the old code...
+# def bceloss_weights_no_reduce_scalar_test():
+#     return dict(
+#         fullname='BCELoss_weights_no_reduce_scalar',
+#         functional_name='binary_cross_entropy',
+#         constructor=wrap_functional(
+#             lambda i, t, weights: F.binary_cross_entropy(i, t.type_as(i),
+#                                              weight=weights.type_as(i), reduction='none')),
+#         cpp_options_arg='F::BinaryCrossEntropyFuncOptions().weight(%s).reduction(torch::kNone)' % 'torch::rand({}).to(i0.options())',
+#         input_fn=lambda: torch.rand(()).clamp_(2.8e-2, 1 - 2.8e-2),
+#         target_fn=lambda: torch.randn(()).double(),
+#         extra_args_fn=lambda: (torch.rand(()),), # weights
+#         cpp_input_args=['torch::rand({}).clamp_(2.8e-2, 1 - 2.8e-2)'],
+#         cpp_target_args=['torch::randn({}).to(torch::kDouble).to(i0.options())'],
+#         reference_fn=lambda i, t, weights, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
+#         pickle=False
+#     )
 
 
 def bce_with_logistic_legacy_enum_test():
