@@ -148,7 +148,7 @@ def is_criterion_test(test_instance):
     isinstance(test_instance, common_nn.NewCriterionTest)
 
 # yf225 TODO: move to common utils
-def move_cpp_tensors_to_device(cpp_tensors, device):
+def move_cpp_tensors_to_device(cpp_stmts, device):
   return ['{}.to("{}")'.format(stmt, device) for stmt in cpp_stmts]
 
 # yf225 TODO: move to common utils?
