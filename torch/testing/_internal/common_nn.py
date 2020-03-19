@@ -4288,7 +4288,7 @@ new_criterion_tests = [
     ),
     dict(
         module_name='MultiLabelSoftMarginLoss',
-        constructor_args_fn=lambda: (criterion_weight_rand_10,),
+        constructor_args=(criterion_weight_rand_10,),
         cpp_constructor_args='torch::nn::MultiLabelSoftMarginLossOptions().weight(weight)',
         input_fn=lambda: torch.randn(5, 10),
         target_fn=lambda: torch.rand(5, 10).mul(2).floor(),
