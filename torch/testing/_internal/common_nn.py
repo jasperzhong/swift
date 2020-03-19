@@ -837,14 +837,13 @@ def multilabelmarginloss_1d_no_reduce_test():
 
 def multilabelmarginloss_index_neg_test():
     return dict(
-        # yf225 TODO: move target_fn to be below input_fn!
-        target_fn=lambda: Variable(torch.clamp(torch.rand(5, 10).add(-.5).mul(20).floor().long(), min=-1)),
         fullname='MultiLabelMarginLoss_index_neg',
         functional_name='multilabel_margin_loss',
         constructor=wrap_functional(
             lambda i, t: F.multilabel_margin_loss(i, t.type_as(i).long(), reduction='none')),
         cpp_options_arg='F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone)',
         input_fn=lambda: torch.randn(5, 10),
+        target_fn=lambda: Variable(torch.clamp(torch.rand(5, 10).add(-.5).mul(20).floor().long(), min=-1)),
         cpp_input_args=['torch::randn({5, 10})'],
         cpp_target_args=['torch::clamp(torch::rand({5, 10}).add(-.5).mul(20).floor().to(torch::kLong), /*min=*/-1).to(i0.options()).to(torch::kLong)'],
         reference_fn=lambda i, t, *_:
@@ -4977,7 +4976,7 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
             test_case.assertEqual(cpu_output, gpu_output, 1e-1 if dtype in {torch.half, torch.bfloat16} else 4e-4)
 
             if self.is_functional:
-                gradOutput = torch.randn(cpu_input.shape)
+                gradOutput = torch.randn(cpu_output.shape)
             else:
                 gradOutput = torch.randn(())
             cpu_gradInput = test_case._backward_criterion(cpu_module, cpu_input, cpu_target, gradOutput, extra_args=extra_args)
