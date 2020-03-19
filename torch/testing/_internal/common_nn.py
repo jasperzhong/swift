@@ -3849,9 +3849,8 @@ criterion_tests = [
         constructor_args_fn=lambda: (torch.rand(10), None, -1),
         cpp_constructor_args='torch::nn::NLLLossOptions().weight(torch::rand(10)).ignore_index(-1)',
         input_fn=lambda: torch.rand(15, 10).add(1e-2).log(),
-        cpp_dynamic_args={'i': 'input'},
         target_fn=lambda: torch.Tensor(15).uniform_().mul(10 + 1).floor().long() - 1,
-        cpp_target_args=['torch::empty({15}).uniform_().mul(10 + 1).floor().to(torch::kLong).sub(1)'],
+        cpp_dynamic_args={'i': 'input', 'target': 'target'},
         reference_fn=lambda i, t, m:
             nllloss_reference(i, t, weight=get_weight(m), ignore_index=-1),
         desc='weights_ignore_index_neg',
@@ -3878,7 +3877,7 @@ criterion_tests = [
     dict(
         module_name='BCELoss',
         input_fn=lambda: torch.rand(15, 10).clamp_(1e-2, 1 - 1e-2),
-        target_fn=lambda: torch.randn(15, 10).gt(0).to(torch.get_default_dtype()),
+        target_fn=lambda: torch.randn(15, 10).gt(0).double(),
         cpp_dynamic_args={'i': 'input', 'target': 'target'},
         reference_fn=lambda i, t, m: -(t * i.log() + (1 - t) * (1 - i).log()).sum() /
             (i.numel() if get_reduction(m) else 1),
@@ -3890,7 +3889,7 @@ criterion_tests = [
         constructor_args_fn=lambda: (torch.rand(10),),
         cpp_constructor_args='torch::nn::BCELossOptions().weight(torch::rand(10))',
         input_fn=lambda: torch.rand(15, 10).clamp_(1e-2, 1 - 1e-2),
-        target_fn=lambda: torch.randn(15, 10).gt(0).to(torch.get_default_dtype()),
+        target_fn=lambda: torch.randn(15, 10).gt(0).double(),
         cpp_dynamic_args={'i': 'input', 'target': 'target'},
         reference_fn=lambda i, t, m: -((t * i.log() + (1 - t) * (1 - i).log()) * get_weight(m)).sum() /
             (i.numel() if get_reduction(m) else 1),
@@ -4018,7 +4017,7 @@ criterion_tests = [
         constructor_args_fn=lambda: (1, 1., torch.rand(10)),
         cpp_constructor_args='torch::nn::MultiMarginLossOptions().p(1).margin(1.).weight(torch::rand(10))',
         legacy_constructor_args=(1, torch.rand(10)),
-        input_fn=lambda: torch.randn(5, 10),
+        input_size=(5, 10),
         target_fn=lambda: torch.rand(5).mul(8).floor().long(),
         cpp_dynamic_args={'i': 'input', 'target': 'target'},
         reference_fn=lambda i, t, m:
