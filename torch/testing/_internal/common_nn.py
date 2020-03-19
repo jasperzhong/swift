@@ -4459,7 +4459,7 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
             cpu_target = self._get_target()
             cpu_module = self.constructor(*self.constructor_args)
             gpu_module = self.constructor(*self.constructor_args)
-            
+
             # Convert input, target and module parameters to dtype
             if dtype is not None:
                 cpu_input = convert_dtype(cpu_input, dtype, True)
