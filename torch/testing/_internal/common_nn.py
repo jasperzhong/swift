@@ -433,7 +433,7 @@ def kldivloss_with_target_no_reduce_test():
         input_fn=lambda: torch.rand(10, 10),
         cpp_arg_symbol_map={'i': i, 't': 'input'},
         reference_fn=lambda t, *_:
-            loss_reference_fns['KLDivLoss'](i.type_as(t), t, reduction='none')),),
+            loss_reference_fns['KLDivLoss'](i.type_as(t), t, reduction='none'),
         pickle=False)
 
 
@@ -447,7 +447,7 @@ def kldivloss_no_reduce_test():
         input_fn=lambda: torch.rand(10, 10).log(),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['KLDivLoss'](i, t.type_as(i), reduction='none')),),
+            loss_reference_fns['KLDivLoss'](i, t.type_as(i), reduction='none'),
         pickle=False,
     )
 
@@ -462,7 +462,7 @@ def kldivloss_no_reduce_scalar_test():
         input_fn=lambda: torch.rand(()).log(),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['KLDivLoss'](i, t.type_as(i), reduction='none')),),
+            loss_reference_fns['KLDivLoss'](i, t.type_as(i), reduction='none'),
         pickle=False)
 
 
@@ -717,7 +717,7 @@ def smoothl1loss_no_reduce_test():
         input_fn=lambda: torch.randn(2, 3, 4),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['SmoothL1Loss'](i, t.type_as(i), reduction='none')),),
+            loss_reference_fns['SmoothL1Loss'](i, t.type_as(i), reduction='none'),
         pickle=False)
 
 
@@ -731,7 +731,7 @@ def smoothl1loss_no_reduce_scalar_test():
         input_fn=lambda: torch.randn(()),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['SmoothL1Loss'](i, t.type_as(i), reduction='none')),),
+            loss_reference_fns['SmoothL1Loss'](i, t.type_as(i), reduction='none'),
         pickle=False)
 
 
@@ -745,7 +745,7 @@ def multilabelmarginloss_0d_no_reduce_test():
         input_fn=lambda: torch.randn(()),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
+            loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
         check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
@@ -761,7 +761,7 @@ def multilabelmarginloss_1d_no_reduce_test():
         input_fn=lambda: torch.randn(10),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
+            loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
         check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
@@ -777,7 +777,7 @@ def multilabelmarginloss_index_neg_test():
         input_fn=lambda: torch.randn(5, 10),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
+            loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
         check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
@@ -793,7 +793,7 @@ def multilabelmarginloss_no_reduce_test():
         input_fn=lambda: torch.randn(5, 10),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
+            loss_reference_fns['MultiLabelMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
         check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
@@ -809,7 +809,7 @@ def hingeembeddingloss_no_reduce_test():
         input_fn=lambda: torch.randn(10),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['HingeEmbeddingLoss'](i, t.type_as(i), reduction='none')),),
+            loss_reference_fns['HingeEmbeddingLoss'](i, t.type_as(i), reduction='none'),
         check_sum_reduction=True,
         pickle=False)
 
@@ -824,7 +824,7 @@ def hingeembeddingloss_margin_no_reduce_test():
         input_fn=lambda: torch.randn(10),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['HingeEmbeddingLoss'](i, t.type_as(i), margin=0.5, reduction='none')),),
+            loss_reference_fns['HingeEmbeddingLoss'](i, t.type_as(i), margin=0.5, reduction='none'),
         check_sum_reduction=True,
         pickle=False)
 
@@ -839,7 +839,7 @@ def softmarginloss_no_reduce_test():
         input_fn=lambda: torch.randn(5, 5),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['SoftMarginLoss'](i, t.type_as(i), reduction='none')),),
+            loss_reference_fns['SoftMarginLoss'](i, t.type_as(i), reduction='none'),
         pickle=False)
 
 
@@ -886,7 +886,7 @@ def multimarginloss_no_reduce_test():
         input_fn=lambda: torch.randn(5, 10),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
+            loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
         check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
@@ -902,7 +902,7 @@ def multimarginloss_1d_no_reduce_test():
         input_fn=lambda: torch.randn(10),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
+            loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
         check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
@@ -918,7 +918,7 @@ def multimarginloss_1d_input_0d_target_no_reduce_test():
         input_fn=lambda: torch.randn(10),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), reduction='none')),),
+            loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), reduction='none'),
         check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
@@ -934,7 +934,7 @@ def multimarginloss_p_no_reduce_test():
         input_fn=lambda: torch.randn(5, 10).clamp_(1e-2, 1 - 1e-2),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
-            loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), p=2, reduction='none')),),
+            loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(), p=2, reduction='none'),
         check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
@@ -951,7 +951,7 @@ def multimarginloss_margin_no_reduce_test():
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
             loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(),
-                                                  margin=0.5, reduction='none')),),
+                                                  margin=0.5, reduction='none'),
         check_sum_reduction=True,
         check_gradgrad=False,
         pickle=False)
