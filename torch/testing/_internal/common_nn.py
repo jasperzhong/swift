@@ -116,12 +116,12 @@ module_tests = [
     dict(
         module_name='Sigmoid',
         input_size=(2, 3, 4, 5),
-        cpp_input_args=['torch::randn({2, 3, 4, 5})']
+        cpp_dynamic_args={'i': 'input'},
     ),
     dict(
         module_name='Tanh',
         input_size=(2, 3, 4, 5),
-        cpp_input_args=['torch::randn({2, 3, 4, 5})']
+        cpp_dynamic_args={'i': 'input'},
     ),
     dict(
         module_name='Flatten',
@@ -1929,7 +1929,7 @@ new_module_tests = [
         constructor_args=((1, 2, 3, 4),),
         cpp_constructor_args='torch::nn::ZeroPad2dOptions({1, 2, 3, 4})',
         input_size=(2, 3, 4, 4),
-        cpp_input_args=['torch::randn({2, 3, 4, 4})']
+        cpp_dynamic_args={'i': 'input'},
     ),
     dict(
         module_name='ZeroPad2d',
@@ -1944,21 +1944,21 @@ new_module_tests = [
         constructor_args=((1, 2), 2.),
         cpp_constructor_args='torch::nn::ConstantPad1dOptions({1, 2}, 2.)',
         input_size=(2, 3, 4),
-        cpp_input_args=['torch::randn({2, 3, 4})']
+        cpp_dynamic_args={'i': 'input'},
     ),
     dict(
         module_name='ConstantPad2d',
         constructor_args=((1, 2, 3, 4), 2.),
         cpp_constructor_args='torch::nn::ConstantPad2dOptions({1, 2, 3, 4}, 2.)',
         input_size=(2, 3, 4, 4),
-        cpp_input_args=['torch::randn({2, 3, 4, 4})']
+        cpp_dynamic_args={'i': 'input'},
     ),
     dict(
         module_name='ConstantPad3d',
         constructor_args=((1, 2, 3, 4, 1, 0), 2.),
         cpp_constructor_args='torch::nn::ConstantPad3dOptions({1, 2, 3, 4, 1, 0}, 2.)',
         input_size=(2, 3, 4, 4, 5),
-        cpp_input_args=['torch::randn({2, 3, 4, 4, 5})']
+        cpp_dynamic_args={'i': 'input'},
     ),
     dict(
         module_name='Conv3d',
