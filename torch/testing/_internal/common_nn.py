@@ -4502,10 +4502,11 @@ class ModuleTest(TestBase):
             kwargs.get('FIXME_no_cuda_gradgrad_comparison', False)
         self.precision = kwargs.get('precision', 2e-4)
         self.check_forward_only = kwargs.get('check_forward_only', False)
+        self.constructor_args_is_tuple = isinstance(self.constructor_args, tuple)
+        assert self.constructor_args_is_tuple or isinstance(self.constructor_args, dict)
 
     def __call__(self, test_case):
-        print(self.constructor_args)
-        module = self.constructor(*self.constructor_args)
+        module = self.constructor(*self.constructor_args if self.constructor_args_is_tuple else **self.constructor_args)
         input = self._get_input()
 
         if self.reference_fn is not None:
@@ -4589,9 +4590,8 @@ class ModuleTest(TestBase):
             type_map = {'torch.DoubleTensor': torch.cuda.FloatTensor}
             gpu_input = to_gpu(cpu_input, type_map=type_map)
 
-            print(self.constructor_args)
-            cpu_module = self.constructor(*self.constructor_args)
-            gpu_module = self.constructor(*self.constructor_args).float().cuda()
+            cpu_module = self.constructor(*self.constructor_args if self.constructor_args_is_tuple else **self.constructor_args)
+            gpu_module = self.constructor(*self.constructor_args if self.constructor_args_is_tuple else **self.constructor_args).float().cuda()
             cpu_param = test_case._get_parameters(cpu_module)
             gpu_param = test_case._get_parameters(gpu_module)
             for cpu_p, gpu_p in zip(cpu_param[0], gpu_param[0]):
@@ -4674,15 +4674,14 @@ class CriterionTest(TestBase):
         super(CriterionTest, self).__init__(*args, **kwargs)
         self.should_test_cuda = kwargs.get('test_cuda', True)
         self.check_forward_only = kwargs.get('check_forward_only', True)
-        # self.constructor_args_is_tuple = isinstance(self.constructor_args, tuple)
-        # assert self.constructor_args_is_tuple or isinstance(self.constructor_args, dict)
+        self.constructor_args_is_tuple = isinstance(self.constructor_args, tuple)
+        assert self.constructor_args_is_tuple or isinstance(self.constructor_args, dict)
 
     def _get_target(self):
         return self._get_arg('target', True)
 
     def __call__(self, test_case):
-        print(self.constructor_args)
-        module = self.constructor(*self.constructor_args)
+        module = self.constructor(*self.constructor_args if self.constructor_args_is_tuple else **self.constructor_args)
         input = self._get_input()
 
         # Check that these methods don't raise errors
@@ -4716,9 +4715,8 @@ class CriterionTest(TestBase):
             cpu_target = self._get_target()
             gpu_target = to_gpu(cpu_target, type_map=type_map)
 
-            print(self.constructor_args)
-            cpu_module = self.constructor(*self.constructor_args)
-            gpu_module = self.constructor(*self.constructor_args).float().cuda()
+            cpu_module = self.constructor(*self.constructor_args if self.constructor_args_is_tuple else **self.constructor_args)
+            gpu_module = self.constructor(*self.constructor_args if self.constructor_args_is_tuple else **self.constructor_args).float().cuda()
 
             cpu_output = test_case._forward_criterion(cpu_module, cpu_input, cpu_target)
             gpu_output = test_case._forward_criterion(gpu_module, gpu_input, gpu_target)
@@ -4774,7 +4772,6 @@ class NewModuleTest(InputVariableMixin, ModuleTest):
             # check if the inplace variant of the module gives the same result
             # as the out-of-place
 
-            print(self.constructor_args)
             module_ip = self.constructor(*self.constructor_args, inplace=True)
 
             input_version = input._version
@@ -4913,6 +4910,8 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
         self.check_bfloat16 = kwargs.get('check_bfloat16', False)
         self.convert_target = kwargs.get('convert_target', True)
         self.is_functional = kwargs.get('functional_name', False)
+        self.constructor_args_is_tuple = isinstance(self.constructor_args, tuple)
+        assert self.constructor_args_is_tuple or isinstance(self.constructor_args, dict)
 
     def _do_extra_tests(self, test_case, module, input, target):
         if not self.check_gradgrad:
@@ -4953,9 +4952,8 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
         try:
             cpu_input = self._get_input()
             cpu_target = self._get_target()
-            print(self.constructor_args)
-            cpu_module = self.constructor(*self.constructor_args)
-            gpu_module = self.constructor(*self.constructor_args)
+            cpu_module = self.constructor(*self.constructor_args if self.constructor_args_is_tuple else **self.constructor_args)
+            gpu_module = self.constructor(*self.constructor_args if self.constructor_args_is_tuple else **self.constructor_args)
 
             # Convert input, target and module parameters to dtype
             if dtype is not None:
@@ -4976,8 +4974,7 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
                 cpu_input = self._get_input()
                 cpu_target = self._get_target()
                 # Loss modules with weights require consistent input/module weight types
-                print(self.constructor_args)
-                cpu_module = self.constructor(*self.constructor_args)
+                cpu_module = self.constructor(*self.constructor_args if self.constructor_args_is_tuple else **self.constructor_args)
 
             cpu_output = test_case._forward_criterion(cpu_module, cpu_input, cpu_target, extra_args=extra_args)
             gpu_output = test_case._forward_criterion(gpu_module, gpu_input, gpu_target, extra_args=extra_args)
