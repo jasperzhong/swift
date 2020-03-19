@@ -156,7 +156,7 @@ def move_cpp_tensors_to_device(cpp_tensors, device):
 def generate_test_cpp_sources(test_params, template):
   cpp_args = test_params.cpp_args
   cpp_args_construction_stmts = []
-  for arg_name, arg_value in cpp_args:
+  for arg_name, arg_value in cpp_args.items():
     cpp_args_construction_stmts.append('auto {} = arg_dict["{}"]'.format(arg_name, arg_name))
   # cpp_args_construction_stmts = set_cpp_tensors_requires_grad(cpp_args_construction_stmts) # yf225 TODO: this only for module test, not functional!
   cpp_args_construction_stmts = move_cpp_tensors_to_device(cpp_args_construction_stmts, test_params.device)
