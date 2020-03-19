@@ -1012,54 +1012,92 @@ def multimarginloss_weights_no_reduce_test():
 
 
 def fractional_max_pool2d_test(test_case):
-    cpp_random_samples = 'torch::empty({1, 3, 2}).uniform_()'
+    random_samples = torch.DoubleTensor(1, 3, 2).uniform_()
     if test_case == 'ratio':
         return dict(
-            module_name='FractionalMaxPool2d',
-            constructor_args_fn=lambda: {'kernel_size': 2, 'output_ratio': 0.5, '_random_samples': torch.empty(1, 3, 2).uniform_()},
+            constructor=lambda: nn.FractionalMaxPool2d(
+                2, output_ratio=0.5, _random_samples=random_samples),
             cpp_constructor_args='torch::nn::FractionalMaxPool2dOptions(2).output_ratio(0.5)._random_samples(%s)' % cpp_random_samples,
             input_size=(1, 3, 5, 7),
-            cpp_dynamic_args={'i': 'input'},
-            desc='ratio')
+            fullname='FractionalMaxPool2d_ratio')
     elif test_case == 'size':
         return dict(
-            module_name='FractionalMaxPool2d',
-            constructor_args_fn=lambda: ((2, 3), (4, 3), None, None, torch.empty(1, 3, 2).uniform_()),
+            constructor=lambda: nn.FractionalMaxPool2d((2, 3), output_size=(
+                4, 3), _random_samples=random_samples),
             cpp_constructor_args='torch::nn::FractionalMaxPool2dOptions({2, 3}).output_size(std::vector<int64_t>({4, 3}))._random_samples(%s)' % cpp_random_samples,
             input_size=(1, 3, 7, 6),
-            cpp_dynamic_args={'i': 'input'},
-            desc='size')
+            fullname='FractionalMaxPool2d_size')
 
 
 def fractional_max_pool3d_test(test_case):
-    cpp_random_samples = 'torch::empty({2, 4, 3}).uniform_()'
+    random_samples = torch.DoubleTensor(2, 4, 3).uniform_()
     if test_case == 'ratio':
         return dict(
-            module_name='FractionalMaxPool3d',
-            constructor_args_fn=lambda: (2, None, 0.5, False, torch.empty(2, 4, 3).uniform_()),
+            constructor=lambda: nn.FractionalMaxPool3d(
+                2, output_ratio=0.5, _random_samples=random_samples),
             cpp_constructor_args='torch::nn::FractionalMaxPool3dOptions(2).output_ratio(0.5)._random_samples(%s)' % cpp_random_samples,
             input_size=(2, 4, 5, 5, 5),
-            cpp_dynamic_args={'i': 'input'},
-            desc='ratio')
+            fullname='FractionalMaxPool3d_ratio')
     elif test_case == 'size':
         return dict(
-            module_name='FractionalMaxPool3d',
-            constructor_args_fn=lambda: ((2, 2, 2), (4, 4, 4), None, False, torch.empty(2, 4, 3).uniform_()),
+            constructor=lambda: nn.FractionalMaxPool3d((2, 2, 2), output_size=(
+                4, 4, 4), _random_samples=random_samples),
             cpp_constructor_args='torch::nn::FractionalMaxPool3dOptions({2, 2, 2}).output_size(std::vector<int64_t>({4, 4, 4}))._random_samples(%s)' % cpp_random_samples,
             input_size=(2, 4, 7, 7, 7),
-            cpp_dynamic_args={'i': 'input'},
-            desc='size')
+            fullname='FractionalMaxPool3d_size')
     elif test_case == 'asymsize':
         return dict(
-            module_name='FractionalMaxPool3d',
-            constructor_args_fn=lambda: ((4, 2, 3), (10, 3, 2), None, False, torch.empty(2, 4, 3).uniform_()),
+            constructor=lambda: nn.FractionalMaxPool3d((4, 2, 3), output_size=(
+                10, 3, 2), _random_samples=random_samples),
             cpp_constructor_args='torch::nn::FractionalMaxPool3dOptions({4, 2, 3}).output_size(std::vector<int64_t>({10, 3, 2}))._random_samples(%s)' % cpp_random_samples,
             input_size=(2, 4, 16, 7, 5),
-            cpp_dynamic_args={'i': 'input'},
-            desc='asymsize')
+            fullname='FractionalMaxPool3d_asymsize')
 
 
 new_module_tests = [
+    poissonnllloss_no_reduce_test(),    
+    bceloss_no_reduce_test(),   
+    bceloss_weights_no_reduce_test(),   
+    bce_with_logistic_legacy_enum_test(),   
+    bce_with_logistic_no_reduce_test(), 
+    bceloss_no_reduce_scalar_test(),    
+    bceloss_weights_no_reduce_scalar_test(),    
+    bce_with_logistic_no_reduce_scalar_test(),  
+    kldivloss_with_target_no_reduce_test(), 
+    kldivloss_no_reduce_test(), 
+    kldivloss_no_reduce_scalar_test(),  
+    l1loss_no_reduce_test(),    
+    l1loss_no_reduce_scalar_test(), 
+    mseloss_no_reduce_test(),   
+    mseloss_no_reduce_scalar_test(),    
+    nllloss_no_reduce_test(),   
+    nllloss_no_reduce_ignore_index_test(),  
+    nllloss_no_reduce_weights_test(),   
+    nllloss_no_reduce_weights_ignore_index_test(),  
+    nllloss_no_reduce_weights_ignore_index_neg_test(),  
+    nllloss2d_no_reduce_test(), 
+    nllloss2d_no_reduce_weights_test(), 
+    nllloss2d_no_reduce_ignore_index_test(),    
+    nlllossNd_no_reduce_test(), 
+    nlllossNd_no_reduce_weights_test(), 
+    nlllossNd_no_reduce_ignore_index_test(),    
+    smoothl1loss_no_reduce_test(),  
+    smoothl1loss_no_reduce_scalar_test(),   
+    multilabelmarginloss_0d_no_reduce_test(),   
+    multilabelmarginloss_1d_no_reduce_test(),   
+    multilabelmarginloss_index_neg_test(),  
+    multilabelmarginloss_no_reduce_test(),  
+    hingeembeddingloss_no_reduce_test(),    
+    hingeembeddingloss_margin_no_reduce_test(), 
+    softmarginloss_no_reduce_test(),    
+    multilabelsoftmarginloss_no_reduce_test(),  
+    multilabelsoftmarginloss_weights_no_reduce_test(),  
+    multimarginloss_no_reduce_test(),   
+    multimarginloss_1d_no_reduce_test(),    
+    multimarginloss_1d_input_0d_target_no_reduce_test(),    
+    multimarginloss_p_no_reduce_test(), 
+    multimarginloss_margin_no_reduce_test(),    
+    multimarginloss_weights_no_reduce_test(),
     fractional_max_pool2d_test('ratio'),
     fractional_max_pool2d_test('size'),
     fractional_max_pool3d_test('ratio'),
@@ -4085,49 +4123,6 @@ criterion_tests = [
 ]
 
 new_criterion_tests = [
-    poissonnllloss_no_reduce_test(),
-    bceloss_no_reduce_test(),
-    bceloss_weights_no_reduce_test(),
-    bce_with_logistic_legacy_enum_test(),
-    bce_with_logistic_no_reduce_test(),
-    bceloss_no_reduce_scalar_test(),
-    bceloss_weights_no_reduce_scalar_test(),
-    bce_with_logistic_no_reduce_scalar_test(),
-    kldivloss_with_target_no_reduce_test(),
-    kldivloss_no_reduce_test(),
-    kldivloss_no_reduce_scalar_test(),
-    l1loss_no_reduce_test(),
-    l1loss_no_reduce_scalar_test(),
-    mseloss_no_reduce_test(),
-    mseloss_no_reduce_scalar_test(),
-    nllloss_no_reduce_test(),
-    nllloss_no_reduce_ignore_index_test(),
-    nllloss_no_reduce_weights_test(),
-    nllloss_no_reduce_weights_ignore_index_test(),
-    nllloss_no_reduce_weights_ignore_index_neg_test(),
-    nllloss2d_no_reduce_test(),
-    nllloss2d_no_reduce_weights_test(),
-    nllloss2d_no_reduce_ignore_index_test(),
-    nlllossNd_no_reduce_test(),
-    nlllossNd_no_reduce_weights_test(),
-    nlllossNd_no_reduce_ignore_index_test(),
-    smoothl1loss_no_reduce_test(),
-    smoothl1loss_no_reduce_scalar_test(),
-    multilabelmarginloss_0d_no_reduce_test(),
-    multilabelmarginloss_1d_no_reduce_test(),
-    multilabelmarginloss_index_neg_test(),
-    multilabelmarginloss_no_reduce_test(),
-    hingeembeddingloss_no_reduce_test(),
-    hingeembeddingloss_margin_no_reduce_test(),
-    softmarginloss_no_reduce_test(),
-    multilabelsoftmarginloss_no_reduce_test(),
-    multilabelsoftmarginloss_weights_no_reduce_test(),
-    multimarginloss_no_reduce_test(),
-    multimarginloss_1d_no_reduce_test(),
-    multimarginloss_1d_input_0d_target_no_reduce_test(),
-    multimarginloss_p_no_reduce_test(),
-    multimarginloss_margin_no_reduce_test(),
-    multimarginloss_weights_no_reduce_test(),
     dict(
         module_name='BCEWithLogitsLoss',
         input_fn=lambda: torch.rand(15, 10).clamp_(1e-2, 1 - 1e-2),
