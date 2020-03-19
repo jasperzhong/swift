@@ -957,6 +957,25 @@ def multimarginloss_margin_no_reduce_test():
         pickle=False)
 
 
+def multimarginloss_weights_no_reduce_test():
+    t = torch.rand(5).mul(8).floor().long()
+    weights = torch.rand(10)
+    return dict(
+        fullname='MultiMarginLoss_weights_no_reduce',
+        constructor=wrap_functional(
+            lambda i: F.multi_margin_loss(i, t.type_as(i).long(), weight=weights.type_as(i),
+                                          reduction='none')),
+        cpp_constructor='F::multi_margin_loss(i, t.to(i.options()).long(), F::MultiMarginLossFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone))',
+        input_fn=lambda: torch.randn(5, 10),
+        cpp_arg_symbol_map={'i': 'input', 't': t, 'weights': weights},
+        reference_fn=lambda i, *_:
+            loss_reference_fns['MultiMarginLoss'](i, t.data.type_as(i).long(),
+                                                  weight=weights, reduction='none'),
+        check_sum_reduction=True,
+        check_gradgrad=False,
+        pickle=False)
+
+
 def fractional_max_pool2d_test(test_case):
     random_samples = torch.DoubleTensor(1, 3, 2).uniform_()
     if test_case == 'ratio':
