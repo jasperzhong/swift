@@ -65,12 +65,27 @@ def bceloss_weights_no_reduce_scalar_test():
                                              weight=weights.type_as(i), reduction='none')),
         cpp_constructor='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)',
         input_fn=lambda: torch.rand(()).clamp_(2.8e-2, 1 - 2.8e-2),
-        cpp_args={'i': 'input', 't': t, 'weights': weights}, # format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
+        # RHS value format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
+        # NOTE: must be full binding (i.e. all input args to the functional need to be specified)
+        cpp_args={'i': 'input', 't': t, 'weights': weights},
         reference_fn=lambda i, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
         pickle=False
     )
 
+def fractional_max_pool2d_test(test_case):
+    random_samples = torch.DoubleTensor(1, 3, 2).uniform_()
+    return dict(
+        constructor=lambda: torch.nn.FractionalMaxPool2d(
+            2, output_ratio=0.5, _random_samples=random_samples),
+        cpp_constructor_args='torch::nn::FractionalMaxPool2dOptions(2).output_ratio(0.5)._random_samples(random_samples)',
+        input_size=(1, 3, 5, 7),
+        # RHS value format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
+        # NOTE: must be full binding (i.e. all input args to the module forward need to be specified)
+        cpp_args={'i': 'input', 'random_samples', random_samples},
+        fullname='FractionalMaxPool2d_ratio')
+
 new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
+new_module_tests.append(fractional_max_pool2d_test())
 
 for test_params_dicts, test_instance_class in [
   (module_tests, common_nn.ModuleTest),

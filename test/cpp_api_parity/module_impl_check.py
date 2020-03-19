@@ -49,12 +49,6 @@ TORCH_NN_MODULE_TEST_FORWARD_BACKWARD = Template("""
 void ${module_variant_name}_test_forward_backward() {
   pybind11::gil_scoped_release no_gil;
 
-  // NOTE: Because different RNG state would lead to different output,
-  // it is crucial for this function to execute the same statements
-  // in the exact same order as the Python equivalent, otherwise their
-  // outputs would not be the same.
-  torch::manual_seed(0);
-
   ${module_qualified_name} module${cpp_constructor_args};
   module->to(std::string("${device}"));
 
@@ -112,12 +106,6 @@ def _test_torch_nn_module_variant(unit_test_class, test_params):
     return [tensor.to(device) for tensor in python_tensors]
 
   def test_forward_backward(unit_test_class, test_params):
-    # NOTE: Because different RNG state would lead to different output,
-    # it is crucial for this function to execute the same statements
-    # in the exact same order as the C++ equivalent, otherwise their
-    # outputs would not be the same.
-    torch.manual_seed(0)
-
     device = test_params.device
     module = test_params.test_instance.constructor(*test_params.test_instance.constructor_args).to(device)
     inputs = set_python_tensors_requires_grad(convert_to_list(test_params.test_instance._get_input()))
