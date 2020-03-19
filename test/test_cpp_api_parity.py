@@ -16,14 +16,14 @@ from cpp_api_parity import module_impl_check
 
 # yf225 TODO: need to add proper checks and expectations when people:
 # 1. Add a new test to a module already supported by C++ API (i.e. parity table has entry for it, and the parity bit is yes)
-#   a) add a flag `no_cpp_parity_test` to the dict to be able to turn off test as needed
+#   a) add a flag `skip_cpp_parity_test` to the dict to be able to turn off test as needed
 # 2. Add a new test for a module that is not supported by C++ API yet
 
 # yf225 TODO: our new parity test mechanism is changing the way people write common_nn test dicts a lot...
 # can we enforce some constraints to make writing common_nn test dicts easier / get less questions from people?
 
 # yf225 TODO: current plan:
-# transfer all input/target/extra/options args from Python to C++ via JIT serialization
+# transfer all input/target/extra/options non-const args from Python to C++ via JIT serialization
 # transfer module state from Python to C++ via JIT tracing (torch.jit.save -> torch::load)
 # Benefits:
 # 1. Allows minimal changes to common_nn dicts
@@ -66,10 +66,12 @@ def bceloss_weights_no_reduce_scalar_test():
         cpp_constructor='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)',
         input_fn=lambda: torch.rand(()).clamp_(2.8e-2, 1 - 2.8e-2),
         # RHS value format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
-        # NOTE: must be full binding (i.e. all input args to the functional need to be specified)
-        cpp_args={'i': 'input', 't': t, 'weights': weights},
+        # NOTE: must be full binding for all dynamic args (i.e. all dynamic args to the functional need to be specified)
+        # Definition of "dynamic args": any args that would have a different value if the random seed is different when those args are created
+        cpp_dynamic_args={'i': 'input', 't': t, 'weights': weights},
         reference_fn=lambda i, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
-        pickle=False
+        pickle=False,
+        skip_cpp_parity_test=False,
     )
 
 def fractional_max_pool2d_test(test_case):
@@ -80,8 +82,9 @@ def fractional_max_pool2d_test(test_case):
         cpp_constructor_args='torch::nn::FractionalMaxPool2dOptions(2).output_ratio(0.5)._random_samples(random_samples)',
         input_size=(1, 3, 5, 7),
         # RHS value format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
-        # NOTE: must be full binding (i.e. all input args to the module forward need to be specified)
-        cpp_args={'i': 'input', 'random_samples', random_samples},
+        # NOTE: must be full binding for all dynamic args (i.e. all dynamic args to the module forward need to be specified)
+        # Definition of "dynamic args": any args that would have a different value if the random seed is different when those args are created
+        cpp_non_const_args={'i': 'input', 'random_samples', random_samples},
         fullname='FractionalMaxPool2d_ratio')
 
 new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
