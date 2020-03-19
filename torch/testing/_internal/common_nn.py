@@ -3440,14 +3440,12 @@ for padding_mode, cpp_padding_mode in zip(
             # FIXME: remove after implementing reflection pad 3d
             #        https://github.com/pytorch/pytorch/issues/27655
             continue
-        input_size = (2, 3) + (3,) * d
-        cpp_input_args = ['torch::randn({%s})' % ', '.join([str(x) for x in input_size])]
         new_module_tests.append(
             dict(
                 module_name='Conv{}d'.format(d),
                 constructor_args=(3, 4, 3, 2, 2, 1, 1, True, padding_mode),
                 cpp_constructor_args='torch::nn::Conv{}dOptions(3, 4, 3).stride(2).padding(2).dilation(1).groups(1).bias(true).padding_mode({})'.format(d, cpp_padding_mode),
-                input_size=input_size,
+                input_size=(2, 3) + (3,) * d,
                 cpp_dynamic_args={'i': 'input'},
                 output_size=(2, 4) + (3,) * d,
                 cudnn=True,
