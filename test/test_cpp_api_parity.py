@@ -54,12 +54,33 @@ def wrap_functional(fn, **kwargs):
             return fn(*args, **kwargs)
     return FunctionalModule
 
+# How to get the functional name from wrap_functional:
+# ```
+# def wrap_functional(fn, **kwargs):
+#     class FunctionalModule(torch.nn.Module):
+#         def __init__(self):
+#             self.fn = fn
+#         def forward(self, *args):
+#             return self.fn(*args, **kwargs)
+#     return FunctionalModule
+#
+# func_dict = dict(
+#         functional_name='interpolate',
+#         constructor=wrap_functional(F.interpolate, size=(12, ), scale_factor=None, mode='nearest'),
+#         input_size=(1, 2, 3),
+#         fullname='interpolate_nearest_tuple_1d',
+#         pickle=False,
+#     )
+#
+# import inspect
+# print(func_dict['constructor']().fn)  # prints: <function interpolate at 0x7f13611a0ea0>
+# ```
+
 def bceloss_weights_no_reduce_scalar_test():
     t = torch.randn(()).double()
     weights = torch.rand(())
     return dict(
         fullname='BCELoss_weights_no_reduce_scalar',
-        functional_name='binary_cross_entropy',
         constructor=wrap_functional(
             lambda i: F.binary_cross_entropy(i, t.type_as(i),
                                              weight=weights.type_as(i), reduction='none')),
@@ -73,7 +94,16 @@ def bceloss_weights_no_reduce_scalar_test():
         skip_cpp_parity_test=False, # yf225 TODO: this is an optional flag
     )
 
-def fractional_max_pool2d_test(test_case):
+def interpolate_nearest_tuple_1d():
+    dict(
+        constructor=wrap_functional(F.interpolate, size=(12, ), scale_factor=None, mode='nearest'),
+        cpp_constructor_args='F::InterpolateFuncOptions().size(std::vector<int64_t>({12})).scale_factor(c10::nullopt).mode(torch::kNearest)',
+        input_size=(1, 2, 3),
+        fullname='interpolate_nearest_tuple_1d',
+        pickle=False,
+    )
+
+def fractional_max_pool2d_test():
     random_samples = torch.DoubleTensor(1, 3, 2).uniform_()
     return dict(
         constructor=lambda: torch.nn.FractionalMaxPool2d(
@@ -85,24 +115,10 @@ def fractional_max_pool2d_test(test_case):
         cpp_arg_symbol_map={'random_samples', random_samples},
         fullname='FractionalMaxPool2d_ratio')
 
-def fractional_max_pool2d_test(test_case):
-    # notice: no `cpp_arg_symbol_map` here!
-    return dict(
-        module_name='CTCLoss',
-        constructor_args=(14,),  # blank=14
-        cpp_constructor_args='torch::nn::CTCLossOptions().blank(14)',
-        extra_args=([50, 50, 50], [30, 25, 20]),  # input_lengths, target_lengths
-        input_fn=lambda: torch.randn(50, 3, 15).log_softmax(2),
-        target_fn=lambda: torch.randint(0, 14, (3, 30), dtype=torch.long),
-        reference_fn=lambda i, t, il, tl, m:
-            ctcloss_reference(i, t, il, tl, blank=14, reduction=get_reduction(m)),
-        check_sum_reduction=True,
-        check_gradgrad=False,
-        check_half=False,
-    ),
 
 new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
 new_module_tests.append(fractional_max_pool2d_test())
+new_module_tests.append(interpolate_nearest_tuple_1d())
 
 for test_params_dicts, test_instance_class in [
   (module_tests, common_nn.ModuleTest),
