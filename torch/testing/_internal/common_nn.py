@@ -3949,11 +3949,7 @@ class ModuleTest(TestBase):
         self.check_forward_only = kwargs.get('check_forward_only', False)
 
     def __call__(self, test_case):
-        # yf225 TODO: remove these nonsense
-        if isinstance(self.constructor_args, tuple):
-            module = self.constructor(*self.constructor_args)
-        elif isinstance(self.constructor_args, dict):
-            module = self.constructor(**self.constructor_args)
+        module = self.constructor(*self.constructor_args)
         input = self._get_input()
 
         if self.reference_fn is not None:
@@ -4037,12 +4033,8 @@ class ModuleTest(TestBase):
             type_map = {'torch.DoubleTensor': torch.cuda.FloatTensor}
             gpu_input = to_gpu(cpu_input, type_map=type_map)
 
-            if isinstance(self.constructor_args, tuple):
-                cpu_module = self.constructor(*self.constructor_args)
-                gpu_module = self.constructor(*self.constructor_args).float().cuda()
-            elif isinstance(self.constructor_args, dict):
-                cpu_module = self.constructor(**self.constructor_args)
-                gpu_module = self.constructor(**self.constructor_args).float().cuda()
+            cpu_module = self.constructor(*self.constructor_args)
+            gpu_module = self.constructor(*self.constructor_args).float().cuda()
             
             cpu_param = test_case._get_parameters(cpu_module)
             gpu_param = test_case._get_parameters(gpu_module)
@@ -4131,10 +4123,7 @@ class CriterionTest(TestBase):
         return self._get_arg('target', True)
 
     def __call__(self, test_case):
-        if isinstance(self.constructor_args, tuple):
-            module = self.constructor(*self.constructor_args)
-        elif isinstance(self.constructor_args, dict):
-            module = self.constructor(**self.constructor_args)
+        module = self.constructor(*self.constructor_args)
         input = self._get_input()
 
         # Check that these methods don't raise errors
@@ -4168,12 +4157,8 @@ class CriterionTest(TestBase):
             cpu_target = self._get_target()
             gpu_target = to_gpu(cpu_target, type_map=type_map)
 
-            if isinstance(self.constructor_args, tuple):
-                cpu_module = self.constructor(*self.constructor_args)
-                gpu_module = self.constructor(*self.constructor_args).float().cuda()
-            elif isinstance(self.constructor_args, dict):
-                cpu_module = self.constructor(**self.constructor_args)
-                gpu_module = self.constructor(**self.constructor_args).float().cuda()
+            cpu_module = self.constructor(*self.constructor_args)
+            gpu_module = self.constructor(*self.constructor_args).float().cuda()
 
             cpu_output = test_case._forward_criterion(cpu_module, cpu_input, cpu_target)
             gpu_output = test_case._forward_criterion(gpu_module, gpu_input, gpu_target)
@@ -4229,10 +4214,7 @@ class NewModuleTest(InputVariableMixin, ModuleTest):
             # check if the inplace variant of the module gives the same result
             # as the out-of-place
 
-            if isinstance(self.constructor_args, tuple):
-                module_ip = self.constructor(*self.constructor_args, inplace=True)
-            elif isinstance(self.constructor_args, dict):
-                module_ip = self.constructor(**self.constructor_args, inplace=True)
+            module_ip = self.constructor(*self.constructor_args, inplace=True)
 
             input_version = input._version
             with freeze_rng_state():
@@ -4369,9 +4351,6 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
         self.check_half = kwargs.get('check_half', True)
         self.check_bfloat16 = kwargs.get('check_bfloat16', False)
         self.convert_target = kwargs.get('convert_target', True)
-        self.is_functional = kwargs.get('functional_name', False)  # yf225 TODO: remove this nonsense
-        self.constructor_args_is_tuple = isinstance(self.constructor_args, tuple)
-        assert self.constructor_args_is_tuple or isinstance(self.constructor_args, dict)
 
     def _do_extra_tests(self, test_case, module, input, target):
         if not self.check_gradgrad:
@@ -4412,15 +4391,9 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
         try:
             cpu_input = self._get_input()
             cpu_target = self._get_target()
-            if isinstance(self.constructor_args, tuple):
-                cpu_module = self.constructor(*self.constructor_args)
-                gpu_module = self.constructor(*self.constructor_args)
-            elif isinstance(self.constructor_args, dict):
-                cpu_module = self.constructor(**self.constructor_args)
-                gpu_module = self.constructor(**self.constructor_args)
-            if self.is_functional:
-                print(inspect.getsource(self.constructor()))
-
+            cpu_module = self.constructor(*self.constructor_args)
+            gpu_module = self.constructor(*self.constructor_args)
+            
             # Convert input, target and module parameters to dtype
             if dtype is not None:
                 cpu_input = convert_dtype(cpu_input, dtype, True)
@@ -4440,22 +4413,15 @@ class NewCriterionTest(InputVariableMixin, CriterionTest):
                 cpu_input = self._get_input()
                 cpu_target = self._get_target()
                 # Loss modules with weights require consistent input/module weight types
-                if isinstance(self.constructor_args, tuple):
-                    cpu_module = self.constructor(*self.constructor_args)
-                elif isinstance(self.constructor_args, dict):
-                    cpu_module = self.constructor(**self.constructor_args)
+                cpu_module = self.constructor(*self.constructor_args)
 
             cpu_output = test_case._forward_criterion(cpu_module, cpu_input, cpu_target, extra_args=extra_args)
             gpu_output = test_case._forward_criterion(gpu_module, gpu_input, gpu_target, extra_args=extra_args)
             # dtype can be None, so set precision in this way instead of a precision map
             test_case.assertEqual(cpu_output, gpu_output, 1e-1 if dtype in {torch.half, torch.bfloat16} else 4e-4)
 
-            if self.is_functional:
-                gradOutput = torch.randn(cpu_output.shape)
-            else:
-                gradOutput = torch.randn(())
-            cpu_gradInput = test_case._backward_criterion(cpu_module, cpu_input, cpu_target, gradOutput, extra_args=extra_args)
-            gpu_gradInput = test_case._backward_criterion(gpu_module, gpu_input, gpu_target, gradOutput, extra_args=extra_args)
+            cpu_gradInput = test_case._backward_criterion(cpu_module, cpu_input, cpu_target, extra_args=extra_args)
+            gpu_gradInput = test_case._backward_criterion(gpu_module, gpu_input, gpu_target, extra_args=extra_args)
             test_case.assertEqual(cpu_gradInput, gpu_gradInput, 1e-1 if dtype in {torch.half, torch.bfloat16} else 4e-4)
         except NotImplementedError:
             pass
