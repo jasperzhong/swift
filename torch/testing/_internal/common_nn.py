@@ -3167,7 +3167,7 @@ for padding_mode, cpp_padding_mode in zip(
                 constructor_args=(3, 4, 3, 2, 2, 1, 1, True, padding_mode),
                 cpp_constructor_args='torch::nn::Conv{}dOptions(3, 4, 3).stride(2).padding(2).dilation(1).groups(1).bias(true).padding_mode({})'.format(d, cpp_padding_mode),
                 input_size=(2, 3) + (3,) * d,
-                        output_size=(2, 4) + (3,) * d,
+                output_size=(2, 4) + (3,) * d,
                 cudnn=True,
                 desc='{}_stride2_pad2'.format(padding_mode),
             ),
