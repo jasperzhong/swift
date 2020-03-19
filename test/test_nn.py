@@ -10797,7 +10797,7 @@ def load_tests(loader, tests, pattern):
     test_suite = unittest.TestSuite()
     for test_group in tests:
         for test in test_group:
-            test_name = test.split(' ')[0]
+            test_name = str(test).split(' ')[0]
             if test_name in allowed_tests:
                 test_suite.addTest(test)
     return test_suite
