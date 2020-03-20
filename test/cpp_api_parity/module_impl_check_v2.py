@@ -15,6 +15,7 @@ from cpp_api_parity import torch_nn_modules
 # Step 2: Construct a C++ layer, run forward and backward on it, save all its params/buffers/gradients into a ScriptModule
 # Step 3: Load that ScriptModule into Python, and compare output/params/buffers/gradients with Python layer (forward and backward)
 
+# NN tests use double as the default dtype
 torch.set_default_dtype(torch.double)
 
 # yf225 TODO: move to common utils?
@@ -299,13 +300,15 @@ def add_test(unit_test_class, test_name, test_fn):
     raise RuntimeError("Found two tests with the same name: " + test_name)
   setattr(unit_test_class, test_name, test_fn)
 
-def set_cpp_tensors_requires_grad(cpp_tensors):
+def set_cpp_tensors_requires_grad(cpp_tensor_stmts, cpp_tensors):
   # yf225 TODO: we need a flag to decide whether to set requires grad (e.g. it doesn't work for long tensors)
-  return ['{}.requires_grad_(true)'.format(tensor) for tensor in cpp_tensors]
+  assert len(cpp_tensor_stmts) == len(cpp_tensors)
+  return ['{}.requires_grad_(true)'.format(tensor_stmt) if tensor.dtype != torch.long else tensor_stmt \
+    for tensor_stmt, tensor in zip(cpp_tensor_stmts, cpp_tensors)]
 
 # yf225 TODO: move to common utils
-def move_cpp_tensors_to_device(cpp_tensors, device):
-  return ['{}.to("{}")'.format(tensor, device) for tensor in cpp_tensors]
+def move_cpp_tensors_to_device(cpp_tensor_stmts, device):
+  return ['{}.to("{}")'.format(tensor_stmt, device) for tensor_stmt in cpp_tensor_stmts]
 
 def is_criterion_test(test_instance):
   return isinstance(test_instance, common_nn.CriterionTest) or \
@@ -387,7 +390,7 @@ def generate_test_cpp_sources(test_params, template):
       cpp_forward_args_symbols.append(arg_name)
     return args_stmts
 
-  cpp_forward_input_args_stmts = move_cpp_tensors_to_device(set_cpp_tensors_requires_grad(add_cpp_forward_args(test_params.arg_dict['input'])), device)
+  cpp_forward_input_args_stmts = move_cpp_tensors_to_device(set_cpp_tensors_requires_grad(add_cpp_forward_args(test_params.arg_dict['input']), test_params.arg_dict['input']), device)
   cpp_forward_target_args_stmts = move_cpp_tensors_to_device(add_cpp_forward_args(test_params.arg_dict['target']), device)
   cpp_forward_extra_args_stmts = move_cpp_tensors_to_device(add_cpp_forward_args(test_params.arg_dict['extra_args']), device)
 
