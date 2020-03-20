@@ -66,7 +66,7 @@ module_tests = [
         constructor_args=(2., 1.),
         cpp_constructor_args='torch::nn::ThresholdOptions(2., 1.)',
         input_size=(2, 3, 4, 5),
-        check_inplace=True,
+        check_inplace=True, # yf225 TODO: we need to make `check_inplace` work as well!!
         desc='threshold_value'
     ),
     dict(

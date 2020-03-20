@@ -16,7 +16,7 @@ from cpp_api_parity import module_impl_check_v2 as module_impl_check
 
 # yf225 TODO: need to add proper checks and expectations when people:
 # 1. Add a new test to a module already supported by C++ API (i.e. parity table has entry for it, and the parity bit is yes)
-#   a) add a flag `skip_cpp_parity_test` to the dict to be able to turn off test as needed
+#   a) add a flag `test_cpp_api_parity` to the dict to be able to turn off test as needed
 # 2. Add a new test for a module that is not supported by C++ API yet
 
 # yf225 TODO: our new parity test mechanism is changing the way people write common_nn test dicts a lot...
@@ -81,7 +81,7 @@ def bceloss_weights_no_reduce_scalar_test():
         cpp_arg_symbol_map={'i': 'input', 't': t, 'weights': weights},
         reference_fn=lambda i, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
         pickle=False,
-        skip_cpp_parity_test=False, # yf225 TODO: this is an optional flag
+        test_cpp_api_parity=False, # yf225 TODO: this is an optional flag
     )
 
 def interpolate_nearest_tuple_1d():

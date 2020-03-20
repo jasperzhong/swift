@@ -15,6 +15,7 @@ namespace functional {
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 namespace detail {
+// yf225 TODO: should this take `Tensor input` instead? (same for all other functions that has `inplace` bool)
 inline Tensor elu(Tensor& input, double alpha, bool inplace) {
   if (inplace) {
     return torch::elu_(input, alpha);

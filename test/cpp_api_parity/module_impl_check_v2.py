@@ -77,6 +77,7 @@ void ${module_variant_name}_test_forward_backward() {
   module->to(std::string("${device}"));
 
   // Forward pass
+  torch::manual_seed(0);
   auto cpp_output = module(${cpp_forward_args_symbols});
 
   // Save the output into a file to be compared in Python later
@@ -137,6 +138,7 @@ def run_python_forward_backward(unit_test_class, test_params):
   inputs = inputs + [arg_value for _, arg_value in test_params.arg_dict['extra_args']]
   inputs = move_python_tensors_to_device(inputs, device)
 
+  torch.manual_seed(0)
   python_output = module(*inputs)
 
   state_dict_module = torch.nn.Module()
