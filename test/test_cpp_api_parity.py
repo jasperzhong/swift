@@ -85,7 +85,7 @@ def bceloss_weights_no_reduce_scalar_test():
     )
 
 def interpolate_nearest_tuple_1d():
-    dict(
+    return dict(
         constructor=wrap_functional(F.interpolate, size=(12, ), scale_factor=None, mode='nearest'),
         cpp_options_arg='F::InterpolateFuncOptions().size(std::vector<int64_t>({12})).scale_factor(c10::nullopt).mode(torch::kNearest)',
         input_size=(1, 2, 3),
