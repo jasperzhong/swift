@@ -237,9 +237,9 @@ def _process_test_params_for_module(test_params_dict, module_metadata, device, t
       for i, arg in enumerate(args):
         cpp_arg_dict[arg_type].append(CppArg(name=arg_type_prefix+str(i), value=arg))
 
-    put_args_into_cpp_arg_dict('input', 'i', convert_to_list(test_params.test_instance._get_input()))
-    put_args_into_cpp_arg_dict('target', 't', convert_to_list(test_params.test_instance._get_target()))
-    put_args_into_cpp_arg_dict('extra_args', 'e', convert_to_list(test_params.test_instance.extra_args))
+    put_args_into_cpp_arg_dict('input', 'i', convert_to_list(test._get_input()))
+    put_args_into_cpp_arg_dict('target', 't', convert_to_list(test._get_target()))
+    put_args_into_cpp_arg_dict('extra_args', 'e', convert_to_list(test.extra_args))
 
     return cpp_arg_dict
 
