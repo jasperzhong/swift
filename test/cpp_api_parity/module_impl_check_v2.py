@@ -342,6 +342,7 @@ def add_torch_nn_module_impl_parity_tests(parity_table, unit_test_class, test_pa
 
       if device == 'cuda':
         test_fn = unittest.skipIf(not TEST_CUDA, "CUDA unavailable")(test_fn)
+        test_fn = unittest.skipIf(not test_params_dict.get('test_cuda', True), "Excluded from CUDA tests")(test_fn)
 
       # If `Implementation Parity` entry in parity table for this module is `No`,
       # we mark the test as expected failure.
