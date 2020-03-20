@@ -305,6 +305,7 @@ def generate_test_cpp_sources(test_params, template):
 
   # Build the list of arguments needed for module construction
   cpp_args_stmts = []
+  print(test_params.cpp_arg_symbol_map)
   for arg_name, arg_value in test_params.cpp_arg_symbol_map.items():
     if isinstance(arg_value, str):
       if arg_value == 'input':
