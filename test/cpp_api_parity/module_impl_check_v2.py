@@ -35,6 +35,7 @@ void write_ivalue_to_file(const torch::IValue& ivalue, const std::string& file_p
 c10::Dict<torch::IValue, torch::IValue> load_file_to_dict(const std::string& file_path) {
   std::ifstream fin(file_path, std::ios::in | std::ios::binary);
   std::vector<char> bytes((std::istreambuf_iterator<char>(fin)), std::istreambuf_iterator<char>());
+  fin.close();
   return torch::pickle_load(bytes).to<c10::Dict<torch::IValue, torch::IValue>>();
 }
 
