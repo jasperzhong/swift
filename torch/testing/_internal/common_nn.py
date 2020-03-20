@@ -43,7 +43,7 @@ def get_weight(m):
     result = getattr(m, 'weight', None)
     if result is not None:
         return result
-    return getattr(m, 'weights', None)
+    return getattr(m, 'weights': None)
 
 module_tests = [
     dict(
@@ -368,7 +368,7 @@ def bceloss_weights_no_reduce_scalar_test():
             lambda i: F.binary_cross_entropy(i, t.type_as(i),
                                              weight=weights.type_as(i), reduction='none')),
         cpp_constructor='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)' % 'torch::rand({}).to(i0.options()))',
-        cpp_arg_symbol_map={'i': 'input', 't': t, 'weights', weights},
+        cpp_arg_symbol_map={'i': 'input', 't': t, 'weights': weights},
         input_fn=lambda: torch.rand(()).clamp_(2.8e-2, 1 - 2.8e-2),
         reference_fn=lambda i, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
         pickle=False
@@ -868,7 +868,7 @@ def multilabelsoftmarginloss_weights_no_reduce_test():
                                                     weight=weights.type_as(i), reduction='none')),
         cpp_constructor='F::multilabel_soft_margin_loss(i, t.to(i.options()), F::MultiLabelSoftMarginLossFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)',
         input_fn=lambda: torch.randn(5, 10),
-        cpp_arg_symbol_map={'i': 'input', 't': t, 'weights', weights},
+        cpp_arg_symbol_map={'i': 'input', 't': t, 'weights': weights},
         reference_fn=lambda i, *_:
             (-(t * i.sigmoid().log() + (1 - t) * (-i).sigmoid().log()) * weights).sum(dim=1) / i.size(1),
         check_sum_reduction=True,
