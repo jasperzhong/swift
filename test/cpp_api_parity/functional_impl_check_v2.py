@@ -188,7 +188,7 @@ def compute_functional_name(test_params_dict):
   else:
     raise RuntimeError(
       "`cpp_options_arg` or `cpp_function_call` entry must be present in test params dict: {}".format(
-        test_params_dict)
+        test_params_dict))
 
 def compute_cpp_function_call(test_params_dict, arg_dict, functional_name):
   if 'cpp_function_call' in test_params_dict:
