@@ -124,7 +124,7 @@ def BCELoss_test():
             (i.numel() if get_reduction(m) else 1),
         check_gradgrad=False,
         check_bfloat16=False,
-    ),
+    )
 
 # Functional
 # new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
