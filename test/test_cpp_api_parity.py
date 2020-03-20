@@ -104,7 +104,7 @@ def interpolate_nearest_tuple_1d():
     )
 
 def fractional_max_pool2d_test():
-    random_samples = torch.DoubleTensor(1, 3, 2).uniform_()
+    random_samples = torch.empty(1, 3, 2).uniform_()
     return dict(
         constructor=lambda: torch.nn.FractionalMaxPool2d(
             2, output_ratio=0.5, _random_samples=random_samples),
