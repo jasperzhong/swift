@@ -151,7 +151,7 @@ def run_python_forward_backward(unit_test_class, test_params):
   torch.manual_seed(0)
   python_output = module(*inputs)
 
-  module.forward = types.MethodType(lambda self: return torch.tensor(0), module)
+  module.forward = types.MethodType(lambda self: torch.tensor(0), module)
   script_module = torch.jit.script(module)
 
   # state_dict_module = torch.nn.Module()
