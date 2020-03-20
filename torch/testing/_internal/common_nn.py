@@ -602,7 +602,7 @@ def nllloss_no_reduce_weights_ignore_index_neg_test():
         fullname='NLLLoss_no_reduce_weights_ignore_index_neg',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs(i))),
-        cpp_function_call='F::nll_loss(i, t.to(i.options()).to(torch::kLong), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone).ignore_index(-1)',
+        cpp_function_call='F::nll_loss(i, t.to(i.options()).to(torch::kLong), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone).ignore_index(-1))',
         input=torch.rand(15, 10).add(1e-2).log(),
         cpp_arg_symbol_map={'i': 'input', 't': t, 'weight': weight},
         reference_fn=lambda i, *_:
