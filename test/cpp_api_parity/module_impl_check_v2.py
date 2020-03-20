@@ -136,7 +136,7 @@ def run_python_forward_backward(unit_test_class, test_params):
   inputs = move_python_tensors_to_device(inputs, device)
 
   python_output = module(*inputs)
-  traced_script_module = torch.jit.trace(module, inputs)
+  script_module = torch.jit.trace(module, inputs)
 
   python_output.sum().backward()
   # Put all gradients into a dict, to be compared later
@@ -147,13 +147,13 @@ def run_python_forward_backward(unit_test_class, test_params):
       grad = grad.to_dense()
     python_grad_dict[name + "_grad"] = grad
 
-  return traced_script_module, python_output, python_grad_dict
+  return script_module, python_output, python_grad_dict
 
 def test_forward_backward(unit_test_class, test_params):
   module_variant_name = test_params.module_variant_name
 
   # Run forward and backward on Python module
-  traced_script_module, python_output, python_grad_dict = run_python_forward_backward(unit_test_class, test_params)
+  script_module, python_output, python_grad_dict = run_python_forward_backward(unit_test_class, test_params)
 
   # Save Python module and arguments to be used from C++ test
   script_module.save("{}/{}_module.pt".format(test_params.cpp_tmp_folder, module_variant_name))
