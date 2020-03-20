@@ -116,19 +116,19 @@ def BCELoss_test():
         check_bfloat16=False,
     )
 
-module_tests = common_nn.module_tests
-new_module_tests = common_nn.new_module_tests
-criterion_tests = common_nn.criterion_tests
-new_criterion_tests = common_nn.new_criterion_tests
+# module_tests = common_nn.module_tests
+# new_module_tests = common_nn.new_module_tests
+# criterion_tests = common_nn.criterion_tests
+# new_criterion_tests = common_nn.new_criterion_tests
 
-# module_tests = []
-# new_module_tests = []
-# criterion_tests = []
-# new_criterion_tests = []
+module_tests = []
+new_module_tests = []
+criterion_tests = []
+new_criterion_tests = []
 
 # Functional
-# new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
-# new_module_tests.append(interpolate_nearest_tuple_1d())
+new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
+new_module_tests.append(interpolate_nearest_tuple_1d())
 
 # Module
 # new_module_tests.append(fractional_max_pool2d_test())
@@ -141,10 +141,10 @@ for test_params_dicts, test_instance_class in [
   (new_criterion_tests, common_nn.NewCriterionTest),
 ]:
   module_impl_check.add_tests(TestCppApiParity, test_params_dicts, test_instance_class, parity_table)
-  # functional_impl_check.add_tests(TestCppApiParity, test_params_dicts, test_instance_class, parity_table)
+  functional_impl_check.add_tests(TestCppApiParity, test_params_dicts, test_instance_class, parity_table)
 
 module_impl_check.build_cpp_tests(TestCppApiParity)
-# functional_impl_check.build_cpp_tests(TestCppApiParity)
+functional_impl_check.build_cpp_tests(TestCppApiParity)
 
 if __name__ == "__main__":
   common.run_tests()
