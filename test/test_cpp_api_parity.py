@@ -112,7 +112,7 @@ def fractional_max_pool2d_test():
         input_size=(1, 3, 5, 7),
         # RHS value format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
         # NOTE: any var symbol written in the cpp_* fields needs to have a mapping here!
-        cpp_arg_symbol_map={'random_samples', random_samples},
+        cpp_arg_symbol_map={'random_samples': random_samples},
         fullname='FractionalMaxPool2d_ratio')
 
 # Functional
