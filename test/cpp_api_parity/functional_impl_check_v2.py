@@ -361,7 +361,7 @@ def build_cpp_tests(unit_test_class):
         cpp_sources += torch_nn_functionals.functional_metadata_map.get(test_params.functional_name, torch_nn_functionals.TorchNNFunctionalMetadata()).cpp_sources
         functionals_added_metadata_cpp_sources.add(test_params.functional_name)
       cpp_sources += generate_test_cpp_sources(test_params=test_params, template=TORCH_NN_FUNCTIONAL_TEST_FORWARD)
-      functions.append('{}_{}'.format(test_params.functional_variant_name, 'test'))
+      functions.append('{}_{}'.format(test_params.functional_variant_name, 'test_forward'))
     print(cpp_sources)  # yf225 TODO: remove this when ready
 
     cpp_module = compile_cpp_code_inline(
