@@ -350,7 +350,7 @@ def bceloss_weights_no_reduce_test():
         constructor=wrap_functional(
             lambda i: F.binary_cross_entropy(i, t.type_as(i),
                                              weight=weights.type_as(i), reduction='none')),
-        cpp_function_call='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)',
+        cpp_function_call='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone))',
         input_fn=lambda: torch.rand(15, 10).clamp_(2.8e-2, 1 - 2.8e-2),
         cpp_arg_symbol_map={'i': 'input', 't': t, 'weights': weights},
         reference_fn=lambda i, p, m: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
@@ -367,7 +367,7 @@ def bceloss_weights_no_reduce_scalar_test():
         constructor=wrap_functional(
             lambda i: F.binary_cross_entropy(i, t.type_as(i),
                                              weight=weights.type_as(i), reduction='none')),
-        cpp_function_call='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)',
+        cpp_function_call='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone))',
         cpp_arg_symbol_map={'i': 'input', 't': t, 'weights': weights},
         input_fn=lambda: torch.rand(()).clamp_(2.8e-2, 1 - 2.8e-2),
         reference_fn=lambda i, *_: -(t * i.log() + (1 - t) * (1 - i).log()) * weights,
@@ -561,7 +561,7 @@ def nllloss_no_reduce_weights_test():
         fullname='NLLLoss_no_reduce_weights',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs(i))),
-        cpp_function_call='F::nll_loss(i, t.to(i.options()).long(), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone)',
+        cpp_function_call='F::nll_loss(i, t.to(i.options()).long(), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone))',
         input_fn=lambda: torch.rand(15, 10).add(1e-2).log(),
         cpp_arg_symbol_map={'i': 'input', 't': t, 'weight': weight},
         reference_fn=lambda i, *_:
@@ -650,7 +650,7 @@ def nllloss2d_no_reduce_weights_test():
         fullname='NLLLoss2d_no_reduce_weights',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs(i))),
-        cpp_function_call='F::nll_loss(i, t.to(i.options()).long(), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone)',
+        cpp_function_call='F::nll_loss(i, t.to(i.options()).long(), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone))',
         input_fn=lambda: torch.rand(2, 3, 5, 5).log(),
         cpp_arg_symbol_map={'i': 'input', 't': t, 'weight': weight},
         reference_fn=lambda i, *_:
@@ -699,7 +699,7 @@ def nlllossNd_no_reduce_weights_test():
         fullname='NLLLossNd_no_reduce_weights',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs(i))),
-        cpp_function_call='F::nll_loss(i, t.to(i.options()).long(), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone)',
+        cpp_function_call='F::nll_loss(i, t.to(i.options()).long(), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone))',
         input_fn=lambda: torch.rand(2, 3, 5, 5, 2, 2).log(),
         cpp_arg_symbol_map={'i': 'input', 't': t, 'weight': weight},
         reference_fn=lambda i, *_:
@@ -866,7 +866,7 @@ def multilabelsoftmarginloss_weights_no_reduce_test():
         constructor=wrap_functional(
             lambda i: F.multilabel_soft_margin_loss(i, t.type_as(i),
                                                     weight=weights.type_as(i), reduction='none')),
-        cpp_function_call='F::multilabel_soft_margin_loss(i, t.to(i.options()), F::MultiLabelSoftMarginLossFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)',
+        cpp_function_call='F::multilabel_soft_margin_loss(i, t.to(i.options()), F::MultiLabelSoftMarginLossFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone))',
         input_fn=lambda: torch.randn(5, 10),
         cpp_arg_symbol_map={'i': 'input', 't': t, 'weights': weights},
         reference_fn=lambda i, *_:
