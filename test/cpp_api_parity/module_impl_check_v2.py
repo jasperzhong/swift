@@ -32,6 +32,12 @@ void write_ivalue_to_file(const torch::IValue& ivalue, const std::string& file_p
   fout.close();
 }
 
+c10::Dict<std::string, torch::Tensor> load_file_to_dict(const std::string& file_path) {
+  std::ifstream fin(file_path, std::ios::in | std::ios::binary);
+  std::vector<char> bytes((std::istreambuf_iterator<char>(fin)), std::istreambuf_iterator<char>());
+  return torch::pickle_load(bytes).to<c10::Dict<std::string, torch::Tensor>>();
+}
+
 // Generates rand tensor with non-equal values. This ensures that duplicate
 // values won't be causing test failure for modules like MaxPooling.
 // size should be small, otherwise randperm fails / long overflows.
@@ -60,8 +66,8 @@ void ${module_variant_name}_test_forward_backward() {
   pybind11::gil_scoped_release no_gil;
 
   // Declare arguments
-  auto arg_dict = load_ivalue_to_dict("${cpp_tmp_folder}/${module_variant_name}_arg_dict.pt");
-  ${cpp_args_construction_stmts}
+  auto arg_dict = load_file_to_dict("${cpp_tmp_folder}/${module_variant_name}_arg_dict.pt");
+  ${cpp_args_construction_stmts};
 
   // Construct module and load params/buffers from Python module
   ${module_qualified_name} module${cpp_constructor_args};
@@ -151,7 +157,15 @@ def test_forward_backward(unit_test_class, test_params):
 
   # Save Python module and arguments to be used from C++ test
   script_module.save("{}/{}_module.pt".format(test_params.cpp_tmp_folder, module_variant_name))
-  torch.save(test_params.arg_dict, "{}/{}_arg_dict.pt".format(test_params.cpp_tmp_folder, module_variant_name))
+  arg_dict_flat = {
+    arg_name: arg_value \
+      for arg_name, arg_value in \
+        test_params.arg_dict['input'] + \
+        test_params.arg_dict['target'] + \
+        test_params.arg_dict['extra_args'] + \
+        test_params.arg_dict['other']
+  }
+  torch.save(arg_dict_flat, "{}/{}_arg_dict.pt".format(test_params.cpp_tmp_folder, module_variant_name))
 
   cpp_test_name = '{}_{}'.format(test_params.module_variant_name, 'test_forward_backward')
   cpp_test_fn = getattr(unit_test_class.module_impl_check_cpp_module, cpp_test_name)
