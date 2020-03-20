@@ -42,17 +42,6 @@ c10::Dict<std::string, torch::Tensor> load_dict_from_file(const std::string& fil
   }
   return arg_dict;
 }
-
-// Generates rand tensor with non-equal values. This ensures that duplicate
-// values won't be causing test failure for modules like MaxPooling.
-// size should be small, otherwise randperm fails / long overflows.
-torch::Tensor _rand_tensor_non_equal(torch::IntArrayRef size) {
-  int64_t total = 1;
-  for (int64_t elem : size) {
-    total *= elem;
-  }
-  return torch::randperm(total).view(size).to(torch::kDouble);
-}
 """
 
 '''
@@ -203,7 +192,7 @@ def compute_cpp_function_call(test_params_dict, arg_dict, functional_name):
 
 
 # yf225 TODO: move to common utils?
-def process_test_params_for_module(test_params_dict, functional_metadata, device, test_instance_class):
+def process_test_params_for_functional(test_params_dict, functional_metadata, device, test_instance_class):
   test = test_instance_class(**test_params_dict)
   # yf225 TODO: can we remove the magic number `5` here?
   functional_name = compute_functional_name(test_params_dict)
