@@ -20,6 +20,7 @@ TorchNNFunctionalTestParams = namedtuple(
         'functional_variant_name',
         'test_instance',
         'cpp_constructor',
+        'cpp_constructor_args',
         'cpp_arg_symbol_map',
         'has_parity',
         'device',
