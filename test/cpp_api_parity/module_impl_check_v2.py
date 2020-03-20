@@ -359,7 +359,7 @@ def generate_test_cpp_sources(test_params, template):
   def add_cpp_forward_args(args):
     args_stmts = []
     for arg_name, _ in args:
-      args_stmts.append('auto {} = arg_dict_module->get_buffer("{}")'.format(arg_name, arg_name))
+      args_stmts.append('auto {} = arg_dict_module->namd_buffers()["{}"]'.format(arg_name, arg_name))
       cpp_forward_args_symbols.append(arg_name)
     return args_stmts
 
@@ -370,7 +370,7 @@ def generate_test_cpp_sources(test_params, template):
   # Build the list of other arguments needed
   cpp_other_args_stmts = []
   for arg_name, _ in test_params.arg_dict['other']:
-    cpp_other_args_stmts.append('auto {} = arg_dict_module->get_buffer("{}")'.format(arg_name, arg_name))
+    cpp_other_args_stmts.append('auto {} = arg_dict_module->namd_buffers()["{}"]'.format(arg_name, arg_name))
   cpp_other_args_stmts = move_cpp_tensors_to_device(cpp_other_args_stmts, device)
   
   cpp_args_construction_stmts = cpp_forward_input_args_stmts + cpp_forward_target_args_stmts + cpp_forward_extra_args_stmts + cpp_other_args_stmts
