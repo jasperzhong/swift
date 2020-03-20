@@ -248,7 +248,7 @@ def _process_test_params_for_module(test_params_dict, module_metadata, device, t
     module_variant_name=module_variant_name,
     test_instance=test,
     cpp_constructor_args=test_params_dict.get('cpp_constructor_args', ''),
-    arg_dict=compute_arg_dict(),
+    arg_dict=arg_dict,
     has_parity=test_params_dict.get('has_parity', True),
     device=device,
     cpp_tmp_folder=tempfile.mkdtemp(),
