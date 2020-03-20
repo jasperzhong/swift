@@ -32,10 +32,10 @@ void write_ivalue_to_file(const torch::IValue& ivalue, const std::string& file_p
   fout.close();
 }
 
-c10::Dict<std::string, torch::Tensor> load_file_to_dict(const std::string& file_path) {
+c10::Dict<torch::IValue, torch::IValue> load_file_to_dict(const std::string& file_path) {
   std::ifstream fin(file_path, std::ios::in | std::ios::binary);
   std::vector<char> bytes((std::istreambuf_iterator<char>(fin)), std::istreambuf_iterator<char>());
-  return torch::pickle_load(bytes).to<c10::Dict<std::string, torch::Tensor>>();
+  return torch::pickle_load(bytes).to<c10::Dict<torch::IValue, torch::IValue>>();
 }
 
 // Generates rand tensor with non-equal values. This ensures that duplicate
@@ -361,7 +361,7 @@ def generate_test_cpp_sources(test_params, template):
   def add_cpp_forward_args(args):
     args_stmts = []
     for arg_name, _ in args:
-      args_stmts.append('auto {} = arg_dict.at("{}")'.format(arg_name, arg_name))
+      args_stmts.append('auto {} = arg_dict.at(torch::IValue("{}")).toTensor()'.format(arg_name, arg_name))
       cpp_forward_args_symbols.append(arg_name)
     return args_stmts
 
@@ -372,7 +372,7 @@ def generate_test_cpp_sources(test_params, template):
   # Build the list of other arguments needed
   cpp_other_args_stmts = []
   for arg_name, _ in test_params.arg_dict['other']:
-    cpp_other_args_stmts.append('auto {} = arg_dict.at("{}")'.format(arg_name, arg_name))
+    cpp_other_args_stmts.append('auto {} = arg_dict.at(torch::IValue("{}")).toTensor()'.format(arg_name, arg_name))
   cpp_other_args_stmts = move_cpp_tensors_to_device(cpp_other_args_stmts, device)
   
   cpp_args_construction_stmts = cpp_forward_input_args_stmts + cpp_forward_target_args_stmts + cpp_forward_extra_args_stmts + cpp_other_args_stmts
