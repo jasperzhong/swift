@@ -36,10 +36,15 @@ parity_table_path = os.path.join(os.path.dirname(__file__), 'cpp_api_parity/pari
 
 parity_table = parse_parity_tracker_table(parity_table_path)
 
-module_tests = common_nn.module_tests
-new_module_tests = common_nn.new_module_tests
-criterion_tests = common_nn.criterion_tests
-new_criterion_tests = common_nn.new_criterion_tests
+# module_tests = common_nn.module_tests
+# new_module_tests = common_nn.new_module_tests
+# criterion_tests = common_nn.criterion_tests
+# new_criterion_tests = common_nn.new_criterion_tests
+
+module_tests = []
+new_module_tests = []
+criterion_tests = []
+new_criterion_tests = []
 
 import torch.nn.functional as F
 
@@ -110,12 +115,24 @@ def fractional_max_pool2d_test():
         cpp_arg_symbol_map={'random_samples': random_samples},
         fullname='FractionalMaxPool2d_ratio')
 
+def BCELoss_test():
+    return dict(
+        module_name='BCELoss',
+        input_fn=lambda: torch.rand(15, 10).clamp_(1e-2, 1 - 1e-2),
+        target_fn=lambda: torch.randn(15, 10).gt(0).double(),
+        reference_fn=lambda i, t, m: -(t * i.log() + (1 - t) * (1 - i).log()).sum() /
+            (i.numel() if get_reduction(m) else 1),
+        check_gradgrad=False,
+        check_bfloat16=False,
+    ),
+
 # Functional
 # new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
 # new_module_tests.append(interpolate_nearest_tuple_1d())
 
 # Module
-# new_module_tests.append(fractional_max_pool2d_test())
+new_module_tests.append(fractional_max_pool2d_test())
+criterion_tests.append(BCELoss_test())
 
 for test_params_dicts, test_instance_class in [
   (module_tests, common_nn.ModuleTest),
