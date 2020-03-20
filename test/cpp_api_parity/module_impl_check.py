@@ -332,12 +332,11 @@ def add_torch_nn_module_impl_parity_tests(parity_table, unit_test_class, test_pa
       "or set `module_name` using format `ModuleName`."
 
     module_full_name = 'torch::nn::' + module_name
-    # If equivalent module in C++ frontend doesn't exist, we don't do the parity test.
-    if module_full_name not in parity_table['torch::nn']:
-      continue
+    
+    assert module_full_name in parity_table['torch::nn'], \
+      "Please add `{}` entry to `torch::nn` section of `test/cpp_api_parity/parity-tracker.md`.".format(module_full_name)
 
     has_impl_parity, _ = parity_table['torch::nn'][module_full_name]
-    # yf225 TODO: here we should just skip if there is no parity!!!! don't mark it as expected failure!!!
 
     module_metadata = torch_nn_modules.module_metadata_map[module_name]
     for device in devices:

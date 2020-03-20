@@ -278,12 +278,11 @@ def add_torch_nn_functional_impl_parity_tests(parity_table, unit_test_class, tes
       "`torch.nn.functional` doesn't have function `{}`. ".format(functional_name)
 
     functional_full_name = 'F::' + functional_name
-    # If equivalent functional in C++ frontend doesn't exist, we don't do the parity test.
-    if functional_full_name not in parity_table['torch::nn::functional']:
-      continue
+
+    assert functional_full_name in parity_table['torch::nn::functional'], \
+      "Please add `{}` entry to `torch::nn::functional` section of `test/cpp_api_parity/parity-tracker.md`.".format(functional_full_name)
 
     has_impl_parity, _ = parity_table['torch::nn::functional'][functional_full_name]
-    # yf225 TODO: here we should just skip if there is no parity!!!! don't mark it as expected failure!!!
 
     functional_metadata = torch_nn_functionals.functional_metadata_map.get(functional_name, torch_nn_functionals.TorchNNFunctionalMetadata())
     for device in devices:
