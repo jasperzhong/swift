@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from torch.testing._internal.common_nn import wrap_functional
 
 from cpp_api_parity import torch_nn_functionals
