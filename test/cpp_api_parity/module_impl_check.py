@@ -160,8 +160,8 @@ def run_python_forward_backward(unit_test_class, test_params):
   #   state_dict_submodule = torch.nn.Module()
   #   state_dict_module.add_module(module_name, state_dict_submodule)
 
-  module.forward = types.MethodType(lambda self, *args, **kwargs: torch.tensor(0), module)
-  script_module = torch.jit.trace(module, *inputs)
+  module.forward = types.MethodType(lambda self, input: input, module)
+  script_module = torch.jit.trace(module, torch.tensor(0))
 
   python_output.sum().backward()
   # Put all gradients into a dict, to be compared later
