@@ -200,9 +200,7 @@ def _process_test_params_for_module(test_params_dict, module_metadata, device, t
   test_params_dict['constructor'] = test_params_dict.get('constructor', getattr(torch.nn, module_name))
   test = test_instance_class(**test_params_dict)
   # yf225 TODO: can we remove the magic number `5` here?
-  module_variant_name = test.get_name()[5:] + (('_' + device) if device != 'cpu' else '')    
-  assert "cpp_input_args" in test_params_dict, \
-    "`cpp_input_args` entry must be present in test params dict for {}".format(module_variant_name)
+  module_variant_name = test.get_name()[5:] + (('_' + device) if device != 'cpu' else '')
 
   return TorchNNModuleTestParams(
     module_name=module_name,
