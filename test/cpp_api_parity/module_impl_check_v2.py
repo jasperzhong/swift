@@ -6,7 +6,7 @@ from torch.testing._internal.common_cuda import TEST_CUDA
 
 import torch
 import torch.testing._internal.common_nn as common_nn
-from cpp_api_parity.utils import TorchNNModuleTestParams
+from cpp_api_parity.utils import TorchNNModuleTestParams, CppArg
 from cpp_api_parity import torch_nn_modules
 
 # Check 1: Module implementation correctness check:
@@ -14,6 +14,9 @@ from cpp_api_parity import torch_nn_modules
 # Step 1: Translate ctor args from Python layer to C++ layer
 # Step 2: Construct a C++ layer, run forward and backward on it, save all its params/buffers/gradients into a ScriptModule
 # Step 3: Load that ScriptModule into Python, and compare output/params/buffers/gradients with Python layer (forward and backward)
+
+# yf225 TODO: reply to Omkar on Slack about indexing tutorial!
+
 
 # yf225 TODO: move to common utils?
 devices = ['cpu', 'cuda']
@@ -117,7 +120,7 @@ def set_python_tensors_requires_grad(python_tensors):
 def move_python_tensors_to_device(python_tensors, device):
   return [tensor.to(device) for tensor in python_tensors]
 
-def run_forward_backward(unit_test_class, test_params):
+def run_python_forward_backward(unit_test_class, test_params):
   device = test_params.device
   module = test_params.test_instance.constructor(*test_params.test_instance.constructor_args).to(device)
   inputs = set_python_tensors_requires_grad(convert_to_list(test_params.test_instance._get_input()))
@@ -126,6 +129,7 @@ def run_forward_backward(unit_test_class, test_params):
     inputs = inputs + convert_to_list(test_params.test_instance.extra_args)
   inputs = move_python_tensors_to_device(inputs, device)
   python_output = module(*inputs)
+  traced_script_module = torch.jit.trace(module, inputs)
 
   python_output.sum().backward()
   # Put all gradients into a dict, to be compared later
@@ -136,18 +140,25 @@ def run_forward_backward(unit_test_class, test_params):
       grad = grad.to_dense()
     python_grad_dict[name + "_grad"] = grad
 
-  return python_output, python_grad_dict
+  return traced_script_module, python_output, python_grad_dict
 
 def test_forward_backward(unit_test_class, test_params):
-  python_output, python_grad_dict = run_forward_backward(unit_test_class, test_params)
+  module_variant_name = test_params.module_variant_name
+
+  # Run forward and backward on Python module
+  traced_script_module, python_output, python_grad_dict = run_python_forward_backward(unit_test_class, test_params)
+
+  # Save Python module and arguments to be used from C++ test
+  script_module.save("{}/{}_module.pt".format(test_params.cpp_tmp_folder, module_variant_name))
+  torch.save(test_params.cpp_arg_dict, "{}/{}_arg_dict.pt".format(test_params.cpp_tmp_folder, module_variant_name))
 
   cpp_test_name = '{}_{}'.format(test_params.module_variant_name, 'test_forward_backward')
   cpp_test_fn = getattr(unit_test_class.module_impl_check_cpp_module, cpp_test_name)
 
   def run_cpp_test_fn_and_check_output():
     cpp_test_fn()
-    cpp_output = torch.load("{}/{}_forward_output.pt".format(test_params.cpp_tmp_folder, test_params.module_variant_name))
-    cpp_grad_dict = torch.load("{}/{}_backward_grad_dict.pt".format(test_params.cpp_tmp_folder, test_params.module_variant_name))
+    cpp_output = torch.load("{}/{}_forward_output.pt".format(test_params.cpp_tmp_folder, module_variant_name))
+    cpp_grad_dict = torch.load("{}/{}_backward_grad_dict.pt".format(test_params.cpp_tmp_folder, module_variant_name))
 
     def generate_error_msg(name, cpp_value, python_value):
       return "Parity test failed: {} in C++ has value: {}, which does not match the corresponding value in Python: {}".format(
@@ -202,12 +213,42 @@ def _process_test_params_for_module(test_params_dict, module_metadata, device, t
   # yf225 TODO: can we remove the magic number `5` here?
   module_variant_name = test.get_name()[5:] + (('_' + device) if device != 'cpu' else '')
 
+  cpp_arg_symbol_map = test_params_dict.get('cpp_arg_symbol_map', {})
+
+  def compute_cpp_arg_dict(cpp_arg_symbol_map):
+    cpp_arg_dict = {
+      'input': [],
+      'target': [],
+      'extra_args': [],
+      'other': [],
+    }
+    for arg_name, arg_value in cpp_arg_symbol_map.items():
+      if isinstance(arg_value, str):
+        if arg_value == 'input':
+          cpp_arg_dict['input'].append(CppArg(name=arg_name, value=test._get_input()))
+        else:
+          raise RuntimeError("`{}` has unsupported string value: {}".format(arg_name, arg_value))
+      elif isinstance(arg_value, torch.Tensor):
+        cpp_arg_dict['other'].append(CppArg(name=arg_name, value=arg_value))
+      else:
+        raise RuntimeError("`{}` has unsupported value: {}".format(arg_name, arg_value))
+
+    def put_args_into_cpp_arg_dict(arg_type, arg_type_prefix, args):
+      for i, arg in enumerate(args):
+        cpp_arg_dict[arg_type].append(CppArg(name=arg_type_prefix+str(i), value=arg))
+
+    put_args_into_cpp_arg_dict('input', 'i', convert_to_list(test_params.test_instance._get_input()))
+    put_args_into_cpp_arg_dict('target', 't', convert_to_list(test_params.test_instance._get_target()))
+    put_args_into_cpp_arg_dict('extra_args', 'e', convert_to_list(test_params.test_instance.extra_args))
+
+    return cpp_arg_dict
+
   return TorchNNModuleTestParams(
     module_name=module_name,
     module_variant_name=module_variant_name,
     test_instance=test,
     cpp_constructor_args=test_params_dict.get('cpp_constructor_args', ''),
-    cpp_arg_symbol_map=test_params_dict.get('cpp_arg_symbol_map', {}),
+    cpp_arg_dict=compute_cpp_arg_dict(cpp_arg_symbol_map),
     has_parity=test_params_dict.get('has_parity', True),
     device=device,
     cpp_tmp_folder=tempfile.mkdtemp(),
@@ -300,47 +341,27 @@ def generate_test_cpp_sources(test_params, template):
   if cpp_constructor_args != '':
     cpp_constructor_args = '({})'.format(cpp_constructor_args)
 
-  # Mapping: arg_name -> arg_value
-  cpp_arg_dict = {}
-
-  # Build the list of arguments needed for module construction
-  cpp_args_stmts = []
-  for arg_name, arg_value in test_params.cpp_arg_symbol_map.items():
-    if isinstance(arg_value, str):
-      if arg_value == 'input':
-        cpp_arg_dict[arg_name] = test_params.test_instance._get_input()
-      else:
-        raise RuntimeError("`{}` has unsupported string value: {}".format(arg_name, arg_value))
-    elif isinstance(arg_value, torch.Tensor):
-      cpp_arg_dict[arg_name] = arg_value
-    else:
-      raise RuntimeError("`{}` has unsupported value: {}".format(arg_name, arg_value))
-    cpp_args_stmts.append('auto {} = arg_dict["{}"]'.format(arg_name, arg_name))
-  cpp_args_stmts = move_cpp_tensors_to_device(cpp_args_stmts, device)
-
-  # Build the list of arguments for module forward
-  cpp_forward_input_args = convert_to_list(test_params.test_instance._get_input())
-  cpp_forward_target_args = []
-  cpp_forward_extra_args = []
-  if is_criterion_test(test_params.test_instance):
-    cpp_forward_target_args = convert_to_list(test_params.test_instance._get_target())
-    cpp_forward_extra_args = convert_to_list(test_params.test_instance.extra_args)
-
+  # Build the list of arguments needed for module forward
   cpp_forward_args_symbols = []
 
-  def add_cpp_forward_args(args, arg_type_prefix):
+  def add_cpp_forward_args(args):
     args_stmts = []
-    for i, arg in enumerate(args):
-      cpp_arg_dict[arg_type_prefix+str(i)] = arg
-      args_stmts.append('auto {}{} = arg_dict["{}{}"]'.format(arg_type_prefix, i, arg_type_prefix, i))
-      cpp_forward_args_symbols.append(arg_type_prefix+str(i))
+    for arg_name, _ in args:
+      args_stmts.append('auto {} = arg_dict["{}"]'.format(arg_name, arg_name))
+      cpp_forward_args_symbols.append(arg_name)
     return args_stmts
 
-  cpp_forward_input_args_stmts = move_cpp_tensors_to_device(set_cpp_tensors_requires_grad(add_cpp_forward_args(cpp_forward_input_args, "i")), device)
-  cpp_forward_target_args_stmts = move_cpp_tensors_to_device(add_cpp_forward_args(cpp_forward_target_args, "t"), device)
-  cpp_forward_extra_args_stmts = move_cpp_tensors_to_device(add_cpp_forward_args(cpp_forward_extra_args, "e"), device)
+  cpp_forward_input_args_stmts = move_cpp_tensors_to_device(set_cpp_tensors_requires_grad(add_cpp_forward_args(test_params.cpp_arg_dict['input'])), device)
+  cpp_forward_target_args_stmts = move_cpp_tensors_to_device(add_cpp_forward_args(test_params.cpp_arg_dict['target']), device)
+  cpp_forward_extra_args_stmts = move_cpp_tensors_to_device(add_cpp_forward_args(test_params.cpp_arg_dict['extra_args']), device)
 
-  cpp_args_construction_stmts = cpp_args_stmts + cpp_forward_input_args_stmts + cpp_forward_target_args_stmts + cpp_forward_extra_args_stmts
+  # Build the list of other arguments needed
+  cpp_other_args_stmts = []
+  for arg_name, _ in test_params.cpp_arg_dict['other']:
+    cpp_other_args_stmts.append('auto {} = arg_dict["{}"]'.format(arg_name, arg_name))
+  cpp_other_args_stmts = move_cpp_tensors_to_device(cpp_other_args_stmts, device)
+  
+  cpp_args_construction_stmts = cpp_forward_input_args_stmts + cpp_forward_target_args_stmts + cpp_forward_extra_args_stmts + cpp_other_args_stmts
 
   test_cpp_sources = template.substitute(
     module_variant_name=test_params.module_variant_name,

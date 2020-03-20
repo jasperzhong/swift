@@ -28,4 +28,4 @@ TorchNNFunctionalTestParams = namedtuple(
     ]
 )
 
-CppArg = namedtuple('CppArg', ['type', 'value'])
+CppArg = namedtuple('CppArg', ['name', 'value'])
