@@ -160,7 +160,7 @@ def run_python_forward_backward(unit_test_class, test_params):
   #   state_dict_submodule = torch.nn.Module()
   #   state_dict_module.add_module(module_name, state_dict_submodule)
 
-  module.forward = types.MethodType(lambda self: torch.tensor(0), module)
+  module.forward = types.MethodType(lambda self, *args, **kwargs: torch.tensor(0), module)
   script_module = torch.jit.trace(module, *inputs)
 
   python_output.sum().backward()
