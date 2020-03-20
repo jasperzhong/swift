@@ -3261,9 +3261,9 @@ loss_reference_fns = {
     'CTCLoss': ctcloss_reference,
 }
 
-criterion_weight_rand_zero_dim = torch.rand(())
-criterion_weight_rand_3 = torch.rand(3)
-criterion_weight_rand_10 = torch.rand(10)
+criterion_weight_rand_zero_dim = torch.rand(()).double()
+criterion_weight_rand_3 = torch.rand(3).double()
+criterion_weight_rand_10 = torch.rand(10).double()
 
 criterion_tests = [
     dict(

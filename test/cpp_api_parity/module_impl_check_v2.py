@@ -76,8 +76,12 @@ void ${module_variant_name}_test_forward_backward() {
   torch::load(module, "${cpp_tmp_folder}/${module_variant_name}_module.pt");
   module->to(std::string("${device}"));
 
-  // Forward pass
+  // Some modules (such as `RReLU`) create random tensors in their forward pass.
+  // To make sure the random tensors created are the same in Python/C++, we need
+  // to set the RNG seed manually.
   torch::manual_seed(0);
+
+  // Forward pass
   auto cpp_output = module(${cpp_forward_args_symbols});
 
   // Save the output into a file to be compared in Python later
@@ -138,6 +142,9 @@ def run_python_forward_backward(unit_test_class, test_params):
   inputs = inputs + [arg_value for _, arg_value in test_params.arg_dict['extra_args']]
   inputs = move_python_tensors_to_device(inputs, device)
 
+  # Some modules (such as `RReLU`) create random tensors in their forward pass.
+  # To make sure the random tensors created are the same in Python/C++, we need
+  # to set the RNG seed manually.
   torch.manual_seed(0)
   python_output = module(*inputs)
 
