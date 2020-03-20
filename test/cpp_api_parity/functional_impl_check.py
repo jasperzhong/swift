@@ -275,12 +275,14 @@ def add_torch_nn_functional_impl_parity_tests(parity_table, unit_test_class, tes
     functional_name = compute_functional_name(test_params_dict)
 
     assert hasattr(torch.nn.functional, functional_name), \
-      "`torch.nn.functional` doesn't have function `{}`. ".format(functional_name)
+      "`torch.nn.functional` doesn't have function `{}` (discovered while processing {})".format(
+        functional_name, test_params_dict)
 
     functional_full_name = 'F::' + functional_name
 
     assert functional_full_name in parity_table['torch::nn::functional'], \
-      "Please add `{}` entry to `torch::nn::functional` section of `test/cpp_api_parity/parity-tracker.md`.".format(functional_full_name)
+      "Please add `{}` entry to `torch::nn::functional` section of `test/cpp_api_parity/parity-tracker.md` (discovered while processing {})".format(
+        functional_full_name, test_params_dict)
 
     has_impl_parity, _ = parity_table['torch::nn::functional'][functional_full_name]
 
