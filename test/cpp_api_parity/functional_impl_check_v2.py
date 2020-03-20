@@ -7,7 +7,7 @@ from torch.testing._internal.common_cuda import TEST_CUDA
 import torch
 import torch.testing._internal.common_nn as common_nn
 from cpp_api_parity.utils import TorchNNModuleTestParams, CppArg
-from cpp_api_parity import torch_nn_modules
+from cpp_api_parity import torch_nn_functionals
 
 # yf225 TODO: write better docs here
 
