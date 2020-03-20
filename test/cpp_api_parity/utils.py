@@ -10,7 +10,7 @@ TorchNNModuleTestParams = namedtuple(
         'cpp_arg_symbol_map',
         'has_parity',
         'device',
-        'cpp_output_tmp_folder',
+        'cpp_tmp_folder',
     ]
 )
 
@@ -24,7 +24,7 @@ TorchNNFunctionalTestParams = namedtuple(
         'cpp_arg_symbol_map',
         'has_parity',
         'device',
-        'cpp_output_tmp_folder',
+        'cpp_tmp_folder',
     ]
 )
 
