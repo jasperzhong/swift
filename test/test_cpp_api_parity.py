@@ -37,12 +37,7 @@ parity_table_path = os.path.join(os.path.dirname(__file__), 'cpp_api_parity/pari
 parity_table = parse_parity_tracker_table(parity_table_path)
 
 import torch.nn.functional as F
-
-def wrap_functional(fn, **kwargs):
-    class FunctionalModule(torch.nn.Module):
-        def forward(self, *args):
-            return fn(*args, **kwargs)
-    return FunctionalModule
+from torch.testing._internal.common_nn import wrap_functional
 
 # How to get the functional name from wrap_functional:
 # ```
