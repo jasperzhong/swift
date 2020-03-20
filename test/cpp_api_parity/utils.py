@@ -17,10 +17,10 @@ TorchNNModuleTestParams = namedtuple(
 TorchNNFunctionalTestParams = namedtuple(
     'TorchNNFunctionalTestParams',
     [
+        'functional_name',
         'functional_variant_name',
         'test_instance',
-        'cpp_constructor',
-        'cpp_constructor_args',
+        'cpp_function_call',
         'arg_dict',
         'has_parity',
         'device',

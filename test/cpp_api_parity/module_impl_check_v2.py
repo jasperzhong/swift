@@ -9,7 +9,8 @@ import torch.testing._internal.common_nn as common_nn
 from cpp_api_parity.utils import TorchNNModuleTestParams, CppArg
 from cpp_api_parity import torch_nn_modules
 
-# Check 1: Module implementation correctness check:
+# yf225 TODO: write better docs here
+# Module implementation correctness check:
 
 # Step 1: Translate ctor args from Python layer to C++ layer
 # Step 2: Construct a C++ layer, run forward and backward on it, save all its params/buffers/gradients into a ScriptModule
@@ -22,7 +23,7 @@ torch.set_default_dtype(torch.double)
 devices = ['cpu', 'cuda']
 
 # yf225 TODO: move to common utils?
-TORCH_NN_MODULE_COMMON_TEST_HARNESS = """
+TORCH_NN_COMMON_TEST_HARNESS = """
 #include <torch/script.h>
 
 void write_ivalue_to_file(const torch::IValue& ivalue, const std::string& file_path) {
@@ -32,7 +33,7 @@ void write_ivalue_to_file(const torch::IValue& ivalue, const std::string& file_p
   fout.close();
 }
 
-c10::Dict<std::string, torch::Tensor> load_file_to_dict(const std::string& file_path) {
+c10::Dict<std::string, torch::Tensor> load_dict_from_file(const std::string& file_path) {
   c10::Dict<std::string, torch::Tensor> arg_dict;
   auto arg_dict_module = torch::jit::load(file_path);
   for (const auto& p : arg_dict_module.named_buffers(/*recurse=*/false)) {
@@ -69,7 +70,7 @@ void ${module_variant_name}_test_forward_backward() {
   pybind11::gil_scoped_release no_gil;
 
   // Declare arguments
-  auto arg_dict = load_file_to_dict("${cpp_tmp_folder}/${module_variant_name}_arg_dict.pt");
+  auto arg_dict = load_dict_from_file("${cpp_tmp_folder}/${module_variant_name}_arg_dict.pt");
   ${cpp_args_construction_stmts};
 
   // Construct module and load params/buffers from Python module
@@ -110,7 +111,7 @@ void ${module_variant_name}_test_forward_backward() {
 """)
 
 # yf225 TODO: move to common utils?
-def _compile_cpp_code_inline(name, cpp_sources, functions):
+def compile_cpp_code_inline(name, cpp_sources, functions):
   cpp_module = torch.utils.cpp_extension.load_inline(
     name=name,
     cpp_sources=cpp_sources,
@@ -231,7 +232,7 @@ def test_torch_nn_module_variant(unit_test_class, test_params):
   test_forward_backward(unit_test_class, test_params)
 
 # yf225 TODO: move to common utils?
-def _compute_module_name(test_params_dict):
+def compute_module_name(test_params_dict):
     fullname = test_params_dict.get('fullname', None)
     if fullname:
         # NOTE: This doesn't work for some of the `wrap_functional` module tests such as "interpolate_nearest_1d",
@@ -243,8 +244,8 @@ def _compute_module_name(test_params_dict):
     return module_name
 
 # yf225 TODO: move to common utils?
-def _process_test_params_for_module(test_params_dict, module_metadata, device, test_instance_class):
-  module_name = _compute_module_name(test_params_dict)
+def process_test_params_for_module(test_params_dict, module_metadata, device, test_instance_class):
+  module_name = compute_module_name(test_params_dict)
   test_params_dict['constructor'] = test_params_dict.get('constructor', getattr(torch.nn, module_name))
   test = test_instance_class(**test_params_dict)
   # yf225 TODO: can we remove the magic number `5` here?
@@ -300,8 +301,8 @@ def add_test(unit_test_class, test_name, test_fn):
     raise RuntimeError("Found two tests with the same name: " + test_name)
   setattr(unit_test_class, test_name, test_fn)
 
+# yf225 TODO: move to common utils?
 def set_cpp_tensors_requires_grad(cpp_tensor_stmts, cpp_tensors):
-  # yf225 TODO: we need a flag to decide whether to set requires grad (e.g. it doesn't work for long tensors)
   assert len(cpp_tensor_stmts) == len(cpp_tensors)
   return ['{}.requires_grad_(true)'.format(tensor_stmt) if tensor.dtype != torch.long else tensor_stmt \
     for tensor_stmt, (_, tensor) in zip(cpp_tensor_stmts, cpp_tensors)]
@@ -340,7 +341,7 @@ def add_torch_nn_module_impl_parity_tests(parity_table, unit_test_class, test_pa
 
     module_metadata = torch_nn_modules.module_metadata_map[module_name]
     for device in devices:
-      test_params = _process_test_params_for_module(
+      test_params = process_test_params_for_module(
         test_params_dict=test_params_dict,
         module_metadata=module_metadata,
         device=device,
@@ -417,7 +418,7 @@ def build_cpp_tests(unit_test_class):
   # Put all cpp source code into one file and compile together, in order to speed up the build
   # yf225 TODO bonus point: check in the cpp source code for comparison
   if len(torch_nn_test_params_map) > 0:
-    cpp_sources = TORCH_NN_MODULE_COMMON_TEST_HARNESS
+    cpp_sources = TORCH_NN_COMMON_TEST_HARNESS
     functions = []
     modules_added_metadata_cpp_sources = set()
     for test_name, test_params in torch_nn_test_params_map.items():
@@ -428,7 +429,7 @@ def build_cpp_tests(unit_test_class):
       functions.append('{}_{}'.format(test_params.module_variant_name, 'test_forward_backward'))
     print(cpp_sources)  # yf225 TODO: remove this when ready
 
-    cpp_module = _compile_cpp_code_inline(
+    cpp_module = compile_cpp_code_inline(
       name='module_impl_check',
       cpp_sources=cpp_sources,
       functions=functions)

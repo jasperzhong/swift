@@ -74,7 +74,7 @@ def bceloss_weights_no_reduce_scalar_test():
         constructor=wrap_functional(
             lambda i: F.binary_cross_entropy(i, t.type_as(i),
                                              weight=weights.type_as(i), reduction='none')),
-        cpp_constructor='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)',
+        cpp_function_call='F::binary_cross_entropy(i, t.to(i.options()), F::BinaryCrossEntropyFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone)',
         input_fn=lambda: torch.rand(()).clamp_(2.8e-2, 1 - 2.8e-2),
         # RHS value format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
         # NOTE: any var symbol written in the cpp_* fields needs to have a mapping here!
@@ -87,7 +87,7 @@ def bceloss_weights_no_reduce_scalar_test():
 def interpolate_nearest_tuple_1d():
     dict(
         constructor=wrap_functional(F.interpolate, size=(12, ), scale_factor=None, mode='nearest'),
-        cpp_constructor_args='F::InterpolateFuncOptions().size(std::vector<int64_t>({12})).scale_factor(c10::nullopt).mode(torch::kNearest)',
+        cpp_options_arg='F::InterpolateFuncOptions().size(std::vector<int64_t>({12})).scale_factor(c10::nullopt).mode(torch::kNearest)',
         input_size=(1, 2, 3),
         fullname='interpolate_nearest_tuple_1d',
         pickle=False,
