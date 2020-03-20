@@ -115,10 +115,12 @@ def fractional_max_pool2d_test():
         cpp_arg_symbol_map={'random_samples', random_samples},
         fullname='FractionalMaxPool2d_ratio')
 
-
+# Functional
 new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
-new_module_tests.append(fractional_max_pool2d_test())
 new_module_tests.append(interpolate_nearest_tuple_1d())
+
+# Module
+new_module_tests.append(fractional_max_pool2d_test())
 
 for test_params_dicts, test_instance_class in [
   (module_tests, common_nn.ModuleTest),
