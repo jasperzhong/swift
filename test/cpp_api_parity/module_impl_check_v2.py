@@ -169,6 +169,7 @@ def test_forward_backward(unit_test_class, test_params):
         test_params.arg_dict['other']
   }
   arg_dict_module = torch.jit.ScriptModule()
+  arg_dict_module.__init__()
   for arg_name, arg_value in arg_dict_flat.items():
     assert isinstance(arg_value, torch.Tensor)
     arg_dict_module.register_buffer(arg_name, arg_value)
