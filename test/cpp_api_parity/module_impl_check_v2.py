@@ -304,7 +304,7 @@ def set_cpp_tensors_requires_grad(cpp_tensor_stmts, cpp_tensors):
   # yf225 TODO: we need a flag to decide whether to set requires grad (e.g. it doesn't work for long tensors)
   assert len(cpp_tensor_stmts) == len(cpp_tensors)
   return ['{}.requires_grad_(true)'.format(tensor_stmt) if tensor.dtype != torch.long else tensor_stmt \
-    for tensor_stmt, tensor in zip(cpp_tensor_stmts, cpp_tensors)]
+    for tensor_stmt, (_, tensor) in zip(cpp_tensor_stmts, cpp_tensors)]
 
 # yf225 TODO: move to common utils
 def move_cpp_tensors_to_device(cpp_tensor_stmts, device):
