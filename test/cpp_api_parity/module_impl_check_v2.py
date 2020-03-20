@@ -35,7 +35,7 @@ void write_ivalue_to_file(const torch::IValue& ivalue, const std::string& file_p
 c10::Dict<std::string, torch::Tensor> load_file_to_dict(const std::string& file_path) {
   c10::Dict<std::string, torch::Tensor> arg_dict;
   auto arg_dict_module = torch::jit::load(file_path);
-  for (const auto& p : arg_dict_module.named_parameters(/*recurse=*/false)) {
+  for (const auto& p : arg_dict_module.named_buffers(/*recurse=*/false)) {
     arg_dict.insert(p.name, p.value);
   }
   return arg_dict;
