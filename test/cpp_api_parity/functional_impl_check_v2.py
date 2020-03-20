@@ -30,12 +30,6 @@ void ${functional_variant_name}_test() {
 
   namespace F = torch::nn::functional;
 
-  // NOTE: Because different RNG state would lead to different output,
-  // it is crucial for this function to execute the same statements
-  // in the exact same order as the Python equivalent, otherwise their
-  // outputs would not be the same.
-  torch::manual_seed(0);
-
   // yf225 TODO: rename "cpp_output_tmp_folder" -> "cpp_tmp_folder"
   auto arg_dict = load_ivalue_to_dict("${cpp_output_tmp_folder}/${functional_variant_name}_arg_dict.pt")
 
@@ -72,12 +66,6 @@ def _test_torch_nn_functional_variant(unit_test_class, test_params):
     return [tensor.to(device) for tensor in python_tensors]
 
   def do_test(unit_test_class, test_params):
-    # NOTE: Because different RNG state would lead to different output,
-    # it is crucial for this function to execute the same statements
-    # in the exact same order as the C++ equivalent, otherwise their
-    # outputs would not be the same.
-    torch.manual_seed(0)
-
     device = test_params.device
     inputs = convert_to_list(test_params.test_instance._get_input()) # yf225 TODO: convert inputs to CUDA device when needed!
     if is_criterion_test(test_params.test_instance):
