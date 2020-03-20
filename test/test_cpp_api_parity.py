@@ -36,16 +36,6 @@ parity_table_path = os.path.join(os.path.dirname(__file__), 'cpp_api_parity/pari
 
 parity_table = parse_parity_tracker_table(parity_table_path)
 
-# module_tests = common_nn.module_tests
-# new_module_tests = common_nn.new_module_tests
-# criterion_tests = common_nn.criterion_tests
-# new_criterion_tests = common_nn.new_criterion_tests
-
-module_tests = []
-new_module_tests = []
-criterion_tests = []
-new_criterion_tests = []
-
 import torch.nn.functional as F
 
 def wrap_functional(fn, **kwargs):
@@ -126,13 +116,23 @@ def BCELoss_test():
         check_bfloat16=False,
     )
 
+module_tests = common_nn.module_tests
+new_module_tests = common_nn.new_module_tests
+criterion_tests = common_nn.criterion_tests
+new_criterion_tests = common_nn.new_criterion_tests
+
+# module_tests = []
+# new_module_tests = []
+# criterion_tests = []
+# new_criterion_tests = []
+
 # Functional
 # new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
 # new_module_tests.append(interpolate_nearest_tuple_1d())
 
 # Module
-new_module_tests.append(fractional_max_pool2d_test())
-criterion_tests.append(BCELoss_test())
+# new_module_tests.append(fractional_max_pool2d_test())
+# criterion_tests.append(BCELoss_test())
 
 for test_params_dicts, test_instance_class in [
   (module_tests, common_nn.ModuleTest),
