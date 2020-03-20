@@ -61,6 +61,10 @@ from torch.testing._internal.common_nn import wrap_functional
 # print(func_dict['constructor']().fn)  # prints: <function interpolate at 0x7f13611a0ea0>
 # ```
 
+# yf225 TODO comment:
+# RHS value format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
+# NOTE: any var symbol written in the cpp_* fields needs to have a mapping here!
+
 def bceloss_weights_no_reduce_scalar_test():
     t = torch.randn(()).double()
     weights = torch.rand(())
@@ -111,19 +115,19 @@ def BCELoss_test():
         check_bfloat16=False,
     )
 
-# module_tests = common_nn.module_tests
-# new_module_tests = common_nn.new_module_tests
-# criterion_tests = common_nn.criterion_tests
-# new_criterion_tests = common_nn.new_criterion_tests
+module_tests = common_nn.module_tests
+new_module_tests = common_nn.new_module_tests
+criterion_tests = common_nn.criterion_tests
+new_criterion_tests = common_nn.new_criterion_tests
 
-module_tests = []
-new_module_tests = []
-criterion_tests = []
-new_criterion_tests = []
+# module_tests = []
+# new_module_tests = []
+# criterion_tests = []
+# new_criterion_tests = []
 
 # Functional
-new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
-new_module_tests.append(interpolate_nearest_tuple_1d())
+# new_module_tests.append(bceloss_weights_no_reduce_scalar_test())
+# new_module_tests.append(interpolate_nearest_tuple_1d())
 
 # Module
 # new_module_tests.append(fractional_max_pool2d_test())
