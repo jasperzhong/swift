@@ -125,10 +125,10 @@ new_criterion_tests = common_nn.new_criterion_tests
 for test_params_dicts, test_instance_class in [
   (sample_module.module_tests, common_nn.ModuleTest),
   (sample_functional.functional_tests, common_nn.NewModuleTest),
-  # (module_tests, common_nn.ModuleTest),
-  # (new_module_tests, common_nn.NewModuleTest),
-  # (criterion_tests, common_nn.CriterionTest),
-  # (new_criterion_tests, common_nn.NewCriterionTest),
+  (module_tests, common_nn.ModuleTest),
+  (new_module_tests, common_nn.NewModuleTest),
+  (criterion_tests, common_nn.CriterionTest),
+  (new_criterion_tests, common_nn.NewCriterionTest),
 ]:
   module_impl_check.add_tests(TestCppApiParity, test_params_dicts, test_instance_class, parity_table)
   functional_impl_check.add_tests(TestCppApiParity, test_params_dicts, test_instance_class, parity_table)
