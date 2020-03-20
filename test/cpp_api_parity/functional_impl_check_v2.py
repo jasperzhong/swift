@@ -65,7 +65,7 @@ void ${functional_variant_name}_test_forward() {
   // Some functionals (such as `F::rrelu`) create random tensors in their call path.
   // To make sure the random tensors created are the same in Python/C++, we need
   // to set the RNG seed manually.
-  torch.manual_seed(0)
+  torch::manual_seed(0)
 
   // Run function with arguments
   auto cpp_output = ${cpp_function_call};
