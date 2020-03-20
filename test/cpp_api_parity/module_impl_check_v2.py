@@ -214,45 +214,41 @@ def _process_test_params_for_module(test_params_dict, module_metadata, device, t
   # yf225 TODO: can we remove the magic number `5` here?
   module_variant_name = test.get_name()[5:] + (('_' + device) if device != 'cpu' else '')
 
+  arg_dict = {
+    'input': [],
+    'target': [],
+    'extra_args': [],
+    'other': [],
+  }
+
+  def put_args_into_arg_dict(arg_type, arg_type_prefix, args):
+    for i, arg in enumerate(args):
+      arg_dict[arg_type].append(CppArg(name=arg_type_prefix+str(i), value=arg))
+
+  put_args_into_arg_dict('input', 'i', convert_to_list(test._get_input()))
+  if is_criterion_test(test):
+    put_args_into_arg_dict('target', 't', convert_to_list(test._get_target()))
+  if test.extra_args:
+    put_args_into_arg_dict('extra_args', 'e', convert_to_list(test.extra_args))
+
   cpp_arg_symbol_map = test_params_dict.get('cpp_arg_symbol_map', {})
-
-  def compute_arg_dict(cpp_arg_symbol_map):
-    arg_dict = {
-      'input': [],
-      'target': [],
-      'extra_args': [],
-      'other': [],
-    }
-
-    def put_args_into_arg_dict(arg_type, arg_type_prefix, args):
-      for i, arg in enumerate(args):
-        arg_dict[arg_type].append(CppArg(name=arg_type_prefix+str(i), value=arg))
-
-    put_args_into_arg_dict('input', 'i', convert_to_list(test._get_input()))
-    if is_criterion_test(test_params.test_instance):
-      put_args_into_arg_dict('target', 't', convert_to_list(test._get_target()))
-    if test.extra_args:
-      put_args_into_arg_dict('extra_args', 'e', convert_to_list(test.extra_args))
-
-    for arg_name, arg_value in cpp_arg_symbol_map.items():
-      if isinstance(arg_value, str):
-        if arg_value == 'input':
-          arg_dict['other'].append(CppArg(name=arg_name, value=test._get_input()))
-        else:
-          raise RuntimeError("`{}` has unsupported string value: {}".format(arg_name, arg_value))
-      elif isinstance(arg_value, torch.Tensor):
-        arg_dict['other'].append(CppArg(name=arg_name, value=arg_value))
+  for arg_name, arg_value in cpp_arg_symbol_map.items():
+    if isinstance(arg_value, str):
+      if arg_value == 'input':
+        arg_dict['other'].append(CppArg(name=arg_name, value=test._get_input()))
       else:
-        raise RuntimeError("`{}` has unsupported value: {}".format(arg_name, arg_value))
-
-    return arg_dict
+        raise RuntimeError("`{}` has unsupported string value: {}".format(arg_name, arg_value))
+    elif isinstance(arg_value, torch.Tensor):
+      arg_dict['other'].append(CppArg(name=arg_name, value=arg_value))
+    else:
+      raise RuntimeError("`{}` has unsupported value: {}".format(arg_name, arg_value))
 
   return TorchNNModuleTestParams(
     module_name=module_name,
     module_variant_name=module_variant_name,
     test_instance=test,
     cpp_constructor_args=test_params_dict.get('cpp_constructor_args', ''),
-    arg_dict=compute_arg_dict(cpp_arg_symbol_map),
+    arg_dict=compute_arg_dict(),
     has_parity=test_params_dict.get('has_parity', True),
     device=device,
     cpp_tmp_folder=tempfile.mkdtemp(),
