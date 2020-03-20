@@ -114,7 +114,7 @@ def run_forward(unit_test_class, test_params):
   # To make sure the random tensors created are the same in Python/C++, we need
   # to set the RNG seed manually.
   torch.manual_seed(0)
-  python_output = test_params.test_instance.constructor()(*inputs)
+  python_output = test_params.test_instance.constructor(*test_params.test_instance.constructor_args)(*inputs)
 
   return python_output
 
