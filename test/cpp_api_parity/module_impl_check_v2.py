@@ -139,7 +139,7 @@ def run_python_forward_backward(unit_test_class, test_params):
   inputs = move_python_tensors_to_device(inputs, device)
 
   python_output = module(*inputs)
-  script_module = torch.jit.trace(module, inputs)
+  script_module = torch.jit.script(module)
 
   python_output.sum().backward()
   # Put all gradients into a dict, to be compared later
