@@ -47,7 +47,7 @@ Expected substitutions:
 ${module_variant_name}
 ${module_qualified_name}
 ${cpp_tmp_folder}
-${cpp_arg_construction_stmts}
+${cpp_args_construction_stmts}
 ${cpp_constructor_args}
 ${device}
 ${cpp_forward_args_symbols}
@@ -58,7 +58,7 @@ void ${module_variant_name}_test_forward_backward() {
 
   // Declare arguments
   auto arg_dict = load_ivalue_to_dict("${cpp_tmp_folder}/${module_variant_name}_arg_dict.pt");
-  ${cpp_arg_construction_stmts}
+  ${cpp_args_construction_stmts}
 
   // Construct module and load params/buffers from Python module
   ${module_qualified_name} module${cpp_constructor_args};
