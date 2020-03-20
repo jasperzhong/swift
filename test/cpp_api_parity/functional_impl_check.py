@@ -170,6 +170,8 @@ def test_torch_nn_functional_variant(unit_test_class, test_params):
 # yf225 TODO: move to common utils?
 def compute_functional_name(test_params_dict):
   if 'cpp_options_args' in test_params_dict:
+    print(test_params_dict['constructor']().fn)
+    print(test_params_dict['constructor']().fn.__name__)
     return test_params_dict['constructor']().fn.__name__
   elif 'cpp_function_call' in test_params_dict:
     # Expected format: `F::functional_name(...)`
