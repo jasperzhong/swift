@@ -119,7 +119,7 @@ def BCELoss_test():
     return dict(
         module_name='BCELoss',
         input_fn=lambda: torch.rand(15, 10).clamp_(1e-2, 1 - 1e-2),
-        target_fn=lambda: torch.randn(15, 10).gt(0).double(),
+        target_fn=lambda: torch.randn(15, 10).gt(0).to(torch.get_default_dtype()),
         reference_fn=lambda i, t, m: -(t * i.log() + (1 - t) * (1 - i).log()).sum() /
             (i.numel() if get_reduction(m) else 1),
         check_gradgrad=False,
