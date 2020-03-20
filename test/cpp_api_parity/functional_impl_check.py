@@ -2,10 +2,11 @@ import tempfile
 import shutil
 from string import Template
 import unittest
-from torch.testing._internal.common_cuda import TEST_CUDA
+import re
 
 import torch
 import torch.testing._internal.common_nn as common_nn
+from torch.testing._internal.common_cuda import TEST_CUDA
 from cpp_api_parity.utils import TorchNNFunctionalTestParams, CppArg
 from cpp_api_parity import torch_nn_functionals
 
@@ -167,15 +168,18 @@ def test_forward(unit_test_class, test_params):
 def test_torch_nn_functional_variant(unit_test_class, test_params):
   test_forward(unit_test_class, test_params)
 
+
 # yf225 TODO: move to common utils?
 def compute_functional_name(test_params_dict):
+  def camel_case_to_snake_case(camel_case_str):
+    return re.sub(r'(?<!^)(?=[A-Z])', '_', camel_case_str).lower()
+
   if 'cpp_options_args' in test_params_dict:
-    print(test_params_dict['constructor']().fn)
-    print(test_params_dict['constructor']().fn.__name__)
-    return test_params_dict['constructor']().fn.__name__
+    # Expected format: `F::FunctionalFuncOptions(...)`
+    return camel_case_to_snake_case(test_params_dict['cpp_options_args'].split('(')[0].replace('F::', '').replace('FuncOptions', ''))
   elif 'cpp_function_call' in test_params_dict:
     # Expected format: `F::functional_name(...)`
-    return test_params_dict['cpp_function_call'].replace('F::', '').split('(')[0]
+    return test_params_dict['cpp_function_call'].split('(')[0].replace('F::', '')
   else:
     raise RuntimeError(
       "`cpp_options_args` or `cpp_function_call` entry must be present in test params dict: {}".format(

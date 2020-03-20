@@ -3,10 +3,10 @@ import shutil
 from string import Template
 import unittest
 import types
-from torch.testing._internal.common_cuda import TEST_CUDA
 
 import torch
 import torch.testing._internal.common_nn as common_nn
+from torch.testing._internal.common_cuda import TEST_CUDA
 from cpp_api_parity.utils import TorchNNModuleTestParams, CppArg
 from cpp_api_parity import torch_nn_modules
 
