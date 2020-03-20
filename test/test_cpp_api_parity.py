@@ -124,7 +124,7 @@ new_criterion_tests = common_nn.new_criterion_tests
 
 for test_params_dicts, test_instance_class in [
   (sample_module.module_tests, common_nn.ModuleTest),
-  (sample_functional.functional, common_nn.NewModuleTest),
+  (sample_functional.functional_tests, common_nn.NewModuleTest),
   (module_tests, common_nn.ModuleTest),
   (new_module_tests, common_nn.NewModuleTest),
   (criterion_tests, common_nn.CriterionTest),
