@@ -2341,8 +2341,8 @@ new_module_tests = [
     ),
     dict(
         constructor=wrap_functional(F.interpolate, size=(4, 6, 6),
-        cpp_options_arg='F::InterpolateFuncOptions().size(std::vector<int64_t>({4, 6, 6})).scale_factor(c10::nullopt).mode(torch::kTrilinear).align_corners(false)',
                                     scale_factor=None, mode='trilinear', align_corners=False),
+        cpp_options_arg='F::InterpolateFuncOptions().size(std::vector<int64_t>({4, 6, 6})).scale_factor(c10::nullopt).mode(torch::kTrilinear).align_corners(false)',
         input_size=(1, 2, 2, 3, 3),
         fullname='interpolate_trilinear_tuple_3d',
         pickle=False,
