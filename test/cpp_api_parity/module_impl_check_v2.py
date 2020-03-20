@@ -32,6 +32,15 @@ void write_ivalue_to_file(const torch::IValue& ivalue, const std::string& file_p
   fout.close();
 }
 
+c10::Dict<std::string, torch::Tensor> load_file_to_dict(const std::string& file_path) {
+  c10::Dict<std::string, torch::Tensor> arg_dict;
+  auto arg_dict_module = torch::jit::load(file_path);
+  for (const auto& p : arg_dict_module.named_parameters(/*recurse=*/false)) {
+    arg_dict.insert(p.name, p.value);
+  }
+  return arg_dict;
+}
+
 // Generates rand tensor with non-equal values. This ensures that duplicate
 // values won't be causing test failure for modules like MaxPooling.
 // size should be small, otherwise randperm fails / long overflows.
@@ -60,7 +69,7 @@ void ${module_variant_name}_test_forward_backward() {
   pybind11::gil_scoped_release no_gil;
 
   // Declare arguments
-  auto arg_dict_module = torch::jit::load("${cpp_tmp_folder}/${module_variant_name}_arg_dict_module.pt");
+  auto arg_dict = load_file_to_dict("${cpp_tmp_folder}/${module_variant_name}_arg_dict.pt")
   ${cpp_args_construction_stmts};
 
   // Construct module and load params/buffers from Python module
@@ -163,7 +172,7 @@ def test_forward_backward(unit_test_class, test_params):
   for arg_name, arg_value in arg_dict_flat:
     assert isinstance(arg_value, torch.Tensor)
     arg_dict_module._c._register_buffer(arg_name, arg_value)
-  arg_dict_module.save("{}/{}_arg_dict_module.pt".format(test_params.cpp_tmp_folder, module_variant_name))
+  arg_dict_module.save("{}/{}_arg_dict.pt".format(test_params.cpp_tmp_folder, module_variant_name))
 
   cpp_test_name = '{}_{}'.format(test_params.module_variant_name, 'test_forward_backward')
   cpp_test_fn = getattr(unit_test_class.module_impl_check_cpp_module, cpp_test_name)
@@ -359,7 +368,7 @@ def generate_test_cpp_sources(test_params, template):
   def add_cpp_forward_args(args):
     args_stmts = []
     for arg_name, _ in args:
-      args_stmts.append('auto {} = arg_dict_module.named_buffers()["{}"]'.format(arg_name, arg_name))
+      args_stmts.append('auto {} = arg_dict.at("{}")'.format(arg_name, arg_name))
       cpp_forward_args_symbols.append(arg_name)
     return args_stmts
 
@@ -370,7 +379,7 @@ def generate_test_cpp_sources(test_params, template):
   # Build the list of other arguments needed
   cpp_other_args_stmts = []
   for arg_name, _ in test_params.arg_dict['other']:
-    cpp_other_args_stmts.append('auto {} = arg_dict_module.named_buffers()["{}"]'.format(arg_name, arg_name))
+    cpp_other_args_stmts.append('auto {} = arg_dict.at("{}")'.format(arg_name, arg_name))
   cpp_other_args_stmts = move_cpp_tensors_to_device(cpp_other_args_stmts, device)
   
   cpp_args_construction_stmts = cpp_forward_input_args_stmts + cpp_forward_target_args_stmts + cpp_forward_extra_args_stmts + cpp_other_args_stmts
