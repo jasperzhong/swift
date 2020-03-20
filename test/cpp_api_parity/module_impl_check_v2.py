@@ -146,8 +146,8 @@ def test_forward_backward(unit_test_class, test_params):
 
   def run_cpp_test_fn_and_check_output():
     cpp_test_fn()
-    cpp_output = torch.load("{}/{}_forward_output.pt".format(test_params.cpp_output_tmp_folder, test_params.module_variant_name))
-    cpp_grad_dict = torch.load("{}/{}_backward_grad_dict.pt".format(test_params.cpp_output_tmp_folder, test_params.module_variant_name))
+    cpp_output = torch.load("{}/{}_forward_output.pt".format(test_params.cpp_tmp_folder, test_params.module_variant_name))
+    cpp_grad_dict = torch.load("{}/{}_backward_grad_dict.pt".format(test_params.cpp_tmp_folder, test_params.module_variant_name))
 
     def generate_error_msg(name, cpp_value, python_value):
       return "Parity test failed: {} in C++ has value: {}, which does not match the corresponding value in Python: {}".format(
@@ -177,7 +177,7 @@ def test_forward_backward(unit_test_class, test_params):
     run_cpp_test_fn_and_check_output()
 
   # Remove temporary folder that stores C++ outputs
-  shutil.rmtree(test_params.cpp_output_tmp_folder)
+  shutil.rmtree(test_params.cpp_tmp_folder)
 
 def test_torch_nn_module_variant(unit_test_class, test_params):
   test_forward_backward(unit_test_class, test_params)
@@ -210,7 +210,7 @@ def _process_test_params_for_module(test_params_dict, module_metadata, device, t
     cpp_arg_symbol_map=test_params_dict.get('cpp_arg_symbol_map', {}),
     has_parity=test_params_dict.get('has_parity', True),
     device=device,
-    cpp_output_tmp_folder=tempfile.mkdtemp(),
+    cpp_tmp_folder=tempfile.mkdtemp(),
   )
 
 # yf225 TODO: move to common utils?
