@@ -324,7 +324,7 @@ def add_torch_nn_module_impl_parity_tests(parity_table, unit_test_class, test_pa
     if 'FunctionalModule' in str(test_params_dict.get('constructor', '')):
       continue
 
-    module_name = _compute_module_name(test_params_dict)
+    module_name = compute_module_name(test_params_dict)
 
     assert hasattr(torch.nn, module_name), \
       "`torch.nn` doesn't have module `{}`. ".format(module_name) + \
