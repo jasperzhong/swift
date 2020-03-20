@@ -151,15 +151,17 @@ def run_python_forward_backward(unit_test_class, test_params):
   torch.manual_seed(0)
   python_output = module(*inputs)
 
-  module.forward = types.MethodType(lambda self: torch.tensor(0), module)
-  script_module = torch.jit.script(module)
-
   # state_dict_module = torch.nn.Module()
-  # for param_name, param_value in module.named_parameters(recurse=True):
+  # for param_name, param_value in module.named_parameters(recurse=False):
   #   state_dict_module.register_parameter(param_name, param_value)
-  # for buffer_name, buffer_value in module.named_buffers(recurse=True):
+  # for buffer_name, buffer_value in module.named_buffers(recurse=False):
   #   state_dict_module.register_buffer(buffer_name, buffer_value)
-  # script_module = torch.jit.script(state_dict_module)
+  # for module_name, module_value in module.named_children():
+  #   state_dict_submodule = torch.nn.Module()
+  #   state_dict_module.add_module(module_name, state_dict_submodule)
+
+  module.forward = types.MethodType(lambda self: torch.tensor(0), module)
+  script_module = torch.jit.trace(module, *inputs)
 
   python_output.sum().backward()
   # Put all gradients into a dict, to be compared later
