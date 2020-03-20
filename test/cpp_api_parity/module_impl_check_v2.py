@@ -69,7 +69,7 @@ void ${module_variant_name}_test_forward_backward() {
   pybind11::gil_scoped_release no_gil;
 
   // Declare arguments
-  auto arg_dict = load_file_to_dict("${cpp_tmp_folder}/${module_variant_name}_arg_dict.pt")
+  auto arg_dict = load_file_to_dict("${cpp_tmp_folder}/${module_variant_name}_arg_dict.pt");
   ${cpp_args_construction_stmts};
 
   // Construct module and load params/buffers from Python module
