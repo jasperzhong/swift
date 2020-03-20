@@ -57,5 +57,3 @@ functional_tests = [
 torch_nn_functionals.functional_metadata_map['sample_functional'] = torch_nn_functionals.TorchNNFunctionalMetadata(
     cpp_sources=SAMPLE_FUNCTIONAL_CPP_SOURCE,
 )
-
-torch.nn.functional.sample_functional = sample_functional

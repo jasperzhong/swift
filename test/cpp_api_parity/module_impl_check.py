@@ -151,15 +151,9 @@ def run_python_forward_backward(unit_test_class, test_params):
   torch.manual_seed(0)
   python_output = module(*inputs)
 
-  # state_dict_module = torch.nn.Module()
-  # for param_name, param_value in module.named_parameters(recurse=False):
-  #   state_dict_module.register_parameter(param_name, param_value)
-  # for buffer_name, buffer_value in module.named_buffers(recurse=False):
-  #   state_dict_module.register_buffer(buffer_name, buffer_value)
-  # for module_name, module_value in module.named_children():
-  #   state_dict_submodule = torch.nn.Module()
-  #   state_dict_module.add_module(module_name, state_dict_submodule)
-
+  # NOTE: This is a workaround to allow any module to be traced.
+  # We can do this because we are only interested in transferring
+  # the Python module's parameters and buffers to the C++ module.
   module.forward = types.MethodType(lambda self, input: input, module)
   script_module = torch.jit.trace(module, torch.tensor(0))
 
