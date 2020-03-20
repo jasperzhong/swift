@@ -15,8 +15,7 @@ from cpp_api_parity import torch_nn_modules
 # Step 2: Construct a C++ layer, run forward and backward on it, save all its params/buffers/gradients into a ScriptModule
 # Step 3: Load that ScriptModule into Python, and compare output/params/buffers/gradients with Python layer (forward and backward)
 
-# yf225 TODO: reply to Omkar on Slack about indexing tutorial!
-
+torch.set_default_dtype(torch.double)
 
 # yf225 TODO: move to common utils?
 devices = ['cpu', 'cuda']
