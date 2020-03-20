@@ -582,7 +582,7 @@ def nllloss_no_reduce_weights_ignore_index_test():
         fullname='NLLLoss_no_reduce_weights_ignore_index',
         constructor=wrap_functional(
             lambda i: F.nll_loss(i, t.type_as(i).long(), **kwargs(i.data))),
-        cpp_function_call='F::nll_loss(i, t.to(i.options()).to(torch::kLong), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone).ignore_index(2)',
+        cpp_function_call='F::nll_loss(i, t.to(i.options()).to(torch::kLong), F::NLLLossFuncOptions().weight(weight.to(i.options())).reduction(torch::kNone).ignore_index(2))',
         input_fn=lambda: torch.rand(15, 10).add(1e-2).log(),
         cpp_arg_symbol_map={'i': 'input', 't': t, 'weight': weight},
         reference_fn=lambda i, *_:
@@ -3286,7 +3286,7 @@ criterion_tests = [
     dict(
         module_name='NLLLoss',
         constructor_args=(None, None, 2),
-        cpp_constructor_args='torch::nn::NLLLossOptions().weight({}).ignore_index(2)',
+        cpp_constructor_args='torch::nn::NLLLossOptions().weight({}).ignore_index(2))',
         input_fn=lambda: torch.rand(15, 10).log(),
         target_fn=lambda: torch.Tensor(15).uniform_().mul(10).floor().long(),
         reference_fn=lambda i, t, _: nllloss_reference(i, t, ignore_index=2),
@@ -3308,7 +3308,7 @@ criterion_tests = [
     dict(
         module_name='NLLLoss',
         constructor_args_fn=lambda: (criterion_weight_rand_10, None, 2),
-        cpp_constructor_args='torch::nn::NLLLossOptions().weight(weight).ignore_index(2)',
+        cpp_constructor_args='torch::nn::NLLLossOptions().weight(weight).ignore_index(2))',
         input_fn=lambda: torch.rand(15, 10).add(1e-2).log(),
         target_fn=lambda: torch.Tensor(15).uniform_().mul(10).floor().long(),
         cpp_arg_symbol_map={'weight': criterion_weight_rand_10},
