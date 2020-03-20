@@ -123,11 +123,12 @@ def move_python_tensors_to_device(python_tensors, device):
 def run_python_forward_backward(unit_test_class, test_params):
   device = test_params.device
   module = test_params.test_instance.constructor(*test_params.test_instance.constructor_args).to(device)
-  inputs = set_python_tensors_requires_grad(convert_to_list(test_params.test_instance._get_input()))
-  if is_criterion_test(test_params.test_instance):
-    inputs = inputs + convert_to_list(test_params.test_instance._get_target())
-    inputs = inputs + convert_to_list(test_params.test_instance.extra_args)
+
+  inputs = set_python_tensors_requires_grad([arg_value for _, arg_value in test_params.arg_dict['input']])
+  inputs = inputs + [arg_value for _, arg_value in test_params.arg_dict['target']]
+  inputs = inputs + [arg_value for _, arg_value in test_params.arg_dict['extra_args']]
   inputs = move_python_tensors_to_device(inputs, device)
+
   python_output = module(*inputs)
   traced_script_module = torch.jit.trace(module, inputs)
 
@@ -150,7 +151,7 @@ def test_forward_backward(unit_test_class, test_params):
 
   # Save Python module and arguments to be used from C++ test
   script_module.save("{}/{}_module.pt".format(test_params.cpp_tmp_folder, module_variant_name))
-  torch.save(test_params.cpp_arg_dict, "{}/{}_arg_dict.pt".format(test_params.cpp_tmp_folder, module_variant_name))
+  torch.save(test_params.arg_dict, "{}/{}_arg_dict.pt".format(test_params.cpp_tmp_folder, module_variant_name))
 
   cpp_test_name = '{}_{}'.format(test_params.module_variant_name, 'test_forward_backward')
   cpp_test_fn = getattr(unit_test_class.module_impl_check_cpp_module, cpp_test_name)
@@ -215,40 +216,43 @@ def _process_test_params_for_module(test_params_dict, module_metadata, device, t
 
   cpp_arg_symbol_map = test_params_dict.get('cpp_arg_symbol_map', {})
 
-  def compute_cpp_arg_dict(cpp_arg_symbol_map):
-    cpp_arg_dict = {
+  def compute_arg_dict(cpp_arg_symbol_map):
+    arg_dict = {
       'input': [],
       'target': [],
       'extra_args': [],
       'other': [],
     }
+
+    def put_args_into_arg_dict(arg_type, arg_type_prefix, args):
+      for i, arg in enumerate(args):
+        arg_dict[arg_type].append(CppArg(name=arg_type_prefix+str(i), value=arg))
+
+    put_args_into_arg_dict('input', 'i', convert_to_list(test._get_input()))
+    if is_criterion_test(test_params.test_instance):
+      put_args_into_arg_dict('target', 't', convert_to_list(test._get_target()))
+    if test.extra_args:
+      put_args_into_arg_dict('extra_args', 'e', convert_to_list(test.extra_args))
+
     for arg_name, arg_value in cpp_arg_symbol_map.items():
       if isinstance(arg_value, str):
         if arg_value == 'input':
-          cpp_arg_dict['input'].append(CppArg(name=arg_name, value=test._get_input()))
+          arg_dict['other'].append(CppArg(name=arg_name, value=test._get_input()))
         else:
           raise RuntimeError("`{}` has unsupported string value: {}".format(arg_name, arg_value))
       elif isinstance(arg_value, torch.Tensor):
-        cpp_arg_dict['other'].append(CppArg(name=arg_name, value=arg_value))
+        arg_dict['other'].append(CppArg(name=arg_name, value=arg_value))
       else:
         raise RuntimeError("`{}` has unsupported value: {}".format(arg_name, arg_value))
 
-    def put_args_into_cpp_arg_dict(arg_type, arg_type_prefix, args):
-      for i, arg in enumerate(args):
-        cpp_arg_dict[arg_type].append(CppArg(name=arg_type_prefix+str(i), value=arg))
-
-    put_args_into_cpp_arg_dict('input', 'i', convert_to_list(test._get_input()))
-    put_args_into_cpp_arg_dict('target', 't', convert_to_list(test._get_target()))
-    put_args_into_cpp_arg_dict('extra_args', 'e', convert_to_list(test.extra_args))
-
-    return cpp_arg_dict
+    return arg_dict
 
   return TorchNNModuleTestParams(
     module_name=module_name,
     module_variant_name=module_variant_name,
     test_instance=test,
     cpp_constructor_args=test_params_dict.get('cpp_constructor_args', ''),
-    cpp_arg_dict=compute_cpp_arg_dict(cpp_arg_symbol_map),
+    arg_dict=compute_arg_dict(cpp_arg_symbol_map),
     has_parity=test_params_dict.get('has_parity', True),
     device=device,
     cpp_tmp_folder=tempfile.mkdtemp(),
@@ -351,13 +355,13 @@ def generate_test_cpp_sources(test_params, template):
       cpp_forward_args_symbols.append(arg_name)
     return args_stmts
 
-  cpp_forward_input_args_stmts = move_cpp_tensors_to_device(set_cpp_tensors_requires_grad(add_cpp_forward_args(test_params.cpp_arg_dict['input'])), device)
-  cpp_forward_target_args_stmts = move_cpp_tensors_to_device(add_cpp_forward_args(test_params.cpp_arg_dict['target']), device)
-  cpp_forward_extra_args_stmts = move_cpp_tensors_to_device(add_cpp_forward_args(test_params.cpp_arg_dict['extra_args']), device)
+  cpp_forward_input_args_stmts = move_cpp_tensors_to_device(set_cpp_tensors_requires_grad(add_cpp_forward_args(test_params.arg_dict['input'])), device)
+  cpp_forward_target_args_stmts = move_cpp_tensors_to_device(add_cpp_forward_args(test_params.arg_dict['target']), device)
+  cpp_forward_extra_args_stmts = move_cpp_tensors_to_device(add_cpp_forward_args(test_params.arg_dict['extra_args']), device)
 
   # Build the list of other arguments needed
   cpp_other_args_stmts = []
-  for arg_name, _ in test_params.cpp_arg_dict['other']:
+  for arg_name, _ in test_params.arg_dict['other']:
     cpp_other_args_stmts.append('auto {} = arg_dict["{}"]'.format(arg_name, arg_name))
   cpp_other_args_stmts = move_cpp_tensors_to_device(cpp_other_args_stmts, device)
   
