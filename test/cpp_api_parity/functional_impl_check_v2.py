@@ -228,7 +228,7 @@ def process_test_params_for_functional(test_params_dict, functional_metadata, de
     else:
       raise RuntimeError("`{}` has unsupported value: {}".format(arg_name, arg_value))
 
-  return TorchNNModuleTestParams(
+  return TorchNNFunctionalTestParams(
     functional_name=functional_name,
     functional_variant_name=functional_variant_name,
     test_instance=test,
