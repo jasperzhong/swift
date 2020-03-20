@@ -155,7 +155,7 @@ def test_forward_backward(unit_test_class, test_params):
   # Run forward and backward on Python module
   script_module, python_output, python_grad_dict = run_python_forward_backward(unit_test_class, test_params)
 
-  # Save Python module and arguments to be used from C++ test
+  # Save Python module and arguments to be used from C++ function
   script_module.save("{}/{}_module.pt".format(test_params.cpp_tmp_folder, module_variant_name))
   arg_dict_flat = {
     arg_name: arg_value \
@@ -165,7 +165,7 @@ def test_forward_backward(unit_test_class, test_params):
         test_params.arg_dict['extra_args'] + \
         test_params.arg_dict['other']
   }
-  torch.jit.save(arg_dict_flat, "{}/{}_arg_dict.pt".format(test_params.cpp_tmp_folder, module_variant_name))
+  torch.save(arg_dict_flat, "{}/{}_arg_dict.pt".format(test_params.cpp_tmp_folder, module_variant_name), _use_new_zipfile_serialization=True)
 
   cpp_test_name = '{}_{}'.format(test_params.module_variant_name, 'test_forward_backward')
   cpp_test_fn = getattr(unit_test_class.module_impl_check_cpp_module, cpp_test_name)
