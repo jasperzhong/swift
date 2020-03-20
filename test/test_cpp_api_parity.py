@@ -11,23 +11,12 @@ import torch.testing._internal.common_utils as common
 import torch.testing._internal.common_nn as common_nn
 import torch.utils.cpp_extension
 from cpp_api_parity.parity_table_parser import parse_parity_tracker_table
-from cpp_api_parity import functional_impl_check_v2 as functional_impl_check
-from cpp_api_parity import module_impl_check_v2 as module_impl_check
+from cpp_api_parity import module_impl_check, functional_impl_check, sample_module, sample_functional
 
 # yf225 TODO: need to add proper checks and expectations when people:
 # 1. Add a new test to a module already supported by C++ API (i.e. parity table has entry for it, and the parity bit is yes)
 #   a) add a flag `test_cpp_api_parity` to the dict to be able to turn off test as needed
 # 2. Add a new test for a module that is not supported by C++ API yet
-
-# yf225 TODO: our new parity test mechanism is changing the way people write common_nn test dicts a lot...
-# can we enforce some constraints to make writing common_nn test dicts easier / get less questions from people?
-
-# yf225 TODO: current plan:
-# transfer all input/target/extra/options non-const args from Python to C++ via JIT serialization
-# transfer module state from Python to C++ via JIT tracing (torch.jit.save -> torch::load)
-# Benefits:
-# 1. Allows minimal changes to common_nn dicts
-# 2. Easy to maintain common_nn dicts, no tricky things to watch out for
 
 class TestCppApiParity(common.TestCase):
   pass
@@ -86,7 +75,7 @@ def bceloss_weights_no_reduce_scalar_test():
 def interpolate_nearest_tuple_1d():
     return dict(
         constructor=wrap_functional(F.interpolate, size=(12, ), scale_factor=None, mode='nearest'),
-        cpp_options_arg='F::InterpolateFuncOptions().size(std::vector<int64_t>({12})).scale_factor(c10::nullopt).mode(torch::kNearest)',
+        cpp_options_args='F::InterpolateFuncOptions().size(std::vector<int64_t>({12})).scale_factor(c10::nullopt).mode(torch::kNearest)',
         input_size=(1, 2, 3),
         fullname='interpolate_nearest_tuple_1d',
         pickle=False,
@@ -134,6 +123,8 @@ new_criterion_tests = common_nn.new_criterion_tests
 # criterion_tests.append(BCELoss_test())
 
 for test_params_dicts, test_instance_class in [
+  (sample_module.module_tests, common_nn.ModuleTest),
+  (sample_functional.functional, common_nn.NewModuleTest),
   (module_tests, common_nn.ModuleTest),
   (new_module_tests, common_nn.NewModuleTest),
   (criterion_tests, common_nn.CriterionTest),

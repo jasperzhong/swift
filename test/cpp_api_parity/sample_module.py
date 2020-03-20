@@ -6,11 +6,11 @@ from cpp_api_parity import torch_nn_modules
 `SampleModule` is used by `test_cpp_api_parity.py` to test that Python / C++ API
 parity test harness works for `torch.nn.Module` subclasses.
 
-When `SampleModule.has_parity` is true, behavior of `reset_parameters` / `forward` /
-`backward` is the same as the C++ equivalent.
+When `SampleModule.has_parity` is true, behavior of `forward` / `backward`
+is the same as the C++ equivalent.
 
-When `SampleModule.has_parity` is false, behavior of `reset_parameters` / `forward` /
-`backward` is different from the C++ equivalent.
+When `SampleModule.has_parity` is false, behavior of `forward` / `backward`
+is different from the C++ equivalent.
 '''
 
 class SampleModule(torch.nn.Module):
@@ -28,19 +28,17 @@ class SampleModule(torch.nn.Module):
     def reset_parameters(self):
         with torch.no_grad():
             self.param.fill_(1)
-            if not self.has_parity:
-                self.param.add_(10)
 
     def forward(self, x):
         submodule_forward_result = self.submodule(x) if hasattr(self, 'submodule') else 0
-        if not self.has_parity:
-            return x + self.param * 4 + submodule_forward_result + 3
-        else:
+        if self.has_parity:
             return x + self.param * 2 + submodule_forward_result
+        else:
+            return x + self.param * 4 + submodule_forward_result + 3
 
 SAMPLE_MODULE_CPP_SOURCE = """\n
 namespace torch {
-namespace nn{
+namespace nn {
 struct C10_EXPORT SampleModuleOptions {
   SampleModuleOptions(bool has_parity, bool has_submodule) : has_parity_(has_parity), has_submodule_(has_submodule) {}
 
@@ -69,8 +67,8 @@ struct C10_EXPORT SampleModuleImpl : public torch::nn::Cloneable<SampleModuleImp
 };
 
 TORCH_MODULE(SampleModule);
-}
-}
+} // namespace nn
+} // namespace torch
 """
 
 module_tests = [
