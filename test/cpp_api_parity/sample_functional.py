@@ -34,7 +34,7 @@ struct C10_EXPORT SampleFunctionalFuncOptions {
   TORCH_ARG(bool, has_parity);
 };
 
-Tensor sample_functional(Tensor x, bool has_parity) {
+Tensor sample_functional(Tensor x, SampleFunctionalFuncOptions options) {
   return x * 2;
 }
 
