@@ -244,7 +244,7 @@ def compute_module_name(test_params_dict):
     return module_name
 
 # yf225 TODO: move to common utils?
-def process_test_params_for_module(test_params_dict, module_metadata, device, test_instance_class):
+def process_test_params_for_module(test_params_dict, device, test_instance_class):
   module_name = compute_module_name(test_params_dict)
   test_params_dict['constructor'] = test_params_dict.get('constructor', getattr(torch.nn, module_name))
   test = test_instance_class(**test_params_dict)
@@ -338,11 +338,9 @@ def add_torch_nn_module_impl_parity_tests(parity_table, unit_test_class, test_pa
 
     has_impl_parity, _ = parity_table['torch::nn'][module_full_name]
 
-    module_metadata = torch_nn_modules.module_metadata_map[module_name]
     for device in devices:
       test_params = process_test_params_for_module(
         test_params_dict=test_params_dict,
-        module_metadata=module_metadata,
         device=device,
         test_instance_class=test_instance_class,
       )
@@ -422,7 +420,7 @@ def build_cpp_tests(unit_test_class, print_cpp_source=False):
     modules_added_metadata_cpp_sources = set()
     for test_name, test_params in torch_nn_test_params_map.items():
       if not test_params.module_name in modules_added_metadata_cpp_sources:
-        cpp_sources += torch_nn_modules.module_metadata_map[test_params.module_name].cpp_sources
+        cpp_sources += torch_nn_modules.module_metadata_map.get(test_params.module_name, torch_nn_modules.TorchNNModuleMetadata()).cpp_sources
         modules_added_metadata_cpp_sources.add(test_params.module_name)
       cpp_sources += generate_test_cpp_sources(test_params=test_params, template=TORCH_NN_MODULE_TEST_FORWARD_BACKWARD)
       functions.append('{}_{}'.format(test_params.module_variant_name, 'test_forward_backward'))

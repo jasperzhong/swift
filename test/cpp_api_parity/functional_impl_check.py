@@ -198,7 +198,7 @@ def compute_cpp_function_call(test_params_dict, arg_dict, functional_name):
 
 
 # yf225 TODO: move to common utils?
-def process_test_params_for_functional(test_params_dict, functional_metadata, device, test_instance_class):
+def process_test_params_for_functional(test_params_dict, device, test_instance_class):
   test = test_instance_class(**test_params_dict)
   # yf225 TODO: can we remove the magic number `5` here?
   functional_name = compute_functional_name(test_params_dict)
@@ -292,11 +292,9 @@ def add_torch_nn_functional_impl_parity_tests(parity_table, unit_test_class, tes
 
     has_impl_parity, _ = parity_table['torch::nn::functional'][functional_full_name]
 
-    functional_metadata = torch_nn_functionals.functional_metadata_map.get(functional_name, torch_nn_functionals.TorchNNFunctionalMetadata())
     for device in devices:
       test_params = process_test_params_for_functional(
         test_params_dict=test_params_dict,
-        functional_metadata=functional_metadata,
         device=device,
         test_instance_class=test_instance_class,
       )
