@@ -2181,7 +2181,7 @@ TEST_F(ModulesTest, ELU) {
       if (!inplace) {
         x.requires_grad_(true);
       }
-      auto x_orig = x.clone()
+      auto x_orig = x.clone();
       auto y = model(x);
       torch::Tensor s = y.sum();
 
