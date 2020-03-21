@@ -27,34 +27,11 @@ parity_table_path = os.path.join(os.path.dirname(__file__), 'cpp_api_parity/pari
 
 parity_table = parse_parity_tracker_table(parity_table_path)
 
-import torch.nn.functional as F
-from torch.testing._internal.common_nn import wrap_functional
-
-# How to get the functional name from wrap_functional:
-# ```
-# def wrap_functional(fn, **kwargs):
-#     class FunctionalModule(torch.nn.Module):
-#         def __init__(self):
-#             self.fn = fn
-#         def forward(self, *args):
-#             return self.fn(*args, **kwargs)
-#     return FunctionalModule
-#
-# func_dict = dict(
-#         functional_name='interpolate',
-#         constructor=wrap_functional(F.interpolate, size=(12, ), scale_factor=None, mode='nearest'),
-#         input_size=(1, 2, 3),
-#         fullname='interpolate_nearest_tuple_1d',
-#         pickle=False,
-#     )
-#
-# import inspect
-# print(func_dict['constructor']().fn)  # prints: <function interpolate at 0x7f13611a0ea0>
-# ```
-
 # yf225 TODO comment:
 # RHS value format: 'input' / 'target' / 'extra_args_0' / 'extra_args_1'
 # NOTE: any var symbol written in the cpp_* fields needs to have a mapping here!
+
+# test_cpp_api_parity=False, # yf225 TODO: this is an optional flag for each test params
 
 def bceloss_weights_no_reduce_scalar_test():
     t = torch.randn(()).double()

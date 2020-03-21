@@ -9,5 +9,4 @@ TorchNNFunctionalMetadata = namedtuple(
 )
 TorchNNFunctionalMetadata.__new__.__defaults__ = ('',)
 
-functional_metadata_map = {
-}
+functional_metadata_map = {}

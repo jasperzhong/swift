@@ -36,6 +36,8 @@ class SampleModule(torch.nn.Module):
         else:
             return x + self.param * 4 + submodule_forward_result + 3
 
+torch.nn.SampleModule = SampleModule
+
 SAMPLE_MODULE_CPP_SOURCE = """\n
 namespace torch {
 namespace nn {
@@ -93,11 +95,5 @@ module_tests = [
 
 # yf225 TODO: probably clean this up
 torch_nn_modules.module_metadata_map['SampleModule'] = torch_nn_modules.TorchNNModuleMetadata(
-    cpp_default_constructor_args='(true)',
-    num_attrs_recursive=20,
     cpp_sources=SAMPLE_MODULE_CPP_SOURCE,
-    python_ignored_constructor_args=['has_parity'],
-    python_ignored_attrs=['has_parity'],
 )
-
-torch.nn.SampleModule = SampleModule
