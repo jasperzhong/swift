@@ -2531,7 +2531,7 @@ TEST_F(ModulesTest, RReLU) {
           (x_orig < 0) * (y >= x_orig * upper) * (y <= lower * x_orig)) * 1.0;
         ASSERT_TRUE(torch::allclose(z, torch::ones_like(z)));
         if (inplace) {
-          ASSERT_TRUE(torch::allclose(x, torch::ones_like(z)));
+          ASSERT_TRUE(torch::allclose(x, y));
         } else {
           s.backward();
         }
