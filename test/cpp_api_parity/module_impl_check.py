@@ -350,6 +350,8 @@ def add_torch_nn_module_impl_parity_tests(parity_table, unit_test_class, test_pa
       def test_fn(self):
         test_torch_nn_module_variant(unit_test_class=self, test_params=torch_nn_test_params_map[self._testMethodName])
 
+      test_fn = unittest.skipIf(not test_params_dict.get('test_cpp_api_parity', True), "Excluded from C++ API parity tests")(test_fn)
+
       if device == 'cuda':
         test_fn = unittest.skipIf(not TEST_CUDA, "CUDA unavailable")(test_fn)
         test_fn = unittest.skipIf(not test_params_dict.get('test_cuda', True), "Excluded from CUDA tests")(test_fn)

@@ -33,6 +33,8 @@ parity_table = parse_parity_tracker_table(parity_table_path)
 
 # test_cpp_api_parity=False, # yf225 TODO: this is an optional flag for each test params
 
+# yf225 TODO: clean up this file!
+
 def bceloss_weights_no_reduce_scalar_test():
     t = torch.randn(()).double()
     weights = torch.rand(())
