@@ -2190,7 +2190,7 @@ TEST_F(ModulesTest, ELU) {
     for (const auto inplace : {false, true}) {
       ELU model {ELUOptions().alpha(alpha).inplace(inplace)};
       auto x = torch::linspace(-10.0, 10.0, size * size * size);
-      x.resize_({size, size, size})
+      x.resize_({size, size, size});
       if (!inplace) {
         x.requires_grad_(true);
       }
@@ -2263,7 +2263,7 @@ TEST_F(ModulesTest, Hardtanh) {
       for (const auto inplace : {false, true}) {
         Hardtanh model {HardtanhOptions().min_val(min_val).max_val(max_val).inplace(inplace)};
         auto x = torch::linspace(-10.0, 10.0, size * size * size);
-        x.resize_({size, size, size})
+        x.resize_({size, size, size});
         if (!inplace) {
           x.requires_grad_(true);
         }
@@ -2306,7 +2306,7 @@ TEST_F(ModulesTest, LeakyReLU) {
     for (const auto negative_slope : {0.0, 0.42, 1.0}) {
       LeakyReLU model {LeakyReLUOptions().negative_slope(negative_slope).inplace(inplace)};
       auto x = torch::linspace(-10.0, 10.0, size * size * size);
-      x.resize_({size, size, size})
+      x.resize_({size, size, size});
       if (!inplace) {
         x.requires_grad_(true);
       }
