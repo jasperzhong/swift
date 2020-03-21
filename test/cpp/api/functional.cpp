@@ -2334,7 +2334,7 @@ TEST_F(FunctionalTest, AlphaDropout) {
       ASSERT_TRUE(torch::allclose(input_mean, output.mean(), 0.1));
       ASSERT_TRUE(torch::allclose(input_std, output.std(), 0.1));
       if (inplace) {
-        ASSERT_TRUE(torch::allclose(input_, output);
+        ASSERT_TRUE(torch::allclose(input_, output));
       }
     }
   }
@@ -2355,7 +2355,7 @@ TEST_F(FunctionalTest, FeatureAlphaDropout) {
       ASSERT_TRUE(torch::allclose(input_mean, output.mean(), 0.1));
       ASSERT_TRUE(torch::allclose(input_std, output.std(), 0.1));
       if (inplace) {
-        ASSERT_TRUE(torch::allclose(input_, output);
+        ASSERT_TRUE(torch::allclose(input_, output));
       }
     }
   }
