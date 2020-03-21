@@ -28,6 +28,12 @@ namespace torch {
 namespace nn {
 namespace functional {
 
+struct C10_EXPORT SampleFunctionalFuncOptions {
+  SampleFunctionalFuncOptions(bool has_parity) : has_parity_(has_parity) {}
+
+  TORCH_ARG(bool, has_parity);
+};
+
 Tensor sample_functional(Tensor x, bool has_parity) {
   return x * 2;
 }
