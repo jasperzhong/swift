@@ -272,6 +272,7 @@ def is_criterion_test(test_instance):
 
 torch_nn_test_params_map = {}
 
+# yf225 TODO: move this to common utils?
 def add_torch_nn_functional_impl_parity_tests(parity_table, unit_test_class, test_params_dicts, test_instance_class):
   for test_params_dict in test_params_dicts:
     # Skip all `torch.nn` module tests, since they are handled by another test suite.
