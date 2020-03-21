@@ -2165,20 +2165,25 @@ TEST_F(ModulesTest, ELU) {
 }
 
 TEST_F(ModulesTest, SELU) {
-  SELU model;
-  auto input = torch::randn({5, 5}, torch::requires_grad());
-  auto output = model->forward(input);
-  const double scale = 1.0507009873554804934193349852946;
-  const double alpha = 1.6732632423543772848170429916717;
-  auto zero = torch::zeros_like(input);
-  auto expected = scale *
-      (torch::max(zero, input) +
-       torch::min(zero, alpha * (torch::exp(input) - 1)));
-  auto s = output.sum();
-  s.backward();
+  for (const auto inplace : {false, true}) {
+    SELU model(inplace);
+    auto input = torch::randn({5, 5}, torch::requires_grad());
+    auto output = model->forward(input);
+    const double scale = 1.0507009873554804934193349852946;
+    const double alpha = 1.6732632423543772848170429916717;
+    auto zero = torch::zeros_like(input);
+    auto expected = scale *
+        (torch::max(zero, input) +
+         torch::min(zero, alpha * (torch::exp(input) - 1)));
+    auto s = output.sum();
+    s.backward();
 
-  ASSERT_EQ(s.ndimension(), 0);
-  ASSERT_TRUE(output.allclose(expected));
+    ASSERT_EQ(s.ndimension(), 0);
+    ASSERT_TRUE(output.allclose(expected));
+    if (inplace) {
+      ASSERT_TRUE(input.allclose(expected));
+    }
+  }
 }
 
 TEST_F(ModulesTest, Hardshrink) {
@@ -2238,20 +2243,25 @@ TEST_F(ModulesTest, HardtanhMinValGEMaxVal) {
 
 TEST_F(ModulesTest, LeakyReLU) {
   const auto size = 3;
-  for (const auto negative_slope : {0.0, 0.42, 1.0}) {
-    LeakyReLU model {LeakyReLUOptions().negative_slope(negative_slope)};
-    auto x = torch::linspace(-10.0, 10.0, size * size * size);
-    x.resize_({size, size, size}).set_requires_grad(true);
-    auto y = model(x);
-    torch::Tensor s = y.sum();
+  for (const auto inplace : {false, true}) {
+    for (const auto negative_slope : {0.0, 0.42, 1.0}) {
+      LeakyReLU model {LeakyReLUOptions().negative_slope(negative_slope).inplace(inplace)};
+      auto x = torch::linspace(-10.0, 10.0, size * size * size);
+      x.resize_({size, size, size}).set_requires_grad(true);
+      auto y = model(x);
+      torch::Tensor s = y.sum();
 
-    s.backward();
-    ASSERT_EQ(s.ndimension(), 0);
+      s.backward();
+      ASSERT_EQ(s.ndimension(), 0);
 
-    ASSERT_EQ(y.ndimension(), 3);
-    ASSERT_EQ(y.sizes(), std::vector<int64_t>({size, size, size}));
-    auto y_exp = (x < 0) * x * negative_slope + (x >= 0) * x;
-    ASSERT_TRUE(torch::allclose(y, y_exp));
+      ASSERT_EQ(y.ndimension(), 3);
+      ASSERT_EQ(y.sizes(), std::vector<int64_t>({size, size, size}));
+      auto y_exp = (x < 0) * x * negative_slope + (x >= 0) * x;
+      ASSERT_TRUE(torch::allclose(y, y_exp));
+      if (inplace) {
+        ASSERT_TRUE(torch::allclose(x, y_exp));
+      }
+    }
   }
 }
 
@@ -2394,37 +2404,47 @@ TEST_F(ModulesTest, PReLU) {
 }
 
 TEST_F(ModulesTest, ReLU) {
-  const auto size = 3;
-  ReLU model;
-  auto x = torch::linspace(-10.0, 10.0, size * size * size);
-  x.resize_({size, size, size}).set_requires_grad(true);
-  auto y = model(x);
-  torch::Tensor s = y.sum();
+  for (const auto inplace : {false, true}) {
+    const auto size = 3;
+    ReLU model(inplace);
+    auto x = torch::linspace(-10.0, 10.0, size * size * size);
+    x.resize_({size, size, size}).set_requires_grad(true);
+    auto y = model(x);
+    torch::Tensor s = y.sum();
 
-  s.backward();
-  ASSERT_EQ(s.ndimension(), 0);
+    s.backward();
+    ASSERT_EQ(s.ndimension(), 0);
 
-  ASSERT_EQ(y.ndimension(), 3);
-  ASSERT_EQ(y.sizes(), std::vector<int64_t>({size, size, size}));
-  auto y_exp = (x < 0) * 0 + (x >= 0) * x;
-  ASSERT_TRUE(torch::allclose(y, y_exp));
+    ASSERT_EQ(y.ndimension(), 3);
+    ASSERT_EQ(y.sizes(), std::vector<int64_t>({size, size, size}));
+    auto y_exp = (x < 0) * 0 + (x >= 0) * x;
+    ASSERT_TRUE(torch::allclose(y, y_exp));
+    if (inplace) {
+      ASSERT_TRUE(torch::allclose(x, y_exp));
+    }
+  }
 }
 
 TEST_F(ModulesTest, ReLU6) {
-  const auto size = 3;
-  ReLU6 model;
-  auto x = torch::linspace(-10.0, 10.0, size * size * size);
-  x.resize_({size, size, size}).set_requires_grad(true);
-  auto y = model(x);
-  torch::Tensor s = y.sum();
+  for (const auto inplace : {false, true}) {
+    const auto size = 3;
+    ReLU6 model(inplace);
+    auto x = torch::linspace(-10.0, 10.0, size * size * size);
+    x.resize_({size, size, size}).set_requires_grad(true);
+    auto y = model(x);
+    torch::Tensor s = y.sum();
 
-  s.backward();
-  ASSERT_EQ(s.ndimension(), 0);
+    s.backward();
+    ASSERT_EQ(s.ndimension(), 0);
 
-  ASSERT_EQ(y.ndimension(), 3);
-  ASSERT_EQ(y.sizes(), std::vector<int64_t>({size, size, size}));
-  auto y_exp = (x < 0) * 0 + ((x >= 0) * (x <= 6)) * x + (x > 6) * 6;
-  ASSERT_TRUE(torch::allclose(y, y_exp));
+    ASSERT_EQ(y.ndimension(), 3);
+    ASSERT_EQ(y.sizes(), std::vector<int64_t>({size, size, size}));
+    auto y_exp = (x < 0) * 0 + ((x >= 0) * (x <= 6)) * x + (x > 6) * 6;
+    ASSERT_TRUE(torch::allclose(y, y_exp));
+    if (inplace) {
+      ASSERT_TRUE(torch::allclose(x, y_exp));
+    }
+  }
 }
 
 TEST_F(ModulesTest, RReLU) {
@@ -2451,21 +2471,26 @@ TEST_F(ModulesTest, RReLU) {
 
 TEST_F(ModulesTest, CELU) {
   const auto size = 3;
-  for (const auto alpha : {0.42, 1.0, 4.2, 42.42}) {
-    CELU model {CELUOptions().alpha(alpha)};
-    auto x = torch::linspace(-10.0, 10.0, size * size * size);
-    x.resize_({size, size, size}).set_requires_grad(true);
-    auto y = model(x);
-    torch::Tensor s = y.sum();
+  for (const auto inplace : {false, true}) {
+    for (const auto alpha : {0.42, 1.0, 4.2, 42.42}) {
+      CELU model {CELUOptions().alpha(alpha).inplace(inplace)};
+      auto x = torch::linspace(-10.0, 10.0, size * size * size);
+      x.resize_({size, size, size}).set_requires_grad(true);
+      auto y = model(x);
+      torch::Tensor s = y.sum();
 
-    s.backward();
-    ASSERT_EQ(s.ndimension(), 0);
+      s.backward();
+      ASSERT_EQ(s.ndimension(), 0);
 
-    ASSERT_EQ(y.ndimension(), 3);
-    ASSERT_EQ(y.sizes(), std::vector<int64_t>({size, size, size}));
-    auto y_exp = torch::max(torch::zeros_like(x), x) +
-        torch::min(torch::zeros_like(x), alpha * (torch::exp(x / alpha) - 1.0));
-    ASSERT_TRUE(torch::allclose(y, y_exp));
+      ASSERT_EQ(y.ndimension(), 3);
+      ASSERT_EQ(y.sizes(), std::vector<int64_t>({size, size, size}));
+      auto y_exp = torch::max(torch::zeros_like(x), x) +
+          torch::min(torch::zeros_like(x), alpha * (torch::exp(x / alpha) - 1.0));
+      ASSERT_TRUE(torch::allclose(y, y_exp));
+      if (inplace) {
+        ASSERT_TRUE(torch::allclose(x, y_exp));
+      }
+    }
   }
 }
 
@@ -2603,6 +2628,9 @@ TEST_F(ModulesTest, Threshold) {
         ASSERT_EQ(y.ndimension(), 3);
         ASSERT_EQ(y.sizes(), std::vector<int64_t>({size, size, size}));
         ASSERT_TRUE(torch::allclose(y, y_exp));
+        if (inplace) {
+          ASSERT_TRUE(torch::allclose(x, y_exp));
+        }
       }
     }
   }
