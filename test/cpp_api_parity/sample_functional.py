@@ -46,14 +46,14 @@ Tensor sample_functional(Tensor x, bool has_parity) {
 functional_tests = [
     dict(
         constructor=wrap_functional(F.sample_functional, has_parity=True),
-        cpp_options_args='/*has_parity=*/true',
+        cpp_options_args='SampleFunctionalFuncOptions(true)',
         input_size=(1, 2, 3),
         fullname='sample_functional_has_parity',
         has_parity=True,
     ),
     dict(
         constructor=wrap_functional(F.sample_functional, has_parity=False),
-        cpp_options_args='/*has_parity=*/false',
+        cpp_options_args='SampleFunctionalFuncOptions(false)',
         input_size=(1, 2, 3),
         fullname='sample_functional_no_parity',
         has_parity=False,
