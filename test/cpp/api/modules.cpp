@@ -1265,7 +1265,10 @@ TEST_F(ModulesTest, EmbeddingBagFromPretrained) {
 TEST_F(ModulesTest, AlphaDropout) {
   for (const auto inplace : {false, true}) {
     AlphaDropout alpha_dropout(AlphaDropoutOptions(0.5).inplace(inplace));
-    torch::Tensor x = torch::ones(100, torch::requires_grad());
+    torch::Tensor x = torch::ones(100);
+    if (!inplace) {
+      x.requires_grad_(true);
+    }
     torch::Tensor y = alpha_dropout(x);
 
     y.backward(torch::ones_like(y));
@@ -1288,7 +1291,10 @@ TEST_F(ModulesTest, AlphaDropout) {
 TEST_F(ModulesTest, FeatureAlphaDropout) {
   for (const auto inplace : {false, true}) {
     FeatureAlphaDropout feature_alpha_dropout(FeatureAlphaDropoutOptions(0.5).inplace(inplace));
-    torch::Tensor x = torch::ones({10, 10}, torch::requires_grad());
+    torch::Tensor x = torch::ones({10, 10});
+    if (!inplace) {
+      x.requires_grad_(true);
+    }
     torch::Tensor y = feature_alpha_dropout(x);
 
     y.backward(torch::ones_like(y));
@@ -1312,7 +1318,10 @@ TEST_F(ModulesTest, FeatureAlphaDropout) {
 TEST_F(ModulesTest, Dropout) {
   for (const auto inplace : {false, true}) {
     Dropout dropout(DropoutOptions(0.5).inplace(inplace));
-    torch::Tensor x = torch::ones(100, torch::requires_grad());
+    torch::Tensor x = torch::ones(100);
+    if (!inplace) {
+      x.requires_grad_(true);
+    }
     torch::Tensor y = dropout(x);
 
     y.backward(torch::ones_like(y));
@@ -1333,7 +1342,10 @@ TEST_F(ModulesTest, Dropout) {
 TEST_F(ModulesTest, Dropout2d) {
   for (const auto inplace : {false, true}) {
     Dropout2d dropout(Dropout2dOptions(0.5).inplace(inplace));
-    torch::Tensor x = torch::ones({10, 10}, torch::requires_grad());
+    torch::Tensor x = torch::ones({10, 10});
+    if (!inplace) {
+      x.requires_grad_(true);
+    }
     torch::Tensor y = dropout(x);
 
     y.backward(torch::ones_like(y));
@@ -1355,7 +1367,10 @@ TEST_F(ModulesTest, Dropout2d) {
 TEST_F(ModulesTest, Dropout3d) {
   for (const auto inplace : {false, true}) {
     Dropout3d dropout(Dropout3dOptions(0.5).inplace(inplace));
-    torch::Tensor x = torch::ones({4, 5, 5}, torch::requires_grad());
+    torch::Tensor x = torch::ones({4, 5, 5});
+    if (!inplace) {
+      x.requires_grad_(true);
+    }
     torch::Tensor y = dropout(x);
 
     y.backward(torch::ones_like(y));
@@ -2175,7 +2190,10 @@ TEST_F(ModulesTest, ELU) {
     for (const auto inplace : {false, true}) {
       ELU model {ELUOptions().alpha(alpha).inplace(inplace)};
       auto x = torch::linspace(-10.0, 10.0, size * size * size);
-      x.resize_({size, size, size}).set_requires_grad(true);
+      x.resize_({size, size, size})
+      if (!inplace) {
+        x.requires_grad_(true);
+      }
       auto y = model(x);
       torch::Tensor s = y.sum();
 
@@ -2197,7 +2215,10 @@ TEST_F(ModulesTest, ELU) {
 TEST_F(ModulesTest, SELU) {
   for (const auto inplace : {false, true}) {
     SELU model(inplace);
-    auto input = torch::randn({5, 5}, torch::requires_grad());
+    auto input = torch::randn({5, 5});
+    if (!inplace) {
+      input.requires_grad_(true);
+    }
     auto output = model->forward(input);
     const double scale = 1.0507009873554804934193349852946;
     const double alpha = 1.6732632423543772848170429916717;
@@ -2242,7 +2263,10 @@ TEST_F(ModulesTest, Hardtanh) {
       for (const auto inplace : {false, true}) {
         Hardtanh model {HardtanhOptions().min_val(min_val).max_val(max_val).inplace(inplace)};
         auto x = torch::linspace(-10.0, 10.0, size * size * size);
-        x.resize_({size, size, size}).set_requires_grad(true);
+        x.resize_({size, size, size})
+        if (!inplace) {
+          x.requires_grad_(true);
+        }
         auto y = model(x);
         torch::Tensor s = y.sum();
 
@@ -2282,7 +2306,10 @@ TEST_F(ModulesTest, LeakyReLU) {
     for (const auto negative_slope : {0.0, 0.42, 1.0}) {
       LeakyReLU model {LeakyReLUOptions().negative_slope(negative_slope).inplace(inplace)};
       auto x = torch::linspace(-10.0, 10.0, size * size * size);
-      x.resize_({size, size, size}).set_requires_grad(true);
+      x.resize_({size, size, size})
+      if (!inplace) {
+        x.requires_grad_(true);
+      }
       auto y = model(x);
       torch::Tensor s = y.sum();
 
@@ -2443,7 +2470,10 @@ TEST_F(ModulesTest, ReLU) {
     const auto size = 3;
     ReLU model(inplace);
     auto x = torch::linspace(-10.0, 10.0, size * size * size);
-    x.resize_({size, size, size}).set_requires_grad(true);
+    x.resize_({size, size, size});
+    if (!inplace) {
+      x.requires_grad_(true);
+    }
     auto y = model(x);
     torch::Tensor s = y.sum();
 
@@ -2465,7 +2495,10 @@ TEST_F(ModulesTest, ReLU6) {
     const auto size = 3;
     ReLU6 model(inplace);
     auto x = torch::linspace(-10.0, 10.0, size * size * size);
-    x.resize_({size, size, size}).set_requires_grad(true);
+    x.resize_({size, size, size});
+    if (!inplace) {
+      x.requires_grad_(true);
+    }
     auto y = model(x);
     torch::Tensor s = y.sum();
 
@@ -2489,7 +2522,10 @@ TEST_F(ModulesTest, RReLU) {
       for (const auto inplace : {false, true}) {
         RReLU model {RReLUOptions().lower(lower).upper(upper).inplace(inplace)};
         auto x = torch::linspace(-10.0, 10.0, size * size * size);
-        x.resize_({size, size, size}).set_requires_grad(true);
+        x.resize_({size, size, size});
+        if (!inplace) {
+          x.requires_grad_(true);
+        }
         auto y = model(x);
         torch::Tensor s = y.sum();
 
@@ -2515,7 +2551,10 @@ TEST_F(ModulesTest, CELU) {
     for (const auto alpha : {0.42, 1.0, 4.2, 42.42}) {
       CELU model {CELUOptions().alpha(alpha).inplace(inplace)};
       auto x = torch::linspace(-10.0, 10.0, size * size * size);
-      x.resize_({size, size, size}).set_requires_grad(true);
+      x.resize_({size, size, size});
+      if (!inplace) {
+        x.requires_grad_(true);
+      }
       auto y = model(x);
       torch::Tensor s = y.sum();
 
