@@ -742,7 +742,7 @@ def multilabelmarginloss_0d_no_reduce_test():
         fullname='MultiLabelMarginLoss_0d_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multilabel_margin_loss(i, t.type_as(i).long(), reduction='none')),
-        cpp_function_call='F::multilabel_margin_loss(i, t.to(i.options()).to(torch::kLong), F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_function_call='F::multilabel_margin_loss(i, t.to(i.options()).to(torch::kLong), F::MultilabelMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(()),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
@@ -758,7 +758,7 @@ def multilabelmarginloss_1d_no_reduce_test():
         fullname='MultiLabelMarginLoss_1d_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multilabel_margin_loss(i, t.type_as(i).long(), reduction='none')),
-        cpp_function_call='F::multilabel_margin_loss(i, t.to(i.options()).to(torch::kLong), F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_function_call='F::multilabel_margin_loss(i, t.to(i.options()).to(torch::kLong), F::MultilabelMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(10),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
@@ -774,7 +774,7 @@ def multilabelmarginloss_index_neg_test():
         fullname='MultiLabelMarginLoss_index_neg',
         constructor=wrap_functional(
             lambda i: F.multilabel_margin_loss(i, t.type_as(i).long(), reduction='none')),
-        cpp_function_call='F::multilabel_margin_loss(i, t.to(i.options()).to(torch::kLong), F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_function_call='F::multilabel_margin_loss(i, t.to(i.options()).to(torch::kLong), F::MultilabelMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(5, 10),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
@@ -790,7 +790,7 @@ def multilabelmarginloss_no_reduce_test():
         fullname='MultiLabelMarginLoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multilabel_margin_loss(i, t.type_as(i).long(), reduction='none')),
-        cpp_function_call='F::multilabel_margin_loss(i, t.to(i.options()).to(torch::kLong), F::MultiLabelMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_function_call='F::multilabel_margin_loss(i, t.to(i.options()).to(torch::kLong), F::MultilabelMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(5, 10),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
@@ -850,7 +850,7 @@ def multilabelsoftmarginloss_no_reduce_test():
         fullname='MultiLabelSoftMarginLoss_no_reduce',
         constructor=wrap_functional(
             lambda i: F.multilabel_soft_margin_loss(i, t.type_as(i), reduction='none')),
-        cpp_function_call='F::multilabel_soft_margin_loss(i, t.to(i.options()), F::MultiLabelSoftMarginLossFuncOptions().reduction(torch::kNone))',
+        cpp_function_call='F::multilabel_soft_margin_loss(i, t.to(i.options()), F::MultilabelSoftMarginLossFuncOptions().reduction(torch::kNone))',
         input_fn=lambda: torch.randn(5, 10),
         cpp_arg_symbol_map={'i': 'input', 't': t},
         reference_fn=lambda i, *_:
@@ -867,7 +867,7 @@ def multilabelsoftmarginloss_weights_no_reduce_test():
         constructor=wrap_functional(
             lambda i: F.multilabel_soft_margin_loss(i, t.type_as(i),
                                                     weight=weights.type_as(i), reduction='none')),
-        cpp_function_call='F::multilabel_soft_margin_loss(i, t.to(i.options()), F::MultiLabelSoftMarginLossFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone))',
+        cpp_function_call='F::multilabel_soft_margin_loss(i, t.to(i.options()), F::MultilabelSoftMarginLossFuncOptions().weight(weights.to(i.options())).reduction(torch::kNone))',
         input_fn=lambda: torch.randn(5, 10),
         cpp_arg_symbol_map={'i': 'input', 't': t, 'weights': weights},
         reference_fn=lambda i, *_:
