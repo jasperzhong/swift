@@ -13,6 +13,8 @@ import torch.utils.cpp_extension
 from cpp_api_parity.parity_table_parser import parse_parity_tracker_table
 from cpp_api_parity import module_impl_check, functional_impl_check, sample_module, sample_functional
 
+print_cpp_source = True
+
 # yf225 TODO: need to add proper checks and expectations when people:
 # 1. Add a new test to a module already supported by C++ API (i.e. parity table has entry for it, and the parity bit is yes)
 #   a) add a flag `test_cpp_api_parity` to the dict to be able to turn off test as needed
@@ -133,8 +135,8 @@ for test_params_dicts, test_instance_class in [
   module_impl_check.add_tests(TestCppApiParity, test_params_dicts, test_instance_class, parity_table)
   functional_impl_check.add_tests(TestCppApiParity, test_params_dicts, test_instance_class, parity_table)
 
-module_impl_check.build_cpp_tests(TestCppApiParity)
-functional_impl_check.build_cpp_tests(TestCppApiParity)
+module_impl_check.build_cpp_tests(TestCppApiParity, print_cpp_source=print_cpp_source)
+functional_impl_check.build_cpp_tests(TestCppApiParity, print_cpp_source=print_cpp_source)
 
 if __name__ == "__main__":
   common.run_tests()

@@ -356,7 +356,7 @@ def generate_test_cpp_sources(test_params, template):
   )
   return test_cpp_sources
 
-def build_cpp_tests(unit_test_class):
+def build_cpp_tests(unit_test_class, print_cpp_source=False):
   # Put all cpp source code into one file and compile together, in order to speed up the build
   # yf225 TODO bonus point: check in the cpp source code for comparison
   if len(torch_nn_test_params_map) > 0:
@@ -369,7 +369,8 @@ def build_cpp_tests(unit_test_class):
         functionals_added_metadata_cpp_sources.add(test_params.functional_name)
       cpp_sources += generate_test_cpp_sources(test_params=test_params, template=TORCH_NN_FUNCTIONAL_TEST_FORWARD)
       functions.append('{}_{}'.format(test_params.functional_variant_name, 'test_forward'))
-    print(cpp_sources)  # yf225 TODO: remove this when ready
+    if print_cpp_source:
+      print(cpp_sources)
 
     cpp_module = compile_cpp_code_inline(
       name='functional_impl_check',
