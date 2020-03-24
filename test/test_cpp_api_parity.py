@@ -42,37 +42,22 @@ parity_table = parse_parity_tracker_table(PARITY_TABLE_PATH)
 class TestCppApiParity(common.TestCase):
     pass
 
-# yf225 TODO debug
-import torch
-new_criterion_tests = [
-    dict(
-        module_name='BCEWithLogitsLoss',
-        constructor_args=(torch.rand(()),),
-        cpp_constructor_args='torch::nn::BCEWithLogitsLossOptions().weight(torch::rand({}))',
-        input_fn=lambda: torch.rand(()).clamp_(1e-2, 1 - 1e-2),
-        target_fn=lambda: torch.randn(()).gt(0).double(),
-        desc='scalar_weights'
-    ),
-]
-
 for test_params_dicts, test_instance_class in [
-    # yf225 TODO debug
-    # (sample_module.module_tests, common_nn.ModuleTest),
-    # (sample_functional.functional_tests, common_nn.NewModuleTest),
-    # (common_nn.module_tests, common_nn.ModuleTest),
-    # (common_nn.new_module_tests, common_nn.NewModuleTest),
-    # (common_nn.criterion_tests, common_nn.CriterionTest),
-    (new_criterion_tests, common_nn.NewCriterionTest), # yf225 TODO debug
+    (sample_module.module_tests, common_nn.ModuleTest),
+    (sample_functional.functional_tests, common_nn.NewModuleTest),
+    (common_nn.module_tests, common_nn.ModuleTest),
+    (common_nn.new_module_tests, common_nn.NewModuleTest),
+    (common_nn.criterion_tests, common_nn.CriterionTest),
+    (common_nn.new_criterion_tests, common_nn.NewCriterionTest),
 ]:
     module_impl_check.add_tests(TestCppApiParity, test_params_dicts, test_instance_class, parity_table, devices)
     functional_impl_check.add_tests(TestCppApiParity, test_params_dicts, test_instance_class, parity_table, devices)
 
 # Assert that there exists auto-generated tests for `SampleModule` and `sample_functional`.
-# yf225 TODO debug
-# assert len([name for name in TestCppApiParity.__dict__ if 'SampleModule' in name]) == \
-#     len(sample_module.module_tests) * len(devices)
-# assert len([name for name in TestCppApiParity.__dict__ if 'sample_functional' in name]) == \
-#     len(sample_functional.functional_tests) * len(devices)
+assert len([name for name in TestCppApiParity.__dict__ if 'SampleModule' in name]) == \
+    len(sample_module.module_tests) * len(devices)
+assert len([name for name in TestCppApiParity.__dict__ if 'sample_functional' in name]) == \
+    len(sample_functional.functional_tests) * len(devices)
 
 if __name__ == "__main__":
     module_impl_check.build_cpp_tests(TestCppApiParity, print_cpp_source=print_cpp_source)
