@@ -25,6 +25,9 @@ cpp_api_parity.utils.extra_msg_on_failure = MESSAGE_HOW_TO_FIX_CPP_PARITY_TEST_F
 
 import os
 
+# NN tests use double as the default dtype
+torch.set_default_dtype(torch.double)
+
 import torch.testing._internal.common_utils as common
 import torch.testing._internal.common_nn as common_nn
 from cpp_api_parity.parity_table_parser import parse_parity_tracker_table

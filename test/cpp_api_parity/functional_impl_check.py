@@ -44,6 +44,7 @@ void ${functional_variant_name}_test_forward(
     const std::string& arg_dict_file_path,
     const std::string& forward_output_file_path) {
   pybind11::gil_scoped_release no_gil;
+  torch::set_default_dtype(torch::scalarTypeToTypeMeta(torch::kDouble));
 
   namespace F = torch::nn::functional;
 
