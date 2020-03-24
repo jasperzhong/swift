@@ -23,6 +23,7 @@
 #include <THC/THCDeviceUtils.cuh>
 
 #include <cstdint>
+#include <cmath>
 #include <limits>
 #include <utility>
 #include <type_traits>
@@ -50,19 +51,28 @@ void poisson_cuda_kernel(
     at::Tensor& ret,
     const at::Tensor& lambda,
     std::pair<uint64_t, uint64_t> seeds) {
-  at::cuda::CUDA_tensor_apply2<scalar_t, scalar_t>(
-      ret,
-      lambda,
-      [seeds] __device__(
-          scalar_t & ret_val, const scalar_t& lambda) {
-        curandStatePhilox4_32_10_t state;
+  at::TensorIterator iter;
+  iter.add_output(ret);
+  iter.add_input(lambda);
+  iter.build();
+  bool initialized = false;
+  curandStatePhilox4_32_10_t state;
+  at::native::gpu_kernel(iter,
+    [seeds, state, initialized] GPU_LAMBDA (scalar_t lambda) mutable -> scalar_t {
+      #if defined(__CUDA_ARCH__) || defined(__HIP_PLATFORM_HCC__)
+      if (!initialized) {
         curand_init(
             seeds.first,
             blockIdx.x * blockDim.x + threadIdx.x,
             seeds.second,
             &state);
-        ret_val = static_cast<scalar_t>(curand_poisson(&state, lambda));
-      });
+        initialized = true;
+      }
+      return static_cast<scalar_t>(curand_poisson(&state, lambda));
+      #else
+      return static_cast<scalar_t>(std::nan(""));  // just to avoid compiler warning
+      #endif
+    });
 }
 
 template <typename scalar_t>
