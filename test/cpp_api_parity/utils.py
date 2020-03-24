@@ -187,6 +187,7 @@ def compute_arg_dict(test_params_dict, test_instance):
     if is_criterion_test(test_instance):
         put_args_into_arg_dict('target', 't', convert_to_list(test_instance._get_target()))
     if test_instance.extra_args:
+        print(test_instance.extra_args)
         put_args_into_arg_dict('extra_args', 'e', convert_to_list(test_instance.extra_args))
 
     cpp_arg_symbol_map = test_params_dict.get('cpp_arg_symbol_map', {})
