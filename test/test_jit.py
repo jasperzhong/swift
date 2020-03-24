@@ -4579,10 +4579,14 @@ graph(%Ra, %Rb):
                 # type: (Tensor) -> Tensor
                 return 2 * x
 
+            def three(self, x):
+                # type: (Tensor) -> Tensor
+                return x * 3
+
             @torch.jit.script_method
             def forward(self, x):
                 # type: (Tensor) -> Tensor
-                return self.one(self.two(x), x)
+                return self.one(self.two(self.three(x)), x)
 
         class Bar(torch.jit.ScriptModule):
             def __init__(self):
@@ -4595,7 +4599,7 @@ graph(%Ra, %Rb):
 
         bar = Bar()
         ops = torch.jit.export_opnames(bar)
-        expected = ['aten::add.Tensor', 'aten::mul.Scalar']
+        expected = ['aten::add.Tensor', 'aten::mul.Scalar', 'aten::mul.ScalarTensor']
         self.assertEqual(ops, expected)
 
     def test_pytorch_jit_env_off(self):
@@ -6913,7 +6917,7 @@ a")
         def func():
             c = 1
             return c.add(1)
-        with self.assertRaisesRegex(RuntimeError, 'nonexistent attribute or method'):
+        with self.assertRaisesRegex(RuntimeError, r'Arguments for call are not valid\.'):
             torch.jit.script(func)
 
     # testing implicit conversion of tensors to scalars to match function arguments

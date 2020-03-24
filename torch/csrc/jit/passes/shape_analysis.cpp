@@ -964,29 +964,60 @@ class ShapePropagator {
             "aten::sub(Tensor self, Scalar other, Scalar alpha) -> Tensor",
             "aten::mul(Tensor self, Scalar other) -> Tensor",
             "aten::div(Tensor self, Scalar other) -> Tensor",
-          },
-          [this](Node* node) -> type_vec_t {
-            if (auto maybe_tensor_types = gatherTensorTypes(node)) {
-              auto first_scalar_type = (*maybe_tensor_types)[0]->scalarType();
-              auto second_scalar_type = tryScalarTypeFromJitType(node->inputs()[1]->type());
-              if (!first_scalar_type || !second_scalar_type) {
-                return {};
-              }
-              if (isIntegralType(*first_scalar_type, false) && isFloatingType(*second_scalar_type) )
-              {
-                auto default_dtype = at::typeMetaToScalarType(caffe2::get_default_dtype());
-                return {broadcast(*maybe_tensor_types, default_dtype)};
-              }
-              if (c10::ScalarType::Bool == *first_scalar_type &&
-                  c10::ScalarType::Bool != *second_scalar_type)
-              {
-                  auto result_type = c10::promoteTypes(*first_scalar_type, *second_scalar_type);
-                  return {broadcast(*maybe_tensor_types, result_type)};
-              }
-              return {broadcast(*maybe_tensor_types, first_scalar_type)};
+        },
+        [this](Node* node) -> type_vec_t {
+          if (auto maybe_tensor_types = gatherTensorTypes(node)) {
+            auto first_scalar_type = (*maybe_tensor_types)[0]->scalarType();
+            auto second_scalar_type = tryScalarTypeFromJitType(node->inputs()[1]->type());
+            if (!first_scalar_type || !second_scalar_type) {
+              return {};
             }
-            return {};
-          }};
+            if (isIntegralType(*first_scalar_type, false) && isFloatingType(*second_scalar_type) )
+            {
+              auto default_dtype = at::typeMetaToScalarType(caffe2::get_default_dtype());
+              return {broadcast(*maybe_tensor_types, default_dtype)};
+            }
+            if (c10::ScalarType::Bool == *first_scalar_type &&
+                c10::ScalarType::Bool != *second_scalar_type)
+            {
+              auto result_type = c10::promoteTypes(*first_scalar_type, *second_scalar_type);
+              return {broadcast(*maybe_tensor_types, result_type)};
+            }
+            return {broadcast(*maybe_tensor_types, first_scalar_type)};
+          }
+          return {};
+        }};
+
+    static const register_formula_for broadcasting_scalar_tensor_ops_arithmetic{
+        {
+            // Tensor-Scalar operators
+            "aten::add(Scalar self, Tensor other, Scalar alpha) -> Tensor",
+            "aten::sub(Scalar self, Tensor other, Scalar alpha) -> Tensor",
+            "aten::mul(Scalar self, Tensor other) -> Tensor",
+            "aten::div(Scalar self, Tensor other) -> Tensor",
+        },
+        [this](Node* node) -> type_vec_t {
+          if (auto maybe_tensor_types = gatherTensorTypes(node)) {
+            auto first_scalar_type = tryScalarTypeFromJitType(node->inputs()[0]->type());
+            auto second_scalar_type = (*maybe_tensor_types)[0]->scalarType();
+            if (!first_scalar_type || !second_scalar_type) {
+              return {};
+            }
+            if (isIntegralType(*second_scalar_type, false) && isFloatingType(*first_scalar_type) )
+            {
+              auto default_dtype = at::typeMetaToScalarType(caffe2::get_default_dtype());
+              return {broadcast(*maybe_tensor_types, default_dtype)};
+            }
+            if (c10::ScalarType::Bool == *second_scalar_type &&
+                c10::ScalarType::Bool != *first_scalar_type)
+            {
+              auto result_type = c10::promoteTypes(*first_scalar_type, *second_scalar_type);
+              return {broadcast(*maybe_tensor_types, result_type)};
+            }
+            return {broadcast(*maybe_tensor_types, second_scalar_type)};
+          }
+          return {};
+        }};
 
     // NB: we always take the scalar type of the Tensor
     static const register_formula_for broadcasting_tensor_scalar_ops{
@@ -1815,6 +1846,12 @@ class ShapePropagator {
       Node* node,
       bool insert_expands,
       std::vector<TensorTypePtr> tensor_types) {
+    bool tensor_then_scalar = (node->matches("aten::add(Tensor self, Scalar other, Scalar alpha) -> Tensor") ||
+                               node->matches("aten::sub(Tensor self, Scalar other, Scalar alpha) -> Tensor") ||
+                               node->matches("aten::mul(Tensor self, Scalar other) -> Tensor"));
+    bool scalar_then_tensor = (node->matches("aten::add(Scalar self, Tensor other, Scalar alpha) -> Tensor") ||
+                               node->matches("aten::sub(Scalar self, Tensor other, Scalar alpha) -> Tensor") ||
+                               node->matches("aten::mul(Scalar self, Tensor other) -> Tensor"));
     // For expensive ops we can directly encode their shape propagation
     // here, otherwise we fallback to running a fake version of the op
     // to get a quick and dirty propagation.
@@ -1831,33 +1868,27 @@ class ShapePropagator {
     } else if (node->matches("aten::pow(Tensor self, Scalar exponent) -> Tensor")) {
       node->output()->setType(tensor_types.at(0));
       return true;
-    } else if (
-        node->matches(
-            "aten::add(Tensor self, Scalar other, Scalar alpha) -> Tensor") ||
-        node->matches(
-            "aten::sub(Tensor self, Scalar other, Scalar alpha) -> Tensor") ||
-        node->matches("aten::mul(Tensor self, Scalar other) -> Tensor")) {
-      auto first_scalar_type = (tensor_types)[0]->scalarType();
-      auto second_scalar_type = tryScalarTypeFromJitType(node->inputs()[1]->type());
-      if (!first_scalar_type || !second_scalar_type) {
+    } else if (tensor_then_scalar || scalar_then_tensor) {  // 0-dim tensor op scalar or scalar op 0-dim tensor
+      size_t scalar_index = tensor_then_scalar ? 1 : 0;
+      auto tensor_scalar_type = (tensor_types)[0]->scalarType();
+      auto scalar_scalar_type = tryScalarTypeFromJitType(node->inputs()[scalar_index]->type());
+      if (!scalar_scalar_type || !tensor_scalar_type) {
         return false;
       }
-      if (isIntegralType(*first_scalar_type, false) && isFloatingType(*second_scalar_type) )
-      {
+      if (isIntegralType(*tensor_scalar_type, false) && isFloatingType(*scalar_scalar_type) ) {
         auto default_dtype = at::typeMetaToScalarType(caffe2::get_default_dtype());
         auto type = tensor_types[0]->withScalarType(default_dtype);
         node->output()->setType(type);
         return true;
       }
-      if (c10::ScalarType::Bool == *first_scalar_type &&
-          c10::ScalarType::Bool != *second_scalar_type)
-      {
-          auto result_type = c10::promoteTypes(*first_scalar_type, *second_scalar_type);
+      if (c10::ScalarType::Bool == *tensor_scalar_type &&
+          c10::ScalarType::Bool != *scalar_scalar_type) {
+          auto result_type = c10::promoteTypes(*tensor_scalar_type, *scalar_scalar_type);
           auto type = tensor_types[0]->withScalarType(result_type);
           node->output()->setType(type);
           return true;
       }
-      auto type = tensor_types[0]->withScalarType(first_scalar_type);
+      auto type = tensor_types[0]->withScalarType(tensor_scalar_type);
       node->output()->setType(type);
       return true;
     } else if (

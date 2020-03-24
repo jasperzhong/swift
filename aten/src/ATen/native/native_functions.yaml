@@ -315,6 +315,16 @@
   variants: function, method
   supports_named_tensor: True
 
+- func: add.ScalarTensor(Scalar self, Tensor other, Scalar alpha=1) -> Tensor
+  use_c10_dispatcher: full
+  variants: function
+  supports_named_tensor: True
+
+- func: add.ScalarScalar(Scalar self, Scalar other, Scalar alpha=1) -> Scalar
+  use_c10_dispatcher: full
+  variants: function
+  supports_named_tensor: True
+
 - func: add_.Scalar(Tensor(a!) self, Scalar other, Scalar alpha=1) -> Tensor(a!)
   variants: method
   supports_named_tensor: True
@@ -1051,6 +1061,16 @@
 - func: div.Scalar(Tensor self, Scalar other) -> Tensor
   use_c10_dispatcher: full
   variants: function, method
+  supports_named_tensor: True
+
+- func: div.ScalarTensor(Scalar self, Tensor other) -> Tensor
+  use_c10_dispatcher: full
+  variants: function
+  supports_named_tensor: True
+
+- func: div.ScalarScalar(Scalar self, Scalar other) -> Scalar
+  use_c10_dispatcher: full
+  variants: function
   supports_named_tensor: True
 
 - func: div_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
@@ -2025,6 +2045,14 @@
 - func: mul.Scalar(Tensor self, Scalar other) -> Tensor
   use_c10_dispatcher: full
   variants: function, method
+
+- func: mul.ScalarTensor(Scalar self, Tensor other) -> Tensor
+  use_c10_dispatcher: full
+  variants: function
+
+- func: mul.ScalarScalar(Scalar self, Scalar other) -> Scalar
+  use_c10_dispatcher: full
+  variants: function
 
 - func: mul_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
   variants: method
@@ -3236,6 +3264,16 @@
   variants: function, method
   supports_named_tensor: True
 
+- func: sub.ScalarTensor(Scalar self, Tensor other, Scalar alpha=1) -> Tensor
+  use_c10_dispatcher: full
+  variants: function
+  supports_named_tensor: True
+
+- func: sub.ScalarScalar(Scalar self, Scalar other, Scalar alpha=1) -> Scalar
+  use_c10_dispatcher: full
+  variants: function
+  supports_named_tensor: True
+
 - func: sub_.Scalar(Tensor(a!) self, Scalar other, Scalar alpha=1) -> Tensor(a!)
   variants: method
   supports_named_tensor: True
@@ -3247,6 +3285,16 @@
 
 # For C++ only, until we have conversion from C++ numbers to Tensor
 - func: rsub.Scalar(Tensor self, Scalar other, Scalar alpha=1) -> Tensor
+  use_c10_dispatcher: full
+  variants: function
+  supports_named_tensor: True
+
+- func: rsub.ScalarTensor(Scalar self, Tensor other, Scalar alpha=1) -> Tensor
+  use_c10_dispatcher: full
+  variants: function
+  supports_named_tensor: True
+
+- func: rsub.ScalarScalar(Scalar self, Scalar other, Scalar alpha=1) -> Scalar
   use_c10_dispatcher: full
   variants: function
   supports_named_tensor: True
