@@ -86,11 +86,12 @@ def convert_to_list(python_input):
     else:
         return [tensor for tensor in python_input]
 
-def set_python_tensors_requires_grad(python_tensors):
-    return [tensor.requires_grad_(True) if tensor.dtype != torch.long else tensor for tensor in python_tensors]
+def set_python_tensors_requires_grad(python_values):
+    return [value.requires_grad_(True) if isinstance(value, torch.Tensor) and value.dtype != torch.long else value
+            for value in python_values]
 
-def move_python_tensors_to_device(python_tensors, device):
-    return [tensor.to(device) for tensor in python_tensors]
+def move_python_tensors_to_device(python_values, device):
+    return [value.to(device) if isinstance(value, torch.Tensor) else value for value in python_values]
 
 def has_test(unit_test_class, test_name):
     return hasattr(unit_test_class, test_name)
