@@ -57,11 +57,12 @@ void ${module_variant_name}_test_forward_backward(
 
   // Construct module and load params/buffers from Python module
   ${module_qualified_name} module${cpp_constructor_args};
-  std::cout << "here1" << std::endl;
+  std::cout << "module->weight.dtype(): " << module->weight.dtype() << std::endl; // yf225 TODO: debug
+  std::cout << "here1" << std::endl; // yf225 TODO: debug
   torch::load(module, module_file_path);
-  std::cout << "here2" << std::endl;
+  std::cout << "here2" << std::endl; // yf225 TODO: debug
   module->to(std::string("${device}"));
-  std::cout << "here3" << std::endl;
+  std::cout << "here3" << std::endl; // yf225 TODO: debug
 
   // Some modules (such as `RReLU`) create random tensors in their forward pass.
   // To make sure the random tensors created are the same in Python/C++, we need
@@ -69,9 +70,9 @@ void ${module_variant_name}_test_forward_backward(
   torch::manual_seed(0);
 
   // Forward pass
-  std::cout << "here4" << std::endl;
+  std::cout << "here4" << std::endl; // yf225 TODO: debug
   auto cpp_output = module(${cpp_forward_args_symbols});
-  std::cout << "here5" << std::endl;
+  std::cout << "here5" << std::endl; // yf225 TODO: debug
 
   // Save the output into a file to be compared in Python later
   write_ivalue_to_file(torch::IValue(cpp_output), forward_output_file_path);
@@ -114,6 +115,7 @@ def run_python_forward_backward(unit_test_class, test_params):
     # We can do this because we are only interested in transferring
     # the Python module's parameters and buffers to the C++ module.
     module.forward = types.MethodType(lambda self, input: input, module)
+    print("module.weight.dtype: ", module.weight.dtype)  # yf225 TODO: debug
     script_module = torch.jit.trace(module, torch.tensor(0))
 
     # Backward pass
