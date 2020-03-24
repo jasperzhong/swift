@@ -60,26 +60,6 @@ static const std::unordered_map<std::string, std::vector<std::string>> numpy_com
   {"other", {"x2"}},
 };
 
-// TODO: remove this. This is a temporary list of functions that allow Python
-// numbers to bind to Tensors. Some binary ops have separate Tensor and Scalar
-// overloads and binding to the Tensor overload with a number of a different
-// type will trigger a type error.
-//
-// If you modify this, you will need to adjust the blacklist in
-// tools/pyi/gen_pyi.py (and add hardcoded signatures for these
-// functions.)
-static bool should_allow_numbers_as_tensors(const std::string& name) {
-  static std::unordered_set<std::string> allowed = {
-    "add", "add_", "add_out",
-    "div", "div_", "div_out",
-    "mul", "mul_", "mul_out",
-    "sub", "sub_", "sub_out",
-    "true_divide", "true_divide_", "true_divide_out",
-    "floor_divide", "floor_divide_", "floor_divide_out"
-  };
-  return allowed.find(name) != allowed.end();
-}
-
 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 FunctionParameter::FunctionParameter(const std::string& fmt, bool keyword_only)
   : optional(false)
@@ -261,7 +241,7 @@ auto FunctionParameter::check(PyObject* obj, std::vector<py::handle> &overloaded
         }
         return true;
       }
-      return allow_numbers_as_tensors && THPUtils_checkScalar(obj);
+      return false;
     }
     case ParameterType::SCALAR:
     case ParameterType::COMPLEX:
@@ -457,8 +437,6 @@ FunctionSignature::FunctionSignature(const std::string& fmt, int index)
   }
   name = fmt.substr(0, open_paren);
 
-  bool allow_numbers_as_tensors = should_allow_numbers_as_tensors(name);
-
   auto last_offset = open_paren + 1;
   auto next_offset = last_offset;
   bool keyword_only = false;
@@ -485,7 +463,6 @@ FunctionSignature::FunctionSignature(const std::string& fmt, int index)
       keyword_only = true;
     } else {
       params.emplace_back(param_str, keyword_only);
-      params.back().allow_numbers_as_tensors = allow_numbers_as_tensors;
     }
   }
 

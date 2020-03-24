@@ -258,10 +258,6 @@ Tensor& atan2_(Tensor& self, const Tensor& other) {
   return native::atan2_out(self, self, other);
 }
 
-// These are still needed because we don't have C++ conversions from number
-// types (int, float, etc.) to Tensor (only to Scalar). They're not exposed
-// to Python.
-
 static Tensor wrapped_scalar_tensor(Scalar scalar) {
   auto tensor = scalar_to_tensor(scalar);
   tensor.unsafeGetTensorImpl()->set_wrapped_number(true);
@@ -329,8 +325,6 @@ Scalar div(Scalar self, Scalar other) {
 
 // WARNING: This function, with a sparse self, is currently only
 // exercised by DistributedDataParallelTest.test_sparse_gradients
-// (you need to exercise it from C++, because this overload is never
-// used for Python)
 Tensor& div_(Tensor& self, Scalar other) {
   return self.div_(wrapped_scalar_tensor(other)); // redispatch!
 }
