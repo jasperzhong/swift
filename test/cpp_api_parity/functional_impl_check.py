@@ -30,9 +30,6 @@ from cpp_api_parity.utils import TorchNNFunctionalTestParams, CppArg, TORCH_NN_C
     compute_arg_dict, decorate_test_fn, compute_temp_file_path, generate_error_msg
 from cpp_api_parity import torch_nn_functionals
 
-# NN tests use double as the default dtype
-torch.set_default_dtype(torch.double)
-
 # Expected substitutions:
 #
 # ${functional_variant_name}
@@ -44,7 +41,6 @@ void ${functional_variant_name}_test_forward(
     const std::string& arg_dict_file_path,
     const std::string& forward_output_file_path) {
   pybind11::gil_scoped_release no_gil;
-  torch::set_default_dtype(torch::scalarTypeToTypeMeta(torch::kDouble));
 
   namespace F = torch::nn::functional;
 
