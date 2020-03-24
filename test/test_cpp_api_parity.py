@@ -42,13 +42,25 @@ parity_table = parse_parity_tracker_table(PARITY_TABLE_PATH)
 class TestCppApiParity(common.TestCase):
     pass
 
+# yf225 TODO debug
+new_criterion_tests = [
+    dict(
+        module_name='BCEWithLogitsLoss',
+        constructor_args=(torch.rand(()),),
+        cpp_constructor_args='torch::nn::BCEWithLogitsLossOptions().weight(torch::rand({}))',
+        input_fn=lambda: torch.rand(()).clamp_(1e-2, 1 - 1e-2),
+        target_fn=lambda: torch.randn(()).gt(0).double(),
+        desc='scalar_weights'
+    ),
+]
+
 for test_params_dicts, test_instance_class in [
-    (sample_module.module_tests, common_nn.ModuleTest),
-    (sample_functional.functional_tests, common_nn.NewModuleTest),
-    (common_nn.module_tests, common_nn.ModuleTest),
-    (common_nn.new_module_tests, common_nn.NewModuleTest),
-    (common_nn.criterion_tests, common_nn.CriterionTest),
-    (common_nn.new_criterion_tests, common_nn.NewCriterionTest),
+    # (sample_module.module_tests, common_nn.ModuleTest),
+    # (sample_functional.functional_tests, common_nn.NewModuleTest),
+    # (common_nn.module_tests, common_nn.ModuleTest),
+    # (common_nn.new_module_tests, common_nn.NewModuleTest),
+    # (common_nn.criterion_tests, common_nn.CriterionTest),
+    (new_criterion_tests, common_nn.NewCriterionTest), # yf225 TODO debug
 ]:
     module_impl_check.add_tests(TestCppApiParity, test_params_dicts, test_instance_class, parity_table, devices)
     functional_impl_check.add_tests(TestCppApiParity, test_params_dicts, test_instance_class, parity_table, devices)
