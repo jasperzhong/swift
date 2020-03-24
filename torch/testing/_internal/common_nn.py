@@ -3566,11 +3566,10 @@ new_criterion_tests = [
     ),
     dict(
         module_name='BCEWithLogitsLoss',
-        constructor_args=(criterion_weight_rand_zero_dim,),
-        cpp_constructor_args='torch::nn::BCEWithLogitsLossOptions().weight(weight)',
+        constructor_args=(torch.rand(()),),
+        cpp_constructor_args='torch::nn::BCEWithLogitsLossOptions().weight(torch::rand({}))',
         input_fn=lambda: torch.rand(()).clamp_(1e-2, 1 - 1e-2),
         target_fn=lambda: torch.randn(()).gt(0).double(),
-        cpp_arg_symbol_map={'weight': criterion_weight_rand_zero_dim},
         desc='scalar_weights'
     ),
     dict(
