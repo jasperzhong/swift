@@ -57,8 +57,11 @@ void ${module_variant_name}_test_forward_backward(
 
   // Construct module and load params/buffers from Python module
   ${module_qualified_name} module${cpp_constructor_args};
+  std::cout << "here1" << std::endl;
   torch::load(module, module_file_path);
+  std::cout << "here2" << std::endl;
   module->to(std::string("${device}"));
+  std::cout << "here3" << std::endl;
 
   // Some modules (such as `RReLU`) create random tensors in their forward pass.
   // To make sure the random tensors created are the same in Python/C++, we need
@@ -66,7 +69,9 @@ void ${module_variant_name}_test_forward_backward(
   torch::manual_seed(0);
 
   // Forward pass
+  std::cout << "here4" << std::endl;
   auto cpp_output = module(${cpp_forward_args_symbols});
+  std::cout << "here5" << std::endl;
 
   // Save the output into a file to be compared in Python later
   write_ivalue_to_file(torch::IValue(cpp_output), forward_output_file_path);
