@@ -24,6 +24,7 @@ import cpp_api_parity.utils
 cpp_api_parity.utils.extra_msg_on_failure = MESSAGE_HOW_TO_FIX_CPP_PARITY_TEST_FAILURE
 
 import os
+import torch
 
 # NN tests use double as the default dtype
 torch.set_default_dtype(torch.double)
