@@ -43,6 +43,7 @@ class TestCppApiParity(common.TestCase):
     pass
 
 # yf225 TODO debug
+import torch
 new_criterion_tests = [
     dict(
         module_name='BCEWithLogitsLoss',
@@ -55,6 +56,7 @@ new_criterion_tests = [
 ]
 
 for test_params_dicts, test_instance_class in [
+    # yf225 TODO debug
     # (sample_module.module_tests, common_nn.ModuleTest),
     # (sample_functional.functional_tests, common_nn.NewModuleTest),
     # (common_nn.module_tests, common_nn.ModuleTest),
