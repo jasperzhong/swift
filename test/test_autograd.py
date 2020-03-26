@@ -4014,6 +4014,36 @@ for shape in [(1,), ()]:
         foo = MyFn.apply(base, True)
         self.assertEqual(foo.grad_fn.__class__.__name__, "MyFnBackward")
 
+    def test_engine_shared_graph(self):
+        model_shared = nn.Sequential()
+        for i in range(10):
+            model_shared.add_module(str(i), nn.Linear(5, 5))
+            model_shared.add_module(str(i) + "_relu", nn.ReLU())
+
+        model_end = nn.Linear(5, 5)
+
+        # Regular backward
+        inp = torch.rand(2, 5)
+        middle = model_shared(inp)
+        out = model_end(middle)
+        out.sum().backward()
+        saved_grads = [p.grad.clone() for p in model_shared.parameters()]
+
+        # Backward with hook that calls backward on a subset of the original graph
+        # Note that this is not a real algorithm but just an example
+        model_shared.zero_grad()
+        inp = torch.rand(2, 5)
+        middle = model_shared(inp)
+        def my_hook(grad):
+            # Run the backward and compute the 2-norm of gradients
+            grads = torch.autograd.grad(middle, model_shared.parameters(), grad, retain_graph=True)
+            norm = sum(g.norm() for g in grads)
+            # Re-scale the gradients accordingly
+            return grad / norm
+        out = model_end(middle)
+        out.register_hook(my_hook)
+        out.sum().backward()
+
 
 def index_variable(shape, max_indices):
     if not isinstance(shape, tuple):
