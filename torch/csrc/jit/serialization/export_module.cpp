@@ -1,10 +1,12 @@
 #include <torch/csrc/jit/serialization/export.h>
 
 #include <c10/util/Exception.h>
+#include <torch/custom_class.h>
 #include <torch/csrc/jit/serialization/import_export_helpers.h>
 #include <torch/csrc/jit/serialization/python_print.h>
 #include <torch/csrc/jit/serialization/pickle.h>
 #include <torch/csrc/jit/serialization/source_range_serialization.h>
+#include <torch/csrc/jit/serialization/type_importer.h>
 #include <torch/csrc/jit/runtime/instruction.h>
 #include <torch/csrc/jit/passes/inliner.h>
 
@@ -14,6 +16,7 @@
 
 #include <string>
 #include <vector>
+#include "ATen/core/jit_type.h"
 
 namespace torch {
 namespace jit {
@@ -155,11 +158,12 @@ void SetExportModuleExtraFilesHook(ExportModuleExtraFilesHook hook) {
 class ScriptModuleSerializer {
  public:
   explicit ScriptModuleSerializer(const std::string& filename)
-      : writer_(filename) {}
+      : writer_(filename), typeImporter_(std::make_shared<CompilationUnit>()) {}
 
   explicit ScriptModuleSerializer(
-      const std::function<size_t(const void *, size_t)>& writer_func)
-      : writer_(writer_func) {}
+      const std::function<size_t(const void*, size_t)>& writer_func)
+      : writer_(writer_func),
+        typeImporter_(std::make_shared<CompilationUnit>()) {}
 
   void serialize(
       const Module& module,
@@ -167,10 +171,18 @@ class ScriptModuleSerializer {
       bool bytecode_format) {
     C10_LOG_API_USAGE_ONCE("torch.script.save");
     writeExtraFiles(module, extra_files);
+
+    // Import all types used by this module into a fresh CU to resolve any name
+    // collisions.
+    auto newRootType =
+        typeImporter_.import(module.type())->cast<c10::NamedType>();
+    TORCH_INTERNAL_ASSERT(newRootType);
+
     // Serialize the model object
     writeArchive("data", module._ivalue());
+
     // Then we werialize all code info.
-    writeCode(module.type());
+    writeCode(newRootType);
     // The tensor constants from the code are written to a separate archive
     // so loading the code does not depend on loading the data
     std::vector<IValue> ivalue_constants(
@@ -182,16 +194,21 @@ class ScriptModuleSerializer {
   }
 
  private:
-  void writeArchive(const std::string& archive_name, const IValue& value) {
+  void writeArchive(
+      const std::string& archive_name,
+      const IValue& value) {
     std::vector<char> data;
     // Vector to capture the run-time class types during pickling the IValues
     std::vector<c10::ClassTypePtr> memorizedClassTypes;
+    auto typeImporter = [&](TypePtr in) { return typeImporter_.import(in); };
+
     Pickler data_pickle(
         [&](const char* buf, size_t size) {
           data.insert(data.end(), buf, buf + size);
         },
         nullptr,
-        &memorizedClassTypes);
+        &memorizedClassTypes,
+        typeImporter);
     data_pickle.protocol();
     data_pickle.pushIValue(value);
     data_pickle.stop();
@@ -276,6 +293,12 @@ class ScriptModuleSerializer {
     if (converted_types_.count(class_type)) {
       return;
     }
+    const auto qualname = class_type->name().value();
+    // TORCH_INTERNAL_ASSERT(
+    //     !serialized_name.count(qualname.qualifiedName()),
+    //     "Tried to serialize the same qualified name twice: ",
+    //     qualname.qualifiedName());
+    // serialized_name.insert(qualname.qualifiedName());
     converted_types_.insert(class_type);
     std::string qualifier = class_type->name()->prefix();
     PythonPrint* pp = file_streams_.find(qualifier);
@@ -292,6 +315,11 @@ class ScriptModuleSerializer {
   std::vector<at::Tensor> constant_table_;
   std::unordered_set<c10::NamedTypePtr> converted_types_;
   std::vector<c10::NamedTypePtr> class_deps_;
+
+  // Imports types into a fresh CompilationUnit. This ensures that there are no
+  // name collisions, which could otherwise happen if we're referring to types
+  // in different CompilationUnits.
+  TypeImporter typeImporter_;
 
   // qualifier, e.g. '__torch__.Bar' -> PythonPrint for the file that will be
   // created
