@@ -14,6 +14,7 @@ from operator import mul
 from functools import reduce
 import torch
 import json
+import queue
 
 # TODO: remove this global setting
 # Autograd tests use double as the default dtype
@@ -5952,6 +5953,64 @@ class TestAutogradDeviceType(TestCase):
         # gpu thread ReadyQueue
         out.sum().backward()
 
+    @onlyCUDA
+    def test_reentrant_nonblocking_parent(self, device):
+        # Typically parent node will run after child reentrant node. However if the reentrant
+        # node runs on a different device, it's possible for the parent node to run ahead of the
+        # reentrant node.
+        q = queue.Queue()
+        order = []
+
+        class ParentFunc(Function):
+
+            @staticmethod
+            def forward(ctx, inp):
+                return 2 * inp
+
+            @staticmethod
+            def backward(ctx, grad):
+                order.append("Parent")
+                q.put(0)
+                return 2 * grad
+
+        class ChildFunc(Function):
+
+            @staticmethod
+            def forward(ctx, inp):
+                ctx.save_for_backward(inp)
+                return inp * inp
+
+            @staticmethod
+            def backward(ctx, grad):
+                q.get(block=True)
+                order.append("Child")
+                inp, = ctx.saved_tensors
+                return grad * 2 * inp
+
+        a0 = torch.randn(3, 3, requires_grad=True)
+        a1 = ParentFunc.apply(a0)
+
+        re_input = torch.rand(3, 3, requires_grad=True, device=device)
+        re_loss = ChildFunc.apply(re_input).sum()
+
+        class ReentrantFunc(Function):
+
+            @staticmethod
+            def forward(ctx, inp):
+                return inp.clone()
+
+            @staticmethod
+            def backward(ctx, grad):
+                re_loss.backward()
+                return grad
+
+        b0 = torch.rand(3, 3, requires_grad=True, device=device)
+        b1 = ReentrantFunc.apply(b0)
+        loss = torch.sum(a1 + b1.to("cpu"))
+        loss.backward()
+        self.assertEqual(order, ["Parent", "Child"])
+
+
 class TestMultithreadAutograd(TestCase):
     def _run_py_multithread_fn(self, fn, args=(), num_threads=10, kwargs=None):
         threads = []
@@ -6086,7 +6145,6 @@ class TestMultithreadAutograd(TestCase):
         grad, grad1, grad2 = train_fn_fork_join_calls_retain(torch.randn(5, 5, requires_grad=True))
         self.assertEqual(grad, grad1)
         self.assertEqual(grad, grad2)
-
 
 
 for test in method_tests():
