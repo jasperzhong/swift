@@ -65,7 +65,7 @@ struct _cuda_scatter_gather_internal_kernel {
   }
 };
 
-template <bool is_scatter_like = true>
+template <bool is_scatter_like = true, bool cast_to_opaque = true>
 struct cuda_scatter_gather_base_kernel {
   template <typename func_t>
   void operator()(
@@ -124,8 +124,9 @@ struct cuda_scatter_gather_base_kernel {
       at::ScalarType::Half, at::ScalarType::Bool, at::ScalarType::BFloat16,
       iter.dtype(),
       method_name, [&] {
-        //using dtype = OpaqueType<sizeof(scalar_t)>;
-        using dtype = scalar_t;
+        using dtype = typename std::conditional<cast_to_opaque,
+          OpaqueType<sizeof(scalar_t)>, scalar_t>::type;
+
         _cuda_scatter_gather_internal_kernel<is_scatter_like, dtype>()(
           iter, index_size, index_stride, f
         );
