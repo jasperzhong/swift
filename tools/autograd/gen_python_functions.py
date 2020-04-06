@@ -238,6 +238,7 @@ UNPACK_METHODS = {
     'int64_t': 'toInt64',
     'bool': 'toBool',
     'double': 'toDouble',
+    'MemoryFormat': 'memoryformat',
     'std::string': 'string',
 }
 
