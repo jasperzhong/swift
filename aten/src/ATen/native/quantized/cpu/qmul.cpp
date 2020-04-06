@@ -106,10 +106,11 @@ class QMul final : public c10::OperatorKernel {
     check_inputs(qa, qb);
     auto qc = at::_empty_affine_quantized(
         qa.sizes(),
-        at::device(kCPU).dtype(qa.scalar_type()),
+        at::device(kCPU)
+          .dtype(qa.scalar_type())
+          .memory_format(qa.suggest_memory_format()),
         scale,
-        zero_point,
-        qa.suggest_memory_format());
+        zero_point);
     return _mul_out<ReLUFused>(qc, qa, qb);
   }
 };

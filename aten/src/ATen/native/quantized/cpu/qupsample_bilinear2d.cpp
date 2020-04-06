@@ -120,8 +120,7 @@ Tensor quantized_upsample_bilinear2d_cpu(
         {nbatch, channels, output_height, output_width},
         input.options().memory_format(input.suggest_memory_format()),
         input.q_scale(),
-        input.q_zero_point(),
-        c10::nullopt);
+        input.q_zero_point());
 
     qupsample_bilinear2d_nhwc_stub(
         input.device().type(),

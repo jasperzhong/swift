@@ -423,8 +423,7 @@ class QConvInt8 final : public c10::OperatorKernel {
                 .dtype(kQUInt8)
                 .memory_format(MemoryFormat::ChannelsLast),
               output_scale,
-              output_zero_point,
-              c10::nullopt)
+              output_zero_point)
         : fbgemm_utils::MakeEmptyAffineQuantizedChannelsLast3dTensor(
               output_shape[0],
               output_shape[1],
@@ -580,8 +579,7 @@ class QConvInt8 final : public c10::OperatorKernel {
              .dtype(kQUInt8)
              .memory_format(MemoryFormat::ChannelsLast),
           kernel_scale,
-          kernel_zp,
-          c10::nullopt);
+          kernel_zp);
       auto* qnnp_w_data = qnnp_weight.data_ptr<c10::quint8>();
       auto wt_numel = weight_contig.numel();
       for (int i = 0; i < wt_numel; ++i) {
@@ -617,8 +615,7 @@ class QConvInt8 final : public c10::OperatorKernel {
            .dtype(kQUInt8)
            .memory_format(MemoryFormat::ChannelsLast),
         output_scale,
-        output_zero_point,
-        c10::nullopt);
+        output_zero_point);
 
     const pytorch_qnnp_status run_status = qnnpack::qnnpackConv(
         conv_p,

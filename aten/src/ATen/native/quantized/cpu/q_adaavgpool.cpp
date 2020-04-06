@@ -148,8 +148,7 @@ Tensor q_adaptive_avg_pool2d(const Tensor& input, IntArrayRef output_size) {
         output_shape,
         input.options().memory_format(input.suggest_memory_format()),
         input.q_scale(),
-        input.q_zero_point(),
-        c10::nullopt);
+        input.q_zero_point());
     if (input.dim() == 3 || input.size(0) == 1) {
       qadaptive_avg_pool2d_nhwc_stub(
           input.device().type(),

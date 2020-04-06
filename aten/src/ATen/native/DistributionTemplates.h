@@ -255,7 +255,7 @@ Tensor normal_impl(double mean, const Tensor& std, Generator gen) {
 
 template<template<typename> class normal_kernel, typename RNG>
 Tensor normal_impl(const Tensor& mean, const Tensor& std, Generator gen) {
-  Tensor ret = at::empty({0}, mean.options(), MemoryFormat::Contiguous);
+  Tensor ret = at::empty({0}, mean.options().memory_format(MemoryFormat::Contiguous));
   normal_out_impl<normal_kernel, RNG>(ret, mean, std, gen);
   return ret;
 }
