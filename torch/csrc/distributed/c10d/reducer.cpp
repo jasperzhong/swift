@@ -43,7 +43,8 @@ Reducer::Reducer(
     std::vector<std::vector<torch::autograd::Variable>> replicas,
     std::vector<std::vector<size_t>> bucket_indices,
     std::shared_ptr<c10d::ProcessGroup> process_group,
-    std::vector<std::vector<bool>> expect_sparse_gradients)
+    std::vector<std::vector<bool>> expect_sparse_gradients,
+    bool delay_allreduce)
     : replicas_(std::move(replicas)),
       process_group_(std::move(process_group)),
       expect_sparse_gradients_(std::move(expect_sparse_gradients)),
@@ -51,6 +52,8 @@ Reducer::Reducer(
       require_finalize_(false),
       next_bucket_(0),
       has_marked_unused_parameters_(false),
+      delay_allreduce_(delay_allreduce),
+      require_final_hook_(false),
       local_used_maps_reduced_(false),
       backward_stats_base_(0) {
   C10_LOG_API_USAGE_ONCE("torch.distributed.ddp.reducer");
@@ -107,6 +110,55 @@ Reducer::Reducer(
   // This can be reinitialized later after capturing runtime information.
   initialize_buckets(std::move(bucket_indices));
 
+  // Initialize backward stats vector.
+  {
+    const auto replica_count = replicas_.size();
+    backward_stats_.resize(replica_count);
+    const auto variable_count = replicas_[0].size();
+    std::for_each(
+        backward_stats_.begin(),
+        backward_stats_.end(),
+        [=](std::vector<int64_t>& v) { v.resize(variable_count); });
+  }
+
+  // Initialize locally used parameter maps
+  {
+    const auto replica_count = replicas_.size();
+    const auto variable_count = replicas_[0].size();
+    local_used_maps_.resize(replica_count);
+    local_used_maps_dev_.resize(replica_count);
+
+    for (size_t i = 0; i < replica_count; i++) {
+      at::TensorOptions options, options_host;
+      options = options.dtype(at::kInt);
+
+      if (replicas_[i][0].is_cuda()) {
+        at::DeviceGuard g(replicas_[i][0].device());
+        local_used_maps_[i] = at::zeros(
+            {static_cast<long>(variable_count)}, options.pinned_memory(true));
+      } else {
+        local_used_maps_[i] =
+            at::zeros({static_cast<long>(variable_count)}, options);
+      }
+
+      // This tensor needs to be on the same device as replica because backend
+      // such as NCCL may not support CPU tensors, and hence it might not work
+      // if we always put it on CPU.
+      options = options.device(replicas_[i][0].device());
+      local_used_maps_dev_[i] =
+          at::empty({static_cast<long>(variable_count)}, options);
+    }
+  }
+
+  if (delay_allreduce_) {
+    // In delay allreduce mode, the delayed_autograd_hook is registered on the 
+    // first Tensor object in forward outputs. When fired, the 
+    // delayed_autograd_hook install a final callback to the current autograd 
+    // GraphTask. Hence, skip installing per-parameter hooks to AccumulateGrad
+    // functions below.
+    return;
+  }
+  
   // All variables are expected to have their `grad_fn` set to the gradient
   // accumulation function (since they are leafs in the autograd graph).
   // We store pointers to these functions such that we can check if they are
@@ -150,46 +202,6 @@ Reducer::Reducer(
         grad_accumulators_[replica_index][variable_index] =
             std::move(grad_accumulator);
       }
-    }
-  }
-
-  // Initialize backward stats vector.
-  {
-    const auto replica_count = replicas_.size();
-    backward_stats_.resize(replica_count);
-    const auto variable_count = replicas_[0].size();
-    std::for_each(
-        backward_stats_.begin(),
-        backward_stats_.end(),
-        [=](std::vector<int64_t>& v) { v.resize(variable_count); });
-  }
-
-  // Initialize locally used parameter maps
-  {
-    const auto replica_count = replicas_.size();
-    const auto variable_count = replicas_[0].size();
-    local_used_maps_.resize(replica_count);
-    local_used_maps_dev_.resize(replica_count);
-
-    for (size_t i = 0; i < replica_count; i++) {
-      at::TensorOptions options, options_host;
-      options = options.dtype(at::kInt);
-
-      if (replicas_[i][0].is_cuda()) {
-        at::DeviceGuard g(replicas_[i][0].device());
-        local_used_maps_[i] = at::zeros(
-            {static_cast<long>(variable_count)}, options.pinned_memory(true));
-      } else {
-        local_used_maps_[i] =
-            at::zeros({static_cast<long>(variable_count)}, options);
-      }
-
-      // This tensor needs to be on the same device as replica because backend
-      // such as NCCL may not support CPU tensors, and hence it might not work
-      // if we always put it on CPU.
-      options = options.device(replicas_[i][0].device());
-      local_used_maps_dev_[i] =
-          at::empty({static_cast<long>(variable_count)}, options);
     }
   }
 }
@@ -264,6 +276,45 @@ void Reducer::mark_variable_ready_sparse(VariableIndex index) {
   // struct are empty, and there is no pre-existing accumulation tensor.
   // Directly assign the sparse tensor to the `contents` field.
   replica.contents = grad;
+}
+
+void Reducer::delayed_autograd_hook() {
+  std::lock_guard<std::mutex> lock(this->mutex_);
+
+  // Ignore if we don't expect to be called.
+  // This may be the case if the user wants to accumulate gradients
+  // for number of iterations before reducing them.
+  if (!expect_autograd_hooks_) {
+    LOG(INFO) << "Skipping DDP Gradient Synchronization.";
+    return;
+  }
+
+  TORCH_CHECK(
+      require_final_hook_, 
+      "The hook in delay allreduce mode is expected to be called only once "
+      "in each backward pass."
+  );
+  require_final_hook_ = false;
+
+  torch::autograd::Engine::get_default_engine().queue_callback([=] {
+    std::lock_guard<std::mutex> lock(this->mutex_);
+
+    const auto replica_count = replicas_.size();
+    for (size_t replica_index = 0; replica_index < replica_count;
+         replica_index++) {
+      const auto variable_count = replicas_[replica_index].size();
+      for (size_t variable_index = 0; variable_index < variable_count;
+           variable_index++) {
+        const auto index = VariableIndex{
+            .replica_index = replica_index,
+            .variable_index = variable_index,
+        };
+
+        local_used_maps_[index.replica_index][index.variable_index] = 1;
+        mark_variable_ready(index);
+      }
+    }
+  });
 }
 
 // The function `autograd_hook` is called after the gradient for a
@@ -582,6 +633,21 @@ void Reducer::prepare_for_backward(
       replica.pending = replica.variables.size();
     }
     bucket.pending = bucket.replicas.size();
+  }
+
+  if (delay_allreduce_) {
+    TORCH_CHECK(
+        !outputs.empty(),
+        "DistributedDataParallel with delay_allreduce mode expects non-empty"
+        "forward outputs.");
+
+    // Reset delayed allreduce final hook
+    require_final_hook_ = true;
+
+    outputs.front().register_hook([this](torch::autograd::Variable /*unused*/) {
+      this->delayed_autograd_hook();
+    });
+    return;
   }
 
   // Reset unused parameter accounting.
