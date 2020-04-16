@@ -288,15 +288,17 @@ static IValue addInput(
     auto unpack_node = state->graph->insertNode(list_unpack);
     auto elem_values = unpack_node->outputs();
 
-    const auto order = iterationOrder(dict);
-    AT_ASSERT(order.size() == elem_values.size());
+    AT_ASSERT(dict.size() == elem_values.size());
 
     size_t i = 0;
-    for (const auto& pair : order) {
+    for (const auto& entry : dict) {
       dict.insert_or_assign(
-          pair.first,
+          entry.key(),
           addInput(
-              state, pair.second, dict_type->getValueType(), elem_values[i++]));
+              state,
+              entry.value(),
+              dict_type->getValueType(),
+              elem_values[i++]));
     }
 
     return dict;
