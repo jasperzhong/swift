@@ -263,23 +263,11 @@ Value* TracingState::getOutput(const IValue& iv, size_t i) {
          << "or dict[Tensor, Tensor] can be a dictionary output of a traced function";
       throw std::runtime_error(os.str());
     }
-    const auto order = iterationOrder(dict);
     std::vector<Value*> keys;
     std::vector<Value*> values;
-    for (const auto& pair : order) {
-      keys.emplace_back(getValue(pair.first));
-      values.emplace_back(getOutput(pair.second, i));
-    }
-    if (dict.keyType()->cast<TensorType>()) {
-      // First get a permuation that are sorted by the keys Value's unique id
-      std::vector<int64_t> perm(keys.size());
-      std::iota(perm.begin(), perm.end(), 0);
-      std::sort(perm.begin(), perm.end(), [&](int64_t i, int64_t j) {
-        return keys[i]->unique() < keys[j]->unique();
-      });
-      // Apply the permutation to sort keys and values
-      keys = fmap(perm, [&](int64_t i) { return keys[i]; });
-      values = fmap(perm, [&](int64_t i) { return values[i]; });
+    for (const auto& entry : dict) {
+      keys.emplace_back(getValue(entry.key()));
+      values.emplace_back(getOutput(entry.value(), i));
     }
     auto dict_node = graph->createDict(key_type, value_type, keys, values);
     graph->insertNode(dict_node);
@@ -330,15 +318,17 @@ static IValue addInput(
     auto unpack_node = state->graph->insertNode(list_unpack);
     auto elem_values = unpack_node->outputs();
 
-    const auto order = iterationOrder(dict);
-    AT_ASSERT(order.size() == elem_values.size());
+    AT_ASSERT(dict.size() == elem_values.size());
 
     size_t i = 0;
-    for (const auto& pair : order) {
+    for (const auto& entry : dict) {
       dict.insert_or_assign(
-          pair.first,
+          entry.key(),
           addInput(
-              state, pair.second, dict_type->getValueType(), elem_values[i++]));
+              state,
+              entry.value(),
+              dict_type->getValueType(),
+              elem_values[i++]));
     }
 
     return dict;
