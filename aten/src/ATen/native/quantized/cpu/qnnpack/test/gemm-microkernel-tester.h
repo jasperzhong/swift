@@ -279,6 +279,8 @@ class GemmMicrokernelTester {
               qmin(),
               qmax());
       const union pytorch_qnnp_fp32_requantization_params
+          // TODO Kimish: This needs fixing. It shoul use the entire vector
+          // of requant scale
           scalarRequantizationParams =
               pytorch_qnnp_compute_scalar_fp32_requantization_params(
                   requantization_scale[0], cZeroPoint, qmin(), qmax());
@@ -320,7 +322,7 @@ class GemmMicrokernelTester {
               << "), optimized = " << (uint32_t)c[mIndex * cStride() + nIndex]
               << ", Mr x Nr x Kr = " << mr() << " x " << nr() << " x " << kr()
               << ", M x N x K = " << m() << " x " << n() << " x " << k()
-              << ", requantization scale = " << requantization_scale[0]
+              << ", requantization scale = " << requantization_scale[nIndex]
               << ", output zero point = " << int32_t(cZeroPoint);
         }
       }
@@ -550,6 +552,8 @@ class GemmMicrokernelTester {
               qmin(),
               qmax());
       const union pytorch_qnnp_fp32_requantization_params
+          // TODO Kimish: This needs fixing. It shoul use the entire vector
+          // of requant scale
           scalarRequantizationParams =
               pytorch_qnnp_compute_scalar_fp32_requantization_params(
                   requantization_scale[0], cZeroPoint, qmin(), qmax());
@@ -591,7 +595,7 @@ class GemmMicrokernelTester {
               << "), optimized = " << uint32_t(c[mIndex * cStride() + nIndex])
               << ", Mr x Nr x Kr = " << mr() << " x " << nr() << " x " << kr()
               << ", M x N x K = " << m() << " x " << n() << " x " << k()
-              << ", requantization scale = " << requantization_scale[0]
+              << ", requantization scale = " << requantization_scale[nIndex]
               << ", output zero point = " << int32_t(cZeroPoint);
         }
       }

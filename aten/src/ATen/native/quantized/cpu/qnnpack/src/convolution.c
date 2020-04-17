@@ -175,7 +175,7 @@ enum pytorch_qnnp_status pytorch_qnnp_create_convolution2d_nhwc_q8(
         input_padding_right);
   }
 
-  for (int i = 0; i < group_output_channels; ++i) {
+  for (int i = 0; i < groups * group_output_channels; ++i) {
     if (requantization_scales[i] <= 0.0f ||
         !isnormal(requantization_scales[i])) {
       pytorch_qnnp_log_error(
@@ -303,6 +303,9 @@ enum pytorch_qnnp_status pytorch_qnnp_create_convolution2d_nhwc_q8(
       break;
     }
     case pytorch_qnnp_ukernel_type_xzp_gemm: {
+      // TODO: XZP kernels won't be supporting per channel quantization.
+      // For now we dont use XZP kernels anywhere. Probably deprecate it for now
+      // and ressurrect later if needed.
       const uint32_t nr = pytorch_qnnp_params.q8conv_xzp.nr;
       const uint32_t kr = pytorch_qnnp_params.q8conv_xzp.kr;
       const uint32_t sr = pytorch_qnnp_params.q8conv_xzp.kc;

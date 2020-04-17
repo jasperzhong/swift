@@ -103,7 +103,7 @@ enum pytorch_qnnp_status pytorch_qnnp_create_deconvolution2d_nhwc_q8(
 
   status = pytorch_qnnp_status_unsupported_parameter;
 
-  for (int i = 0; i < group_output_channels; i++) {
+  for (int i = 0; i < groups * group_output_channels; i++) {
     if (requantization_scales[i] <= 0.0f ||
         !isnormal(requantization_scales[i])) {
       pytorch_qnnp_log_error(

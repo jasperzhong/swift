@@ -277,7 +277,7 @@ class FullyConnectedOperatorTester {
                   kernel.data(),
                   bias.data()));
 
-          std::vector<float> requantization_scale(outputChannels(), 1 / outputScale);
+          std::vector<float> requantization_scale(num_zero_points_padded, 1 / outputScale);
           const pytorch_qnnp_status runStatus = qnnpack::qnnpackLinear(
               batchSize() /* batch_size */,
               inputChannels() /* input_channels */,
@@ -310,7 +310,8 @@ class FullyConnectedOperatorTester {
           for (size_t i = 0; i < batchSize(); i++) {
             for (size_t c = 0; c < outputChannels(); c++) {
               const double scaledAccumulator =
-                  accumulators[i * outputChannels() + c] / outputScale;
+                  accumulators[i * outputChannels() + c] *
+                  requantization_scale[c];
               const double clampedAccumulator = std::max(
                   std::min(
                       scaledAccumulator, double(qmax()) - double(outputZeroPoint)),

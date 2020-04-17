@@ -489,7 +489,7 @@ class ConvolutionOperatorTester {
           long(std::numeric_limits<uint8_t>::min())));
 
       ASSERT_EQ(pytorch_qnnp_status_success, pytorch_qnnp_initialize());
-      std::vector<float> requantization_scale(num_zero_points_padded, 1.0 * 1.0 / outputScale);
+      std::vector<float> requantization_scales(num_zero_points_padded, 1.0 * 1.0 / outputScale);
 
       switch(mode) {
         case Mode::Static:
@@ -520,7 +520,7 @@ class ConvolutionOperatorTester {
                   qmin(),
                   qmax(),
                   0,
-                  requantization_scale.data(),
+                  requantization_scales.data(),
                   &convolution));
 
           ASSERT_EQ(
@@ -558,7 +558,7 @@ class ConvolutionOperatorTester {
             groupInputChannels() * groups(),
             groupOutputChannels() * groups(),
             kernelZeroPoints.data(),
-            requantization_scale.data(),
+            requantization_scales.data(),
             qmin(),
             qmax());
           auto packW = std::unique_ptr<qnnpack::PrePackConvWeights>(
@@ -599,6 +599,7 @@ class ConvolutionOperatorTester {
                              groupOutputChannels() +
                          c] /
                     outputScale;
+                    requantization_scales[g * groupOutputChannels() + c];
                 const double clampedAccumulator = std::max(
                     std::min(
                         scaledAccumulator,

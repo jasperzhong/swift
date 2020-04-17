@@ -117,7 +117,7 @@ class Q8GEMM : public benchmark::Fixture {
     // Assuming nr_ is power of 2.
     size_t num_zero_points_kernel = (nc_ + (nr_ -1)) & -nr_;
     std::vector<uint8_t> kernel_zero_points(num_zero_points_kernel, 127);
-    std::vector<float> requantization_scale(1, 0.75f);
+    std::vector<float> requantization_scale(num_zero_points_kernel, 0.75f);
     quantizationParams_ = pytorch_qnnp_compute_conv_quantization_params(
         127, kernel_zero_points.data(),
         requantization_scale.data(), 127, 1, 254);

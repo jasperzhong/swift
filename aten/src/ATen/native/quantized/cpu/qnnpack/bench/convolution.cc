@@ -75,7 +75,8 @@ static void convolution_q8(benchmark::State& state, const char* net) {
   size_t num_zero_points_padded =
     ((groups * groupOutputChannels + 7) / 8) * 8;
   std::vector<uint8_t> kernel_zero_points(num_zero_points_padded, 127);
-  std::vector<float> requantization_scale(1, 0.5 * 0.5 / 0.5);
+  std::vector<float> requantization_scale(
+      num_zero_points_padded, 0.5 * 0.5 / 0.5);
   status = pytorch_qnnp_create_convolution2d_nhwc_q8(
       paddingTop,
       paddingRight,
