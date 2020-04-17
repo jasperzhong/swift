@@ -499,7 +499,7 @@ class DeconvolutionOperatorTester {
           long(std::numeric_limits<uint8_t>::min())));
 
       ASSERT_EQ(pytorch_qnnp_status_success, pytorch_qnnp_initialize());
-      std::vector<float> requantization_scale(1, 1.0 * 1.0 / outputScale);
+      std::vector<float> requantization_scale(num_zero_points_padded, 1.0 * 1.0 / outputScale);
       pytorch_qnnp_operator_t deconvolution = nullptr;
 
       ASSERT_EQ(

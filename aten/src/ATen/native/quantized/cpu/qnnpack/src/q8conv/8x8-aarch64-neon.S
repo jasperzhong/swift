@@ -66,10 +66,11 @@ BEGIN_FUNCTION pytorch_q8conv_ukernel_8x8__aarch64_neon
     # v11 := vacc1x4567
     MOV v11.16b, v9.16b
     # Load b_zero_point
-    LD1R {v25.8b}, [x8], x9
-    LD1 {v25.8b}, [x10], 8
+    LD1 {v25.8b}, [x10]
+    ADD x8, x8, 8
     # Load a_zero_point
-    LD1R {v24.8b}, [x8], 4
+    LD1R {v24.8b}, [x8]
+    ADD x8, x8, 4
 
     # v12 := vacc2x0123
     MOV v12.16b, v8.16b

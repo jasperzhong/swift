@@ -175,7 +175,15 @@ enum pytorch_qnnp_status pytorch_qnnp_create_convolution2d_nhwc_q8(
         input_padding_right);
   }
 
-  const float convolution_scale = input_scale * kernel_scale / output_scale;
+  for (int i = 0; i < group_output_channels; ++i) {
+    if (requantization_scales[i] <= 0.0f ||
+        !isnormal(requantization_scales[i])) {
+      pytorch_qnnp_log_error(
+          "failed to create fully connected operator with %.7g requantization scale: scale must be finite and positive",
+          requantization_scales[i]);
+      goto error;
+    }
+  }
 
   status = pytorch_qnnp_status_out_of_memory;
 
@@ -451,7 +459,7 @@ enum pytorch_qnnp_status pytorch_qnnp_create_convolution2d_nhwc_q8(
         pytorch_qnnp_compute_conv_quantization_params(
             input_zero_point,
             kernel_zero_points,
-            requantization_scale,
+            requantization_scales,
             output_zero_point,
             output_min,
             output_max);

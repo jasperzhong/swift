@@ -110,7 +110,7 @@ enum pytorch_qnnp_status pytorch_qnnp_create_fully_connected_nc_q8(
       pytorch_qnnp_compute_conv_quantization_params(
           input_zero_point,
           kernel_zero_points,
-          requantization_scale,
+          requantization_scales,
           output_zero_point,
           output_min,
           output_max);

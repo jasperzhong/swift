@@ -186,7 +186,7 @@ class FullyConnectedOperatorTester {
 
       ASSERT_EQ(pytorch_qnnp_status_success, pytorch_qnnp_initialize());
       // 1 bcz input_scale and kernel_scale are both 1.
-      std::vector<float> requantization_scale(outputChannels(), 1 / outputScale);
+      std::vector<float> requantization_scale(num_zero_points_padded, 1 / outputScale);
 
       switch(mode) {
         case Mode::Static:
@@ -236,7 +236,7 @@ class FullyConnectedOperatorTester {
               new qnnpack::PackBMatrix(
                   inputChannels(),
                   outputChannels(),
-                  kernelZeroPoint[0],
+                  kernelZeroPoints[0],
                   1.0f,
                   kernel.data(),
                   nullptr));
@@ -272,7 +272,7 @@ class FullyConnectedOperatorTester {
               new qnnpack::PackBMatrix(
                   inputChannels(),
                   outputChannels(),
-                  kernelZeroPoint[0],
+                  kernelZeroPoints[0],
                   1.0f,
                   kernel.data(),
                   bias.data()));
