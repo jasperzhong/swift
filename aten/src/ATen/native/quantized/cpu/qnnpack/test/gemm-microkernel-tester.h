@@ -212,6 +212,10 @@ class GemmMicrokernelTester {
 
       std::fill(packedW.begin(), packedW.end(), bZeroPoint());
 
+      size_t num_zero_points_padded = n() + 8;
+      std::vector<uint8_t> kernel_zero_points
+        (num_zero_points_padded, bZeroPoint());
+      std::generate(kernel_zero_points.begin(), kernel_zero_points.end(), std::ref(u8rng));
       pytorch_pack_q8gemm_w(
           n(),
           k(),
@@ -224,6 +228,7 @@ class GemmMicrokernelTester {
 #endif
           b.data(),
           bias.data(),
+          kernel_zero_points.data(),
           packedW.data());
 
       ASSERT_NE(
@@ -244,7 +249,7 @@ class GemmMicrokernelTester {
             acc[mIndex * n() + nIndex] +=
                 (int32_t(aPtr[mIndex * aStride() + kIndex]) -
                  int32_t(aZeroPoint())) *
-                (int32_t(b[nIndex * k() + kIndex]) - int32_t(bZeroPoint()));
+                (int32_t(b[nIndex * k() + kIndex]) - int32_t(kernel_zero_points[nIndex]));
           }
           acc[mIndex * n() + nIndex] += bias[nIndex];
         }
@@ -267,9 +272,7 @@ class GemmMicrokernelTester {
               long(std::numeric_limits<uint8_t>::max())),
           long(std::numeric_limits<uint8_t>::min())));
 
-      size_t num_zero_points_padded = ((nr() + 7) / 8) * 8;
       std::vector<float> requantization_scale(num_zero_points_padded, 1.0f / float(cScale));
-      std::vector<uint8_t> kernel_zero_points(num_zero_points_padded, bZeroPoint());
       const union pytorch_qnnp_conv_quantization_params quantizationParams =
           pytorch_qnnp_compute_conv_quantization_params(
               aZeroPoint(),
@@ -279,11 +282,9 @@ class GemmMicrokernelTester {
               qmin(),
               qmax());
       const union pytorch_qnnp_fp32_requantization_params
-          // TODO Kimish: This needs fixing. It shoul use the entire vector
-          // of requant scale
           scalarRequantizationParams =
               pytorch_qnnp_compute_scalar_fp32_requantization_params(
-                  requantization_scale[0], cZeroPoint, qmin(), qmax());
+                  requantization_scale.data(), cZeroPoint, qmin(), qmax());
 
       qgemm(
           m(),
@@ -301,10 +302,10 @@ class GemmMicrokernelTester {
         for (size_t nIndex = 0; nIndex < n(); nIndex++) {
 #if defined(__arm__) || defined(_M_ARM)
           cRef[mIndex * n() + nIndex] = pytorch_qnnp_fp32_requantize_magic(
-              acc[mIndex * n() + nIndex], scalarRequantizationParams);
+              acc[mIndex * n() + nIndex], scalarRequantizationParams, nIndex);
 #else
           cRef[mIndex * n() + nIndex] = pytorch_qnnp_fp32_requantize(
-              acc[mIndex * n() + nIndex], scalarRequantizationParams);
+              acc[mIndex * n() + nIndex], scalarRequantizationParams, nIndex);
 #endif
         }
       }
@@ -369,6 +370,7 @@ class GemmMicrokernelTester {
           bZeroPoint(),
 #endif
           b.data(),
+          nullptr,
           nullptr,
           packedW.data());
 
@@ -461,6 +463,11 @@ class GemmMicrokernelTester {
 
       std::fill(packedW.begin(), packedW.end(), bZeroPoint());
 
+      size_t num_zero_points_padded = n() + 8;
+      std::vector<uint8_t> kernel_zero_points
+        (num_zero_points_padded, bZeroPoint());
+      std::generate(kernel_zero_points.begin(), kernel_zero_points.end(), std::ref(u8rng));
+
       pytorch_pack_q8conv_w(
           n(),
           ks(),
@@ -473,6 +480,7 @@ class GemmMicrokernelTester {
 #endif
           b.data(),
           bias.data(),
+          kernel_zero_points.data(),
           packedW.data());
 
       ASSERT_NE(
@@ -515,7 +523,7 @@ class GemmMicrokernelTester {
                     (int32_t(
                          b[(nIndex * ks() + ksIndex) * k() + kBlockStart +
                            kBlockOffset]) -
-                     int32_t(bZeroPoint()));
+                     int32_t(kernel_zero_points[nIndex]));
               }
             }
           }
@@ -540,9 +548,7 @@ class GemmMicrokernelTester {
               long(std::numeric_limits<uint8_t>::max())),
           long(std::numeric_limits<uint8_t>::min())));
 
-      size_t num_zero_points_padded = ((nr() + 7) / 8) * 8;
       std::vector<float> requantization_scale(num_zero_points_padded, 1.0f / float(cScale));
-      std::vector<uint8_t> kernel_zero_points(num_zero_points_padded, bZeroPoint());
       const union pytorch_qnnp_conv_quantization_params quantizationParams =
           pytorch_qnnp_compute_conv_quantization_params(
               aZeroPoint(),
@@ -552,11 +558,9 @@ class GemmMicrokernelTester {
               qmin(),
               qmax());
       const union pytorch_qnnp_fp32_requantization_params
-          // TODO Kimish: This needs fixing. It shoul use the entire vector
-          // of requant scale
           scalarRequantizationParams =
               pytorch_qnnp_compute_scalar_fp32_requantization_params(
-                  requantization_scale[0], cZeroPoint, qmin(), qmax());
+                  requantization_scale.data(), cZeroPoint, qmin(), qmax());
 
       qconv(
           m(),
@@ -574,10 +578,10 @@ class GemmMicrokernelTester {
         for (size_t nIndex = 0; nIndex < n(); nIndex++) {
 #if defined(__arm__) || defined(_M_ARM)
           cRef[mIndex * n() + nIndex] = pytorch_qnnp_fp32_requantize_magic(
-              acc[mIndex * n() + nIndex], scalarRequantizationParams);
+              acc[mIndex * n() + nIndex], scalarRequantizationParams, nIndex);
 #else
           cRef[mIndex * n() + nIndex] = pytorch_qnnp_fp32_requantize(
-              acc[mIndex * n() + nIndex], scalarRequantizationParams);
+              acc[mIndex * n() + nIndex], scalarRequantizationParams, nIndex);
 #endif
         }
       }

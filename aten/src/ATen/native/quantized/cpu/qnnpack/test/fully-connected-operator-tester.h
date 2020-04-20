@@ -142,6 +142,7 @@ class FullyConnectedOperatorTester {
       std::generate(input.begin(), input.end(), std::ref(u8rng));
       std::generate(kernel.begin(), kernel.end(), std::ref(u8rng));
       std::generate(bias.begin(), bias.end(), std::ref(s32rng));
+      std::generate(kernelZeroPoints.begin(), kernelZeroPoints.end(), std::ref(u8rng));
       std::fill(output.begin(), output.end(), 0xA5);
       std::fill(output_dynamic.begin(), output_dynamic.end(), 0.0f);
       std::fill(accumulators.begin(), accumulators.end(), 0);
@@ -154,11 +155,19 @@ class FullyConnectedOperatorTester {
       for (size_t i = 0; i < batchSize(); i++) {
         for (size_t oc = 0; oc < outputChannels(); oc++) {
           for (size_t ic = 0; ic < inputChannels(); ic++) {
-            accumulators[i * outputChannels() + oc] +=
-                (int32_t(inputPtr[i * inputStride() + ic]) -
-                 int32_t(inputZeroPoint)) *
-                (int32_t(kernel[oc * inputChannels() + ic]) -
-                 int32_t(kernelZeroPoints[oc]));
+            if (mode == Mode::Dynamic) {
+              accumulators[i * outputChannels() + oc] +=
+                  (int32_t(inputPtr[i * inputStride() + ic]) -
+                   int32_t(inputZeroPoint)) *
+                  (int32_t(kernel[oc * inputChannels() + ic]) -
+                   int32_t(kernelZeroPoints[0]));
+            } else {
+              accumulators[i * outputChannels() + oc] +=
+                  (int32_t(inputPtr[i * inputStride() + ic]) -
+                   int32_t(inputZeroPoint)) *
+                  (int32_t(kernel[oc * inputChannels() + ic]) -
+                   int32_t(kernelZeroPoints[oc]));
+            }
           }
         }
       }
@@ -268,16 +277,16 @@ class FullyConnectedOperatorTester {
 
         case Mode::Runtime:
         {
+          std::vector<float> requantization_scale(num_zero_points_padded, 1 / outputScale);
           auto packW = std::unique_ptr<qnnpack::PackBMatrix>(
               new qnnpack::PackBMatrix(
                   inputChannels(),
                   outputChannels(),
-                  kernelZeroPoints[0],
-                  1.0f,
+                  kernelZeroPoints.data(),
+                  requantization_scale.data(),
                   kernel.data(),
                   bias.data()));
 
-          std::vector<float> requantization_scale(num_zero_points_padded, 1 / outputScale);
           const pytorch_qnnp_status runStatus = qnnpack::qnnpackLinear(
               batchSize() /* batch_size */,
               inputChannels() /* input_channels */,

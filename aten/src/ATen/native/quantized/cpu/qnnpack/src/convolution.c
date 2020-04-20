@@ -380,6 +380,7 @@ enum pytorch_qnnp_status pytorch_qnnp_create_convolution2d_nhwc_q8(
 #endif
                 kernel + group * group_output_channels * group_input_channels,
                 bias + group * group_output_channels,
+                kernel_zero_points + group * group_output_channels,
                 (void*)((uintptr_t)convolution->packed_weights + group * packed_group_weights_size));
           }
           break;
@@ -399,6 +400,7 @@ enum pytorch_qnnp_status pytorch_qnnp_create_convolution2d_nhwc_q8(
                     group * group_output_channels * kernel_size *
                         group_input_channels,
                 bias + group * group_output_channels,
+                kernel_zero_points + group * group_output_channels,
                 (void*)((uintptr_t)convolution->packed_weights + group * packed_group_weights_size));
           }
           break;

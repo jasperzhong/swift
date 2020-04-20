@@ -26,7 +26,7 @@ void pytorch_q8dwconv_ukernel_mp8x25__neon(
   const uint8x8_t vkernel_zero_point =
       vld1_dup_u8(quantization_params->neon.kernel_zero_points);
   const float32x4_t requantization_scale_v =
-      vdupq_n_f32(quantization_params->neon.requantization_scale);
+      vdupq_n_f32(quantization_params->neon.requantization_scales[0]);
   const int16x8_t voutput_zero_point =
       vld1q_dup_s16(&quantization_params->neon.output_zero_point);
   const uint8x8_t voutput_min = vld1_dup_u8(&quantization_params->neon.output_min);
