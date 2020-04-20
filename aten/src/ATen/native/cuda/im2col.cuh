@@ -2,6 +2,7 @@
 
 #include <THC/THCGeneral.h>
 #include <THC/THCDeviceUtils.cuh>
+#include <THC/THCNumerics.cuh>
 
 #include <ATen/ATen.h>
 #include <ATen/TensorUtils.h>
@@ -9,7 +10,6 @@
 
 #include <ATen/cuda/CUDAContext.h>
 #include <ATen/cuda/detail/KernelUtils.h>
-#include <ATen/cuda/CUDAApplyUtils.cuh>
 #include <ATen/cuda/detail/IndexUtils.cuh>
 #include <ATen/cuda/detail/TensorInfo.cuh>
 

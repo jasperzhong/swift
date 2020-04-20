@@ -2,8 +2,8 @@
 
 #include <ATen/cuda/detail/IndexUtils.cuh>
 #include <ATen/NativeFunctions.h>
-#include <ATen/cuda/CUDAApplyUtils.cuh>
 #include <ATen/cuda/CUDAContext.h>
+#include <ATen/cuda/CUDAUtils.h>
 #include <c10/macros/Macros.h>
 
 #include <cstddef>

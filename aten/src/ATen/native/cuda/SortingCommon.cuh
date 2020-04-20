@@ -3,12 +3,13 @@
 #include <assert.h>
 #include <c10/macros/Macros.h>
 #include <stdlib.h>
-#include <ATen/cuda/CUDAApplyUtils.cuh>
 #include <ATen/cuda/detail/TensorInfo.cuh>
 #include <THC/THCDeviceUtils.cuh> // only for THCRoundUp?
 #include <THC/THCNumerics.cuh>
 #include <THC/THCScanUtils.cuh>
 #include <THC/THCTensorMathReduce.cuh> // AddOp
+#include <ATen/cuda/CUDAUtils.h>
+#include <ATen/cuda/detail/IndexUtils.cuh>
 
 namespace at {
 namespace native {

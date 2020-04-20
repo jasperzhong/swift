@@ -3,9 +3,10 @@
 #include <ATen/LegacyTHFunctionsCUDA.h>
 #include <ATen/native/UnaryOps.h>
 #include <ATen/cuda/CUDAContext.h>
-#include <ATen/cuda/CUDAApplyUtils.cuh>
 #include <ATen/native/cuda/LaunchUtils.h>
 #include <ATen/AccumulateType.h>
+#include <ATen/detail/CUDAHooksInterface.h>
+#include <ATen/CUDAGeneratorImpl.h>
 
 #include <THC/THCReduceApplyUtils.cuh>
 #include <THC/THCTensorMathReduce.cuh>
