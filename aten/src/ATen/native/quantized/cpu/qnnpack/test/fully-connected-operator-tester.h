@@ -121,6 +121,8 @@ class FullyConnectedOperatorTester {
     auto s32rng =
         std::bind(std::uniform_int_distribution<int32_t>(-10000, 10000), rng);
     auto u8rng = std::bind(std::uniform_int_distribution<uint8_t>(), rng);
+    auto f32rng =
+        std::bind(std::uniform_real_distribution<float>(1, 5), rng);
 
     std::vector<uint8_t> input(
         (batchSize() - 1) * inputStride() + inputChannels() + 8);
@@ -135,7 +137,7 @@ class FullyConnectedOperatorTester {
     const uint8_t inputZeroPoint = 127;
     // Make number of output channels multiple of 8.
     // This is the least common denominator for SSE/ARM kernels we have.
-    size_t num_zero_points_padded = ((outputChannels() + 7) / 8) * 8;
+    size_t num_zero_points_padded = outputChannels() + 8;
     std::vector<uint8_t> kernelZeroPoints(num_zero_points_padded, 127);
 
     for (size_t iteration = 0; iteration < iterations(); iteration++) {
@@ -195,7 +197,12 @@ class FullyConnectedOperatorTester {
 
       ASSERT_EQ(pytorch_qnnp_status_success, pytorch_qnnp_initialize());
       // 1 bcz input_scale and kernel_scale are both 1.
-      std::vector<float> requantization_scale(num_zero_points_padded, 1 / outputScale);
+      std::vector<float> requantization_scales(num_zero_points_padded);
+      auto scale_generator = [&]() -> float {return (f32rng()/outputScale);};
+      std::generate(
+          requantization_scales.begin(),
+          requantization_scales.end(),
+          std::ref(scale_generator));
 
       switch(mode) {
         case Mode::Static:
@@ -215,7 +222,7 @@ class FullyConnectedOperatorTester {
                   qmin(),
                   qmax(),
                   0,
-                  requantization_scale.data(),
+                  requantization_scales.data(),
                   &convolution));
 
           ASSERT_EQ(
@@ -277,13 +284,12 @@ class FullyConnectedOperatorTester {
 
         case Mode::Runtime:
         {
-          std::vector<float> requantization_scale(num_zero_points_padded, 1 / outputScale);
           auto packW = std::unique_ptr<qnnpack::PackBMatrix>(
               new qnnpack::PackBMatrix(
                   inputChannels(),
                   outputChannels(),
                   kernelZeroPoints.data(),
-                  requantization_scale.data(),
+                  requantization_scales.data(),
                   kernel.data(),
                   bias.data()));
 
@@ -293,7 +299,7 @@ class FullyConnectedOperatorTester {
               outputChannels() /* output_channels */,
               inputZeroPoint,
               kernelZeroPoints.data(),
-              requantization_scale.data(),
+              requantization_scales.data(),
               outputZeroPoint,
               qmin(),
               qmax(),
@@ -320,7 +326,7 @@ class FullyConnectedOperatorTester {
             for (size_t c = 0; c < outputChannels(); c++) {
               const double scaledAccumulator =
                   accumulators[i * outputChannels() + c] *
-                  requantization_scale[c];
+                  requantization_scales[c];
               const double clampedAccumulator = std::max(
                   std::min(
                       scaledAccumulator, double(qmax()) - double(outputZeroPoint)),

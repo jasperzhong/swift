@@ -371,6 +371,8 @@ class ConvolutionOperatorTester {
     auto s32rng =
         std::bind(std::uniform_int_distribution<int32_t>(-10000, 10000), rng);
     auto u8rng = std::bind(std::uniform_int_distribution<uint8_t>(), rng);
+    auto f32rng =
+        std::bind(std::uniform_real_distribution<float>(1, 5), rng);
 
     std::vector<uint8_t> input(
         batchSize() *
@@ -495,6 +497,14 @@ class ConvolutionOperatorTester {
 
       ASSERT_EQ(pytorch_qnnp_status_success, pytorch_qnnp_initialize());
       std::vector<float> requantization_scales(num_zero_points_padded, 1.0 * 1.0 / outputScale);
+      // For now disable per channel quant for depthwise. TODO Kimish. Fix this.
+      if (groupInputChannels() != 1) {
+        auto scale_generator = [&]() -> float {return (f32rng()/outputScale);};
+        std::generate(
+            requantization_scales.begin(),
+            requantization_scales.end(),
+            std::ref(scale_generator));
+      }
 
       switch(mode) {
         case Mode::Static:
@@ -602,8 +612,7 @@ class ConvolutionOperatorTester {
                               groups() +
                           g) *
                              groupOutputChannels() +
-                         c] /
-                    outputScale;
+                         c] *
                     requantization_scales[g * groupOutputChannels() + c];
                 const double clampedAccumulator = std::max(
                     std::min(

@@ -192,6 +192,8 @@ class GemmMicrokernelTester {
     auto s32rng =
         std::bind(std::uniform_int_distribution<int32_t>(-10000, 10000), rng);
     auto u8rng = std::bind(std::uniform_int_distribution<uint8_t>(), rng);
+    auto f32rng =
+        std::bind(std::uniform_real_distribution<float>(1, 5), rng);
 
     std::vector<uint8_t> a((m() - 1) * aStride() + k() + 8);
     std::vector<uint8_t> b(n() * k());
@@ -272,19 +274,24 @@ class GemmMicrokernelTester {
               long(std::numeric_limits<uint8_t>::max())),
           long(std::numeric_limits<uint8_t>::min())));
 
-      std::vector<float> requantization_scale(num_zero_points_padded, 1.0f / float(cScale));
+      std::vector<float> requantization_scales(num_zero_points_padded);
+      auto scale_generator = [&]() -> float {return (f32rng()/cScale);};
+      std::generate(
+          requantization_scales.begin(),
+          requantization_scales.end(),
+          std::ref(scale_generator));
       const union pytorch_qnnp_conv_quantization_params quantizationParams =
           pytorch_qnnp_compute_conv_quantization_params(
               aZeroPoint(),
               kernel_zero_points.data(),
-              requantization_scale.data(),
+              requantization_scales.data(),
               cZeroPoint,
               qmin(),
               qmax());
       const union pytorch_qnnp_fp32_requantization_params
           scalarRequantizationParams =
               pytorch_qnnp_compute_scalar_fp32_requantization_params(
-                  requantization_scale.data(), cZeroPoint, qmin(), qmax());
+                  requantization_scales.data(), cZeroPoint, qmin(), qmax());
 
       qgemm(
           m(),
@@ -323,7 +330,7 @@ class GemmMicrokernelTester {
               << "), optimized = " << (uint32_t)c[mIndex * cStride() + nIndex]
               << ", Mr x Nr x Kr = " << mr() << " x " << nr() << " x " << kr()
               << ", M x N x K = " << m() << " x " << n() << " x " << k()
-              << ", requantization scale = " << requantization_scale[nIndex]
+              << ", requantization scale = " << requantization_scales[nIndex]
               << ", output zero point = " << int32_t(cZeroPoint);
         }
       }
@@ -441,6 +448,8 @@ class GemmMicrokernelTester {
     auto s32rng =
         std::bind(std::uniform_int_distribution<int32_t>(-10000, 10000), rng);
     auto u8rng = std::bind(std::uniform_int_distribution<uint8_t>(), rng);
+    auto f32rng =
+        std::bind(std::uniform_real_distribution<float>(1, 5), rng);
 
     std::vector<uint8_t> a((mr() - 1) * aStride() + k() + 8);
     std::vector<uint8_t> b(n() * ks() * k());
@@ -548,19 +557,24 @@ class GemmMicrokernelTester {
               long(std::numeric_limits<uint8_t>::max())),
           long(std::numeric_limits<uint8_t>::min())));
 
-      std::vector<float> requantization_scale(num_zero_points_padded, 1.0f / float(cScale));
+      std::vector<float> requantization_scales(num_zero_points_padded, 1.0f / float(cScale));
+      auto scale_generator = [&]() -> float {return (f32rng()/cScale);};
+      std::generate(
+          requantization_scales.begin(),
+          requantization_scales.end(),
+          std::ref(scale_generator));
       const union pytorch_qnnp_conv_quantization_params quantizationParams =
           pytorch_qnnp_compute_conv_quantization_params(
               aZeroPoint(),
               kernel_zero_points.data(),
-              requantization_scale.data(),
+              requantization_scales.data(),
               cZeroPoint,
               qmin(),
               qmax());
       const union pytorch_qnnp_fp32_requantization_params
           scalarRequantizationParams =
               pytorch_qnnp_compute_scalar_fp32_requantization_params(
-                  requantization_scale.data(), cZeroPoint, qmin(), qmax());
+                  requantization_scales.data(), cZeroPoint, qmin(), qmax());
 
       qconv(
           m(),
@@ -599,7 +613,7 @@ class GemmMicrokernelTester {
               << "), optimized = " << uint32_t(c[mIndex * cStride() + nIndex])
               << ", Mr x Nr x Kr = " << mr() << " x " << nr() << " x " << kr()
               << ", M x N x K = " << m() << " x " << n() << " x " << k()
-              << ", requantization scale = " << requantization_scale[nIndex]
+              << ", requantization scale = " << requantization_scales[nIndex]
               << ", output zero point = " << int32_t(cZeroPoint);
         }
       }
