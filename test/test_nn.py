@@ -35,7 +35,7 @@ from torch.autograd.gradcheck import gradgradcheck
 from torch.nn import Parameter
 from torch.nn.parallel._functions import Broadcast
 from torch.testing._internal.common_utils import freeze_rng_state, run_tests, TestCase, skipIfNoLapack, skipIfRocm, \
-    TEST_NUMPY, TEST_SCIPY, TEST_WITH_ROCM, download_file, PY3, \
+    TEST_NUMPY, TEST_SCIPY, TEST_WITH_ROCM, download_file, \
     get_function_arglist, load_tests, repeat_test_for_types, ALL_TENSORTYPES, \
     ALL_TENSORTYPES2, TemporaryFileName, TEST_WITH_UBSAN, IS_PPC
 from torch.testing._internal.common_cuda import TEST_CUDA, TEST_MULTIGPU, TEST_CUDNN, TEST_CUDNN_VERSION
@@ -344,15 +344,6 @@ class TestNN(NNTestCase):
         s = nn.Sequential(n, n)
 
         return l, n, s
-
-    @contextlib.contextmanager
-    def _compatible_subtest(self, **kwargs):
-        # Added for subtest compatibility with Python 2
-        if PY3:
-            with self.subTest(**kwargs):
-                yield
-        else:
-            yield
 
     def test_requires_grad_(self):
         m = self._create_basic_net()[-1]
@@ -1783,7 +1774,7 @@ class TestNN(NNTestCase):
 
         for m in modules:
             for name in names:
-                with self._compatible_subtest(m=m, name=name):
+                with self.subTest(m=m, name=name):
                     original_tensor = getattr(m, name)
 
                     prune.random_unstructured(m, name=name, amount=0.1)
@@ -1815,7 +1806,7 @@ class TestNN(NNTestCase):
 
         for m in modules:
             for name in names:
-                with self._compatible_subtest(m=m, name=name):
+                with self.subTest(m=m, name=name):
 
                     # tensor prior to pruning
                     original_tensor = getattr(m, name)
@@ -1836,7 +1827,7 @@ class TestNN(NNTestCase):
 
         for m in modules:
             for name in names:
-                with self._compatible_subtest(m=m, name=name):
+                with self.subTest(m=m, name=name):
                     # tensor prior to pruning
                     original_tensor = getattr(m, name)
                     prune.random_unstructured(m, name=name, amount=0.1)
@@ -2021,7 +2012,7 @@ class TestNN(NNTestCase):
 
         for m in modules:
             for name in names:
-                with self._compatible_subtest(m=m, name=name):
+                with self.subTest(m=m, name=name):
                     prune.random_unstructured(m, name=name, amount=0.1)
                     m_new = pickle.loads(pickle.dumps(m))
                     self.assertIsInstance(m_new, type(m))
@@ -2225,7 +2216,7 @@ class TestNN(NNTestCase):
 
         for m in modules:
             for name in names:
-                with self._compatible_subtest(m=m, name=name):
+                with self.subTest(m=m, name=name):
                     # first prune
                     prune.random_unstructured(m, name, amount=0.5)
                     self.assertIn(name + "_orig", dict(m.named_parameters()))
@@ -2251,7 +2242,7 @@ class TestNN(NNTestCase):
 
         for m in modules:
             for name in names:
-                with self._compatible_subtest(m=m, name=name):
+                with self.subTest(m=m, name=name):
                     # check that the module isn't pruned
                     self.assertFalse(prune.is_pruned(m))
                     # since it isn't pruned, pruning can't be removed from it
@@ -2327,7 +2318,7 @@ class TestNN(NNTestCase):
 
         for m in modules:
             for name in names:
-                with self._compatible_subtest(m=m, name=name):
+                with self.subTest(m=m, name=name):
 
                     with mock.patch(
                         "torch.nn.utils.prune.L1Unstructured.compute_mask"
