@@ -54,6 +54,7 @@ TYPE_MAP = {
     # in returns
     'std::vector<Tensor>': 'Tensor[]',
     'IntArrayRef': 'int[]',
+    'IntArrayRef?': 'int[]?',
     'Layout': 'Layout',
     'Layout?': 'Layout?',
     'Device': 'Device',
@@ -107,6 +108,7 @@ FROM_IVALUE = {
     'Device': '{}.toDevice()',
     'Device?': '{}.toOptional<c10::Device>()',
     'IntArrayRef': '{}.toIntVector()',
+    'IntArrayRef?': '{}.toIntVectorOptional()',
     'Layout': '{}.toLayout()',
     'Layout?': '{}.toOptional<c10::Layout>()',
     'MemoryFormat': '{}.toMemoryFormat()',
@@ -249,8 +251,9 @@ def is_tensor_arg(arg):
 
 
 def is_sized_intlist_arg(arg):
-    """Returns True for arguments declared as IntArrayRef[k], but False for IntArrayRef."""
-    return (arg['simple_type'] == 'IntArrayRef') and ('size' in arg)
+    # Returns True for arguments declared as IntArrayRef[k], but False for IntArrayRef.
+    # Also allows optionality in list or element type.
+    return arg['simple_type'].startswith('IntArrayRef') and ('size' in arg)
 
 
 def base_name(decl):
@@ -371,9 +374,32 @@ def gen_jit_dispatch(
                     name=decl['name'], first=args[0],
                     args=pack_arguments(args[1:]), num_inputs=num_inputs)
 
-    def requires_lvalue(arg):
+
+    def is_mutable_tensor(arg):
         jit_type = jit_type_of(arg)
         return jit_type.startswith('Tensor') and '!' in jit_type
+
+    def is_optional_int_list(arg):
+        jit_type = jit_type_of(arg)
+        return jit_type.startswith('int[') and jit_type.endswith(']?')
+
+    def requires_lvalue(arg):
+        # we may need to store the unpacked param value to an lvalue
+        # before passing it on
+        return is_mutable_tensor(arg) or is_optional_int_list(arg)
+
+    def unpack_lvalue(arg, value):
+        # generate unpack snippets based on arg type
+        name = arg['name']
+        if is_optional_int_list(arg):
+            return [
+                'auto __{} = {};'.format(name, value),
+                'c10::optional<IntArrayRef> {name} = __{name} ? c10::make_optional(IntArrayRef(__{name}.value())) : c10::nullopt;'
+                    .format(name=name, value=value)
+            ]
+        else:
+            return ['auto {} = {};\n'.format(name, value)]
+
 
     def emit_decl_variant(decl):
         if ('emit_dummy_placeholder' in decl):
@@ -395,7 +421,8 @@ def gen_jit_dispatch(
         for i, arg in enumerate(decl['arguments']):
             value = from_ivalue(arg, '(std::move(peek(*stack, {}, {})))'.format(order[i], num_inputs))
             if requires_lvalue(arg):
-                lvalues.append('auto {} = {};\n'.format(arg['name'], value))
+                # lvalues.append('auto {} = {};\n'.format(arg['name'], value))
+                lvalues.extend(unpack_lvalue(arg, value))
                 value = arg['name']
             arguments.append(value)
 
