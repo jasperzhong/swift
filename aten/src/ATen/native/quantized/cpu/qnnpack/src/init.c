@@ -206,10 +206,12 @@ static void init(void) {
   };
   pytorch_qnnp_params.q8dw9 = (struct pytorch_q8dwconv_up_parameters){
       .updw = pytorch_q8dwconv_ukernel_up8x9__sse2,
+      .updw_per_channel = pytorch_q8dwconv_ukernel_up8x9_per_channel__sse2,
       .cr = 8,
   };
   pytorch_qnnp_params.q8dw25 = (struct pytorch_q8dwconv_mp_parameters){
       .mpdw = pytorch_q8dwconv_ukernel_mp8x25__sse2,
+      .mpdw_per_channel = pytorch_q8dwconv_ukernel_mp8x25_per_channel__sse2,
       .cr = 8,
   };
   pytorch_qnnp_params.q8vadd = pytorch_q8vadd_ukernel__sse2;
