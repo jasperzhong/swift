@@ -1845,7 +1845,6 @@ class TestQuantizedLinear(unittest.TestCase):
             # QNNPACK qlinear is flaky on MACOS. Issue #27326
             if IS_PPC or TEST_WITH_UBSAN or IS_MACOS:
                 return
-            use_channelwise = False
             use_multi_dim_input = False
             # QNNPACK supports uint8 in the kernels. In the op we shift the int8
             # weight values to uint8 to be on par with fbgemm. However, this causes
@@ -1967,7 +1966,6 @@ class TestQuantizedLinear(unittest.TestCase):
         if qengine == 'qnnpack':
             if IS_PPC or TEST_WITH_UBSAN:
                 return
-            use_channelwise = False
 
         with override_quantized_engine(qengine):
             W, (W_scale, W_zp, torch_type) = W
