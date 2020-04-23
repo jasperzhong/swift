@@ -60,6 +60,7 @@ enum pytorch_qnnp_status pytorch_qnnp_create_convolution2d_nhwc_q8(
     uint8_t output_max,
     uint32_t flags,
     const float* requantization_scales,
+    bool per_channel,
     pytorch_qnnp_operator_t* convolution_out) {
   pytorch_qnnp_operator_t convolution = NULL;
   enum pytorch_qnnp_status status = pytorch_qnnp_status_uninitialized;
@@ -472,6 +473,8 @@ enum pytorch_qnnp_status pytorch_qnnp_create_convolution2d_nhwc_q8(
 
   convolution->ukernel_type = ukernel_type;
   convolution->format = pytorch_qnnp_format_quint8;
+
+  convolution->per_channel = per_channel;
 
   *convolution_out = convolution;
   return pytorch_qnnp_status_success;

@@ -140,6 +140,15 @@ class ConvolutionOperatorTester {
     return this->groupInputChannels_;
   }
 
+  inline ConvolutionOperatorTester& per_channel(bool per_channel) {
+    this->per_channel_ = per_channel;
+    return *this;
+  }
+
+  inline bool per_channel() const {
+    return this->per_channel_;
+  }
+
   inline ConvolutionOperatorTester& groupOutputChannels(
       size_t groupOutputChannels) {
     assert(groupOutputChannels >= 1);
@@ -403,10 +412,12 @@ class ConvolutionOperatorTester {
       std::generate(input.begin(), input.end(), std::ref(u8rng));
       std::generate(kernel.begin(), kernel.end(), std::ref(u8rng));
       std::generate(bias.begin(), bias.end(), std::ref(s32rng));
-      // For now disable per channel quant for depthwise. TODO Kimish. Fix this.
-      if (groupInputChannels() != 1) {
-        // depthwise convolution do not have per channel quant.
-        std::generate(kernelZeroPoints.begin(), kernelZeroPoints.end(), std::ref(u8rng));
+      if (per_channel()) {
+        // For now disable per channel quant for depthwise. TODO Kimish. Fix this.
+        if (groupInputChannels() != 1) {
+          // depthwise convolution do not have per channel quant.
+          std::generate(kernelZeroPoints.begin(), kernelZeroPoints.end(), std::ref(u8rng));
+        }
       }
       std::fill(output.begin(), output.end(), 0xA5);
       std::fill(accumulators.begin(), accumulators.end(), 0);
@@ -497,13 +508,15 @@ class ConvolutionOperatorTester {
 
       ASSERT_EQ(pytorch_qnnp_status_success, pytorch_qnnp_initialize());
       std::vector<float> requantization_scales(num_zero_points_padded, 1.0 * 1.0 / outputScale);
-      // For now disable per channel quant for depthwise. TODO Kimish. Fix this.
-      if (groupInputChannels() != 1) {
-        auto scale_generator = [&]() -> float {return (f32rng()/outputScale);};
-        std::generate(
-            requantization_scales.begin(),
-            requantization_scales.end(),
-            std::ref(scale_generator));
+      if (per_channel()) {
+        // For now disable per channel quant for depthwise. TODO Kimish. Fix this.
+        if (groupInputChannels() != 1) {
+          auto scale_generator = [&]() -> float {return (f32rng()/outputScale);};
+          std::generate(
+              requantization_scales.begin(),
+              requantization_scales.end(),
+              std::ref(scale_generator));
+        }
       }
 
       switch(mode) {
@@ -536,6 +549,7 @@ class ConvolutionOperatorTester {
                   qmax(),
                   0,
                   requantization_scales.data(),
+                  per_channel(),
                   &convolution));
 
           ASSERT_EQ(
@@ -575,7 +589,8 @@ class ConvolutionOperatorTester {
             kernelZeroPoints.data(),
             requantization_scales.data(),
             qmin(),
-            qmax());
+            qmax(),
+            per_channel());
           auto packW = std::unique_ptr<qnnpack::PrePackConvWeights>(
               new qnnpack::PrePackConvWeights(
                   conv_p,
@@ -660,4 +675,5 @@ class ConvolutionOperatorTester {
   uint8_t qmin_{0};
   uint8_t qmax_{255};
   size_t iterations_{1};
+  bool per_channel_{false};
 };
