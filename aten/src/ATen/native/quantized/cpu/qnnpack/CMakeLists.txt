@@ -172,7 +172,9 @@ set(PYTORCH_QNNPACK_ARM_NEON_UKERNELS
   src/q8conv/4x8-neon.c
   src/q8conv/8x8-neon.c
   src/q8dwconv/mp8x25-neon.c
+  src/q8dwconv/mp8x25-neon-per-channel.c
   src/q8dwconv/up8x9-neon.c
+  src/q8dwconv/up8x9-neon-per-channel.c
   src/q8gavgpool/mp8x7p7q-neon.c
   src/q8gavgpool/up8x7-neon.c
   src/q8gavgpool/up8xm-neon.c
@@ -198,6 +200,7 @@ set(PYTORCH_QNNPACK_AARCH32_ASM_UKERNELS
   src/hgemm/8x8-aarch32-neonfp16arith.S
   src/q8conv/4x8-aarch32-neon.S
   src/q8dwconv/up8x9-aarch32-neon.S
+  src/q8dwconv/up8x9-aarch32-neon-per-channel.S
   src/q8gemm/4x8-aarch32-neon.S
   src/q8gemm/4x8-dq-aarch32-neon.S
   src/q8gemm/4x8c2-xzp-aarch32-neon.S)

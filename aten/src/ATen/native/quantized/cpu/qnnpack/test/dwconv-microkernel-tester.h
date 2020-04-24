@@ -209,11 +209,11 @@ class DWConvMicrokernelTester {
 
       size_t num_zero_points_padded = channels() + 8;
       std::vector<uint8_t> kernel_zero_points(
-          num_zero_points_padded, this->kernelZeroPoint_);
+          num_zero_points_padded, 0);
       if (per_channel) {
         std::generate(
             kernel_zero_points.begin(),
-            kernel_zero_points.end(),
+            kernel_zero_points.begin() + channels(),
             std::ref(u8rng));
       }
 

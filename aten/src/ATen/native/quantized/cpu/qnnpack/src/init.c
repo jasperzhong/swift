@@ -91,10 +91,12 @@ static void init(void) {
 #endif
   pytorch_qnnp_params.q8dw9 = (struct pytorch_q8dwconv_up_parameters){
       .updw = pytorch_q8dwconv_ukernel_up8x9__aarch32_neon,
+      .updw_per_channel = pytorch_q8dwconv_ukernel_up8x9_per_channel__aarch32_neon,
       .cr = 8,
   };
   pytorch_qnnp_params.q8dw25 = (struct pytorch_q8dwconv_mp_parameters){
       .mpdw = pytorch_q8dwconv_ukernel_mp8x25__neon,
+      .mpdw_per_channel = pytorch_q8dwconv_ukernel_mp8x25_per_channel__neon,
       .cr = 8,
   };
   pytorch_qnnp_params.q8sum_rows = (struct pytorch_q8sum_rows_parameters){
