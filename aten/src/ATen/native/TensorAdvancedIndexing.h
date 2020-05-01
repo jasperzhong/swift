@@ -16,10 +16,10 @@ using index_put_fn = void(*)(TensorIterator &, IntArrayRef indexed_sizes, IntArr
 using index_put_accum_fn = void(*)(Tensor &, TensorList , const Tensor &, bool unsafe);
 using masked_fill_fn = void(*)(TensorIterator &, Scalar scalar);
 
-using gather_fn = void (*)(Tensor & result, const Tensor & self, int64_t dim, const Tensor & index, int64_t force_heuristic);
-using scatter_fn = void(*)(Tensor& self, int64_t dim, const Tensor& index, const Tensor& src, int64_t force_heuristic);
-using scatter_fill_fn = void(*)(Tensor& self, int64_t dim, const Tensor& index, Scalar src, int64_t force_heuristic);
-using scatter_add_fn = void(*)(Tensor& self, int64_t dim, const Tensor& index, const Tensor& src, int64_t force_heuristic);
+using gather_fn = void (*)(Tensor & result, const Tensor & self, int64_t dim, const Tensor & index);
+using scatter_fn = void(*)(Tensor& self, int64_t dim, const Tensor& index, const Tensor& src);
+using scatter_fill_fn = void(*)(Tensor& self, int64_t dim, const Tensor& index, Scalar src);
+using scatter_add_fn = void(*)(Tensor& self, int64_t dim, const Tensor& index, const Tensor& src);
 
 DECLARE_DISPATCH(index_fn, index_stub);
 DECLARE_DISPATCH(index_put_fn, index_put_stub);

@@ -48,6 +48,8 @@
 #include <torch/csrc/utils/init.h>
 #include <torch/csrc/api/include/torch/python/init.h>
 
+#include <aten/src/ATen/native/Heuristics.h>
+
 #ifdef USE_DISTRIBUTED
 #ifdef USE_C10D
 #include <torch/csrc/distributed/autograd/autograd.h>
@@ -758,6 +760,7 @@ PyObject* initModule() {
   auto py_module = py::reinterpret_borrow<py::module>(module);
   py_module.def("_demangle", &c10::demangle);
   py_module.def("_log_api_usage_once", &LogAPIUsageOnceFromPython);
+  py_module.def("set_heuristic", &set_heuristic);
 
   ASSERT_TRUE(set_module_attr("has_openmp", at::hasOpenMP() ? Py_True : Py_False));
   ASSERT_TRUE(set_module_attr("has_mkl", at::hasMKL() ? Py_True : Py_False));

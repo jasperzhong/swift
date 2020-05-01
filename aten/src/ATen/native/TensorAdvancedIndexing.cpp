@@ -436,12 +436,12 @@ void resize_result(
 // Stub wrappers
 Tensor & gather_out_cpu(Tensor& result, const Tensor& self, int64_t dim, const Tensor& index, bool /*sparse_grad*/) {
   resize_result(result, self, dim, index, /*broadcast_index=*/false);
-  gather_stub(result.device().type(), result, self, dim, index, /*force_heuristic=*/-1);
+  gather_stub(result.device().type(), result, self, dim, index);
   return result;
 }
 
 Tensor & scatter_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & src) {
-  scatter_stub(self.device().type(), self, dim, index, src, /*force_heuristic=*/-1);
+  scatter_stub(self.device().type(), self, dim, index, src);
   return self;
 }
 
@@ -451,13 +451,13 @@ Tensor & scatter_fill_(Tensor & self, int64_t dim, const Tensor & index, Scalar 
 }
 
 Tensor & scatter_add_cpu_(Tensor & self, int64_t dim, const Tensor & index, const Tensor & src) {
-  scatter_add_stub(self.device().type(), self, dim, index, src, /*force_heuristic=*/-1);
+  scatter_add_stub(self.device().type(), self, dim, index, src);
   return self;
 }
 
 Tensor & index_select_out_cpu_(Tensor & result, const Tensor & self, int64_t dim, const Tensor & index){
     resize_result(result, self, dim, index, /*broadcast_index=*/true);
-    index_select_kernel_stub(self.device().type(), result, self, dim, index, /*force_heuristic=*/-1);
+    index_select_kernel_stub(self.device().type(), result, self, dim, index);
     return result;
 }
 

@@ -202,7 +202,7 @@ struct cpu_scatter_gather_base_kernel_new {
       //       May be better to just reuse `scatter_shape_check`.
     } else {
       is_scatter_like ? scatter_shape_check(self, dim, index, src)
-                      : gather_shape_check(self, dim, index, src);
+                      : gather_shape_check(self, dim, index);  // TODO(taylorrobie): `, src);`
     }
 
     auto iter = TensorIterator();
@@ -311,25 +311,22 @@ static inline auto make_assign_add_f = [](auto*){  // Argument is strictly to in
 };
 
 // TODO(taylorrobie): Can we reduce the boilerplate?
-void gather_cpu_kernel_new(
-    Tensor& result, const Tensor& self, int64_t dim,
-    const Tensor& index, int64_t force_heuristic = -1) {
+void gather_cpu_kernel_new(Tensor& result, const Tensor& self, int64_t dim, const Tensor& index) {
   cpu_scatter_gather_base_kernel_new</*broadcast_index=*/false, /*is_scatter_like=*/false>()(
       result, dim, index, self, "index_select_out_cpu", make_assign_f,
-      /*serial_exec=*/false, force_heuristic
+      /*serial_exec=*/false, /*force_heuristic=*/-1
   );
 }
 
 void scatter_cpu_kernel_new(
-    Tensor& self, int64_t dim, const Tensor& index, const Tensor& src,
-    int64_t force_heuristic = -1) {
+    Tensor& self, int64_t dim, const Tensor& index, const Tensor& src) {
   cpu_scatter_gather_base_kernel_new</*broadcast_index=*/false, /*is_scatter_like=*/true>()(
     self, dim, index, src, "scatter_cpu_", make_assign_f,
-    /*serial_exec=*/false, force_heuristic
+    /*serial_exec=*/false, /*force_heuristic=*/-1
   );
 }
 
-void scatter_fill_cpu_kernel_new(Tensor& self, int64_t dim, const Tensor& index, Scalar src, int64_t force_heuristic = -1) {
+void scatter_fill_cpu_kernel_new(Tensor& self, int64_t dim, const Tensor& index, Scalar src) {
   auto make_assign_fill_f = [src](auto* _){
     using scalar_t = typename std::remove_pointer<decltype(_)>::type;
     scalar_t fill_value = src.to<scalar_t>();
@@ -338,33 +335,30 @@ void scatter_fill_cpu_kernel_new(Tensor& self, int64_t dim, const Tensor& index,
 
   cpu_scatter_gather_base_kernel_new</*broadcast_index=*/false, /*is_scatter_like=*/true>()(
     self, dim, index, self, "scatter_fill_cpu_", make_assign_fill_f,
-    /*serial_exec=*/false, force_heuristic
+    /*serial_exec=*/false, /*force_heuristic=*/-1
   );
 }
 
-void scatter_add_cpu_kernel_new(Tensor& self, int64_t dim, const Tensor& index, const Tensor& src,
-                            int64_t force_heuristic = -1) {
+void scatter_add_cpu_kernel_new(Tensor& self, int64_t dim, const Tensor& index, const Tensor& src) {
   cpu_scatter_gather_base_kernel_new</*broadcast_index=*/false, /*is_scatter_like=*/true>()(
     self, dim, index, src, "scatter_add_cpu_", make_assign_add_f,
-    /*serial_exec=*/true, force_heuristic
+    /*serial_exec=*/true, /*force_heuristic=*/-1
   );
 }
 
 void index_select_cpu_kernel_new(
-    Tensor& result, const Tensor& self, int64_t dim,
-    const Tensor& index, int64_t force_heuristic = -1) {
+    Tensor& result, const Tensor& self, int64_t dim, const Tensor& index) {
   cpu_scatter_gather_base_kernel_new</*broadcast_index=*/true, /*is_scatter_like=*/false>()(
       result, dim, index, self, "index_select_out_cpu", make_assign_f,
-      /*serial_exec=*/false, force_heuristic
+      /*serial_exec=*/false, /*force_heuristic=*/-1
   );
 }
 
 void index_put_cpu_kernel_new(
-    Tensor& self, int64_t dim, const Tensor& index, const Tensor& src,
-    int64_t force_heuristic = -1) {
+    Tensor& self, int64_t dim, const Tensor& index, const Tensor& src) {
   cpu_scatter_gather_base_kernel_new</*broadcast_index=*/true, /*is_scatter_like=*/true>()(
     self, dim, index, src, "index_put_cpu_", make_assign_f,
-    /*serial_exec=*/false, force_heuristic
+    /*serial_exec=*/false, /*force_heuristic=*/-1
   );
 }
 
