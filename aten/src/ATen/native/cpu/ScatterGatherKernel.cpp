@@ -2,22 +2,16 @@
 #include <utility>
 #include <vector>
 
+#include <ATen/native/Heuristics.h>
 #include <ATen/native/ScatterGatherShapeChecks.h>
 #include <ATen/native/DispatchStub.h>
 #include <ATen/native/TensorIterator.h>
 #include <ATen/Parallel.h>
 
+
 namespace at { namespace native {
 
 namespace {
-
-enum class LoopSpecialization {
-  ONE_DIMENSIONAL,
-  ONE_DIMENSIONAL_CONTIGUOUS,
-  BATCH_MAJOR,
-  BATCH_MAJOR_CONTIGUOUS,
-  FEATURE_MAJOR,
-};
 
 template <typename scalar_t, bool is_scatter_like>
 struct _loop_helper {
@@ -37,27 +31,6 @@ struct _loop_helper {
   scalar_t* self_ptr;
   int64_t* index_ptr;
   scalar_t* src_ptr;
-
-  int64_t force_heuristic;
-
-  LoopSpecialization choose_specialization(
-      const bool vector_subtask,
-      const bool contiguous_subtask,
-      const int64_t n) {
-    if (vector_subtask) {
-      return contiguous_subtask ? LoopSpecialization::ONE_DIMENSIONAL_CONTIGUOUS
-                                : LoopSpecialization::ONE_DIMENSIONAL;
-    }
-
-    if (contiguous_subtask) return LoopSpecialization::BATCH_MAJOR_CONTIGUOUS;
-
-    if (force_heuristic == 0) return LoopSpecialization::FEATURE_MAJOR;
-    if (force_heuristic == 1) return LoopSpecialization::BATCH_MAJOR;
-
-    return ((self_dim_stride == 1) || (n < index_dim_size))
-      ? LoopSpecialization::FEATURE_MAJOR
-      : LoopSpecialization::BATCH_MAJOR;
-  }
 
   template <typename func_t>
   void batch_major(
@@ -172,7 +145,7 @@ struct _loop_helper {
 };
 
 template <bool broadcast_index, bool is_scatter_like>
-struct cpu_scatter_gather_base_kernel_new {
+struct cpu_scatter_gather_base_kernel {
   template <typename func_factory_t>
   void operator()(
     Tensor& self,
@@ -181,8 +154,8 @@ struct cpu_scatter_gather_base_kernel_new {
     const Tensor& src,
     const std::string& method_name,
     const func_factory_t& make_f,
-    bool serial_exec = true,
-    const int64_t force_heuristic = -1
+    const sg_heuristic::Method method,
+    bool serial_exec = true
   ) {
     auto self_dim = self.dim();
     dim = maybe_wrap_dim(dim, self_dim);
@@ -260,31 +233,37 @@ struct cpu_scatter_gather_base_kernel_new {
             index_dim_stride, index_dim_size,
             src_dim_stride, src_dim_size,
             dim, index_upper_bound, serial_exec,
-            self_ptr, index_ptr, src_ptr,
-            force_heuristic
+            self_ptr, index_ptr, src_ptr
           });
 
-          switch (loop_helper.choose_specialization(
-              vector_subtask, contiguous_subtask, n)) {
-            case LoopSpecialization::ONE_DIMENSIONAL_CONTIGUOUS:
+          auto specialization = sg_heuristic::choose_specialization(
+              method,
+              vector_subtask,
+              contiguous_subtask,
+              n,
+              self_dim_stride,
+              index_dim_size);
+
+          switch (specialization) {
+            case sg_heuristic::LoopSpecialization::ONE_DIMENSIONAL_CONTIGUOUS:
               TORCH_INTERNAL_ASSERT(n == 1);
               loop_helper.batch_major_contiguous(f, /*n=*/1);
               break;
-            case LoopSpecialization::ONE_DIMENSIONAL:
+            case sg_heuristic::LoopSpecialization::ONE_DIMENSIONAL:
               TORCH_INTERNAL_ASSERT(n == 1);
               loop_helper.batch_major(
                   f, /*n=*/1, self_iter_stride,
                   index_iter_stride, src_iter_stride);
               break;
-            case LoopSpecialization::BATCH_MAJOR_CONTIGUOUS:
+            case sg_heuristic::LoopSpecialization::BATCH_MAJOR_CONTIGUOUS:
               loop_helper.batch_major_contiguous(f, n);
               break;
-            case LoopSpecialization::BATCH_MAJOR:
+            case sg_heuristic::LoopSpecialization::BATCH_MAJOR:
               loop_helper.batch_major(
                   f, n, self_iter_stride,
                   index_iter_stride, src_iter_stride);
               break;
-            case LoopSpecialization::FEATURE_MAJOR:
+            case sg_heuristic::LoopSpecialization::FEATURE_MAJOR:
               loop_helper.feature_major(
                   f, n, self_iter_stride,
                   index_iter_stride, src_iter_stride);
@@ -311,67 +290,57 @@ static inline auto make_assign_add_f = [](auto*){  // Argument is strictly to in
 };
 
 // TODO(taylorrobie): Can we reduce the boilerplate?
-void gather_cpu_kernel_new(Tensor& result, const Tensor& self, int64_t dim, const Tensor& index) {
-  cpu_scatter_gather_base_kernel_new</*broadcast_index=*/false, /*is_scatter_like=*/false>()(
+void gather_cpu_kernel(Tensor& result, const Tensor& self, int64_t dim, const Tensor& index) {
+  cpu_scatter_gather_base_kernel</*broadcast_index=*/false, /*is_scatter_like=*/false>()(
       result, dim, index, self, "index_select_out_cpu", make_assign_f,
-      /*serial_exec=*/false, /*force_heuristic=*/-1
+      sg_heuristic::Method::GATHER, /*serial_exec=*/false
   );
 }
 
-void scatter_cpu_kernel_new(
+void scatter_cpu_kernel(
     Tensor& self, int64_t dim, const Tensor& index, const Tensor& src) {
-  cpu_scatter_gather_base_kernel_new</*broadcast_index=*/false, /*is_scatter_like=*/true>()(
+  cpu_scatter_gather_base_kernel</*broadcast_index=*/false, /*is_scatter_like=*/true>()(
     self, dim, index, src, "scatter_cpu_", make_assign_f,
-    /*serial_exec=*/false, /*force_heuristic=*/-1
+    sg_heuristic::Method::SCATTER, /*serial_exec=*/false
   );
 }
 
-void scatter_fill_cpu_kernel_new(Tensor& self, int64_t dim, const Tensor& index, Scalar src) {
+void scatter_fill_cpu_kernel(Tensor& self, int64_t dim, const Tensor& index, Scalar src) {
   auto make_assign_fill_f = [src](auto* _){
     using scalar_t = typename std::remove_pointer<decltype(_)>::type;
     scalar_t fill_value = src.to<scalar_t>();
     return [fill_value](auto* lhs, const auto*) { *lhs = fill_value; };
   };
 
-  cpu_scatter_gather_base_kernel_new</*broadcast_index=*/false, /*is_scatter_like=*/true>()(
+  cpu_scatter_gather_base_kernel</*broadcast_index=*/false, /*is_scatter_like=*/true>()(
     self, dim, index, self, "scatter_fill_cpu_", make_assign_fill_f,
-    /*serial_exec=*/false, /*force_heuristic=*/-1
+    sg_heuristic::Method::SCATTER_FILL, /*serial_exec=*/false
   );
 }
 
-void scatter_add_cpu_kernel_new(Tensor& self, int64_t dim, const Tensor& index, const Tensor& src) {
-  cpu_scatter_gather_base_kernel_new</*broadcast_index=*/false, /*is_scatter_like=*/true>()(
+void scatter_add_cpu_kernel(Tensor& self, int64_t dim, const Tensor& index, const Tensor& src) {
+  cpu_scatter_gather_base_kernel</*broadcast_index=*/false, /*is_scatter_like=*/true>()(
     self, dim, index, src, "scatter_add_cpu_", make_assign_add_f,
-    /*serial_exec=*/true, /*force_heuristic=*/-1
+    sg_heuristic::Method::SCATTER_ADD, /*serial_exec=*/true
   );
 }
 
-void index_select_cpu_kernel_new(
+void index_select_cpu_kernel(
     Tensor& result, const Tensor& self, int64_t dim, const Tensor& index) {
-  cpu_scatter_gather_base_kernel_new</*broadcast_index=*/true, /*is_scatter_like=*/false>()(
+  cpu_scatter_gather_base_kernel</*broadcast_index=*/true, /*is_scatter_like=*/false>()(
       result, dim, index, self, "index_select_out_cpu", make_assign_f,
-      /*serial_exec=*/false, /*force_heuristic=*/-1
+      sg_heuristic::Method::INDEX_SELECT, /*serial_exec=*/false
   );
 }
-
-void index_put_cpu_kernel_new(
-    Tensor& self, int64_t dim, const Tensor& index, const Tensor& src) {
-  cpu_scatter_gather_base_kernel_new</*broadcast_index=*/true, /*is_scatter_like=*/true>()(
-    self, dim, index, src, "index_put_cpu_", make_assign_f,
-    /*serial_exec=*/false, /*force_heuristic=*/-1
-  );
-}
-
-
 
 } // anonymous namespace
 
-REGISTER_DISPATCH(gather_stub, &gather_cpu_kernel_new);
-REGISTER_DISPATCH(scatter_stub, &scatter_cpu_kernel_new);
-REGISTER_DISPATCH(scatter_fill_stub, &scatter_fill_cpu_kernel_new);
-REGISTER_DISPATCH(scatter_add_stub, &scatter_add_cpu_kernel_new);
+REGISTER_DISPATCH(gather_stub, &gather_cpu_kernel);
+REGISTER_DISPATCH(scatter_stub, &scatter_cpu_kernel);
+REGISTER_DISPATCH(scatter_fill_stub, &scatter_fill_cpu_kernel);
+REGISTER_DISPATCH(scatter_add_stub, &scatter_add_cpu_kernel);
 
-REGISTER_DISPATCH(index_select_kernel_stub, &index_select_cpu_kernel_new);
+REGISTER_DISPATCH(index_select_kernel_stub, &index_select_cpu_kernel);
 
 
 }} // namespace at::native
