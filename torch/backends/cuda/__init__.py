@@ -1,5 +1,6 @@
 import sys
 import torch
+from torch.backends import ContextProp
 
 
 def is_built():
@@ -83,6 +84,11 @@ class cuFFTPlanCacheManager(object):
             return super(cuFFTPlanCacheManager, self).__setattr__(name, value)
 
 
+class CUBLASModule:
+
+    use_tf32 = ContextProp(torch._C._get_cublas_use_tf32, torch._C._set_cublas_use_tf32)
+
+
 class CUDAModule(object):
     def __init__(self, m):
         self.__dict__ = m.__dict__
@@ -92,6 +98,7 @@ class CUDAModule(object):
         self.__old_mod = m
 
     cufft_plan_cache = cuFFTPlanCacheManager()
+    matmul = CUBLASModule()
 
 # This is the sys.modules replacement trick, see
 # https://stackoverflow.com/questions/2447353/getattr-on-a-module/7668273#7668273

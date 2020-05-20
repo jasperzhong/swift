@@ -466,6 +466,35 @@ PyObject *THPModule_benchmarkCuDNN(PyObject *_unused, PyObject *noargs)
   else Py_RETURN_FALSE;
 }
 
+PyObject *THPModule_setUseTF32CuDNN(PyObject *_unused, PyObject *arg)
+{
+  THPUtils_assert(PyBool_Check(arg), "set_use_tf32_cudnn expects a bool, "
+          "but got %s", THPUtils_typename(arg));
+  at::globalContext().setUseTF32CuDNN(arg == Py_True);
+  Py_RETURN_NONE;
+}
+
+PyObject *THPModule_useTF32CuDNN(PyObject *_unused, PyObject *noargs)
+{
+  if (at::globalContext().useTF32CuDNN()) Py_RETURN_TRUE;
+  else Py_RETURN_FALSE;
+}
+
+PyObject *THPModule_setUseTF32CuBLAS(PyObject *_unused, PyObject *arg)
+{
+  THPUtils_assert(PyBool_Check(arg), "set_use_tf32_cublas expects a bool, "
+          "but got %s", THPUtils_typename(arg));
+  at::globalContext().setUseTF32CuBLAS(arg == Py_True);
+  Py_RETURN_NONE;
+}
+
+PyObject *THPModule_useTF32CuBLAS(PyObject *_unused, PyObject *noargs)
+{
+  if (at::globalContext().useTF32CuBLAS()) Py_RETURN_TRUE;
+  else Py_RETURN_FALSE;
+}
+
+
 PyObject *THPModule_setFlushDenormal(PyObject *_unused, PyObject *arg) {
   THPUtils_assert(PyBool_Check(arg), "flush_denormal expects a bool, "
           "but got %s", THPUtils_typename(arg));
@@ -558,6 +587,10 @@ static PyMethodDef TorchMethods[] = {
   {"_set_cudnn_benchmark", (PyCFunction)THPModule_setBenchmarkCuDNN, METH_O,  nullptr},
   {"_get_cudnn_deterministic", (PyCFunction)THPModule_deterministicCuDNN, METH_NOARGS,     nullptr},
   {"_set_cudnn_deterministic", (PyCFunction)THPModule_setDeterministicCuDNN, METH_O,  nullptr},
+  {"_get_cudnn_use_tf32", (PyCFunction)THPModule_useTF32CuDNN, METH_NOARGS,     nullptr},
+  {"_set_cudnn_use_tf32", (PyCFunction)THPModule_setUseTF32CuDNN, METH_O,  nullptr},
+  {"_get_cublas_use_tf32", (PyCFunction)THPModule_useTF32CuBLAS, METH_NOARGS,     nullptr},
+  {"_set_cublas_use_tf32", (PyCFunction)THPModule_setUseTF32CuBLAS, METH_O,  nullptr},
   {"_to_dlpack",      (PyCFunction)THPModule_toDLPack,          METH_O,       nullptr},
   {"_from_dlpack",    (PyCFunction)THPModule_fromDLPack,        METH_O,       nullptr},
   {"set_flush_denormal", (PyCFunction)THPModule_setFlushDenormal, METH_O,     nullptr},

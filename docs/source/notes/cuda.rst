@@ -144,6 +144,26 @@ complete snapshot of the memory allocator state via
 :meth:`~torch.cuda.memory_snapshot`, which can help you understand the
 underlying allocation patterns produced by your code.
 
+.. _tf32_on_ampere:
+
+TensorFloat-32(TF32) on Ampere devices
+--------------------------------------
+
+Starting from `CUDA 11`_ and the `Ampere architecture`_, it is possible to compute
+matrix multiplications and convolutions for ``torch.float32`` data type using the
+new `TensorFloat-32`_ tensor cores. TensorFloat-32 is a new math mode that approaches
+up to 10x speedups by sacrificing precision. If you are using a device with TF32 support,
+the default math mode will be TF32. The precision for TF32 will be enough for most AI
+use cases, but if you are seeing precision issue, try manually turning it off:
+
+.. code: python
+  torch.backends.cudnn.use_tf32 = False        # for convolutions
+  torch.backends.cuda.matmul.use_tf32 = False  # for matrix multiplications
+
+.. _TensorFloat-32: https://blogs.nvidia.com/blog/2020/05/14/tensorfloat-32-precision-format/
+.. _CUDA 11: https://devblogs.nvidia.com/cuda-11-features-revealed/
+.. _Ampere architecture: https://devblogs.nvidia.com/nvidia-ampere-architecture-in-depth/
+
 .. _cufft-plan-cache:
 
 cuFFT plan cache
