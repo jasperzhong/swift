@@ -1679,9 +1679,7 @@ if _enabled:
 
         def _reconstruct(self, init_fn=None):
             cpp_module = self._c
-            # delete all existing attributes
-            for attr in dir(self):
-                delattr(self, attr)
+            # [TODO] delete all existing attributes
             self.__init__(cpp_module)
             if init_fn:
                 init_fn(self)
