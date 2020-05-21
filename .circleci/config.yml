@@ -2083,7 +2083,7 @@ jobs:
 # Workflows
 ##############################################################################
 workflows:
-  build:
+  build_workflow_000:
     jobs:
       - setup:
           filters:
@@ -2417,6 +2417,14 @@ workflows:
           vc_product: Community
           vc_version: ""
           vc_year: "2019"
+  build_workflow_001:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - pytorch_linux_build:
           name: pytorch_linux_xenial_pynightly_build
           requires:
@@ -2794,6 +2802,14 @@ workflows:
           build_environment: "pytorch-xla-linux-bionic-py3.6-clang9-test"
           docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-bionic-py3.6-clang9:1bc00f11-e0f3-4e5c-859f-15937dd938cd"
           resource_class: large
+  build_workflow_002:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - pytorch_macos_10_13_py3_build:
           requires:
             - setup
@@ -2801,6 +2817,14 @@ workflows:
           requires:
             - setup
             - pytorch_macos_10_13_py3_build
+  build_workflow_003:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - pytorch_android_gradle_build-x86_32:
           filters:
             branches:
@@ -2824,6 +2848,14 @@ workflows:
             - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_build
             - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_build
             - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_build
+  build_workflow_004:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - pytorch_ios_build:
           build_environment: pytorch-ios-11.2.1-x86_64_build
           ios_arch: x86_64
@@ -2848,6 +2880,14 @@ workflows:
           op_list: mobilenetv2.yaml
           requires:
             - setup
+  build_workflow_005:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - pytorch_linux_build:
           build_environment: pytorch-linux-xenial-py3-clang5-mobile-build
           build_only: "1"
@@ -2882,6 +2922,14 @@ workflows:
           name: pytorch_linux_xenial_py3_clang5_mobile_code_analysis
           requires:
             - setup
+  build_workflow_006:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - pytorch_linux_test:
           build_environment: pytorch-linux-xenial-py3.6-gcc5.4-ge_config_legacy-test
           docker_image: 308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3.6-gcc5.4:1bc00f11-e0f3-4e5c-859f-15937dd938cd
@@ -2924,6 +2972,14 @@ workflows:
             - pytorch_linux_xenial_cuda10_2_cudnn7_py3_gcc7_build
           resource_class: gpu.medium
           use_cuda_docker_runtime: "1"
+  build_workflow_007:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - pytorch_linux_bazel_build:
           build_environment: pytorch-linux-xenial-py3.6-gcc7-bazel-build
           docker_image: 308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3.6-gcc7:1bc00f11-e0f3-4e5c-859f-15937dd938cd
@@ -2938,6 +2994,14 @@ workflows:
           requires:
             - setup
             - pytorch_bazel_build
+  build_workflow_008:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - caffe2_linux_build:
           name: caffe2_onnx_main_py3_6_clang7_ubuntu16_04_build
           requires:
@@ -2968,6 +3032,14 @@ workflows:
           build_environment: "caffe2-onnx-ort2-py3.6-clang7-ubuntu16.04-test"
           docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/caffe2/py3.6-clang7-ubuntu16.04:376"
           resource_class: large
+  build_workflow_009:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - binary_linux_build:
           build_environment: manywheel 3.7m cu102 devtoolset7
           docker_image: pytorch/manylinux-cuda102
@@ -3093,6 +3165,14 @@ workflows:
           requires:
             - setup
             - binary_linux_libtorch_3_7m_cpu_gcc5_4_cxx11-abi_shared-with-deps_build
+  build_workflow_010:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - smoke_linux_test:
           name: smoke_linux_manywheel_3_6m_cpu_devtoolset7_nightly
           build_environment: "manywheel 3.6m cpu devtoolset7"
@@ -3895,6 +3975,14 @@ workflows:
           filters:
             branches:
               only: postnightly
+  build_workflow_011:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - binary_linux_build:
           name: binary_linux_manywheel_3_6m_cpu_devtoolset7_nightly_build
           build_environment: "manywheel 3.6m cpu devtoolset7"
@@ -4933,6 +5021,14 @@ workflows:
               only: nightly
             tags:
               only: /v[0-9]+(\.[0-9]+)*-rc[0-9]+/
+  build_workflow_012:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - binary_ios_build:
           build_environment: libtorch-ios-11.2.1-nightly-x86_64-build
           context: org-member
@@ -4965,6 +5061,14 @@ workflows:
             - setup
             - pytorch_ios_11_2_1_nightly_x86_64_build
             - pytorch_ios_11_2_1_nightly_arm64_build
+  build_workflow_013:
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
       - pytorch_linux_build:
           build_environment: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-x86_32
           docker_image: 308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c:1bc00f11-e0f3-4e5c-859f-15937dd938cd

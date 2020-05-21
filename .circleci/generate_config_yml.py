@@ -82,7 +82,6 @@ class Header(object):
 
 def gen_build_workflows_tree():
     build_workflows_functions = [
-        cimodel.data.simple.setup_job.get_workflow_jobs,
         windows_build_definitions.get_windows_workflows,
         pytorch_build_definitions.get_workflow_jobs,
         cimodel.data.simple.macos_definitions.get_workflow_jobs,
@@ -99,12 +98,17 @@ def gen_build_workflows_tree():
         cimodel.data.simple.nightly_android.get_workflow_jobs,
     ]
 
+    job_list = [f() for f in build_workflows_functions]
+
+    workflows_dict = {}
+    for i, job in enumerate(job_list):
+        workflow_name = "build_workflow_{:03d}".format(i)
+
+        inner_job_list = cimodel.data.simple.setup_job.get_workflow_jobs() + [job]
+        workflows_dict[workflow_name] = {"jobs": inner_job_list}
+
     return {
-        "workflows": {
-            "build": {
-                "jobs": [f() for f in build_workflows_functions],
-            },
-        },
+        "workflows": workflows_dict,
     }
 
 
