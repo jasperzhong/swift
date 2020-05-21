@@ -81,11 +81,11 @@ def lnlstm_creator(script=True, decompose_layernorm=False, **kwargs):
     seq_len = kwargs['seqLength']
     batch_size = kwargs['miniBatch']
     ge = script_lnlstm(input_size, hidden_size, 1,
-                       decompose_layernorm=decompose_layernorm).cuda()
+                       decompose_layernorm=decompose_layernorm)
 
-    input = torch.randn(seq_len, batch_size, input_size, device='cuda')
-    states = [(torch.randn(batch_size, hidden_size, device='cuda'),
-               torch.randn(batch_size, hidden_size, device='cuda'))]
+    input = torch.randn(seq_len, batch_size, input_size, device='cpu')
+    states = [(torch.randn(batch_size, hidden_size, device='cpu'),
+               torch.randn(batch_size, hidden_size, device='cpu'))]
 
     return ModelDef(
         inputs=[input, states],
@@ -103,11 +103,11 @@ def dropoutlstm_creator(script=True, **kwargs):
     seq_len = kwargs['seqLength']
     batch_size = kwargs['miniBatch']
     num_layers = kwargs['numLayers']
-    ge = script_lstm(input_size, hidden_size, num_layers, dropout=True).cuda()
+    ge = script_lstm(input_size, hidden_size, num_layers, dropout=True)
 
-    input = torch.randn(seq_len, batch_size, input_size, device='cuda')
-    states = [LSTMState(torch.randn(batch_size, hidden_size, device='cuda'),
-                        torch.randn(batch_size, hidden_size, device='cuda'))
+    input = torch.randn(seq_len, batch_size, input_size, device='cpu')
+    states = [LSTMState(torch.randn(batch_size, hidden_size, device='cpu'),
+                        torch.randn(batch_size, hidden_size, device='cpu'))
               for _ in range(num_layers)]
     return ModelDef(
         inputs=[input, states],
@@ -162,7 +162,7 @@ def lstm_multilayer_creator(script=True, **kwargs):
 
 
 def imagenet_cnn_creator(arch, jit=True):
-    def creator(device='cuda', **kwargs):
+    def creator(device='cpu', **kwargs):
         model = arch().to(device)
         x = torch.randn(32, 3, 224, 224, device=device)
         if jit:
@@ -179,7 +179,7 @@ def imagenet_cnn_creator(arch, jit=True):
 
 def varlen_lstm_inputs(minlen=30, maxlen=100,
                        numLayers=1, inputSize=512, hiddenSize=512,
-                       miniBatch=64, return_module=False, device='cuda',
+                       miniBatch=64, return_module=False, device='cpu',
                        seed=None, **kwargs):
     if seed is not None:
         torch.manual_seed(seed)
@@ -289,10 +289,10 @@ def layernorm_pytorch_lstm_creator(**kwargs):
     input, hidden, _, module = lstm_inputs(return_module=True, **kwargs)
     batch_size = kwargs['miniBatch']
     hidden_size = kwargs['hiddenSize']
-    ln_i = torch.nn.LayerNorm(4 * hidden_size).cuda()
-    ln_h = torch.nn.LayerNorm(4 * hidden_size).cuda()
-    ln_c = torch.nn.LayerNorm(hidden_size).cuda()
-    ln_input1 = torch.randn(batch_size, 4 * hidden_size, device='cuda')
+    ln_i = torch.nn.LayerNorm(4 * hidden_size)
+    ln_h = torch.nn.LayerNorm(4 * hidden_size)
+    ln_c = torch.nn.LayerNorm(hidden_size)
+    ln_input1 = torch.randn(batch_size, 4 * hidden_size, device='cpu')
 
     def forward(input, hidden):
         out, new_hidden = module(input, hidden)
@@ -340,7 +340,8 @@ def stack_weights(weights):
 
 # returns: x, (hx, cx), all_weights, lstm module with all_weights as params
 def lstm_inputs(seqLength=100, numLayers=1, inputSize=512, hiddenSize=512,
-                miniBatch=64, dropout=0.0, return_module=False, device='cuda', seed=None):
+                miniBatch=64, dropout=0.0, return_module=False, device='cpu', seed=None):
+    device = 'cpu'
     if seed is not None:
         torch.manual_seed(seed)
     x = torch.randn(seqLength, miniBatch, inputSize, device=device)
@@ -348,7 +349,7 @@ def lstm_inputs(seqLength=100, numLayers=1, inputSize=512, hiddenSize=512,
     cx = torch.randn(numLayers, miniBatch, hiddenSize, device=device)
     lstm = torch.nn.LSTM(inputSize, hiddenSize, numLayers, dropout=dropout)
     if 'cuda' in device:
-        lstm = lstm.cuda()
+        lstm = lstm
 
     if return_module:
         return x, (hx, cx), lstm.all_weights, lstm
