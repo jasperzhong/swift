@@ -10,35 +10,39 @@ Distributed communication package - torch.distributed
 Backends
 --------
 
-``torch.distributed`` supports three backends, each with
+``torch.distributed`` supports three built-in backends, each with
 different capabilities. The table below shows which functions are available
 for use with CPU / CUDA tensors.
 MPI supports CUDA only if the implementation used to build PyTorch supports it.
 
 
-+------------+-----------+-----------+-----------+
-| Backend    | ``gloo``  | ``mpi``   | ``nccl``  |
-+------------+-----+-----+-----+-----+-----+-----+
-| Device     | CPU | GPU | CPU | GPU | CPU | GPU |
-+============+=====+=====+=====+=====+=====+=====+
-| send       | ✓   | ✘   | ✓   | ?   | ✘   | ✘   |
-+------------+-----+-----+-----+-----+-----+-----+
-| recv       | ✓   | ✘   | ✓   | ?   | ✘   | ✘   |
-+------------+-----+-----+-----+-----+-----+-----+
-| broadcast  | ✓   | ✓   | ✓   | ?   | ✘   | ✓   |
-+------------+-----+-----+-----+-----+-----+-----+
-| all_reduce | ✓   | ✓   | ✓   | ?   | ✘   | ✓   |
-+------------+-----+-----+-----+-----+-----+-----+
-| reduce     | ✓   | ✘   | ✓   | ?   | ✘   | ✓   |
-+------------+-----+-----+-----+-----+-----+-----+
-| all_gather | ✓   | ✘   | ✓   | ?   | ✘   | ✓   |
-+------------+-----+-----+-----+-----+-----+-----+
-| gather     | ✓   | ✘   | ✓   | ?   | ✘   | ✘   |
-+------------+-----+-----+-----+-----+-----+-----+
-| scatter    | ✓   | ✘   | ✓   | ?   | ✘   | ✘   |
-+------------+-----+-----+-----+-----+-----+-----+
-| barrier    | ✓   | ✘   | ✓   | ?   | ✘   | ✓   |
-+------------+-----+-----+-----+-----+-----+-----+
++----------------+-----------+-----------+-----------+
+| Backend        | ``gloo``  | ``mpi``   | ``nccl``  |
++----------------+-----+-----+-----+-----+-----+-----+
+| Device         | CPU | GPU | CPU | GPU | CPU | GPU |
++================+=====+=====+=====+=====+=====+=====+
+| send           | ✓   | ✘   | ✓   | ?   | ✘   | ✘   |
++----------------+-----+-----+-----+-----+-----+-----+
+| recv           | ✓   | ✘   | ✓   | ?   | ✘   | ✘   |
++----------------+-----+-----+-----+-----+-----+-----+
+| broadcast      | ✓   | ✓   | ✓   | ?   | ✘   | ✓   |
++----------------+-----+-----+-----+-----+-----+-----+
+| all_reduce     | ✓   | ✓   | ✓   | ?   | ✘   | ✓   |
++----------------+-----+-----+-----+-----+-----+-----+
+| reduce         | ✓   | ✘   | ✓   | ?   | ✘   | ✓   |
++----------------+-----+-----+-----+-----+-----+-----+
+| all_gather     | ✓   | ✘   | ✓   | ?   | ✘   | ✓   |
++----------------+-----+-----+-----+-----+-----+-----+
+| gather         | ✓   | ✘   | ✓   | ?   | ✘   | ✘   |
++----------------+-----+-----+-----+-----+-----+-----+
+| scatter        | ✓   | ✘   | ✓   | ?   | ✘   | ✘   |
++----------------+-----+-----+-----+-----+-----+-----+
+| reduce_scatter | ✘   | ✘   | ✘   | ✘   | ✘   | ✓   |
++----------------+-----+-----+-----+-----+-----+-----+
+| all_to_all     | ✘   | ✘   | ✓   | ?   | ✘   | ✘   |
++----------------+-----+-----+-----+-----+-----+-----+
+| barrier        | ✓   | ✘   | ✓   | ?   | ✘   | ✓   |
++----------------+-----+-----+-----+-----+-----+-----+
 
 
 Backends that come with PyTorch
@@ -90,15 +94,17 @@ Common environment variables
 Choosing the network interface to use
 """""""""""""""""""""""""""""""""""""
 
-By default, both NCCL and Gloo
-backends will try to find the network interface to use for communication. However, this
-is not always guaranteed to be successful from our experiences. Therefore, if you
-encounter any problem on either backend not being able to find the correct network
-interface. You can try to set the following environment variables (each one
-applicable to its respective backend):
+By default, both the NCCL and Gloo backends will try to find the right network interface to use.
+If the automatically detected interface is not correct, you can override it using the following
+environment variables (applicable to the respective backend):
 
 * **NCCL_SOCKET_IFNAME**, for example ``export NCCL_SOCKET_IFNAME=eth0``
 * **GLOO_SOCKET_IFNAME**, for example ``export GLOO_SOCKET_IFNAME=eth0``
+
+If you're using the Gloo backend, you can specify multiple interfaces by separating
+them by a comma, like this: ``export GLOO_SOCKET_IFNAME=eth0,eth1,eth2,eth3``.
+The backend will dispatch operations in a round-robin fashion across these interfaces.
+It is imperative that all processes specify the same number of interfaces in this variable.
 
 Other NCCL environment variables
 """"""""""""""""""""""""""""""""
@@ -149,6 +155,8 @@ Initialization
 The package needs to be initialized using the :func:`torch.distributed.init_process_group`
 function before calling any other methods. This blocks until all processes have
 joined.
+
+.. autofunction:: is_available
 
 .. autofunction:: init_process_group
 
@@ -221,7 +229,7 @@ distributed package and ``group_name`` is deprecated as well.
     In other words, if the file is not removed/cleaned up and you call
     :func:`init_process_group` again on that file, failures are expected.
     The rule of thumb here is that, make sure that the file is non-existent or
-    empty everytime :func:`init_process_group` is called.
+    empty every time :func:`init_process_group` is called.
 
 ::
 
@@ -259,9 +267,6 @@ used to create new groups, with arbitrary subsets of all processes. It returns
 an opaque group handle that can be given as a ``group`` argument to all collectives
 (collectives are distributed functions to exchange information in certain well-known programming patterns).
 
-Currently `torch.distributed` does not support creating groups with different backends.
-In other words, each group being created will use the same backend as you specified in
-:func:`~torch.distributed.init_process_group`.
 
 .. autofunction:: new_group
 
@@ -318,6 +323,10 @@ Collective functions
 
 .. autofunction:: scatter
 
+.. autofunction:: reduce_scatter
+
+.. autofunction:: all_to_all
+
 .. autofunction:: barrier
 
 .. autoclass:: ReduceOp
@@ -336,8 +345,9 @@ Multi-GPU collective functions
 If you have more than one GPU on each node, when using the NCCL and Gloo backend,
 :func:`~torch.distributed.broadcast_multigpu`
 :func:`~torch.distributed.all_reduce_multigpu`
-:func:`~torch.distributed.reduce_multigpu` and
-:func:`~torch.distributed.all_gather_multigpu` support distributed collective
+:func:`~torch.distributed.reduce_multigpu`
+:func:`~torch.distributed.all_gather_multigpu` and
+:func:`~torch.distributed.reduce_scatter_multigpu` support distributed collective
 operations among multiple GPUs within each node. These functions can potentially
 improve the overall distributed training performance and be easily used by
 passing a list of tensors. Each Tensor in the passed tensor list needs
@@ -395,14 +405,37 @@ of 16
 
 .. autofunction:: all_gather_multigpu
 
+.. autofunction:: reduce_scatter_multigpu
+
+
+.. _distributed-launch:
+
+Third-party backends
+--------------------
+
+Besides the GLOO/MPI/NCCL backends, PyTorch distributed supports third-party backends
+through a run-time register mechanism.
+For references on how to develop a third-party backend through C++ Extension,
+please refer to `Tutorials - Custom C++ and CUDA Extensions <https://pytorch.org/
+tutorials/advanced/cpp_extension.html>`_ and `test/cpp_extensions/cpp_c10d_extension.cpp`.
+The capability of third-party backends are decided by their own implementations.
+
+The new backend derives from `c10d.ProcessGroup` and registers the backend name and the
+instantiating interface through :func:`torch.distributed.Backend.register_backend` when
+imported.
+
+When manually importing this backend and invoking :func:`torch.distributed.init_process_group`
+with the corresponding backend name, the `torch.distributed` package runs on the new backend.
+
+.. warning::
+    The support of third-party backend is experimental and subject to change.
 
 Launch utility
 --------------
 
 The `torch.distributed` package also provides a launch utility in
 `torch.distributed.launch`. This helper utility can be used to launch
-multiple processes per node for distributed training. This utility also supports
-both python2 and python3.
+multiple processes per node for distributed training.
 
 
 .. automodule:: torch.distributed.launch
@@ -411,13 +444,13 @@ both python2 and python3.
 Spawn utility
 -------------
 
-The :doc:`torch.multiprocessing` package also provides a ``spawn``
+The :ref:`multiprocessing-doc` package also provides a ``spawn``
 function in :func:`torch.multiprocessing.spawn`. This helper function
 can be used to spawn multiple processes. It works by passing in the
 function that you want to run and spawns N processes to run it. This
 can be used for multiprocess distributed training as well.
 
-For references on how to use it, please refer to `PyToch example - ImageNet
+For references on how to use it, please refer to `PyTorch example - ImageNet
 implementation <https://github.com/pytorch/examples/tree/master/imagenet>`_
 
 Note that this function requires Python 3.4 or higher.

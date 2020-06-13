@@ -14,11 +14,9 @@ namespace at {
 namespace native {
 
 #if defined(__HIP_PLATFORM_HCC__)
-constexpr int WARP_SIZE = 64;
 constexpr int MAX_BLOCK_SIZE = 256;
 
 #else
-constexpr int WARP_SIZE = 32;
 constexpr int MAX_BLOCK_SIZE = 1024;
 #endif
 
@@ -77,6 +75,9 @@ __device__ __forceinline__ index_t getLinearBlockId() {
 // (sliceSize - 1) * sliceStride, we fill that slice from `0` to
 // `sliceSize - 1`.
 template <typename index_t, int Dim>
+#ifdef __HIP_PLATFORM_HCC__
+C10_LAUNCH_BOUNDS_1(1024)
+#endif
 __global__ void fillSliceWithIndex_kernel(
     cuda::detail::TensorInfo<int64_t, index_t> out,
     index_t totalSlices,

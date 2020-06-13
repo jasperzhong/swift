@@ -1,4 +1,8 @@
+#pragma once
 #include <ATen/ATen.h>
+#include <ATen/cuda/Exceptions.h>
+#include <ATen/cuda/CUDAContext.h>
+#include <ATen/cuda/PinnedMemoryAllocator.h>
 #include <THC/THC.h>  // for USE_MAGMA
 
 #ifdef USE_MAGMA
@@ -49,17 +53,38 @@ static inline magma_int_t magma_int_cast(int64_t value, const char* varname) {
   }
   return result;
 }
+
+// MAGMA functions that don't take a magma_queue_t aren't stream safe
+// Work around this by synchronizing with the default stream
+struct MagmaStreamSyncGuard {
+  MagmaStreamSyncGuard() {
+    auto stream = at::cuda::getCurrentCUDAStream();
+    if (stream != at::cuda::getDefaultCUDAStream()) {
+      AT_CUDA_CHECK(cudaStreamSynchronize(stream));
+    }
+  }
+
+  ~MagmaStreamSyncGuard() noexcept(false) {
+    auto default_stream = at::cuda::getDefaultCUDAStream();
+    if (at::cuda::getCurrentCUDAStream() != default_stream) {
+      AT_CUDA_CHECK(cudaStreamSynchronize(default_stream));
+    }
+  }
+};
 #endif
 
 // Creates an array of size elements of type T, backed by pinned memory
 // wrapped in a Storage
 template<class T>
-static inline Storage pin_memory(int64_t size, Tensor dummy) {
-  int64_t adjusted_size = size * sizeof(T);
+static inline Storage pin_memory(int64_t size) {
   auto* allocator = cuda::getPinnedMemoryAllocator();
-  auto& backend = dummy.type().toBackend(Backend::CPU).toScalarType(kByte);
-  return backend.storageWithAllocator(adjusted_size, allocator);
+  int64_t adjusted_size = size * sizeof(T);
+  return Storage(
+      Storage::use_byte_size_t(),
+      adjusted_size,
+      allocator,
+      /*resizable=*/false);
 }
-  
+
 } // namespace native
 } // namespace at

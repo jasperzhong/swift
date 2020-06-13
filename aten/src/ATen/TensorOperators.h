@@ -2,7 +2,6 @@
 
 #include <c10/core/Scalar.h>
 #include <ATen/Tensor.h>
-#include <ATen/Type.h>
 
 #include <string>
 #include <stdexcept>
@@ -17,6 +16,9 @@ inline Tensor & Tensor::operator=(Tensor && rhs) && {
 }
 inline Tensor & Tensor::operator=(Scalar v) && {
   return fill_(v);
+}
+inline Tensor Tensor::operator~() const {
+  return bitwise_not();
 }
 inline Tensor Tensor::operator-() const {
   return neg();
@@ -45,9 +47,18 @@ inline Tensor& Tensor::operator/=(const Tensor & other) {
 inline Tensor& Tensor::operator/=(Scalar other) {
   return div_(other);
 }
+inline Tensor& Tensor::operator&=(const Tensor & other) {
+  return bitwise_and_(other);
+}
+inline Tensor& Tensor::operator|=(const Tensor & other) {
+  return bitwise_or_(other);
+}
+inline Tensor& Tensor::operator^=(const Tensor & other) {
+  return bitwise_xor_(other);
+}
 inline Tensor Tensor::operator[](Scalar index) const {
-  if (!index.isIntegral()) {
-    AT_INDEX_ERROR("Can only index tensors with integral scalars");
+  if (!index.isIntegral(false)) {
+    TORCH_CHECK_INDEX(false, "Can only index tensors with integral scalars");
   }
   return select(0, index.toLong());
 }
@@ -55,10 +66,10 @@ inline Tensor Tensor::operator[](Tensor index) const {
   // These properties are checked in the Scalar constructor, but we already
   // check them here to provide more useful diagnostics for the user.
   if (!index.defined()) {
-    AT_INDEX_ERROR("Can only index with tensors that are defined");
+    TORCH_CHECK_INDEX(false, "Can only index with tensors that are defined");
   }
   if (index.dim() != 0) {
-    AT_INDEX_ERROR(
+    TORCH_CHECK_INDEX(false,
       "Can only index with tensors that are scalars (zero-dim)");
   }
   // The Scalar(Tensor) constructor is explicit, so we need to call it.
@@ -71,9 +82,12 @@ inline Tensor Tensor::operator[](int64_t index) const {
 #define AT_FORALL_BINARY_OPS(_) \
 _(+,x.add(y), y.add(x)) \
 _(*,x.mul(y), y.mul(x)) \
-_(-,x.sub(y), ::at::empty(y.sizes(), y.options()).fill_(x).sub_(y)) \
-_(/,x.div(y), ::at::empty(y.sizes(), y.options()).fill_(x).div_(y)) \
-_(%,x.remainder(y), ::at::empty(y.sizes(), y.options()).fill_(x).remainder_(y)) \
+_(-,x.sub(y), ::at::empty_like(y, at::MemoryFormat::Preserve).fill_(x).sub_(y)) \
+_(/,x.div(y), ::at::empty_like(y, at::MemoryFormat::Preserve).fill_(x).div_(y)) \
+_(%,x.remainder(y), ::at::empty_like(y, at::MemoryFormat::Preserve).fill_(x).remainder_(y)) \
+_(&,x.bitwise_and(y), y.bitwise_and(x)) \
+_(|,x.bitwise_or(y), y.bitwise_or(x)) \
+_(^,x.bitwise_xor(y), y.bitwise_xor(x)) \
 _(<,x.lt(y), y.gt(x)) \
 _(<=,x.le(y), y.ge(x)) \
 _(>,x.gt(y),y.lt(x)) \

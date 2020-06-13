@@ -1,9 +1,27 @@
+# TODO: Add ThreadPoolXNNPACK.cc when XNNPACK integration is updated
+# to pass the actual threadpool ptr instead of nullptr.
+if(INTERN_BUILD_MOBILE AND NOT BUILD_CAFFE2_MOBILE)
+  add_definitions(-DUSE_INTERNAL_THREADPOOL_IMPL)
+  list(APPEND Caffe2_CPU_SRCS
+    utils/string_utils.cc
+    utils/threadpool/pthreadpool.cc
+    utils/threadpool/pthreadpool_impl.cc
+    utils/threadpool/pthreadpool_new_if_impl.c
+    utils/threadpool/ThreadPool.cc
+    utils/threadpool/ThreadPoolMobile.cc
+    utils/threadpool/ThreadPoolXNNPACK.cc
+  )
+  set(Caffe2_CPU_SRCS ${Caffe2_CPU_SRCS} PARENT_SCOPE)
+  return()
+endif()
+
 list(APPEND Caffe2_CPU_SRCS
   utils/bench_utils.cc
   utils/cpuid.cc
   utils/math/broadcast.cc
   utils/math/elementwise.cc
   utils/math/reduce.cc
+  utils/math/transpose.cc
   utils/math/utils.cc
   utils/math_cpu.cc
   utils/murmur_hash3.cc
@@ -18,10 +36,14 @@ list(APPEND Caffe2_CPU_SRCS
 # ---[ threadpool/pthreadpool* is a local modification of the NNPACK
 # pthreadpool with a very similar interface. Neither NNPACK, nor this
 # thread pool supports Windows.
-if (NOT MSVC)
+if(NOT MSVC AND USE_XNNPACK)
+  add_definitions(-DUSE_INTERNAL_THREADPOOL_IMPL)
   set(Caffe2_CPU_SRCS ${Caffe2_CPU_SRCS}
           utils/threadpool/pthreadpool.cc
           utils/threadpool/pthreadpool_impl.cc
+          utils/threadpool/pthreadpool_new_if_impl.c
+          utils/threadpool/ThreadPoolMobile.cc
+          utils/threadpool/ThreadPoolXNNPACK.cc
           )
 endif()
 
@@ -29,6 +51,7 @@ set(Caffe2_GPU_SRCS ${Caffe2_GPU_SRCS}
         utils/math/broadcast.cu
         utils/math/elementwise.cu
         utils/math/reduce.cu
+        utils/math/transpose.cu
         utils/math_gpu.cu
         )
 
@@ -36,6 +59,7 @@ set(Caffe2_HIP_SRCS ${Caffe2_HIP_SRCS}
         utils/math/hip/broadcast.hip
         utils/math/hip/elementwise.hip
         utils/math/hip/reduce.hip
+        utils/math/hip/transpose.hip
         utils/hip/math_gpu.hip
         )
 

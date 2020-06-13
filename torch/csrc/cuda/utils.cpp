@@ -9,7 +9,13 @@
 #include <THC/THCGenerateAllTypes.h>
 
 #define THC_GENERIC_FILE "torch/csrc/generic/utils.cpp"
+#include <THC/THCGenerateComplexTypes.h>
+
+#define THC_GENERIC_FILE "torch/csrc/generic/utils.cpp"
 #include <THC/THCGenerateBoolType.h>
+
+#define THC_GENERIC_FILE "torch/csrc/generic/utils.cpp"
+#include <THC/THCGenerateBFloat16Type.h>
 
 #ifdef USE_CUDA
 // NB: It's a list of *optional* CUDAStream; when nullopt, that means to use

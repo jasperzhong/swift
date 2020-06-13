@@ -1,6 +1,8 @@
 #pragma once
-
-#if defined(_MSC_VER)
+#if defined(__clang__) && (defined(__x86_64__) || defined(__i386__))
+/* Clang-compatible compiler, targeting x86/x86-64 */
+#include <x86intrin.h>
+#elif defined(_MSC_VER)
 /* Microsoft C/C++-compatible compiler */
 #include <intrin.h>
 #if _MSC_VER <= 1900
@@ -19,7 +21,7 @@
 /* GCC-compatible compiler, targeting ARM with WMMX */
 #include <mmintrin.h>
 #elif (defined(__GNUC__) || defined(__xlC__)) &&                               \
-	(defined(__VEC__) || defined(__ALTIVEC__))
+        (defined(__VEC__) || defined(__ALTIVEC__))
 /* XLC or GCC-compatible compiler, targeting PowerPC with VMX/VSX */
 #include <altivec.h>
 #elif defined(__GNUC__) && defined(__SPE__)

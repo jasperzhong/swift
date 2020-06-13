@@ -23,14 +23,14 @@ import caffe2.python.onnx.frontend as c2_onnx
 import caffe2.python.onnx.backend as c2
 
 import numpy as np
-from caffe2.python.models.download import downloadFromURLToFile, getURLFromName, deleteDirectory
+from caffe2.python.models.download import ModelDownloader
 
-from caffe2.python.onnx.tests.test_utils import DownloadingTestCase
+from caffe2.python.onnx.tests.test_utils import TestCase
 
 import caffe2.python._import_c_extension as C
 
 
-class TestCaffe2Basic(DownloadingTestCase):
+class TestCaffe2Basic(TestCase):
     def test_dummy_name(self):
         g = C.DummyName()
         n1 = g.new_dummy_name()
@@ -48,6 +48,46 @@ class TestCaffe2Basic(DownloadingTestCase):
                                    RuntimeError,
                                    "Don't know how to map unexpected argument (foo|bar)"):
             b2.convert_node(bad_node_def.SerializeToString())
+
+    def test_dynamicslice_3inputs_graph(self):
+        node_def = make_node(
+            "DynamicSlice", ["X1", "X2", "X3"], ["Y"])
+
+        graph_def = make_graph(
+            [node_def],
+            name="test",
+            inputs=[make_tensor_value_info("X1", onnx.TensorProto.FLOAT, (2, 4)),
+             make_tensor_value_info("X2", onnx.TensorProto.INT32, (1, 2)),
+             make_tensor_value_info("X3", onnx.TensorProto.INT32, (1, 2))],
+            outputs=[make_tensor_value_info("Y", onnx.TensorProto.FLOAT, (1, 2))])
+        model_def = make_model(graph_def, producer_name='caffe2-ref-test')
+
+        x = [[1,2,3,4],[5,6,7,8]]
+        start = [0, 0]
+        end = [-1, 4]
+        prepared = c2.prepare(model_def)
+        output = prepared.run(inputs=[np.array(x), np.array(start), np.array(end)])
+        self.assertSameOutputs(output[0], np.array(x)[0:-1, 0:4])
+
+    def test_dynamicslice_4inputs_graph(self):
+        node_def = make_node(
+            "DynamicSlice", ["X1", "X2", "X3", "axes"], ["Y"])
+        graph_def = make_graph(
+            [node_def],
+            name="test",
+            inputs=[make_tensor_value_info("X1", onnx.TensorProto.FLOAT, (2, 4)),
+             make_tensor_value_info("X2", onnx.TensorProto.INT32, (1, 2)),
+             make_tensor_value_info("X3", onnx.TensorProto.INT32, (1, 2)),
+             make_tensor_value_info("axes", onnx.TensorProto.INT32, (1, 2))],
+            outputs=[make_tensor_value_info("Y", onnx.TensorProto.FLOAT, (1, 2))])
+        model_def = make_model(graph_def, producer_name='caffe2-ref-test')
+        x = [[1,2,3,4],[5,6,7,8]]
+        start = [0, 1]
+        end = [4, 5]
+        axes = [1, 0]
+        prepared = c2.prepare(model_def)
+        output = prepared.run(inputs=[np.array(x), np.array(start), np.array(end), np.array(axes)])
+        self.assertSameOutputs(output[0], np.array(x)[1:5, 0:4])
 
     def test_relu_graph(self):
         X = np.random.randn(3, 2).astype(np.float32)
@@ -726,83 +766,104 @@ class TestCaffe2Basic(DownloadingTestCase):
             self.assertSameOutputs(c2_outputs, onnx_outputs)
 
 
-class TestCaffe2End2End(DownloadingTestCase):
-    def _model_dir(self, model):
-        caffe2_home = os.path.expanduser(os.getenv('CAFFE2_HOME', '~/.caffe2'))
-        models_dir = os.getenv('ONNX_MODELS', os.path.join(caffe2_home, 'models'))
-        return os.path.join(models_dir, model)
+class TestCaffe2End2End(TestCase):
+    def setUp(self):
+        self.model_downloader = ModelDownloader('ONNX_MODELS')
 
     def _test_net(self,
                   net_name,
                   input_blob_dims=(1, 3, 224, 224),
                   decimal=7):
         np.random.seed(seed=0)
-        model_dir = self._model_dir(net_name)
-        if not os.path.exists(model_dir):
-            self._download(net_name)
-        c2_predict_pb = os.path.join(model_dir, 'predict_net.pb')
-        c2_predict_net = caffe2_pb2.NetDef()
-        with open(c2_predict_pb, 'rb') as f:
-            c2_predict_net.ParseFromString(f.read())
-        c2_predict_net.name = net_name
+        try:
+            c2_init_net, c2_predict_net, value_info, debug_str = self.model_downloader.get_c2_model_dbg(net_name)
+        except Exception as e:
+            # catch IOError/OSError that is caused by FileNotFoundError and PermissionError
+            # This is helpful because sometimes we get errors due to gfs not available
+            # get_c2_model_dbg wraps URLError/HTTPErrors into generic Exception
+            # Skip the tests if model can not be downloaded due to the any of the above
+            print("\n_test_net exception: ", e)
+            self.skipTest(str(e))
 
-        c2_init_pb = os.path.join(model_dir, 'init_net.pb')
-        c2_init_net = caffe2_pb2.NetDef()
-        with open(c2_init_pb, 'rb') as f:
-            c2_init_net.ParseFromString(f.read())
-        c2_init_net.name = net_name + '_init'
-
+        # start to run the model and compare outputs
         n, c, h, w = input_blob_dims
         data = np.random.randn(n, c, h, w).astype(np.float32)
         inputs = [data]
-        _, c2_outputs = c2_native_run_net(c2_init_net, c2_predict_net, inputs)
+        _, c2_outputs = c2_native_run_net(c2_init_net, c2_predict_net, inputs, debug_str)
         del _
 
-        with open(os.path.join(model_dir, 'value_info.json'), 'r') as value_info_conf:
-            model = c2_onnx.caffe2_net_to_onnx_model(
-                predict_net=c2_predict_net,
-                init_net=c2_init_net,
-                value_info=json.load(value_info_conf))
+        model = c2_onnx.caffe2_net_to_onnx_model(
+            predict_net=c2_predict_net,
+            init_net=c2_init_net,
+            value_info=value_info,
+        )
         c2_ir = c2.prepare(model)
         onnx_outputs = c2_ir.run(inputs)
         self.assertSameOutputs(c2_outputs, onnx_outputs, decimal=decimal)
 
+    @unittest.skipIf(
+        os.environ.get('SKIP_IN_FB'),
+        'Skip internally!')
     def test_alexnet(self):
         self._test_net('bvlc_alexnet', decimal=4)
 
+    @unittest.skipIf(
+        os.environ.get('SKIP_IN_FB'),
+        'Skip internally!')
     def test_resnet50(self):
         self._test_net('resnet50')
 
     @unittest.skipIf(
-        os.environ.get('JENKINS_URL'),
+        os.environ.get('JENKINS_URL') or os.environ.get('SKIP_IN_FB'),
         'Taking too long to download!')
     def test_vgg16(self):
         self._test_net('vgg16')
 
     @unittest.skipIf(
-        os.environ.get('JENKINS_URL'),
+        os.environ.get('JENKINS_URL') or os.environ.get('SKIP_IN_FB'),
         'Taking too long to download!')
     def test_zfnet(self):
         self._test_net('zfnet')
 
+    @unittest.skipIf(
+        os.environ.get('SKIP_IN_FB'),
+        'Skip internally!')
     def test_inception_v1(self):
         self._test_net('inception_v1', decimal=2)
 
+    @unittest.skipIf(
+        os.environ.get('SKIP_IN_FB'),
+        'Skip internally!')
     def test_inception_v2(self):
         self._test_net('inception_v2')
 
+    @unittest.skipIf(
+        os.environ.get('SKIP_IN_FB'),
+        'Skip internally!')
     def test_squeezenet(self):
         self._test_net('squeezenet')
 
+    @unittest.skipIf(
+        os.environ.get('SKIP_IN_FB'),
+        'Skip internally!')
     def test_densenet121(self):
         self._test_net('densenet121')
 
+    @unittest.skipIf(
+        os.environ.get('SKIP_IN_FB'),
+        'Skip internally!')
     def test_bvlc_googlenet(self):
         self._test_net('bvlc_googlenet')
 
+    @unittest.skipIf(
+        os.environ.get('SKIP_IN_FB'),
+        'Skip internally!')
     def test_bvlc_reference_caffenet(self):
         self._test_net('bvlc_reference_caffenet')
 
+    @unittest.skipIf(
+        os.environ.get('SKIP_IN_FB'),
+        'Skip internally!')
     def test_bvlc_reference_rcnn_ilsvrc13(self):
         self._test_net('bvlc_reference_rcnn_ilsvrc13')
 

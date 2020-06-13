@@ -119,12 +119,12 @@ class BinaryElementwiseWithArgsOp final : public Operator<Context> {
         // Get axis from an explicit axis argument.
         CAFFE_ENFORCE_EQ(
             axis_str_.size(),
-            0,
+            0U,
             "Args axis and axis_str cannot be used simultaneously.");
       } else if (axis_str_.size()) {
         // Get the axis index semantically.
         CAFFE_ENFORCE_EQ(
-            axis_str_.size(), 1, "Unsupported axis string", axis_str_);
+            axis_str_.size(), 1U, "Unsupported axis string", axis_str_);
         const size_t semantic_axis_ = order_.find(axis_str_);
         CAFFE_ENFORCE_NE(
             semantic_axis_,
@@ -231,12 +231,12 @@ class BinaryElementwiseWithArgsGradientOp final : public Operator<Context> {
         // Get axis from an explicit axis argument.
         CAFFE_ENFORCE_EQ(
             axis_str_.size(),
-            0,
+            0U,
             "Args axis and axis_str cannot be used simultaneously.");
       } else if (axis_str_.size()) {
         // Get the axis index semantically.
         CAFFE_ENFORCE_EQ(
-            axis_str_.size(), 1, "Unsupported axis string", axis_str_);
+            axis_str_.size(), 1U, "Unsupported axis string", axis_str_);
         const size_t semantic_axis_ = order_.find(axis_str_);
         CAFFE_ENFORCE_NE(
             semantic_axis_,
@@ -413,7 +413,7 @@ struct SignFunctor {
 };
 
 // Forward-only Binary Functors.
-#define C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(FunctorName) \
+#define C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(FunctorName) \
   template <class Context>                                  \
   struct FunctorName##Functor {                             \
     template <typename TIn, typename TOut>                  \
@@ -438,24 +438,24 @@ struct SignFunctor {
   };
 
 // Compare functors.
-C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(EQ);
-C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(NE);
-C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(LT);
-C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(LE);
-C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(GT);
-C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(GE);
+C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(EQ);
+C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(NE);
+C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(LT);
+C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(LE);
+C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(GT);
+C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(GE);
 
 // Logical functors.
-C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(And);
-C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(Or);
-C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(Xor);
+C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(And);
+C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(Or);
+C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(Xor);
 
 // Bitwise functors.
-C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(BitwiseAnd);
-C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(BitwiseOr);
-C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR(BitwiseXor);
+C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(BitwiseAnd);
+C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(BitwiseOr);
+C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR(BitwiseXor);
 
-#undef C10_DECLARE_FOWARD_ONLY_BINARY_FUNCTOR
+#undef C10_DECLARE_FORWARD_ONLY_BINARY_FUNCTOR
 
 namespace SRLHelper {
 
@@ -495,12 +495,12 @@ class SumReduceLikeOp final : public Operator<Context> {
       // Get axis from an explicit axis argument.
       CAFFE_ENFORCE_EQ(
           axis_str_.size(),
-          0,
+          0U,
           "Args axis and axis_str cannot be used simultaneously.");
     } else if (axis_str_.size()) {
       // Get the axis index semantically.
       CAFFE_ENFORCE_EQ(
-          axis_str_.size(), 1, "Unsupported axis string", axis_str_);
+          axis_str_.size(), 1U, "Unsupported axis string", axis_str_);
       size_t semantic_axis = order_.find(axis_str_);
       CAFFE_ENFORCE_NE(
           semantic_axis,

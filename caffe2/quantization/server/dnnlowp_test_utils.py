@@ -1,7 +1,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import collections
+
 import numpy as np
-from caffe2.python import utils
+from caffe2.python import utils, workspace
 from hypothesis import assume
 
 
@@ -12,6 +14,8 @@ from hypothesis import assume
 def check_quantized_results_close(outputs, ref=None, symmetric=False, atol_scale=0.53):
     if ref is None:
         ref = outputs[0][0]
+    if ref.size == 0:
+        return
     ref_min = min(np.min(ref), 0)
     ref_max = max(np.max(ref), 0)
     if symmetric:
@@ -217,7 +221,8 @@ def generate_convnd_inputs(
     )
     X = X.astype(np.float32)
     if (
-        depthwise_convolution
+        batch_size != 0
+        and depthwise_convolution
         and groupwise_quantization
         and not preserve_activation_sparsity
     ):
@@ -269,7 +274,8 @@ def generate_convnd_inputs(
         # input channel 0 is all X_min to avoid overflow from vpmaddubsw when
         # multiplied with W_min and W_max
         X[..., 0] = X_min
-        X[(0,) * (X.ndim - 1) + (1,)] = X_max
+        if batch_size != 0:
+            X[(0,) * (X.ndim - 1) + (1,)] = X_max
 
     if preserve_weight_sparsity:
         W_min = -128
@@ -362,3 +368,49 @@ def generate_conv_inputs(
         preserve_activation_sparsity,
         preserve_weight_sparsity,
     )
+
+
+def run_conv_or_fc(
+    test_case, init_net, net, X, W, b, op_type, engine, order, gc, outputs
+):
+    if order:
+        # Conv
+        Output = collections.namedtuple("Output", ["Y", "op_type", "engine", "order"])
+    else:
+        # FC
+        Output = collections.namedtuple("Output", ["Y", "op_type", "engine"])
+
+    # We run DNNLOWP ops multiple times to test their first runs that
+    # do caching so exercises different code paths from the subsequent
+    # runs
+
+    # self.ws.run re-creates operator every time so this test covers
+    # cases when we have multiple nets sharing the same workspace
+    test_case.ws.create_blob("X").feed(X, device_option=gc)
+    test_case.ws.create_blob("W").feed(W, device_option=gc)
+    test_case.ws.create_blob("b").feed(b, device_option=gc)
+    if init_net:
+        test_case.ws.run(init_net)
+    for i in range(1 if engine == "" else 2):
+        test_case.ws.run(net)
+        Y = test_case.ws.blobs["Y"].fetch()
+        if order:
+            outputs.append(Output(Y=Y, op_type=op_type, engine=engine, order=order))
+        else:
+            outputs.append(Output(Y=Y, op_type=op_type, engine=engine))
+
+    # workspace.CreateNet + workspace.RunNet reuses the same operator
+    if engine != "":
+        workspace.FeedBlob("X", X)
+        workspace.FeedBlob("W", W)
+        workspace.FeedBlob("b", b)
+        if init_net:
+            workspace.RunNetOnce(init_net)
+        workspace.CreateNet(net)
+        for i in range(2):
+            workspace.RunNet(net)
+            Y = workspace.FetchBlob("Y")
+            if order:
+                outputs.append(Output(Y=Y, op_type=op_type, engine=engine, order=order))
+            else:
+                outputs.append(Output(Y=Y, op_type=op_type, engine=engine))

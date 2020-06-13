@@ -1,14 +1,52 @@
 #pragma once
 
-#include <unordered_set>
-#include <unordered_map>
+#include <c10/util/ArrayRef.h>
+#include <c10/util/Optional.h>
+#include <c10/util/flat_hash_map.h>
+#include <c10/util/sparse_bitset.h>
 #include <memory>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
+#include <torch/csrc/WindowsTorchApiMacro.h>
+
+// Uses a compressed index representation for faster comparisons
+typedef c10::SparseBitVector<256> MemoryLocations;
 namespace torch {
 namespace jit {
 
 struct Element;
 struct Value;
+class MemoryDAG;
+
+/**
+ * Helper to build up the points-to graph.
+ *
+ * We separate the "building" into a different class because it allows us to
+ * cache internally to MemoryDAG without worrying about how the DAG structure
+ * is mutated.
+ */
+class TORCH_API MemoryDAGBuilder {
+ public:
+  MemoryDAGBuilder() {}
+  MemoryDAGBuilder(const MemoryDAGBuilder&) = delete;
+  MemoryDAGBuilder& operator=(const MemoryDAGBuilder&) = delete;
+
+  // Make `from` point at `to`.
+  void makePointerTo(Element* from, Element* to);
+
+  void addToContainedElements(Element* contained, Element* container);
+
+  // Make a fresh element (i.e. an element that doesn't point to anything) and
+  // return it.
+  Element* makeFreshValue(const Value* v);
+
+  friend MemoryDAG;
+
+ private:
+  std::vector<std::unique_ptr<Element>> indexToElementMap_;
+};
 
 // class MemoryDAG
 //
@@ -25,96 +63,94 @@ struct Value;
 //
 // So, by traversing the "points-to" graph to the leaves, you can determine
 // which memory locations an element may point to.
-class MemoryDAG {
+class TORCH_API MemoryDAG {
  public:
-  // Make `from` point at `to`.
-  void makePointerTo(Element* from, Element* to);
+  explicit MemoryDAG(std::unique_ptr<MemoryDAGBuilder> builder)
+      : indexToElementMap_(std::move(builder->indexToElementMap_)) {}
+  // explicitly delete copy constructor because otherwise windows build is
+  // confused for an exported class see
+  // https://stackoverflow.com/a/51033485/105137
+  MemoryDAG(const MemoryDAG&) = delete;
+  MemoryDAG& operator=(const MemoryDAG&) = delete;
 
-  // Make a fresh element (i.e. an element that doesn't point to anything) and
-  // return it.
-  Element* makeFreshValue(const Value* v);
+  // Return the unique memory locations that `Element` might represent.
+  const MemoryLocations& getMemoryLocations(const Element* e) const;
 
   // Do `a` and `b` potentially share a memory location?
   bool mayAlias(const Element* a, const Element* b) const;
   bool mayAlias(Element* a, Element* b) const;
 
-  // Do any values in group `a` potentially share a memory location with any
-  // value in group `b`?
-  //
-  // This is written so that either of the inputs could be a multiset
-  template <typename T, typename U>
-  bool mayAlias(const T& a, const U& b) const {
-    if (a.empty() || b.empty()) {
-      return false;
-    }
+  // Does a hold reference to any memory that is stored in elem, or vice versa?
+  bool mayContainAlias(const Element* a, const Element* b) const;
+  bool mayContainAlias(Element* a, Element* b) const;
 
-    // Record all memory locations from group `a`
-    std::unordered_set<const Element*> memoryLocations;
-    for (auto it = a.cbegin(); it != a.cend();) {
-      const auto element = *it;
+  bool mayContainAlias(
+      const at::ArrayRef<Element*> a,
+      const at::ArrayRef<Element*> b) const;
 
-      for (const auto loc : element->getMemoryLocations()) {
-        memoryLocations.insert(loc);
-      }
+  // Converts from the compressed index representation
+  const Element* fromIndex(unsigned x) const;
+  Element* fromIndex(unsigned x);
+  void collectAllContainedMemoryLocations(
+      const Element* elem,
+      MemoryLocations& cont) const;
 
-      const auto cnt = a.count(*it);
-      std::advance(it, cnt);
-    }
-
-    // If any of group `b`s memory locations overlap, return true.
-    for (auto it = b.cbegin(); it != b.cend();) {
-      const auto element = *it;
-
-      for (const auto loc : element->getMemoryLocations()) {
-        if (memoryLocations.count(loc)) {
-          return true;
-        }
-      }
-
-      const auto cnt = b.count(*it);
-      std::advance(it, cnt);
-    }
-    // No overlap, so group `a` and `b` do not share a memory location
-    return false;
-  }
+  /**
+   * The following methods are special cases where we need to reach mutate the
+   * internals of MemoryDAG for efficiency reasons. Don't call them unless you
+   * know what you're doing! In particular, don't add new mutating methods
+   * without ensuring that you are maintaining cache consistency for memory
+   * locations.
+   */
+  // Adding wildcards can trigger extremely expensive cache invalidations. This
+  // method adds them in a more efficient cache-aware way.
+  void setWildcards(
+      const std::unordered_set<const Value*>& wildcards,
+      const ska::flat_hash_map<const Value*, Element*>& elementMap,
+      const std::function<Element*(const Value*)>& getWildcardElement);
+  Element* unsafeMakeFreshValue(const Value* v);
 
  private:
-   bool mayAliasImpl(const Element* a, const Element* b) const;
-  // Structure that owns all the element pointers. It's a map of
-  //  raw pointer -> unique_ptr to facilitate easy queries
-  std::unordered_map<Element*, std::unique_ptr<Element>> elements_;
-};
-
-enum class BfsDirection {
-  POINTS_TO,
-  POINTED_FROM,
+  bool mayAliasImpl(const Element* a, const Element* b) const;
+  bool mayContainAliasImpl(const Element* contained, const Element* container)
+      const;
+  std::vector<std::unique_ptr<Element>> indexToElementMap_;
 };
 
 // `Element` represents the vertex in the points-to graph. It represents
 // anything that could have an aliasing relationship, mostly IR `Value`s, but
 // also the "inside of a list", or wildcards.
 struct Element {
-  // The value that this element corresponds to. May be null if this element
-  // doesn't represent a first-class value.
-  const Value* value = nullptr;
+  Element(const Value* value_, unsigned index_);
+  // wildcard constructor
+  explicit Element(unsigned index_);
+
+  // Index into the owning DAG's bit vector that represents this element.
+  unsigned index;
 
   // All elements that this element *may* point to. It's possible to have
   // multiple elements that you might point to due to control flow/complex ops
-  std::unordered_set<Element*> pointsTo;
+  MemoryLocations pointsTo;
   // Backreference for points-to.
-  std::unordered_set<Element*> pointedFrom;
+  MemoryLocations pointedFrom;
 
-  // Return the unique memory locations that `Element` might represent.
-  std::unordered_set<const Element*> getMemoryLocations() const;
-  // We do path compression to make repeated memory location queries faster.
-  // An empty cache means it is invalidated (it can never be empty otherwise,
-  // since every element must point to at least one memory location).
-  mutable std::unordered_set<const Element*> cachedMemoryLocations_;
+  // Elements can contain other elements (e.g. List[Tensor])
+  MemoryLocations containedElements;
 
-  // Do a breadth-first search over the graph, starting at `this` and
-  // traversing in the direction `dir`.`fn` will be run on each element.
-  template <typename Fn>
-  bool bfs(Fn fn, BfsDirection dir) const;
+  // The values that this element corresponds to. May be empty if this element
+  // doesn't represent a first-class value.
+  // This is for debug information only.
+  std::unordered_set<const Value*> values;
+
+ private:
+  // Make `from` point at `to`.
+  void makePointerTo(Element* from, Element* to);
+
+  friend class MemoryDAG;
+  // We memoize the results of `getMemoryLocations` to speed up queries.
+  // A nullopt means that this cache is not yet populated. Since `MemoryDAG` is
+  // immutable, this cache should never need to be invalidated.
+  mutable c10::optional<MemoryLocations> cachedMemoryLocations_;
 };
 
 } // namespace jit

@@ -3,7 +3,6 @@
 #include <THC/THCTensorCopy.h>
 #include <THC/THCApply.cuh>
 #include <THC/THCNumerics.cuh>
-#include <THC/THCTensorMath.cuh>
 #include <THC/THCThrustAllocator.cuh>
 #include <THC/THCTensor.hpp>
 
@@ -109,5 +108,20 @@ struct NonZeroOp
   }
 };
 
+template <>
+struct NonZeroOp<bool>
+{
+  NonZeroOp() {}
+  __host__ __device__ bool operator()(bool lhs) const {
+    return lhs != false;
+  }
+};
+
 #include <THC/generic/THCTensorMath.cu>
 #include <THC/THCGenerateAllTypes.h>
+
+#include <THC/generic/THCTensorMath.cu>
+#include <THC/THCGenerateBoolType.h>
+
+#include <THC/generic/THCTensorMath.cu>
+#include <THC/THCGenerateBFloat16Type.h>

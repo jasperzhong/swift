@@ -123,9 +123,15 @@ void writeOutput(
     const bool text_output,
     const int index,
     const int num_blobs);
+void logBenchmarkResult(
+    const std::string& type,
+    const std::string& metric,
+    const std::string& unit,
+    const int value);
+long getVirtualMemoryIfOptionEnabled(bool FLAGS_measure_memory);
 void runNetwork(
     shared_ptr<caffe2::Workspace> workspace,
-    caffe2::NetDef& net_def,
+    caffe2::NetBase* net,
     map<string, caffe2::TensorProtos>& tensor_protos_map,
     const bool wipe_cache,
     const bool run_individual,
@@ -149,6 +155,7 @@ int benchmark(
     const string& FLAGS_input_file,
     const string& FLAGS_input_type,
     int FLAGS_iter,
+    bool FLAGS_measure_memory,
     const string& FLAGS_net,
     const string& FLAGS_output,
     const string& FLAGS_output_folder,

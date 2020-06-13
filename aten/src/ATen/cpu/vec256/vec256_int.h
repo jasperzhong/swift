@@ -1,13 +1,17 @@
 #pragma once
 
+// DO NOT DEFINE STATIC DATA IN THIS HEADER!
+// See Note [Do not compile initializers with AVX]
+
 #include <ATen/cpu/vec256/intrinsics.h>
 #include <ATen/cpu/vec256/vec256_base.h>
+#include <c10/macros/Macros.h>
 
 namespace at {
 namespace vec256 {
 namespace {
 
-#ifdef __AVX2__
+#ifdef CPU_CAPABILITY_AVX2
 
 struct Vec256i {
 protected:
@@ -25,8 +29,20 @@ public:
   }
 };
 
+#else
+
+struct Vec256i {};  // dummy definition to make Vec256i always defined
+
+#endif // CPU_CAPABILITY_AVX2
+
+#ifdef CPU_CAPABILITY_AVX2
+
 template <>
-struct Vec256<int64_t> : public Vec256i {
+class Vec256<int64_t> : public Vec256i {
+private:
+  static const Vec256<int64_t> ones;
+public:
+  using value_type = int64_t;
   static constexpr int size() {
     return 4;
   }
@@ -54,7 +70,8 @@ struct Vec256<int64_t> : public Vec256i {
                                 const Vec256<int64_t>& mask) {
     return _mm256_blendv_epi8(a.values, b.values, mask.values);
   }
-  static Vec256<int64_t> arange(int64_t base = 0, int64_t step = 1) {
+  template <typename step_t>
+  static Vec256<int64_t> arange(int64_t base = 0, step_t step = static_cast<step_t>(1)) {
     return Vec256<int64_t>(base, base + step, base + 2 * step, base + 3 * step);
   }
   static Vec256<int64_t>
@@ -76,6 +93,12 @@ struct Vec256<int64_t> : public Vec256i {
   }
   static Vec256<int64_t> loadu(const void* ptr, int64_t count) {
     __at_align32__ int64_t tmp_values[size()];
+    // Ensure uninitialized memory does not change the output value See https://github.com/pytorch/pytorch/issues/32502
+    // for more details. We do not initialize arrays to zero using "={0}" because gcc would compile it to two
+    // instructions while a loop would be compiled to one instruction.
+    for (auto i = 0; i < size(); ++i) {
+      tmp_values[i] = 0;
+    }
     std::memcpy(tmp_values, ptr, count * sizeof(int64_t));
     return loadu(tmp_values);
   }
@@ -96,6 +119,20 @@ struct Vec256<int64_t> : public Vec256i {
     auto inverse = _mm256_xor_si256(values, is_larger);
     return _mm256_sub_epi64(inverse, is_larger);
   }
+  Vec256<int64_t> angle() const {
+    return _mm256_set1_epi64x(0);
+  }
+  Vec256<int64_t> real() const {
+    return *this;
+  }
+  Vec256<int64_t> imag() const {
+    return _mm256_set1_epi64x(0);
+  }
+  Vec256<int64_t> conj() const {
+    return *this;
+  }
+  Vec256<int64_t> frac() const;
+  Vec256<int64_t> neg() const;
   Vec256<int64_t> operator==(const Vec256<int64_t>& other) const {
     return _mm256_cmpeq_epi64(values, other.values);
   }
@@ -114,10 +151,21 @@ struct Vec256<int64_t> : public Vec256i {
   Vec256<int64_t> operator>=(const Vec256<int64_t>& other) const {
     return invert(_mm256_cmpgt_epi64(other.values, values));
   }
+
+  Vec256<int64_t> eq(const Vec256<int64_t>& other) const;
+  Vec256<int64_t> ne(const Vec256<int64_t>& other) const;
+  Vec256<int64_t> gt(const Vec256<int64_t>& other) const;
+  Vec256<int64_t> ge(const Vec256<int64_t>& other) const;
+  Vec256<int64_t> lt(const Vec256<int64_t>& other) const;
+  Vec256<int64_t> le(const Vec256<int64_t>& other) const;
 };
 
 template <>
-struct Vec256<int32_t> : public Vec256i {
+class Vec256<int32_t> : public Vec256i {
+private:
+  static const Vec256<int32_t> ones;
+public:
+  using value_type = int32_t;
   static constexpr int size() {
     return 8;
   }
@@ -136,7 +184,8 @@ struct Vec256<int32_t> : public Vec256i {
                                 const Vec256<int32_t>& mask) {
     return _mm256_blendv_epi8(a.values, b.values, mask.values);
   }
-  static Vec256<int32_t> arange(int32_t base = 0, int32_t step = 1) {
+  template <typename step_t>
+  static Vec256<int32_t> arange(int32_t base = 0, step_t step = static_cast<step_t>(1)) {
     return Vec256<int32_t>(
       base,            base +     step, base + 2 * step, base + 3 * step,
       base + 4 * step, base + 5 * step, base + 6 * step, base + 7 * step);
@@ -168,6 +217,12 @@ struct Vec256<int32_t> : public Vec256i {
   }
   static Vec256<int32_t> loadu(const void* ptr, int32_t count) {
     __at_align32__ int32_t tmp_values[size()];
+    // Ensure uninitialized memory does not change the output value See https://github.com/pytorch/pytorch/issues/32502
+    // for more details. We do not initialize arrays to zero using "={0}" because gcc would compile it to two
+    // instructions while a loop would be compiled to one instruction.
+    for (auto i = 0; i < size(); ++i) {
+      tmp_values[i] = 0;
+    }
     std::memcpy(tmp_values, ptr, count * sizeof(int32_t));
     return loadu(tmp_values);
   }
@@ -180,11 +235,31 @@ struct Vec256<int32_t> : public Vec256i {
       std::memcpy(ptr, tmp_values, count * sizeof(int32_t));
     }
   }
+  void dump() const {
+      for (size_t i = 0; i < size(); ++i) {
+          std::cout << (int)((value_type*)&values)[i] << " ";
+      }
+      std::cout << std::endl;
+  }
   const int32_t& operator[](int idx) const  = delete;
   int32_t& operator[](int idx)  = delete;
   Vec256<int32_t> abs() const {
     return _mm256_abs_epi32(values);
   }
+  Vec256<int32_t> angle() const {
+    return _mm256_set1_epi32(0);
+  }
+  Vec256<int32_t> real() const {
+    return *this;
+  }
+  Vec256<int32_t> imag() const {
+    return _mm256_set1_epi32(0);
+  }
+  Vec256<int32_t> conj() const {
+    return *this;
+  }
+  Vec256<int32_t> frac() const;
+  Vec256<int32_t> neg() const;
   Vec256<int32_t> operator==(const Vec256<int32_t>& other) const {
     return _mm256_cmpeq_epi32(values, other.values);
   }
@@ -203,10 +278,16 @@ struct Vec256<int32_t> : public Vec256i {
   Vec256<int32_t> operator>=(const Vec256<int32_t>& other) const {
     return invert(_mm256_cmpgt_epi32(other.values, values));
   }
+  Vec256<int32_t> eq(const Vec256<int32_t>& other) const;
+  Vec256<int32_t> ne(const Vec256<int32_t>& other) const;
+  Vec256<int32_t> gt(const Vec256<int32_t>& other) const;
+  Vec256<int32_t> ge(const Vec256<int32_t>& other) const;
+  Vec256<int32_t> lt(const Vec256<int32_t>& other) const;
+  Vec256<int32_t> le(const Vec256<int32_t>& other) const;
 };
 
 template <>
-void convert(const int32_t *src, float *dst, int64_t n) {
+inline void convert(const int32_t *src, float *dst, int64_t n) {
   int64_t i;
   // int32_t and float have same size
 #ifndef _MSC_VER
@@ -226,7 +307,7 @@ void convert(const int32_t *src, float *dst, int64_t n) {
 }
 
 template <>
-void convert(const int32_t *src, double *dst, int64_t n) {
+inline void convert(const int32_t *src, double *dst, int64_t n) {
   int64_t i;
   // int32_t has half the size of double
 #ifndef _MSC_VER
@@ -246,7 +327,11 @@ void convert(const int32_t *src, double *dst, int64_t n) {
 }
 
 template <>
-struct Vec256<int16_t> : public Vec256i {
+class Vec256<int16_t> : public Vec256i {
+private:
+  static const Vec256<int16_t> ones;
+public:
+  using value_type = int16_t;
   static constexpr int size() {
     return 16;
   }
@@ -302,7 +387,8 @@ struct Vec256<int16_t> : public Vec256i {
                                 const Vec256<int16_t>& mask) {
     return _mm256_blendv_epi8(a.values, b.values, mask.values);
   }
-  static Vec256<int16_t> arange(int16_t base = 0, int16_t step = 1) {
+  template <typename step_t>
+  static Vec256<int16_t> arange(int16_t base = 0, step_t step = static_cast<step_t>(1)) {
     return Vec256<int16_t>(
       base,             base +      step, base +  2 * step, base +  3 * step,
       base +  4 * step, base +  5 * step, base +  6 * step, base +  7 * step,
@@ -352,6 +438,12 @@ struct Vec256<int16_t> : public Vec256i {
   }
   static Vec256<int16_t> loadu(const void* ptr, int16_t count) {
     __at_align32__ int16_t tmp_values[size()];
+    // Ensure uninitialized memory does not change the output value See https://github.com/pytorch/pytorch/issues/32502
+    // for more details. We do not initialize arrays to zero using "={0}" because gcc would compile it to two
+    // instructions while a loop would be compiled to one instruction.
+    for (auto i = 0; i < size(); ++i) {
+      tmp_values[i] = 0;
+    }
     std::memcpy(tmp_values, ptr, count * sizeof(int16_t));
     return loadu(tmp_values);
   }
@@ -369,6 +461,20 @@ struct Vec256<int16_t> : public Vec256i {
   Vec256<int16_t> abs() const {
     return _mm256_abs_epi16(values);
   }
+  Vec256<int16_t> angle() const {
+    return _mm256_set1_epi16(0);
+  }
+  Vec256<int16_t> real() const {
+    return *this;
+  }
+  Vec256<int16_t> imag() const {
+    return _mm256_set1_epi16(0);
+  }
+  Vec256<int16_t> conj() const {
+    return *this;
+  }
+  Vec256<int16_t> frac() const;
+  Vec256<int16_t> neg() const;
   Vec256<int16_t> operator==(const Vec256<int16_t>& other) const {
     return _mm256_cmpeq_epi16(values, other.values);
   }
@@ -387,6 +493,13 @@ struct Vec256<int16_t> : public Vec256i {
   Vec256<int16_t> operator>=(const Vec256<int16_t>& other) const {
     return invert(_mm256_cmpgt_epi16(other.values, values));
   }
+
+  Vec256<int16_t> eq(const Vec256<int16_t>& other) const;
+  Vec256<int16_t> ne(const Vec256<int16_t>& other) const;
+  Vec256<int16_t> gt(const Vec256<int16_t>& other) const;
+  Vec256<int16_t> ge(const Vec256<int16_t>& other) const;
+  Vec256<int16_t> lt(const Vec256<int16_t>& other) const;
+  Vec256<int16_t> le(const Vec256<int16_t>& other) const;
 };
 
 template <>
@@ -419,6 +532,19 @@ Vec256<int16_t> inline operator-(const Vec256<int16_t>& a, const Vec256<int16_t>
   return _mm256_sub_epi16(a, b);
 }
 
+// Negation. Defined here so we can utilize operator-
+Vec256<int64_t> Vec256<int64_t>::neg() const {
+  return Vec256<int64_t>(0) - *this;
+}
+
+Vec256<int32_t> Vec256<int32_t>::neg() const {
+  return Vec256<int32_t>(0) - *this;
+}
+
+Vec256<int16_t> Vec256<int16_t>::neg() const {
+  return Vec256<int16_t>(0) - *this;
+}
+
 // Emulate operations with no native 64-bit support in avx,
 // by extracting each element, performing the operation pointwise,
 // then combining the results into a vector.
@@ -442,13 +568,39 @@ Vec256<int64_t> inline emulate(const Vec256<int64_t>& a, const Vec256<int64_t>& 
   return _mm256_set_epi64x(c3, c2, c1, c0);
 }
 
+template <typename op_t>
+Vec256<int64_t> inline emulate(const Vec256<int64_t>& a, const Vec256<int64_t>& b, const Vec256<int64_t>& c, const op_t& op) {
+  int64_t a0 = _mm256_extract_epi64(a, 0);
+  int64_t a1 = _mm256_extract_epi64(a, 1);
+  int64_t a2 = _mm256_extract_epi64(a, 2);
+  int64_t a3 = _mm256_extract_epi64(a, 3);
+
+  int64_t b0 = _mm256_extract_epi64(b, 0);
+  int64_t b1 = _mm256_extract_epi64(b, 1);
+  int64_t b2 = _mm256_extract_epi64(b, 2);
+  int64_t b3 = _mm256_extract_epi64(b, 3);
+
+  int64_t c0 = _mm256_extract_epi64(c, 0);
+  int64_t c1 = _mm256_extract_epi64(c, 1);
+  int64_t c2 = _mm256_extract_epi64(c, 2);
+  int64_t c3 = _mm256_extract_epi64(c, 3);
+
+  int64_t d0 = op(a0, b0, c0);
+  int64_t d1 = op(a1, b1, c1);
+  int64_t d2 = op(a2, b2, c2);
+  int64_t d3 = op(a3, b3, c3);
+
+  return _mm256_set_epi64x(d3, d2, d1, d0);
+}
+
 // AVX2 has no intrinsic for int64_t multiply so it needs to be emulated
 // This could be implemented more efficiently using epi32 instructions
 // This is also technically avx compatible, but then we'll need AVX
 // code for add as well.
+// Note: intentionally ignores undefined behavior like (-lowest * -1).
 template <>
 Vec256<int64_t> inline operator*(const Vec256<int64_t>& a, const Vec256<int64_t>& b) {
-  return emulate(a, b, [](int64_t a_point, int64_t b_point){return a_point * b_point;});
+  return emulate(a, b, [](int64_t a_point, int64_t b_point) __ubsan_ignore_undefined__ {return a_point * b_point;});
 }
 
 template <>
@@ -491,38 +643,175 @@ Vec256<int16_t> inline maximum(const Vec256<int16_t>& a, const Vec256<int16_t>& 
   return _mm256_max_epi16(a, b);
 }
 
-template <typename T>
-Vec256<T> inline intdiv_256(const Vec256<T>& a, const Vec256<T>& b) {
+template <>
+Vec256<int64_t> inline clamp(const Vec256<int64_t>& a, const Vec256<int64_t>& min_val, const Vec256<int64_t>& max_val) {
+  return emulate(a, min_val, max_val, [](int64_t a_point, int64_t min_point, int64_t max_point) {return std::min(max_point, std::max(a_point, min_point));});
+}
+
+template <>
+Vec256<int32_t> inline clamp(const Vec256<int32_t>& a, const Vec256<int32_t>& min_val, const Vec256<int32_t>& max_val) {
+  return _mm256_min_epi32(max_val, _mm256_max_epi32(a, min_val));
+}
+
+template <>
+Vec256<int16_t> inline clamp(const Vec256<int16_t>& a, const Vec256<int16_t>& min_val, const Vec256<int16_t>& max_val) {
+  return _mm256_min_epi16(max_val, _mm256_max_epi16(a, min_val));
+}
+
+template <>
+Vec256<int64_t> inline clamp_max(const Vec256<int64_t>& a, const Vec256<int64_t>& max_val) {
+  return emulate(a, max_val, [](int64_t a_point, int64_t max_point) {return std::min(max_point, a_point);});
+}
+
+template <>
+Vec256<int32_t> inline clamp_max(const Vec256<int32_t>& a, const Vec256<int32_t>& max_val) {
+  return _mm256_min_epi32(max_val, a);
+}
+
+template <>
+Vec256<int16_t> inline clamp_max(const Vec256<int16_t>& a, const Vec256<int16_t>& max_val) {
+  return _mm256_min_epi16(max_val, a);
+}
+
+template <>
+Vec256<int64_t> inline clamp_min(const Vec256<int64_t>& a, const Vec256<int64_t>& min_val) {
+  return emulate(a, min_val, [](int64_t a_point, int64_t min_point) {return std::max(min_point, a_point);});
+}
+
+template <>
+Vec256<int32_t> inline clamp_min(const Vec256<int32_t>& a, const Vec256<int32_t>& min_val) {
+  return _mm256_max_epi32(min_val, a);
+}
+
+template <>
+Vec256<int16_t> inline clamp_min(const Vec256<int16_t>& a, const Vec256<int16_t>& min_val) {
+  return _mm256_max_epi16(min_val, a);
+}
+
+template<typename T>
+Vec256<int32_t> inline convert_to_int32(const T* ptr) {
+  return Vec256<int32_t>::loadu(ptr);
+}
+
+template<>
+Vec256<int32_t> inline convert_to_int32<int8_t>(const int8_t* ptr) {
+  return _mm256_cvtepi8_epi32(_mm_loadl_epi64(reinterpret_cast<const __m128i*>(ptr)));
+}
+
+template<>
+Vec256<int32_t> inline convert_to_int32<uint8_t>(const uint8_t* ptr) {
+  return _mm256_cvtepu8_epi32(_mm_loadl_epi64(reinterpret_cast<const __m128i*>(ptr)));
+}
+
+template <typename T, typename Op>
+Vec256<T> inline int_elementwise_binary_256(const Vec256<T>& a, const Vec256<T>& b, Op op) {
   T values_a[Vec256<T>::size()];
   T values_b[Vec256<T>::size()];
   a.store(values_a);
   b.store(values_b);
   for (int i = 0; i != Vec256<T>::size(); i++) {
-    values_a[i] /= values_b[i];
+    values_a[i] = op(values_a[i], values_b[i]);
   }
   return Vec256<T>::loadu(values_a);
 }
 
-#define DEFINE_INTEGER_BINARY_OP(op, func)                                                \
-template <>                                                                               \
-Vec256<int64_t> inline operator op(const Vec256<int64_t>& a, const Vec256<int64_t>& b) {  \
-  return func(a, b);                                                                      \
-}                                                                                         \
-template <>                                                                               \
-Vec256<int32_t> inline operator op(const Vec256<int32_t>& a, const Vec256<int32_t>& b) {  \
-  return func(a, b);                                                                      \
-}                                                                                         \
-template <>                                                                               \
-Vec256<int16_t> inline operator op(const Vec256<int16_t>& a, const Vec256<int16_t>& b) {  \
-  return func(a, b);                                                                      \
+template <>
+Vec256<int64_t> inline operator/(const Vec256<int64_t>& a, const Vec256<int64_t>& b) {
+  return int_elementwise_binary_256(a, b, std::divides<int64_t>());
+}
+template <>
+Vec256<int32_t> inline operator/(const Vec256<int32_t>& a, const Vec256<int32_t>& b) {
+  return int_elementwise_binary_256(a, b, std::divides<int32_t>());
+}
+template <>
+Vec256<int16_t> inline operator/(const Vec256<int16_t>& a, const Vec256<int16_t>& b) {
+  return int_elementwise_binary_256(a, b, std::divides<int16_t>());
 }
 
-DEFINE_INTEGER_BINARY_OP(/, intdiv_256)
-DEFINE_INTEGER_BINARY_OP(&, _mm256_and_si256)
-DEFINE_INTEGER_BINARY_OP(|, _mm256_or_si256)
-DEFINE_INTEGER_BINARY_OP(^, _mm256_xor_si256)
+template<class T, typename std::enable_if_t<std::is_base_of<Vec256i, Vec256<T>>::value, int> = 0>
+inline Vec256<T> operator&(const Vec256<T>& a, const Vec256<T>& b) {
+  return _mm256_and_si256(a, b);
+}
+template<class T, typename std::enable_if_t<std::is_base_of<Vec256i, Vec256<T>>::value, int> = 0>
+inline Vec256<T> operator|(const Vec256<T>& a, const Vec256<T>& b) {
+  return _mm256_or_si256(a, b);
+}
+template<class T, typename std::enable_if_t<std::is_base_of<Vec256i, Vec256<T>>::value, int> = 0>
+inline Vec256<T> operator^(const Vec256<T>& a, const Vec256<T>& b) {
+  return _mm256_xor_si256(a, b);
+}
 
-#undef DEFINE_INTEGER_BINARY_OP
+Vec256<int64_t> Vec256<int64_t>::eq(const Vec256<int64_t>& other) const {
+  return (*this == other) & Vec256<int64_t>(1);
+}
+
+Vec256<int64_t> Vec256<int64_t>::ne(const Vec256<int64_t>& other) const {
+  return (*this != other) & Vec256<int64_t>(1);
+}
+
+Vec256<int64_t> Vec256<int64_t>::gt(const Vec256<int64_t>& other) const {
+  return (*this > other) & Vec256<int64_t>(1);
+}
+
+Vec256<int64_t> Vec256<int64_t>::ge(const Vec256<int64_t>& other) const {
+  return (*this >= other) & Vec256<int64_t>(1);
+}
+
+Vec256<int64_t> Vec256<int64_t>::lt(const Vec256<int64_t>& other) const {
+  return (*this < other) & Vec256<int64_t>(1);
+}
+
+Vec256<int64_t> Vec256<int64_t>::le(const Vec256<int64_t>& other) const {
+  return (*this <= other) & Vec256<int64_t>(1);
+}
+
+Vec256<int32_t> Vec256<int32_t>::eq(const Vec256<int32_t>& other) const {
+  return (*this == other) & Vec256<int32_t>(1);
+}
+
+Vec256<int32_t> Vec256<int32_t>::ne(const Vec256<int32_t>& other) const {
+  return (*this != other) & Vec256<int32_t>(1);
+}
+
+Vec256<int32_t> Vec256<int32_t>::gt(const Vec256<int32_t>& other) const {
+  return (*this > other) & Vec256<int32_t>(1);
+}
+
+Vec256<int32_t> Vec256<int32_t>::ge(const Vec256<int32_t>& other) const {
+  return (*this >= other) & Vec256<int32_t>(1);
+}
+
+Vec256<int32_t> Vec256<int32_t>::lt(const Vec256<int32_t>& other) const {
+  return (*this < other) & Vec256<int32_t>(1);
+}
+
+Vec256<int32_t> Vec256<int32_t>::le(const Vec256<int32_t>& other) const {
+  return (*this <= other) & Vec256<int32_t>(1);
+}
+
+Vec256<int16_t> Vec256<int16_t>::eq(const Vec256<int16_t>& other) const {
+  return (*this == other) & Vec256<int16_t>(1);
+}
+
+Vec256<int16_t> Vec256<int16_t>::ne(const Vec256<int16_t>& other) const {
+  return (*this != other) & Vec256<int16_t>(1);
+}
+
+Vec256<int16_t> Vec256<int16_t>::gt(const Vec256<int16_t>& other) const {
+  return (*this > other) & Vec256<int16_t>(1);
+}
+
+Vec256<int16_t> Vec256<int16_t>::ge(const Vec256<int16_t>& other) const {
+  return (*this >= other) & Vec256<int16_t>(1);
+}
+
+Vec256<int16_t> Vec256<int16_t>::lt(const Vec256<int16_t>& other) const {
+  return (*this < other) & Vec256<int16_t>(1);
+}
+
+Vec256<int16_t> Vec256<int16_t>::le(const Vec256<int16_t>& other) const {
+  return (*this <= other) & Vec256<int16_t>(1);
+}
 
 #endif
 

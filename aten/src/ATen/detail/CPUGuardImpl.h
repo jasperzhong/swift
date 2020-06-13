@@ -34,9 +34,28 @@ struct CPUGuardImpl final : public c10::impl::DeviceGuardImplInterface {
     // no-op
     return Stream(Stream::DEFAULT, Device(DeviceType::CPU, -1));
   }
-  DeviceIndex deviceCount() const override {
+  DeviceIndex deviceCount() const noexcept override {
     return 1;
   }
+
+  // Event-related functions
+  void record(void** event,
+    const Stream& stream,
+    const DeviceIndex device_index,
+    const EventFlag flag) const override {
+    TORCH_CHECK(false, "CPU backend doesn't support events.");
+  }
+  void block(
+    void* event,
+    const Stream& stream) const override {
+    TORCH_CHECK(false, "CPU backend doesn't support events.")
+  }
+  bool queryEvent(void* event) const override {
+    TORCH_CHECK(false, "CPU backend doesn't support events.")
+  }
+  void destroyEvent(
+    void* event,
+    const DeviceIndex device_index) const noexcept override { }
 };
 
 }} // namespace at::detail

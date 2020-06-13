@@ -1,7 +1,9 @@
-#include <torch/csrc/jit/argument_spec.h>
-#include <torch/csrc/jit/ir.h>
-#include <torch/csrc/jit/operator.h>
+#include <torch/csrc/jit/passes/requires_grad_analysis.h>
 #include <ATen/core/jit_type.h>
+#include <torch/csrc/autograd/autograd.h>
+#include <torch/csrc/jit/ir/constants.h>
+#include <torch/csrc/jit/ir/ir.h>
+#include <torch/csrc/jit/runtime/operator.h>
 
 #include <vector>
 
@@ -15,7 +17,7 @@ bool getRequiresGrad(Value* value) {
 }
 
 void setRequiresGrad(Value* value, bool req_value) {
-  if (auto type = value->type()->cast<DimensionedTensorType>()) {
+  if (auto type = value->type()->cast<TensorType>()) {
     value->setType(type->withRequiresGrad(req_value));
   }
 }
@@ -57,13 +59,28 @@ void PropagateRequiresGradSimpleNode(Node* node) {
       "aten::ne(Tensor self, Scalar other) -> Tensor",
   };
 
-  if (comparison_ops.find(node)) {
+  if (node->isMemberOf(comparison_ops)) {
     return setRequiresGrad(node->output(), false);
   } else if (node->matches(
                  "aten::type_as(Tensor self, Tensor other) -> Tensor")) {
     return setRequiresGrad(node->output(), node->input(0)->requires_grad());
   } else if (node->matches("aten::detach(Tensor self) -> Tensor")) {
     return setRequiresGrad(node->output(), false);
+  } else if (node->kind() == aten::tensor) {
+    if (auto grad_index =
+            node->schema().argumentIndexWithName("requires_grad")) {
+      if (auto const_arg = constant_as<bool>(node->inputs().at(*grad_index))) {
+        return setRequiresGrad(node->output(), *const_arg);
+      }
+    }
+    if (auto type = node->output()->type()->cast<TensorType>()) {
+      if (type->scalarType()) {
+        setRequiresGrad(
+            node->output(),
+            autograd::isDifferentiableType(*type->scalarType()));
+      }
+    }
+    return;
   }
 
   auto inputs = node->inputs();
@@ -71,9 +88,13 @@ void PropagateRequiresGradSimpleNode(Node* node) {
   bool should_require =
       std::any_of(inputs.begin(), inputs.end(), getRequiresGrad);
   for (Value* output : outputs) {
-    if (auto type = output->type()->cast<DimensionedTensorType>()) {
-      setRequiresGrad(
-          output, should_require && at::isFloatingType(type->scalarType()));
+    if (auto type = output->type()->cast<TensorType>()) {
+      if (type->scalarType()) {
+        setRequiresGrad(
+            output,
+            should_require &&
+                autograd::isDifferentiableType(*type->scalarType()));
+      }
     }
   }
 }
@@ -95,21 +116,30 @@ void PropagateRequiresGrad(Node* node) {
     setRequiresGrad(node, outputs_require);
   } else if (node->kind() == prim::Loop) {
     auto body = node->blocks().at(0);
-    std::vector<bool> body_inputs_require =
+    std::vector<bool> loop_inputs_require =
         fmap(node->inputs().slice(2), getRequiresGrad);
+    std::vector<bool> body_inputs_require = loop_inputs_require;
     std::vector<bool> body_outputs_require(node->outputs().size(), false);
 
-    while (body_inputs_require != body_outputs_require) {
-      body_inputs_require =
+    std::vector<bool> new_body_inputs_require = body_inputs_require;
+    std::vector<bool> new_body_outputs_require = body_outputs_require;
+
+    // continue iterating until the results have converged
+    do {
+      body_inputs_require = new_body_inputs_require;
+      body_outputs_require = new_body_outputs_require;
+
+      new_body_inputs_require =
           bitwiseOr(body_inputs_require, body_outputs_require);
       setRequiresGrad(
-          body->param_node()->outputs().slice(1), body_inputs_require);
+          body->param_node()->outputs().slice(1), new_body_inputs_require);
       PropagateRequiresGrad(body);
-      body_outputs_require =
+      new_body_outputs_require =
           fmap(body->return_node()->inputs().slice(1), getRequiresGrad);
-    }
+    } while (new_body_inputs_require != body_inputs_require &&
+             new_body_outputs_require != body_outputs_require);
 
-    setRequiresGrad(node, body_outputs_require);
+    setRequiresGrad(node, bitwiseOr(body_outputs_require, loop_inputs_require));
   } else {
     PropagateRequiresGradSimpleNode(node);
   }
@@ -120,12 +150,10 @@ void PropagateRequiresGrad(Block* block) {
     PropagateRequiresGrad(node);
   }
 }
-
 } // anonymous namespace
 
 void PropagateRequiresGrad(std::shared_ptr<Graph>& graph) {
   PropagateRequiresGrad(graph->block());
 }
-
 } // namespace jit
 } // namespace torch

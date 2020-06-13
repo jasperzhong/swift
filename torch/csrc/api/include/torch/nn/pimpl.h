@@ -98,19 +98,19 @@ class ModuleHolder : torch::detail::ModuleHolderIndicator {
 
   /// Returns a shared pointer to the underlying module.
   const std::shared_ptr<Contained>& ptr() const {
-    AT_CHECK(!is_empty(), "Accessing empty ModuleHolder");
+    TORCH_CHECK(!is_empty(), "Accessing empty ModuleHolder");
     return impl_;
   }
 
   /// Returns a pointer to the underlying module.
   Contained* get() {
-    AT_CHECK(!is_empty(), "Accessing empty ModuleHolder");
+    TORCH_CHECK(!is_empty(), "Accessing empty ModuleHolder");
     return impl_.get();
   }
 
   /// Returns a const pointer to the underlying module.
   const Contained* get() const {
-    AT_CHECK(!is_empty(), "Accessing empty ModuleHolder");
+    TORCH_CHECK(!is_empty(), "Accessing empty ModuleHolder");
     return impl_.get();
   }
 
@@ -129,7 +129,7 @@ class ModuleHolder : torch::detail::ModuleHolderIndicator {
   /// NOTE: std::forward is qualified to prevent VS2017 emitting
   ///       error C2872: 'std': ambiguous symbol
   template <typename Arg>
-  auto operator[](Arg&& arg) -> decltype((*impl_)[::std::forward<Arg>(arg)]) {
+  decltype(auto) operator[](Arg&& arg) {
     return (*impl_)[::std::forward<Arg>(arg)];
   }
 

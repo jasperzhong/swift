@@ -486,7 +486,7 @@ void TensorRTTransformer::Transform(
   auto trt_builder = tensorrt::TrtObject(nvinfer1::createInferBuilder(logger));
   auto trt_network = tensorrt::TrtObject(trt_builder->createNetwork());
   auto importer =
-      tensorrt::TrtObject(nvonnxparser::createParser(trt_network.get(), logger));
+      tensorrt::TrtObject(nvonnxparser::createParser(*trt_network, logger));
 
   // function to tell whether TensorRT supports a given C2 op or not
   auto supports =
@@ -507,7 +507,7 @@ void TensorRTTransformer::Transform(
         return true;
       };
 
-  // function to convert runnbale subgraph into a trt op. Note that to keep the
+  // function to convert runnable subgraph into a trt op. Note that to keep the
   // interface clean, we do the double conversion from C2 op to Onnx ops here
   // but it should be OK as the cost is really small. We also need to keep the
   // same exporter throughout the process to avoid duplicated dummy name

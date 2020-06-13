@@ -1,12 +1,8 @@
 import warnings
 
-import torch
 from .module import Module
-from .container import Sequential
-from .activation import LogSoftmax
 from .. import functional as F
 from .. import _reduction as _Reduction
-from ..._jit_internal import weak_module, weak_script_method
 
 
 class _Loss(Module):
@@ -24,7 +20,6 @@ class _WeightedLoss(_Loss):
         self.register_buffer('weight', weight)
 
 
-@weak_module
 class L1Loss(_Loss):
     r"""Creates a criterion that measures the mean absolute error (MAE) between each element in
     the input :math:`x` and target :math:`y`.
@@ -89,12 +84,10 @@ class L1Loss(_Loss):
     def __init__(self, size_average=None, reduce=None, reduction='mean'):
         super(L1Loss, self).__init__(size_average, reduce, reduction)
 
-    @weak_script_method
     def forward(self, input, target):
         return F.l1_loss(input, target, reduction=self.reduction)
 
 
-@weak_module
 class NLLLoss(_WeightedLoss):
     r"""The negative log likelihood loss. It is useful to train a classification
     problem with `C` classes.
@@ -113,8 +106,9 @@ class NLLLoss(_WeightedLoss):
     You may use `CrossEntropyLoss` instead, if you prefer not to add an extra
     layer.
 
-    The `target` that this loss expects is a class index in the range :math:`[0, C-1]`
-    where `C = number of classes`.
+    The `target` that this loss expects should be a class index in the range :math:`[0, C-1]`
+    where `C = number of classes`; if `ignore_index` is specified, this loss also accepts
+    this class index (this index may not necessarily be in the class range).
 
     The unreduced (i.e. with :attr:`reduction` set to ``'none'``) loss can be described as:
 
@@ -123,7 +117,8 @@ class NLLLoss(_WeightedLoss):
         l_n = - w_{y_n} x_{n,y_n}, \quad
         w_{c} = \text{weight}[c] \cdot \mathbb{1}\{c \not= \text{ignore\_index}\},
 
-    where :math:`N` is the batch size. If :attr:`reduction` is not ``'none'``
+    where :math:`x` is the input, :math:`y` is the target, :math:`w` is the weight, and
+    :math:`N` is the batch size. If :attr:`reduction` is not ``'none'``
     (default ``'mean'``), then
 
     .. math::
@@ -199,19 +194,17 @@ class NLLLoss(_WeightedLoss):
         >>> output = loss(m(conv(data)), target)
         >>> output.backward()
     """
-    __constants__ = ['ignore_index', 'weight', 'reduction']
+    __constants__ = ['ignore_index', 'reduction']
 
     def __init__(self, weight=None, size_average=None, ignore_index=-100,
                  reduce=None, reduction='mean'):
         super(NLLLoss, self).__init__(weight, size_average, reduce, reduction)
         self.ignore_index = ignore_index
 
-    @weak_script_method
     def forward(self, input, target):
         return F.nll_loss(input, target, weight=self.weight, ignore_index=self.ignore_index, reduction=self.reduction)
 
 
-@weak_module
 class NLLLoss2d(NLLLoss):
     def __init__(self, weight=None, size_average=None, ignore_index=-100,
                  reduce=None, reduction='mean'):
@@ -221,7 +214,6 @@ class NLLLoss2d(NLLLoss):
         super(NLLLoss2d, self).__init__(weight, size_average, ignore_index, reduce, reduction)
 
 
-@weak_module
 class PoissonNLLLoss(_Loss):
     r"""Negative log likelihood loss with Poisson distribution of target.
 
@@ -288,13 +280,11 @@ class PoissonNLLLoss(_Loss):
         self.full = full
         self.eps = eps
 
-    @weak_script_method
     def forward(self, log_input, target):
         return F.poisson_nll_loss(log_input, target, log_input=self.log_input, full=self.full,
                                   eps=self.eps, reduction=self.reduction)
 
 
-@weak_module
 class KLDivLoss(_Loss):
     r"""The `Kullback-Leibler divergence`_ Loss
 
@@ -304,7 +294,8 @@ class KLDivLoss(_Loss):
 
     As with :class:`~torch.nn.NLLLoss`, the `input` given is expected to contain
     *log-probabilities* and is not restricted to a 2D Tensor.
-    The targets are given as *probabilities* (i.e. without taking the logarithm).
+    The targets are interpreted as *probabilities* by default, but could be considered
+    as *log-probabilities* with :attr:`log_target` set to ``True``.
 
     This criterion expects a `target` `Tensor` of the same size as the
     `input` `Tensor`.
@@ -349,14 +340,16 @@ class KLDivLoss(_Loss):
             ``'sum'``: the output will be summed.
             ``'mean'``: the output will be divided by the number of elements in the output.
             Default: ``'mean'``
+        log_target (bool, optional): Specifies whether `target` is passed in the log space.
+            Default: ``False``
 
     .. note::
         :attr:`size_average` and :attr:`reduce` are in the process of being deprecated,
         and in the meantime, specifying either of those two args will override :attr:`reduction`.
 
     .. note::
-        :attr:``reduction`` = ``'mean'`` doesn't return the true kl divergence value, please use
-        :attr:``reduction`` = ``'batchmean'`` which aligns with KL math definition.
+        :attr:`reduction` = ``'mean'`` doesn't return the true kl divergence value, please use
+        :attr:`reduction` = ``'batchmean'`` which aligns with KL math definition.
         In the next major release, ``'mean'`` will be changed to be the same as ``'batchmean'``.
 
     Shape:
@@ -369,15 +362,14 @@ class KLDivLoss(_Loss):
     """
     __constants__ = ['reduction']
 
-    def __init__(self, size_average=None, reduce=None, reduction='mean'):
+    def __init__(self, size_average=None, reduce=None, reduction='mean', log_target=False):
         super(KLDivLoss, self).__init__(size_average, reduce, reduction)
+        self.log_target = log_target
 
-    @weak_script_method
     def forward(self, input, target):
-        return F.kl_div(input, target, reduction=self.reduction)
+        return F.kl_div(input, target, reduction=self.reduction, log_target=self.log_target)
 
 
-@weak_module
 class MSELoss(_Loss):
     r"""Creates a criterion that measures the mean squared error (squared L2 norm) between
     each element in the input :math:`x` and target :math:`y`.
@@ -401,7 +393,7 @@ class MSELoss(_Loss):
     :math:`x` and :math:`y` are tensors of arbitrary shapes with a total
     of :math:`n` elements each.
 
-    The sum operation still operates over all the elements, and divides by :math:`n`.
+    The mean operation still operates over all the elements, and divides by :math:`n`.
 
     The division by :math:`n` can be avoided if one sets ``reduction = 'sum'``.
 
@@ -440,12 +432,10 @@ class MSELoss(_Loss):
     def __init__(self, size_average=None, reduce=None, reduction='mean'):
         super(MSELoss, self).__init__(size_average, reduce, reduction)
 
-    @weak_script_method
     def forward(self, input, target):
         return F.mse_loss(input, target, reduction=self.reduction)
 
 
-@weak_module
 class BCELoss(_WeightedLoss):
     r"""Creates a criterion that measures the Binary Cross Entropy
     between the target and the output:
@@ -468,6 +458,23 @@ class BCELoss(_WeightedLoss):
     This is used for measuring the error of a reconstruction in for example
     an auto-encoder. Note that the targets :math:`y` should be numbers
     between 0 and 1.
+
+    Notice that if :math:`x_n` is either 0 or 1, one of the log terms would be
+    mathematically undefined in the above loss equation. PyTorch chooses to set
+    :math:`\log (0) = -\infty`, since :math:`\lim_{x\to 0} \log (x) = -\infty`.
+    However, an infinite term in the loss equation is not desirable for several reasons.
+
+    For one, if either :math:`y_n = 0` or :math:`(1 - y_n) = 0`, then we would be
+    multipying 0 with infinity. Secondly, if we have an infinite loss value, then
+    we would also have an infinite term in our gradient, since
+    :math:`\lim_{x\to 0} \frac{d}{dx} \log (x) = \infty`.
+    This would make BCELoss's backward method nonlinear with respect to :math:`x_n`,
+    and using it for things like linear regression would not be straight-forward.
+
+    Our solution is that BCELoss clamps its log function outputs to be greater than
+    or equal to -100. This way, we can always have a finite loss value and a linear
+    backward method.
+
 
     Args:
         weight (Tensor, optional): a manual rescaling weight given to the loss
@@ -504,17 +511,15 @@ class BCELoss(_WeightedLoss):
         >>> output = loss(m(input), target)
         >>> output.backward()
     """
-    __constants__ = ['reduction', 'weight']
+    __constants__ = ['reduction']
 
     def __init__(self, weight=None, size_average=None, reduce=None, reduction='mean'):
         super(BCELoss, self).__init__(weight, size_average, reduce, reduction)
 
-    @weak_script_method
     def forward(self, input, target):
         return F.binary_cross_entropy(input, target, weight=self.weight, reduction=self.reduction)
 
 
-@weak_module
 class BCEWithLogitsLoss(_Loss):
     r"""This loss combines a `Sigmoid` layer and the `BCELoss` in one single
     class. This version is more numerically stable than using a plain `Sigmoid`
@@ -542,19 +547,32 @@ class BCEWithLogitsLoss(_Loss):
     between 0 and 1.
 
     It's possible to trade off recall and precision by adding weights to positive examples.
-    In this case the loss can be described as:
+    In the case of multi-label classification the loss can be described as:
 
     .. math::
-        \ell(x, y) = L = \{l_1,\dots,l_N\}^\top, \quad
-        l_n = - w_n \left[ p_n y_n \cdot \log \sigma(x_n)
-        + (1 - y_n) \cdot \log (1 - \sigma(x_n)) \right],
+        \ell_c(x, y) = L_c = \{l_{1,c},\dots,l_{N,c}\}^\top, \quad
+        l_{n,c} = - w_{n,c} \left[ p_c y_{n,c} \cdot \log \sigma(x_{n,c})
+        + (1 - y_{n,c}) \cdot \log (1 - \sigma(x_{n,c})) \right],
 
-    where :math:`p_n` is the weight of the positive class for sample :math:`n` in the batch.
-    :math:`p_n > 1` increases the recall, :math:`p_n < 1` increases the precision.
+    where :math:`c` is the class number (:math:`c > 1` for multi-label binary classification,
+    :math:`c = 1` for single-label binary classification),
+    :math:`n` is the number of the sample in the batch and
+    :math:`p_c` is the weight of the positive answer for the class :math:`c`.
+
+    :math:`p_c > 1` increases the recall, :math:`p_c < 1` increases the precision.
 
     For example, if a dataset contains 100 positive and 300 negative examples of a single class,
     then `pos_weight` for the class should be equal to :math:`\frac{300}{100}=3`.
     The loss would act as if the dataset contains :math:`3\times 100=300` positive examples.
+
+    Examples::
+
+        >>> target = torch.ones([10, 64], dtype=torch.float32)  # 64 classes, batch size = 10
+        >>> output = torch.full([10, 64], 1.5)  # A prediction (logit)
+        >>> pos_weight = torch.ones([64])  # All weights are equal to 1
+        >>> criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        >>> criterion(output, target)  # -log(sigmoid(1.5))
+        tensor(0.2014)
 
     Args:
         weight (Tensor, optional): a manual rescaling weight given to the loss
@@ -591,14 +609,11 @@ class BCEWithLogitsLoss(_Loss):
         >>> output = loss(input, target)
         >>> output.backward()
     """
-    __constants__ = ['weight', 'pos_weight', 'reduction']
-
     def __init__(self, weight=None, size_average=None, reduce=None, reduction='mean', pos_weight=None):
         super(BCEWithLogitsLoss, self).__init__(size_average, reduce, reduction)
         self.register_buffer('weight', weight)
         self.register_buffer('pos_weight', pos_weight)
 
-    @weak_script_method
     def forward(self, input, target):
         return F.binary_cross_entropy_with_logits(input, target,
                                                   self.weight,
@@ -606,7 +621,6 @@ class BCEWithLogitsLoss(_Loss):
                                                   reduction=self.reduction)
 
 
-@weak_module
 class HingeEmbeddingLoss(_Loss):
     r"""Measures the loss given an input tensor :math:`x` and a labels tensor :math:`y`
     (containing 1 or -1).
@@ -654,7 +668,7 @@ class HingeEmbeddingLoss(_Loss):
         - Input: :math:`(*)` where :math:`*` means, any number of dimensions. The sum operation
           operates over all the elements.
         - Target: :math:`(*)`, same shape as the input
-        - Output: scalar. If :attr:``reduction`` is ``'none'``, then same shape as the input
+        - Output: scalar. If :attr:`reduction` is ``'none'``, then same shape as the input
     """
     __constants__ = ['margin', 'reduction']
 
@@ -662,12 +676,10 @@ class HingeEmbeddingLoss(_Loss):
         super(HingeEmbeddingLoss, self).__init__(size_average, reduce, reduction)
         self.margin = margin
 
-    @weak_script_method
     def forward(self, input, target):
         return F.hinge_embedding_loss(input, target, margin=self.margin, reduction=self.reduction)
 
 
-@weak_module
 class MultiLabelMarginLoss(_Loss):
     r"""Creates a criterion that optimizes a multi-class multi-classification
     hinge loss (margin-based loss) between input :math:`x` (a 2D mini-batch `Tensor`)
@@ -710,7 +722,7 @@ class MultiLabelMarginLoss(_Loss):
         - Input: :math:`(C)` or :math:`(N, C)` where `N` is the batch size and `C`
           is the number of classes.
         - Target: :math:`(C)` or :math:`(N, C)`, label targets padded by -1 ensuring same shape as the input.
-        - Output: scalar. If :attr:``reduction`` is ``'none'``, then :math:`(N)`.
+        - Output: scalar. If :attr:`reduction` is ``'none'``, then :math:`(N)`.
 
     Examples::
 
@@ -728,17 +740,15 @@ class MultiLabelMarginLoss(_Loss):
     def __init__(self, size_average=None, reduce=None, reduction='mean'):
         super(MultiLabelMarginLoss, self).__init__(size_average, reduce, reduction)
 
-    @weak_script_method
     def forward(self, input, target):
         return F.multilabel_margin_loss(input, target, reduction=self.reduction)
 
 
-@weak_module
 class SmoothL1Loss(_Loss):
     r"""Creates a criterion that uses a squared term if the absolute
     element-wise error falls below 1 and an L1 term otherwise.
     It is less sensitive to outliers than the `MSELoss` and in some cases
-    prevents exploding gradients (e.g. see "Fast R-CNN" paper by Ross Girshick).
+    prevents exploding gradients (e.g. see `Fast R-CNN` paper by Ross Girshick).
     Also known as the Huber loss:
 
     .. math::
@@ -788,12 +798,10 @@ class SmoothL1Loss(_Loss):
     def __init__(self, size_average=None, reduce=None, reduction='mean'):
         super(SmoothL1Loss, self).__init__(size_average, reduce, reduction)
 
-    @weak_script_method
     def forward(self, input, target):
         return F.smooth_l1_loss(input, target, reduction=self.reduction)
 
 
-@weak_module
 class SoftMarginLoss(_Loss):
     r"""Creates a criterion that optimizes a two-class classification
     logistic loss between input tensor :math:`x` and target tensor :math:`y`
@@ -831,12 +839,10 @@ class SoftMarginLoss(_Loss):
     def __init__(self, size_average=None, reduce=None, reduction='mean'):
         super(SoftMarginLoss, self).__init__(size_average, reduce, reduction)
 
-    @weak_script_method
     def forward(self, input, target):
         return F.soft_margin_loss(input, target, reduction=self.reduction)
 
 
-@weak_module
 class CrossEntropyLoss(_WeightedLoss):
     r"""This criterion combines :func:`nn.LogSoftmax` and :func:`nn.NLLLoss` in one single class.
 
@@ -852,7 +858,9 @@ class CrossEntropyLoss(_WeightedLoss):
     with :math:`K \geq 1` for the `K`-dimensional case (described later).
 
     This criterion expects a class index in the range :math:`[0, C-1]` as the
-    `target` for each value of a 1D tensor of size `minibatch`.
+    `target` for each value of a 1D tensor of size `minibatch`; if `ignore_index`
+    is specified, this criterion also accepts this class index (this index may not
+    necessarily be in the class range).
 
     The loss can be described as:
 
@@ -916,20 +924,18 @@ class CrossEntropyLoss(_WeightedLoss):
         >>> output = loss(input, target)
         >>> output.backward()
     """
-    __constants__ = ['weight', 'ignore_index', 'reduction']
+    __constants__ = ['ignore_index', 'reduction']
 
     def __init__(self, weight=None, size_average=None, ignore_index=-100,
                  reduce=None, reduction='mean'):
         super(CrossEntropyLoss, self).__init__(weight, size_average, reduce, reduction)
         self.ignore_index = ignore_index
 
-    @weak_script_method
     def forward(self, input, target):
         return F.cross_entropy(input, target, weight=self.weight,
                                ignore_index=self.ignore_index, reduction=self.reduction)
 
 
-@weak_module
 class MultiLabelSoftMarginLoss(_WeightedLoss):
     r"""Creates a criterion that optimizes a multi-label one-versus-all
     loss based on max-entropy, between input :math:`x` and target :math:`y` of size
@@ -968,17 +974,15 @@ class MultiLabelSoftMarginLoss(_WeightedLoss):
         - Target: :math:`(N, C)`, label targets padded by -1 ensuring same shape as the input.
         - Output: scalar. If :attr:`reduction` is ``'none'``, then :math:`(N)`.
     """
-    __constants__ = ['weight', 'reduction']
+    __constants__ = ['reduction']
 
     def __init__(self, weight=None, size_average=None, reduce=None, reduction='mean'):
         super(MultiLabelSoftMarginLoss, self).__init__(weight, size_average, reduce, reduction)
 
-    @weak_script_method
     def forward(self, input, target):
         return F.multilabel_soft_margin_loss(input, target, weight=self.weight, reduction=self.reduction)
 
 
-@weak_module
 class CosineEmbeddingLoss(_Loss):
     r"""Creates a criterion that measures the loss given input tensors
     :math:`x_1`, :math:`x_2` and a `Tensor` label :math:`y` with values 1 or -1.
@@ -997,8 +1001,8 @@ class CosineEmbeddingLoss(_Loss):
 
     Args:
         margin (float, optional): Should be a number from :math:`-1` to :math:`1`,
-        :math:`0` to :math:`0.5` is suggested. If :attr:`margin` is missing, the
-        default value is :math:`0`.
+            :math:`0` to :math:`0.5` is suggested. If :attr:`margin` is missing, the
+            default value is :math:`0`.
         size_average (bool, optional): Deprecated (see :attr:`reduction`). By default,
             the losses are averaged over each loss element in the batch. Note that for
             some losses, there are multiple elements per sample. If the field :attr:`size_average`
@@ -1021,15 +1025,13 @@ class CosineEmbeddingLoss(_Loss):
         super(CosineEmbeddingLoss, self).__init__(size_average, reduce, reduction)
         self.margin = margin
 
-    @weak_script_method
     def forward(self, input1, input2, target):
         return F.cosine_embedding_loss(input1, input2, target, margin=self.margin, reduction=self.reduction)
 
 
-@weak_module
 class MarginRankingLoss(_Loss):
     r"""Creates a criterion that measures the loss given
-    inputs :math:`x1`, :math:`x2`, two 1D mini-batch `Tensor`s,
+    inputs :math:`x1`, :math:`x2`, two 1D mini-batch `Tensors`,
     and a label 1D mini-batch tensor :math:`y` (containing 1 or -1).
 
     If :math:`y = 1` then it assumed the first input should be ranked higher
@@ -1069,12 +1071,10 @@ class MarginRankingLoss(_Loss):
         super(MarginRankingLoss, self).__init__(size_average, reduce, reduction)
         self.margin = margin
 
-    @weak_script_method
     def forward(self, input1, input2, target):
         return F.margin_ranking_loss(input1, input2, target, margin=self.margin, reduction=self.reduction)
 
 
-@weak_module
 class MultiMarginLoss(_WeightedLoss):
     r"""Creates a criterion that optimizes a multi-class classification hinge
     loss (margin-based loss) between input :math:`x` (a 2D mini-batch `Tensor`) and
@@ -1121,7 +1121,7 @@ class MultiMarginLoss(_WeightedLoss):
             and :attr:`reduce` are in the process of being deprecated, and in the meantime,
             specifying either of those two args will override :attr:`reduction`. Default: ``'mean'``
     """
-    __constants__ = ['p', 'margin', 'weight', 'reduction']
+    __constants__ = ['p', 'margin', 'reduction']
 
     def __init__(self, p=1, margin=1., weight=None, size_average=None,
                  reduce=None, reduction='mean'):
@@ -1132,19 +1132,17 @@ class MultiMarginLoss(_WeightedLoss):
         self.p = p
         self.margin = margin
 
-    @weak_script_method
     def forward(self, input, target):
         return F.multi_margin_loss(input, target, p=self.p, margin=self.margin,
                                    weight=self.weight, reduction=self.reduction)
 
 
-@weak_module
 class TripletMarginLoss(_Loss):
     r"""Creates a criterion that measures the triplet loss given an input
     tensors :math:`x1`, :math:`x2`, :math:`x3` and a margin with a value greater than :math:`0`.
     This is used for measuring a relative similarity between samples. A triplet
-    is composed by `a`, `p` and `n`: `anchor`, `positive examples` and `negative
-    examples` respectively. The shapes of all input tensors should be
+    is composed by `a`, `p` and `n` (i.e., `anchor`, `positive examples` and `negative
+    examples` respectively). The shapes of all input tensors should be
     :math:`(N, D)`.
 
     The distance swap is described in detail in the paper `Learning shallow
@@ -1165,7 +1163,7 @@ class TripletMarginLoss(_Loss):
     Args:
         margin (float, optional): Default: :math:`1`.
         p (int, optional): The norm degree for pairwise distance. Default: :math:`2`.
-        swap (float, optional): The distance swap is described in detail in the paper
+        swap (bool, optional): The distance swap is described in detail in the paper
             `Learning shallow convolutional feature descriptors with triplet losses` by
             V. Balntas, E. Riba et al. Default: ``False``.
         size_average (bool, optional): Deprecated (see :attr:`reduction`). By default,
@@ -1189,14 +1187,14 @@ class TripletMarginLoss(_Loss):
         - Output: scalar. If :attr:`reduction` is ``'none'``, then :math:`(N)`.
 
     >>> triplet_loss = nn.TripletMarginLoss(margin=1.0, p=2)
-    >>> input1 = torch.randn(100, 128, requires_grad=True)
-    >>> input2 = torch.randn(100, 128, requires_grad=True)
-    >>> input3 = torch.randn(100, 128, requires_grad=True)
-    >>> output = triplet_loss(input1, input2, input3)
+    >>> anchor = torch.randn(100, 128, requires_grad=True)
+    >>> positive = torch.randn(100, 128, requires_grad=True)
+    >>> negative = torch.randn(100, 128, requires_grad=True)
+    >>> output = triplet_loss(anchor, positive, negative)
     >>> output.backward()
 
     .. _Learning shallow convolutional feature descriptors with triplet losses:
-        http://www.iis.ee.ic.ac.uk/%7Evbalnt/shallow_descr/TFeat_paper.pdf
+        http://www.bmva.org/bmvc/2016/papers/paper119/index.html
     """
     __constants__ = ['margin', 'p', 'eps', 'swap', 'reduction']
 
@@ -1208,48 +1206,102 @@ class TripletMarginLoss(_Loss):
         self.eps = eps
         self.swap = swap
 
-    @weak_script_method
     def forward(self, anchor, positive, negative):
         return F.triplet_margin_loss(anchor, positive, negative, margin=self.margin, p=self.p,
                                      eps=self.eps, swap=self.swap, reduction=self.reduction)
 
 
-@weak_module
 class CTCLoss(_Loss):
     r"""The Connectionist Temporal Classification loss.
+
+    Calculates loss between a continuous (unsegmented) time series and a target sequence. CTCLoss sums over the
+    probability of possible alignments of input to target, producing a loss value which is differentiable
+    with respect to each input node. The alignment of input to target is assumed to be "many-to-one", which
+    limits the length of the target sequence such that it must be :math:`\leq` the input length.
 
     Args:
         blank (int, optional): blank label. Default :math:`0`.
         reduction (string, optional): Specifies the reduction to apply to the output:
-            'none' | 'mean' | 'sum'. 'none': no reduction will be applied,
-            'mean': the output losses will be divided by the target lengths and
-            then the mean over the batch is taken. Default: 'mean'
+            ``'none'`` | ``'mean'`` | ``'sum'``. ``'none'``: no reduction will be applied,
+            ``'mean'``: the output losses will be divided by the target lengths and
+            then the mean over the batch is taken. Default: ``'mean'``
         zero_infinity (bool, optional):
             Whether to zero infinite losses and the associated gradients.
             Default: ``False``
             Infinite losses mainly occur when the inputs are too short
             to be aligned to the targets.
 
-    Inputs:
-        log_probs: Tensor of size :math:`(T, N, C)` where `C = number of characters in alphabet including blank`,
-            `T = input length`, and `N = batch size`.
-            The logarithmized probabilities of the outputs
-            (e.g. obtained with :func:`torch.nn.functional.log_softmax`).
-        targets: Tensor of size :math:`(N, S)` or `(sum(target_lengths))`.
-            Targets (cannot be blank). In the second form, the targets are assumed to be concatenated.
-        input_lengths: Tuple or tensor of size :math:`(N)`.
-            Lengths of the inputs (must each be :math:`\leq T`)
-        target_lengths: Tuple or tensor of size  :math:`(N)`.
-            Lengths of the targets
+    Shape:
+        - Log_probs: Tensor of size :math:`(T, N, C)`,
+          where :math:`T = \text{input length}`,
+          :math:`N = \text{batch size}`, and
+          :math:`C = \text{number of classes (including blank)}`.
+          The logarithmized probabilities of the outputs (e.g. obtained with
+          :func:`torch.nn.functional.log_softmax`).
+        - Targets: Tensor of size :math:`(N, S)` or
+          :math:`(\operatorname{sum}(\text{target\_lengths}))`,
+          where :math:`N = \text{batch size}` and
+          :math:`S = \text{max target length, if shape is } (N, S)`.
+          It represent the target sequences. Each element in the target
+          sequence is a class index. And the target index cannot be blank (default=0).
+          In the :math:`(N, S)` form, targets are padded to the
+          length of the longest sequence, and stacked.
+          In the :math:`(\operatorname{sum}(\text{target\_lengths}))` form,
+          the targets are assumed to be un-padded and
+          concatenated within 1 dimension.
+        - Input_lengths: Tuple or tensor of size :math:`(N)`,
+          where :math:`N = \text{batch size}`. It represent the lengths of the
+          inputs (must each be :math:`\leq T`). And the lengths are specified
+          for each sequence to achieve masking under the assumption that sequences
+          are padded to equal lengths.
+        - Target_lengths: Tuple or tensor of size :math:`(N)`,
+          where :math:`N = \text{batch size}`. It represent lengths of the targets.
+          Lengths are specified for each sequence to achieve masking under the
+          assumption that sequences are padded to equal lengths. If target shape is
+          :math:`(N,S)`, target_lengths are effectively the stop index
+          :math:`s_n` for each target sequence, such that ``target_n = targets[n,0:s_n]`` for
+          each target in a batch. Lengths must each be :math:`\leq S`
+          If the targets are given as a 1d tensor that is the concatenation of individual
+          targets, the target_lengths must add up to the total length of the tensor.
+        - Output: scalar. If :attr:`reduction` is ``'none'``, then
+          :math:`(N)`, where :math:`N = \text{batch size}`.
 
-    Example::
+    Examples::
 
+        >>> # Target are to be padded
+        >>> T = 50      # Input sequence length
+        >>> C = 20      # Number of classes (including blank)
+        >>> N = 16      # Batch size
+        >>> S = 30      # Target sequence length of longest target in batch (padding length)
+        >>> S_min = 10  # Minimum target length, for demonstration purposes
+        >>>
+        >>> # Initialize random batch of input vectors, for *size = (T,N,C)
+        >>> input = torch.randn(T, N, C).log_softmax(2).detach().requires_grad_()
+        >>>
+        >>> # Initialize random batch of targets (0 = blank, 1:C = classes)
+        >>> target = torch.randint(low=1, high=C, size=(N, S), dtype=torch.long)
+        >>>
+        >>> input_lengths = torch.full(size=(N,), fill_value=T, dtype=torch.long)
+        >>> target_lengths = torch.randint(low=S_min, high=S, size=(N,), dtype=torch.long)
         >>> ctc_loss = nn.CTCLoss()
-        >>> log_probs = torch.randn(50, 16, 20).log_softmax(2).detach().requires_grad_()
-        >>> targets = torch.randint(1, 20, (16, 30), dtype=torch.long)
-        >>> input_lengths = torch.full((16,), 50, dtype=torch.long)
-        >>> target_lengths = torch.randint(10,30,(16,), dtype=torch.long)
-        >>> loss = ctc_loss(log_probs, targets, input_lengths, target_lengths)
+        >>> loss = ctc_loss(input, target, input_lengths, target_lengths)
+        >>> loss.backward()
+        >>>
+        >>>
+        >>> # Target are to be un-padded
+        >>> T = 50      # Input sequence length
+        >>> C = 20      # Number of classes (including blank)
+        >>> N = 16      # Batch size
+        >>>
+        >>> # Initialize random batch of input vectors, for *size = (T,N,C)
+        >>> input = torch.randn(T, N, C).log_softmax(2).detach().requires_grad_()
+        >>> input_lengths = torch.full(size=(N,), fill_value=T, dtype=torch.long)
+        >>> 
+        >>> # Initialize random batch of targets (0 = blank, 1:C = classes)
+        >>> target_lengths = torch.randint(low=1, high=T, size=(N,), dtype=torch.long)
+        >>> target = torch.randint(low=1, high=C, size=(sum(target_lengths),), dtype=torch.long)
+        >>> ctc_loss = nn.CTCLoss()
+        >>> loss = ctc_loss(input, target, input_lengths, target_lengths)
         >>> loss.backward()
 
     Reference:
@@ -1257,7 +1309,7 @@ class CTCLoss(_Loss):
         Labelling Unsegmented Sequence Data with Recurrent Neural Networks:
         https://www.cs.toronto.edu/~graves/icml_2006.pdf
 
-    .. Note::
+    Note:
         In order to use CuDNN, the following must be satisfied: :attr:`targets` must be
         in concatenated format, all :attr:`input_lengths` must be `T`.  :math:`blank=0`,
         :attr:`target_lengths` :math:`\leq 256`, the integer arguments must be of
@@ -1266,9 +1318,13 @@ class CTCLoss(_Loss):
         The regular implementation uses the (more common in PyTorch) `torch.long` dtype.
 
 
-    .. include:: cudnn_deterministic.rst
-
-
+    Note:
+        In some circumstances when using the CUDA backend with CuDNN, this operator
+        may select a nondeterministic algorithm to increase performance. If this is
+        undesirable, you can try to make the operation deterministic (potentially at
+        a performance cost) by setting ``torch.backends.cudnn.deterministic =
+        True``.
+        Please see the notes on :doc:`/notes/randomness` for background.
     """
     __constants__ = ['blank', 'reduction']
 
@@ -1277,7 +1333,6 @@ class CTCLoss(_Loss):
         self.blank = blank
         self.zero_infinity = zero_infinity
 
-    @weak_script_method
     def forward(self, log_probs, targets, input_lengths, target_lengths):
         return F.ctc_loss(log_probs, targets, input_lengths, target_lengths, self.blank, self.reduction,
                           self.zero_infinity)

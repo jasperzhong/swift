@@ -1,6 +1,8 @@
 #include <caffe2/ideep/ideep_utils.h>
 
-namespace caffe2 {
+using namespace caffe2;
+
+namespace {
 
 // Takes a shape and data tensor and reshapes it
 class IDEEPReshapeOp final : public IDEEPOperator {
@@ -10,7 +12,7 @@ class IDEEPReshapeOp final : public IDEEPOperator {
 
   IDEEPReshapeOp(const OperatorDef& operator_def, Workspace* ws)
       : IDEEPOperator(operator_def, ws),
-        new_shape_(OperatorBase::GetRepeatedArgument<int>("shape")) {}
+        new_shape_(OperatorBase::GetRepeatedArgument<itensor::dim>("shape")) {}
 
   bool RunOnDevice() override {
     ideep::tensor::dims actual_new_shape = new_shape_;
@@ -127,4 +129,4 @@ class IDEEPReshapeOp final : public IDEEPOperator {
 
 REGISTER_IDEEP_OPERATOR(Reshape, IDEEPReshapeOp);
 
-} // namespace caffe2
+} // namespace

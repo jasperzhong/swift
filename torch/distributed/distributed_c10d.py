@@ -3,16 +3,28 @@ import warnings
 from torch._six import string_classes
 from datetime import timedelta
 
-from .rendezvous import rendezvous, register_rendezvous_handler
-from . import BroadcastOptions, AllreduceOptions, ReduceOptions, \
-    ScatterOptions, GatherOptions
+# This module is wildcard imported from torch.distributed.
+# TODO: specify __all__
+
+from .constants import default_pg_timeout
+from .rendezvous import rendezvous, register_rendezvous_handler  # noqa: F401
+from . import (
+    AllreduceOptions,
+    AllreduceCoalescedOptions,
+    AllToAllOptions,
+    BroadcastOptions,
+    GatherOptions,
+    ReduceOptions,
+    ReduceScatterOptions,
+    ScatterOptions,
+)
 from . import ReduceOp
 from . import PrefixStore
-from . import ProcessGroupGloo
 
 
 _MPI_AVAILABLE = True
 _NCCL_AVAILABLE = True
+_GLOO_AVAILABLE = True
 
 
 try:
@@ -25,10 +37,16 @@ try:
 except ImportError:
     _NCCL_AVAILABLE = False
 
+try:
+    from. import ProcessGroupGloo
+except ImportError:
+    _GLOO_AVAILABLE = False
+
 
 class Backend(object):
     """
-    An enum-like class of available backends: GLOO, NCCL, and MPI.
+    An enum-like class of available backends: GLOO, NCCL, MPI, and other registered
+    backends.
 
     The values of this class are lowercase strings, e.g., ``"gloo"``. They can
     be accessed as attributes, e.g., ``Backend.NCCL``.
@@ -59,7 +77,28 @@ class Backend(object):
                              "on CPU tensors.")
         elif value == Backend.UNDEFINED:
             raise ValueError("Invalid backend: '{}'".format(name))
+        elif value != Backend.GLOO and value != Backend.NCCL and value != Backend.MPI:
+            value = name
         return value
+
+    @classmethod
+    def register_backend(cls, name, func):
+        """
+        Registers a new backend.
+
+        This class method is used by 3rd party cpp extension to register new backend.
+
+        Arguments:
+            name (str): Backend name matching with the one in `init_process_group()`.
+            func (function): Function handler that instantiates the backend.
+                             The function should be implemented in the backend cpp extension
+                             and takes four arguments, including prefix_store, rank,
+                             world_size, and timeout.
+
+        .. note:: This support of 3rd party backend is experimental and subject to change.
+
+        """ 
+        setattr(Backend, name.upper(), func)
 
 # `_backend`, `dist_backend`, and `reduce_op` are here to maintain backward
 # compatibility with pre-c10d distributed package.
@@ -102,8 +141,7 @@ class GroupMember(object):
 
 # Cached process groups
 # For NCCL and GLOO pg, it is a map from ProcessGroup to (Backend, Store)
-# For MPI pg, it is a map from ProcessGroup to (Backend, Bool), where bool
-# represents if the ProcessGroup objects is part of the group
+# For MPI pg, it is a map from ProcessGroup to (Backend, None)
 _pg_map = {}
 # Process group's names, map from ProcessGroup to str
 _pg_names = {}
@@ -114,12 +152,6 @@ _pg_group_ranks = {}
 _default_pg = None
 _default_pg_init_method = None
 
-# Default process group wide timeout, if applicable.
-# This currently only applies to the gloo backend. To make an attempt at
-# backwards compatibility with THD, we use an extraordinarily high default
-# timeout, given that THD did not have timeouts.
-_default_pg_timeout = timedelta(minutes=30)
-
 # Process group count for default naming
 _group_count = 0
 
@@ -129,15 +161,9 @@ def _rank_not_in_group(group):
     Helper that checks if the current process's rank is not in a given group
 
     """
-    default_backend, _ = _pg_map[_get_default_group()]
-    if default_backend != Backend.MPI:
-        return group == GroupMember.NON_GROUP_MEMBER
-    else:
-        if group == GroupMember.WORLD:
-            return False
-        else:
-            _, in_group = _pg_map[group]
-            return not in_group
+    if group == GroupMember.WORLD:
+        return False
+    return group == GroupMember.NON_GROUP_MEMBER
 
 
 def _get_group_rank(group, rank):
@@ -176,7 +202,7 @@ def _get_global_rank(group, group_rank):
 
 def _check_default_pg():
     """
-    Helper that checks if the default ProcessGroup has been initializd, with
+    Helper that checks if the default ProcessGroup has been initialized, with
     assertion
 
     """
@@ -199,35 +225,28 @@ def _get_group_size(group):
 
 def _check_single_tensor(param, param_name):
     """
-    Helper that check the parameter: param_name is a single Tensor
+    Helper to check that the parameter ``param_name`` is a single tensor.
 
     """
     if not isinstance(param, torch.Tensor):
-        raise RuntimeError("Invalid function argument. Expecting parameter: {} "
-                           "to be a torch.Tensor type".format(param_name))
+        raise RuntimeError("Invalid function argument. Expected parameter `{}` "
+                           "to be of type torch.Tensor.".format(param_name))
 
 
 def _check_tensor_list(param, param_name):
     """
-    Helper that check the parameter: param_name is a Tensor list
+    Helper to check that the parameter ``param_name`` is a list of tensors.
 
     """
-    wrong_type = False
-    if isinstance(param, list):
-        for p in param:
-            if not isinstance(p, torch.Tensor):
-                wrong_type = True
-                break
-    else:
-        wrong_type = True
-    if wrong_type:
-        raise RuntimeError("Invalid function argument. Expecting parameter: {} "
-                           "to be a List[torch.Tensor] type".format(param_name))
+    if not isinstance(param, list) or \
+       not all(isinstance(p, torch.Tensor) for p in param):
+        raise RuntimeError("Invalid function argument. Expected parameter `{}` "
+                           "to be of type List[torch.Tensor].".format(param_name))
 
 
 def is_mpi_available():
     """
-    Checks if MPI is available
+    Checks if the MPI backend is available.
 
     """
     return _MPI_AVAILABLE
@@ -235,10 +254,18 @@ def is_mpi_available():
 
 def is_nccl_available():
     """
-    Checks if NCCL is available
+    Checks if the NCCL backend is available.
 
     """
     return _NCCL_AVAILABLE
+
+
+def is_gloo_available():
+    """
+    Checks if the Gloo backend is available.
+
+    """
+    return _GLOO_AVAILABLE
 
 
 def is_initialized():
@@ -258,6 +285,18 @@ def _get_default_group():
         raise RuntimeError("Default process group has not been initialized, "
                            "please make sure to call init_process_group.")
     return _default_pg
+
+
+def _get_default_store():
+    """
+    Getting the default store created by init_process_group
+
+    """
+    if not is_initialized():
+        raise RuntimeError("Default process group has not been initialized, "
+                           "please make sure to call init_process_group.")
+    _, default_store = _pg_map[_default_pg]
+    return default_store
 
 
 def get_backend(group=group.WORLD):
@@ -285,37 +324,57 @@ def get_backend(group=group.WORLD):
 
 
 def init_process_group(backend,
-                       init_method="env://",
-                       timeout=_default_pg_timeout,
-                       **kwargs):
+                       init_method=None,
+                       timeout=default_pg_timeout,
+                       world_size=-1,
+                       rank=-1,
+                       store=None,
+                       group_name=''):
     """
     Initializes the default distributed process group, and this will also
-    initialize the distributed package
+    initialize the distributed package.
+
+    There are 2 main ways to initialize a process group:
+        1. Specify ``store``, ``rank``, and ``world_size`` explicitly.
+        2. Specify ``init_method`` (a URL string) which indicates where/how
+           to discover peers. Optionally specify ``rank`` and ``world_size``,
+           or encode all required parameters in the URL and omit them.
+
+    If neither is specified, ``init_method`` is assumed to be "env://".
+
 
     Arguments:
         backend (str or Backend): The backend to use. Depending on
             build-time configurations, valid values include ``mpi``, ``gloo``,
             and ``nccl``. This field should be given as a lowercase string
             (e.g., ``"gloo"``), which can also be accessed via
-            :class:`Backend` attributes (e.g., ``Backend.GLOO``).
+            :class:`Backend` attributes (e.g., ``Backend.GLOO``). If using
+            multiple processes per machine with ``nccl`` backend, each process
+            must have exclusive access to every GPU it uses, as sharing GPUs
+            between processes can result in deadlocks.
         init_method (str, optional): URL specifying how to initialize the
-                                     process group.
+                                     process group. Default is "env://" if no
+                                     ``init_method`` or ``store`` is specified.
+                                     Mutually exclusive with ``store``.
         world_size (int, optional): Number of processes participating in
-                                    the job.
+                                    the job. Required if ``store`` is specified.
         rank (int, optional): Rank of the current process.
-        store(Store, optional): Rendevous key/value store as an alternative
-                                to other init methods.
+                              Required if ``store`` is specified.
+        store(Store, optional): Key/value store accessible to all workers, used
+                                to exchange connection/address information.
+                                Mutually exclusive with ``init_method``.
         timeout (timedelta, optional): Timeout for operations executed against
             the process group. Default value equals 30 minutes.
-            This is only applicable for the ``gloo`` backend.
+            This is applicable for the ``gloo`` backend. For ``nccl``, this is
+            applicable only if the environment variable ``NCCL_BLOCKING_WAIT``
+            is set to 1.
         group_name (str, optional, deprecated): Group name.
 
-    To enable ``backend == Backend.MPI``, PyTorch needs to built from source
-    on a system that supports MPI. The same applies to NCCL as well.
+    To enable ``backend == Backend.MPI``, PyTorch needs to be built from source
+    on a system that supports MPI.
 
     """
-    global _pg_map
-    global _pg_names
+    global _pg_group_ranks
     global _backend
     global _default_pg
     global _default_pg_init_method
@@ -328,53 +387,51 @@ def init_process_group(backend,
         raise RuntimeError("trying to initialize the default process group "
                            "twice!")
 
-    world_size = kwargs.pop('world_size', -1)
-    group_name = kwargs.pop('group_name', '')
-    rank = kwargs.pop('rank', -1)
-    store = kwargs.pop('store', None)
+    assert (store is None) or (init_method is None), \
+        "Cannot specify both init_method and store."
+
     if store is not None:
-        assert world_size > 0, 'world_size needs to be positive'
-        assert rank >= 0, 'rank needs to be non-negative'
-    assert len(kwargs) == 0, \
-        "got unexpected keyword arguments: %s" % ",".join(kwargs.keys())
+        assert world_size > 0, 'world_size must be positive if using store'
+        assert rank >= 0, 'rank must be non-negative if using store'
+    elif init_method is None:
+        init_method = "env://"
 
     backend = Backend(backend)
 
     if backend == Backend.MPI:
-        if not is_mpi_available():
-            raise RuntimeError("Distributed package doesn't have MPI built in")
+        if world_size != -1 or rank != -1:
+            warnings.warn(
+                "For MPI backend, world_size ({}) and rank ({}) "
+                "are ignored since they are assigned by the "
+                "MPI runtime.".format(world_size, rank))
 
-        _default_pg = ProcessGroupMPI([])
-        _pg_map[_default_pg] = (Backend.MPI, True)
-        _pg_names[_default_pg] = group_name
+        _default_pg = _new_process_group_helper(
+            -1,
+            -1,
+            [],
+            Backend.MPI,
+            None,
+            group_name=group_name,
+            timeout=timeout)
     else:
         # backward compatible API
-        url = init_method
-        if world_size != -1 and rank != -1:
-            url += "?rank={}&world_size={}".format(rank, world_size)
-        elif rank != -1:
-            url += "?rank={}".format(rank)
-        elif world_size != -1:
-            url += "?world_size={}".format(world_size)
-
         if store is None:
-            store, rank, world_size = next(rendezvous(url))
-        if backend == Backend.GLOO:
-            _default_pg = ProcessGroupGloo(
-                store,
-                rank,
-                world_size,
-                timeout=timeout)
-            _pg_map[_default_pg] = (Backend.GLOO, store)
-            _pg_names[_default_pg] = group_name
-        elif backend == Backend.NCCL:
-            if not is_nccl_available():
-                raise RuntimeError("Distributed package doesn't have NCCL "
-                                   "built in")
-            _default_pg = ProcessGroupNCCL(store, rank, world_size)
-            _pg_map[_default_pg] = (Backend.NCCL, store)
-            _pg_names[_default_pg] = group_name
+            rendezvous_iterator = rendezvous(
+                init_method, rank, world_size, timeout=timeout
+            )
+            store, rank, world_size = next(rendezvous_iterator)
+            store.set_timeout(timeout)
 
+        _default_pg = _new_process_group_helper(
+            world_size,
+            rank,
+            [],
+            backend,
+            store,
+            group_name=group_name,
+            timeout=timeout)
+
+    _pg_group_ranks[_default_pg] = {i: i for i in range(_default_pg.size())}
     _backend = _pg_map[_default_pg][0]
     _default_pg_init_method = init_method
 
@@ -382,13 +439,18 @@ def init_process_group(backend,
 def _new_process_group_helper(world_size,
                               rank,
                               group_ranks,
-                              in_group,
-                              group_name,
-                              timeout=_default_pg_timeout):
+                              backend,
+                              store,
+                              group_name=None,
+                              timeout=default_pg_timeout):
     """
-    Create a new distributed process group. And the new process group can be
-    used to perform collective operations.
+    Create a new distributed process group.
 
+    This function must be called by ALL processes in the global group, even if
+    the calling process is not part of the newly created group. In that case,
+    this function returns GroupMember.NON_GROUP_MEMBER.
+
+    This function is called with ``group_ranks == []`` for the default group.
     """
     global _pg_map
     global _group_count
@@ -406,35 +468,61 @@ def _new_process_group_helper(world_size,
         raise RuntimeError("Expected timeout argument to be of type"
                            "datetime.timedelta")
 
-    default_backend, default_store = _pg_map[_default_pg]
+    # The list of group ranks is empty if we're creating the default group.
+    is_default_group = (len(group_ranks) == 0)
 
-    if default_backend == Backend.MPI:
+    backend = Backend(backend)
+    if backend == Backend.MPI:
         if not is_mpi_available():
-            raise RuntimeError("Distributed package doesn't have MPI built in")
-        pg = ProcessGroupMPI(group_ranks)
-        _pg_map[pg] = (Backend.MPI, in_group)
+            raise RuntimeError(
+                "Distributed package doesn't have MPI built in."
+                " MPI is only included if you build PyTorch from"
+                " source on a host that has MPI installed.")
+        pg = ProcessGroupMPI.create(group_ranks)
+        if not pg:
+            return GroupMember.NON_GROUP_MEMBER
+        _pg_map[pg] = (Backend.MPI, None)
         _pg_names[pg] = group_name
     else:
-        # Create the prefix store
-        store = PrefixStore(group_name, default_store)
+        # If this is a subgroup (which means group_ranks is specified),
+        # we check if the current process is a member of the new group.
+        if not is_default_group:
+            global_rank = _default_pg.rank()
+            if global_rank not in group_ranks:
+                return GroupMember.NON_GROUP_MEMBER
 
-        if default_backend == Backend.GLOO:
+        # Use the group name as prefix in the default store, such that
+        # a single store can be reused by multiple groups.
+        prefix_store = PrefixStore(group_name, store)
+
+        if backend == Backend.GLOO:
             pg = ProcessGroupGloo(
-                store,
+                prefix_store,
                 rank,
                 world_size,
                 timeout=timeout)
             _pg_map[pg] = (Backend.GLOO, store)
             _pg_names[pg] = group_name
-        elif default_backend == Backend.NCCL:
+        elif backend == Backend.NCCL:
             if not is_nccl_available():
                 raise RuntimeError("Distributed package doesn't have NCCL "
                                    "built in")
-            pg = ProcessGroupNCCL(store, rank, world_size, group_name)
+            pg = ProcessGroupNCCL(
+                prefix_store,
+                rank,
+                world_size,
+                timeout)
             _pg_map[pg] = (Backend.NCCL, store)
             _pg_names[pg] = group_name
         else:
-            raise RuntimeError("Unsupported distributed backend by group")
+            pg = getattr(Backend, backend.upper())(
+                prefix_store,
+                rank,
+                world_size,
+                timeout)
+            _pg_map[pg] = (backend, store)
+            _pg_names[pg] = group_name
+
     return pg
 
 
@@ -453,16 +541,16 @@ def destroy_process_group(group=group.WORLD):
     global _pg_group_ranks
     global _default_pg
     global _default_pg_init_method
+    global _group_count
 
-    default_backend, _ = _pg_map[_get_default_group()]
-    if (default_backend != Backend.MPI and
-            group == GroupMember.NON_GROUP_MEMBER):
+    if group == GroupMember.NON_GROUP_MEMBER:
         return
 
     if group == GroupMember.WORLD:
         pg = _default_pg
     else:
         pg = group
+
     if _pg_map.get(pg, None) is None:
         raise RuntimeError("Invalid process group specified")
 
@@ -472,6 +560,16 @@ def destroy_process_group(group=group.WORLD):
         _pg_map.clear()
         _pg_names.clear()
         _pg_group_ranks.clear()
+
+        # when process group doesn't have an explicit name (only WORLD (default)
+        # process group can have an explicit name), we use global _group_counter
+        # to generate the name. We need to reset the counter on destruction to
+        # allow consistent value to be generated when we re-create process
+        # groups after some trainers recover from failure
+        #
+        # We only reset this when WORLD is being destroyed because if this
+        # process group is in good state, we aren't dealing with failures.
+        _group_count = 0
     else:
         del _pg_map[pg]
         del _pg_names[pg]
@@ -845,6 +943,57 @@ def all_reduce(tensor,
         work.wait()
 
 
+def all_reduce_coalesced(tensors,
+                         op=ReduceOp.SUM,
+                         group=group.WORLD,
+                         async_op=False):
+    """
+    WARNING: at this time individual shape checking is not implemented across nodes.
+    For example, if the rank 0 node passes [torch.rand(4), torch.rand(2)] and the
+    rank 1 node passes [torch.rand(2), torch.rand(2), torch.rand(2)], the allreduce
+    operation will proceed without complaint and return erroneous outputs. This lack
+    of shape checking results in significant performance improvements but users of this
+    function should take extra care to ensure that each node passes in tensors whose
+    shapes match across nodes.
+
+    Reduces each tensor in tensors (residing on the same device) across all machines
+    in such a way that all get the final result.
+
+    After the call each tensor in tensors is going to bitwise identical
+    in all processes.
+
+    Arguments:
+        tensors (List[Tensor]): Input and output of the collective. The function
+            operates in-place.
+        op (Optional[ReduceOp]): One of the values from
+            ``torch.distributed.ReduceOp`` enum. Specifies an operation used for
+            element-wise reductions.
+        group (Optional[ProcessGroup]): The process group to work on.
+        async_op (Optional[bool]): Whether this op should be an async op.
+
+    Returns:
+        Async work handle, if async_op is set to True.
+        None, if not async_op or if not part of the group.
+
+    """
+    _check_tensor_list(tensors, "tensor")
+    if _rank_not_in_group(group):
+        return
+
+    opts = AllreduceCoalescedOptions()
+    opts.reduceOp = op
+    if group == GroupMember.WORLD:
+        _check_default_pg()
+        work = _default_pg.allreduce_coalesced(tensors, opts)
+    else:
+        work = group.allreduce_coalesced(tensors, opts)
+
+    if async_op:
+        return work
+    else:
+        work.wait()
+
+
 def reduce_multigpu(tensor_list,
                     dst,
                     op=ReduceOp.SUM,
@@ -962,16 +1111,18 @@ def all_gather_multigpu(output_tensor_lists,
 
     Arguments:
         output_tensor_lists (List[List[Tensor]]): Output lists. It should
-            contain correctly-sized tensors on each GPU to be used for output of
-            the collective.
-            e.g. ``output_tensor_lists[i]`` contains the all_gather
-            result that resides on the GPU of ``input_tensor_list[i]``.
-            Note that each element of ``output_tensor_lists[i]`` has the size of
+            contain correctly-sized tensors on each GPU to be used for output
+            of the collective, e.g. ``output_tensor_lists[i]`` contains the
+            all_gather result that resides on the GPU of
+            ``input_tensor_list[i]``.
+
+            Note that each element of ``output_tensor_lists`` has the size of
             ``world_size * len(input_tensor_list)``, since the function all
             gathers the result from every single GPU in the group. To interpret
-            each element of ``output_tensor_list[i]``, note that
+            each element of ``output_tensor_lists[i]``, note that
             ``input_tensor_list[j]`` of rank k will be appear in
-            ``output_tensor_list[i][rank * world_size + j]``
+            ``output_tensor_lists[i][k * world_size + j]``
+
             Also note that ``len(output_tensor_lists)``, and the size of each
             element in ``output_tensor_lists`` (each element is a list,
             therefore ``len(output_tensor_lists[i])``) need to be the same
@@ -1040,10 +1191,77 @@ def all_gather(tensor_list,
     else:
         work.wait()
 
+def all_gather_coalesced(output_tensor_lists,
+                         input_tensor_list,
+                         group=group.WORLD,
+                         async_op=False):
+    """
+    Gathers input tensors from the whole group in a list in a coalesced manner.
+
+    Arguments:
+        output_tensor_lists (list[list[Tensor]]): Output list. It should contain
+            correctly-sized tensors to be used for output of the collective.
+        input_tensor_list (list[Tensor]): Tensors to be broadcast from
+            current process. At least one tensor has to be non empty.
+        group (ProcessGroup, optional): The process group to work on
+        async_op (bool, optional): Whether this op should be an async op.
+
+    Returns:
+        Async work handle, if async_op is set to True.
+        None, if not async_op or if not part of the group
+
+    Example:
+        we have 2 process groups, 2 ranks.
+        rank 0 passes:
+            input_tensor_list = [[[1, 1], [1, 1]], [2], [3, 3]]
+            output_tensor_lists =
+               [[[[-1, -1], [-1, -1]], [-1], [-1, -1]],
+                [[[-1, -1], [-1, -1]], [-1], [-1, -1]]]
+        rank 1 passes:
+            input_tensor_list = [[[3, 3], [3, 3]], [5], [1, 1]]
+            output_tensor_lists =
+               [[[[-1, -1], [-1, -1]], [-1], [-1, -1]],
+                [[[-1, -1], [-1, -1]], [-1], [-1, -1]]]
+        both rank 0 and 1 get:
+            output_tensor_lists =
+               [[[1, 1], [1, 1]], [2], [3, 3]],
+                [[3, 3], [3, 3]], [5], [1, 1]]].
+
+    WARNING: at this time individual shape checking is not implemented across nodes.
+    For example, if the rank 0 node passes [torch.rand(4), torch.rand(2)] and the
+    rank 1 node passes [torch.rand(2), torch.rand(2), torch.rand(2)], the
+    all_gather_coalesced operation will proceed without complaint and return
+    erroneous outputs. This lack of shape checking results in significant
+    performance improvements but users of this function should take extra care
+    to ensure that each node passes in tensors whose shapes match across nodes.
+    """
+    # We only check basic compatibility with C++ params here, C++ code will
+    # do shape and type checking.
+    if _rank_not_in_group(group):
+        return
+    _check_tensor_list(input_tensor_list, "tensor_list")
+    if not isinstance(output_tensor_lists, list):
+        raise RuntimeError("Invalid function argument: "
+                           "output_tensor_lists should be a list")
+    for output_tensor_list in output_tensor_lists:
+        _check_tensor_list(output_tensor_list, "output_tensor_lists")
+
+    if group == GroupMember.WORLD:
+        _check_default_pg()
+        work = _default_pg.allgather_coalesced(
+            output_tensor_lists, input_tensor_list)
+    else:
+        work = group.allgather_coalesced(output_tensor_lists, input_tensor_list)
+
+    if async_op:
+        return work
+    else:
+        work.wait()
+
 
 def gather(tensor,
-           gather_list,
-           dst,
+           gather_list=None,
+           dst=0,
            group=group.WORLD,
            async_op=False):
     """
@@ -1051,10 +1269,10 @@ def gather(tensor,
 
     Arguments:
         tensor (Tensor): Input tensor.
-        gather_list (list[Tensor]): List of appropriately-sized tensors to
-            use for received data. Required only in the receiving process.
-        dst (int): Destination rank. Required in all processes except the one
-            that is receiveing the data.
+        gather_list (list[Tensor], optional): List of appropriately-sized
+            tensors to use for gathered data (default is None, must be specified
+            on the destination rank)
+        dst (int, optional): Destination rank (default is 0)
         group (ProcessGroup, optional): The process group to work on
         async_op (bool, optional): Whether this op should be an async op
 
@@ -1064,21 +1282,27 @@ def gather(tensor,
 
     """
     _check_single_tensor(tensor, "tensor")
-    _check_tensor_list(gather_list, "gather_list")
+
+    # Parameter ``gather_list`` may be left unspecified on non-dst ranks.
+    if gather_list:
+        _check_tensor_list(gather_list, "gather_list")
+    else:
+        gather_list = []
+
     if _rank_not_in_group(group):
         return
 
     my_rank = get_rank()
     if dst == my_rank:
-        if gather_list is None:
-            raise RuntimeError("gather_list is a required argument in gather "
-                               "destination")
+        if not gather_list:
+            raise ValueError("Argument ``gather_list`` must be specified "
+                             "on destination rank.")
         input_tensors = [tensor]
         output_tensors = [gather_list]
     else:
         if gather_list:
-            raise RuntimeError("non-empty gather_list can be given only "
-                               "to gather destination")
+            raise ValueError("Argument ``gather_list`` must NOT be specified "
+                             "on non-destination ranks.")
         input_tensors = [tensor]
         output_tensors = []
 
@@ -1100,8 +1324,8 @@ def gather(tensor,
 
 
 def scatter(tensor,
-            scatter_list,
-            src,
+            scatter_list=None,
+            src=0,
             group=group.WORLD,
             async_op=False):
     """
@@ -1112,10 +1336,9 @@ def scatter(tensor,
 
     Arguments:
         tensor (Tensor): Output tensor.
-        scatter_list (list[Tensor]): List of tensors to scatter. Required only
-            in the process that is sending the data.
-        src (int): Source rank. Required in all processes except the one that
-            is sending the data.
+        scatter_list (list[Tensor]): List of tensors to scatter (default is
+            None, must be specified on the source rank)
+        src (int): Source rank (default is 0)
         group (ProcessGroup, optional): The process group to work on
         async_op (bool, optional): Whether this op should be an async op
 
@@ -1125,21 +1348,27 @@ def scatter(tensor,
 
     """
     _check_single_tensor(tensor, "tensor")
-    _check_tensor_list(scatter_list, "scatter_list")
+
+    # Parameter ``scatter_list`` may be left unspecified on non-src ranks.
+    if scatter_list:
+        _check_tensor_list(scatter_list, "scatter_list")
+    else:
+        scatter_list = []
+
     if _rank_not_in_group(group):
         return
 
     my_rank = get_rank()
     if src == my_rank:
-        if scatter_list is None:
-            raise RuntimeError("scatter_list is a required argument in "
-                               "scatter source")
+        if not scatter_list:
+            raise ValueError("Argument ``scatter_list`` must be specified "
+                             "on source rank.")
         input_tensors = [scatter_list]
         output_tensors = [tensor]
     else:
         if scatter_list:
-            raise RuntimeError("non-empty can be given only to scatter "
-                               "source")
+            raise ValueError("Argument ``scatter_list`` must NOT be specified "
+                             "on non-source ranks.")
         input_tensors = []
         output_tensors = [tensor]
 
@@ -1153,6 +1382,303 @@ def scatter(tensor,
         group_src_rank = _get_group_rank(group, src)
         opts.rootRank = group_src_rank
         work = group.scatter(output_tensors, input_tensors, opts)
+
+    if async_op:
+        return work
+    else:
+        work.wait()
+
+
+def reduce_scatter_multigpu(output_tensor_list,
+                            input_tensor_lists,
+                            op=ReduceOp.SUM,
+                            group=group.WORLD,
+                            async_op=False):
+    """
+    Reduce and scatter a list of tensors to the whole group.  Only nccl backend
+    is currently supported.
+
+    Each tensor in ``output_tensor_list`` should reside on a separate GPU, as
+    should each list of tensors in ``input_tensor_lists``.
+
+    Arguments:
+        output_tensor_list (List[Tensor]): Output tensors (on different GPUs)
+            to receive the result of the operation.
+
+            Note that ``len(output_tensor_list)`` needs to be the same for all
+            the distributed processes calling this function.
+
+        input_tensor_lists (List[List[Tensor]]): Input lists.  It should
+            contain correctly-sized tensors on each GPU to be used for input of
+            the collective, e.g. ``input_tensor_lists[i]`` contains the
+            reduce_scatter input that resides on the GPU of
+            ``output_tensor_list[i]``.
+
+            Note that each element of ``input_tensor_lists`` has the size of
+            ``world_size * len(output_tensor_list)``, since the function
+            scatters the result from every single GPU in the group.  To
+            interpret each element of ``input_tensor_lists[i]``, note that
+            ``output_tensor_list[j]`` of rank k receives the reduce-scattered
+            result from ``input_tensor_lists[i][k * world_size + j]``
+
+            Also note that ``len(input_tensor_lists)``, and the size of each
+            element in ``input_tensor_lists`` (each element is a list,
+            therefore ``len(input_tensor_lists[i])``) need to be the same for
+            all the distributed processes calling this function.
+
+        group (ProcessGroup, optional): The process group to work on.
+        async_op (bool, optional): Whether this op should be an async op.
+
+    Returns:
+        Async work handle, if async_op is set to True.
+        None, if not async_op or if not part of the group.
+
+    """
+    if _rank_not_in_group(group):
+        return
+
+    opts = ReduceScatterOptions()
+    opts.reduceOp = op
+
+    if group == GroupMember.WORLD:
+        _check_default_pg()
+        work = _default_pg.reduce_scatter(
+            output_tensor_list,
+            input_tensor_lists,
+            opts
+        )
+    else:
+        work = group.reduce_scatter(
+            output_tensor_list,
+            input_tensor_lists,
+            opts
+        )
+
+    if async_op:
+        return work
+    else:
+        work.wait()
+
+
+def reduce_scatter(output,
+                   input_list,
+                   op=ReduceOp.SUM,
+                   group=group.WORLD,
+                   async_op=False):
+    """
+    Reduces, then scatters a list of tensors to all processes in a group.
+
+    Arguments:
+        output (Tensor): Output tensor.
+        input_list (list[Tensor]): List of tensors to reduce and scatter.
+        group (ProcessGroup, optional): The process group to work on.
+        async_op (bool, optional): Whether this op should be an async op.
+
+    Returns:
+        Async work handle, if async_op is set to True.
+        None, if not async_op or if not part of the group.
+
+    """
+    _check_single_tensor(output, "output")
+    _check_tensor_list(input_list, "input_list")
+    if _rank_not_in_group(group):
+        return
+
+    opts = ReduceScatterOptions()
+    opts.reduceOp = op
+
+    if group == GroupMember.WORLD:
+        _check_default_pg()
+        work = _default_pg.reduce_scatter([output], [input_list], opts)
+    else:
+        work = group.reduce_scatter([output], [input_list], opts)
+
+    if async_op:
+        return work
+    else:
+        work.wait()
+
+
+def all_to_all_single(output,
+                      input,
+                      output_split_sizes=None,
+                      input_split_sizes=None,
+                      group=group.WORLD,
+                      async_op=False):
+    """
+    Each process splits input tensor and then scatters the split list
+    to all processes in a group. Then concatenate the received tensors from all
+    the processes in the group and return single output tensor.
+
+    Arguments:
+        output (Tensor): Gathered cancatenated output tensor.
+        input (Tensor): Input tensor to scatter.
+        output_split_sizes: (list[Int], optional): Output split sizes for dim 0
+            if specified None or empty, dim 0 of ``output`` tensor must divide
+            equally by ``world_size``.
+        input_split_sizes: (list[Int], optional): Input split sizes for dim 0
+            if specified None or empty, dim 0 of ``input`` tensor must divide
+            equally by ``world_size``.
+        group (ProcessGroup, optional): The process group to work on.
+        async_op (bool, optional): Whether this op should be an async op.
+
+    Returns:
+        Async work handle, if async_op is set to True.
+        None, if not async_op or if not part of the group.
+
+    .. warning::
+        `all_to_all_single` is experimental and subject to change.
+
+    Examples:
+        >>> input = torch.arange(4) + rank * 4
+        >>> input
+        tensor([0, 1, 2, 3])     # Rank 0
+        tensor([4, 5, 6, 7])     # Rank 1
+        tensor([8, 9, 10, 11])   # Rank 2
+        tensor([12, 13, 14, 15]) # Rank 3
+        >>> output = torch.empty([4], dtype=torch.int64)
+        >>> dist.all_to_all_single(output, input)
+        >>> output
+        tensor([0, 4, 8, 12])    # Rank 0
+        tensor([1, 5, 9, 13])    # Rank 1
+        tensor([2, 6, 10, 14])   # Rank 2
+        tensor([3, 7, 11, 15])   # Rank 3
+
+        >>> # Essentially, it is similar to following operation:
+        >>> scatter_list = list(input.chunk(world_size))
+        >>> gather_list  = list(output.chunk(world_size))
+        >>> for i in range(world_size):
+        >>>   dist.scatter(gather_list[i], scatter_list if i == rank else [], src = i)
+
+        >>> # Another example with uneven split
+        >>> input
+        tensor([0, 1, 2, 3, 4, 5])                                       # Rank 0
+        tensor([10, 11, 12, 13, 14, 15, 16, 17, 18])                     # Rank 1
+        tensor([20, 21, 22, 23, 24])                                     # Rank 2
+        tensor([30, 31, 32, 33, 34, 35, 36])                             # Rank 3
+        >>> input_splits
+        [2, 2, 1, 1]                                                     # Rank 0
+        [3, 2, 2, 2]                                                     # Rank 1
+        [2, 1, 1, 1]                                                     # Rank 2
+        [2, 2, 2, 1]                                                     # Rank 3
+        >>> output_splits
+        [2, 3, 2, 2]                                                     # Rank 0
+        [2, 2, 1, 2]                                                     # Rank 1
+        [1, 2, 1, 2]                                                     # Rank 2
+        [1, 2, 1, 1]                                                     # Rank 3
+        >>> output = ...
+        >>> dist.all_to_all_single(output, input, output_splits, input_splits)
+        >>> output
+        tensor([ 0,  1, 10, 11, 12, 20, 21, 30, 31])                     # Rank 0
+        tensor([ 2,  3, 13, 14, 22, 32, 33])                             # Rank 1
+        tensor([ 4, 15, 16, 23, 34, 35])                                 # Rank 2
+        tensor([ 5, 17, 18, 24, 36])                                     # Rank 3
+    """
+    if _rank_not_in_group(group):
+        return
+
+    opts = AllToAllOptions()
+    _check_single_tensor(output, "output")
+    _check_single_tensor(input, "input")
+    output_split_sizes = [] if output_split_sizes is None else output_split_sizes
+    input_split_sizes = [] if input_split_sizes is None else input_split_sizes
+
+    if group == GroupMember.WORLD:
+        _check_default_pg()
+        work = _default_pg.alltoall_base(output, input, output_split_sizes, input_split_sizes, opts)
+    else:
+        work = group.alltoall_base(output, input, output_split_sizes, input_split_sizes, opts)
+
+    if async_op:
+        return work
+    else:
+        work.wait()
+
+def all_to_all(output_tensor_list,
+               input_tensor_list,
+               group=group.WORLD,
+               async_op=False):
+    """
+    Each process scatters list of input tensors to all processes in a group and
+    return gathered list of tensors in output list.
+
+    Arguments:
+        output_tensor_list (list[Tensor]): List of tensors to be gathered one 
+            per rank.
+        input_tensor_list (list[Tensor]): List of tensors to scatter one per rank.
+        group (ProcessGroup, optional): The process group to work on.
+        async_op (bool, optional): Whether this op should be an async op.
+
+    Returns:
+        Async work handle, if async_op is set to True.
+        None, if not async_op or if not part of the group.
+
+    .. warning::
+        `all_to_all` is experimental and subject to change.
+
+    Examples:
+        >>> input = torch.arange(4) + rank * 4
+        >>> input = list(input.chunk(4))
+        >>> input
+        [tensor([0]), tensor([1]), tensor([2]), tensor([3])]     # Rank 0
+        [tensor([4]), tensor([5]), tensor([6]), tensor([7])]     # Rank 1
+        [tensor([8]), tensor([9]), tensor([10]), tensor([11])]   # Rank 2
+        [tensor([12]), tensor([13]), tensor([14]), tensor([15])] # Rank 3
+        >>> output = list(torch.empty([4], dtype=torch.int64).chunk(4))
+        >>> dist.all_to_all(output, input)
+        >>> output
+        [tensor([0]), tensor([4]), tensor([8]), tensor([12])]    # Rank 0
+        [tensor([1]), tensor([5]), tensor([9]), tensor([13])]    # Rank 1
+        [tensor([2]), tensor([6]), tensor([10]), tensor([14])]   # Rank 2
+        [tensor([3]), tensor([7]), tensor([11]), tensor([15])]   # Rank 3
+
+        >>> # Essentially, it is similar to following operation:
+        >>> scatter_list = input
+        >>> gather_list  = output
+        >>> for i in range(world_size):
+        >>>   dist.scatter(gather_list[i], scatter_list if i == rank else [], src = i)
+
+        >>> input
+        tensor([0, 1, 2, 3, 4, 5])                                       # Rank 0
+        tensor([10, 11, 12, 13, 14, 15, 16, 17, 18])                     # Rank 1
+        tensor([20, 21, 22, 23, 24])                                     # Rank 2
+        tensor([30, 31, 32, 33, 34, 35, 36])                             # Rank 3
+        >>> input_splits
+        [2, 2, 1, 1]                                                     # Rank 0
+        [3, 2, 2, 2]                                                     # Rank 1
+        [2, 1, 1, 1]                                                     # Rank 2
+        [2, 2, 2, 1]                                                     # Rank 3
+        >>> output_splits
+        [2, 3, 2, 2]                                                     # Rank 0
+        [2, 2, 1, 2]                                                     # Rank 1
+        [1, 2, 1, 2]                                                     # Rank 2
+        [1, 2, 1, 1]                                                     # Rank 3
+        >>> input = list(input.split(input_splits))
+        >>> input
+        [tensor([0, 1]), tensor([2, 3]), tensor([4]), tensor([5])]                   # Rank 0
+        [tensor([10, 11, 12]), tensor([13, 14]), tensor([15, 16]), tensor([17, 18])] # Rank 1
+        [tensor([20, 21]), tensor([22]), tensor([23]), tensor([24])]                 # Rank 2
+        [tensor([30, 31]), tensor([32, 33]), tensor([34, 35]), tensor([36])]         # Rank 3
+        >>> output = ...
+        >>> dist.all_to_all(output, input)
+        >>> output
+        [tensor([0, 1]), tensor([10, 11, 12]), tensor([20, 21]), tensor([30, 31])]   # Rank 0
+        [tensor([2, 3]), tensor([13, 14]), tensor([22]), tensor([32, 33])]           # Rank 1
+        [tensor([4]), tensor([15, 16]), tensor([23]), tensor([34, 35])]              # Rank 2
+        [tensor([5]), tensor([17, 18]), tensor([24]), tensor([36])]                  # Rank 3
+    """
+    if _rank_not_in_group(group):
+        return
+
+    opts = AllToAllOptions()
+    _check_tensor_list(output_tensor_list, "output_tensor_list")
+    _check_tensor_list(input_tensor_list, "input_tensor_list")
+
+    if group == GroupMember.WORLD:
+        _check_default_pg()
+        work = _default_pg.alltoall(output_tensor_list, input_tensor_list, opts)
+    else:
+        work = group.alltoall(output_tensor_list, input_tensor_list, opts)
 
     if async_op:
         return work
@@ -1191,7 +1717,7 @@ def barrier(group=group.WORLD,
         work.wait()
 
 
-def new_group(ranks=None, timeout=_default_pg_timeout):
+def new_group(ranks=None, timeout=default_pg_timeout, backend=None):
     """
     Creates a new distributed group.
 
@@ -1205,6 +1731,12 @@ def new_group(ranks=None, timeout=_default_pg_timeout):
         timeout (timedelta, optional): Timeout for operations executed against
             the process group. Default value equals 30 minutes.
             This is only applicable for the ``gloo`` backend.
+        backend (str or Backend, optional): The backend to use. Depending on
+            build-time configurations, valid values are ``gloo`` and ``nccl``.
+            By default uses the same backend as the global group. This field
+            should be given as a lowercase string (e.g., ``"gloo"``), which can
+            also be accessed via :class:`Backend` attributes (e.g.,
+            ``Backend.GLOO``).
 
     Returns:
         A handle of distributed group that can be given to collective calls.
@@ -1213,23 +1745,19 @@ def new_group(ranks=None, timeout=_default_pg_timeout):
     _check_default_pg()
 
     global _pg_group_ranks
-    global _group_count
-    global _pg_names
 
-    group_name = str(_group_count)
-    _group_count += 1
-
-    if group_name in _pg_names.values():
-        raise RuntimeError("The specified group name has already been "
-                           "created, please use a different group name")
-
-    default_backend, _ = _pg_map[_default_pg]
+    default_backend, default_store = _pg_map[_default_pg]
     global_rank = _default_pg.rank()
     global_world_size = _default_pg.size()
 
+    # Default to the same backend as the global process group
+    # if the backend is not specified.
+    if not backend:
+        backend = default_backend
+
     # checks the input ranks
     if ranks is not None:
-        input_ranks = list(ranks)
+        ranks = sorted(ranks)
         group_world_size = len(ranks)
         if group_world_size > global_world_size:
             raise RuntimeError("the new group's world size should be less or "
@@ -1245,38 +1773,22 @@ def new_group(ranks=None, timeout=_default_pg_timeout):
         else:
             group_rank = None
     else:
-        input_ranks = []
         ranks = list(range(global_world_size))
         group_world_size = global_world_size
         group_rank = global_rank
 
-    if default_backend == Backend.MPI:
-        in_group = global_rank in ranks
-        pg = _new_process_group_helper(group_world_size,
-                                       group_rank,
-                                       input_ranks,
-                                       in_group,
-                                       group_name,
-                                       timeout=timeout)
-    else:
-        # Release ranks not in the group
-        if global_rank not in ranks:
-            return GroupMember.NON_GROUP_MEMBER
-
-        if default_backend != Backend.MPI:
-            pg = _new_process_group_helper(group_world_size,
-                                           group_rank,
-                                           input_ranks,
-                                           True,
-                                           group_name,
-                                           timeout=timeout)
+    backend = Backend(backend)
+    pg = _new_process_group_helper(group_world_size,
+                                   group_rank,
+                                   ranks,
+                                   backend,
+                                   default_store,
+                                   timeout=timeout)
 
     # Create the global rank to group rank mapping
-    _pg_group_ranks[pg] = {}
-    if default_backend == Backend.MPI:
-        _pg_group_ranks[pg] = pg.group_ranks()
-    else:
-        for rank in range(global_world_size):
-            if rank in ranks:
-                _pg_group_ranks[pg][rank] = ranks.index(rank)
+    _pg_group_ranks[pg] = {
+        global_rank: group_rank
+        for group_rank, global_rank in enumerate(ranks)
+    }
+
     return pg

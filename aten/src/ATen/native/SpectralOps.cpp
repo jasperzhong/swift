@@ -1,6 +1,8 @@
 // define constants like M_PI and C keywords for MSVC
 #ifdef _MSC_VER
+#ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
+#endif
 #include <math.h>
 #endif
 
@@ -24,12 +26,12 @@ static inline Tensor _fft(const Tensor &self, const int64_t signal_ndim,
            const bool inverse, IntArrayRef signal_sizes, const bool normalized,
            const bool onesided) {
 
-  AT_CHECK(signal_ndim >= 1 && signal_ndim <= 3,
+  TORCH_CHECK(signal_ndim >= 1 && signal_ndim <= 3,
            "Expected signal_ndim to be 1, 2, or 3, but got signal_ndim=",
            signal_ndim);
-  AT_CHECK(at::isFloatingType(self.scalar_type()),
+  TORCH_CHECK(at::isFloatingType(self.scalar_type()),
            "Expected an input tensor of floating types, but got input=",
-           self.type(), self.sizes());
+           self.toString(), self.sizes());
 
   auto signal_tensor_ndim = signal_ndim + static_cast<int64_t>(complex_input);  // add complex dim
   if (self.dim() < signal_tensor_ndim) {
@@ -39,7 +41,7 @@ static inline Tensor _fft(const Tensor &self, const int64_t signal_ndim,
     if (complex_input) {
       ss << " (complex input adds an extra dimension)";
     }
-    ss << ", but got input=" << self.type() << self.sizes();
+    ss << ", but got input=" << self.toString() << self.sizes();
     AT_ERROR(ss.str());
   }
 
@@ -62,14 +64,14 @@ static inline Tensor _fft(const Tensor &self, const int64_t signal_ndim,
   // now we assume that input is batched as [ B x signal_dims... ]
 
   if (complex_input) {
-    AT_CHECK(input.size(signal_ndim + 1) == 2,
+    TORCH_CHECK(input.size(signal_ndim + 1) == 2,
              "Expected an input tensor with a last dimension of size 2 "
              "representing real + imaginary components, but got input ",
-             self.type(), self.sizes());
+             self.toString(), self.sizes());
   }
 
   // build signal_sizes and output_size
-  AT_CHECK(signal_sizes.size() == 0 || static_cast<int64_t>(signal_sizes.size()) == signal_ndim,
+  TORCH_CHECK(signal_sizes.size() == 0 || static_cast<int64_t>(signal_sizes.size()) == signal_ndim,
            "Expected signal_sizes to be empty (default) or of signal_ndim=",
            signal_ndim, "D, but got signal_sizes=", signal_sizes);
   std::vector<int64_t> output_sizes(signal_ndim + 1 + static_cast<int64_t>(complex_output));
@@ -98,10 +100,10 @@ static inline Tensor _fft(const Tensor &self, const int64_t signal_ndim,
         output_sizes[i + 1] = input_size;
       }
       checked_signal_sizes[i] = input_size;
-      AT_CHECK(signal_sizes.size() == 0 || signal_sizes[i] == checked_signal_sizes[i],
+      TORCH_CHECK(signal_sizes.size() == 0 || signal_sizes[i] == checked_signal_sizes[i],
                "Expected given signal_sizes=", signal_sizes," to have same "
                "shape with input at signal dimension ", i, ", but got "
-               "signal_sizes=", signal_sizes, " and input=", self.type(),
+               "signal_sizes=", signal_sizes, " and input=", self.toString(),
                self.sizes());
     }
   }
@@ -130,20 +132,20 @@ static inline Tensor _fft(const Tensor &self, const int64_t signal_ndim,
 
 // We call the following methods via CUDA hooks because they are really only
 // valid when CUDA is available. See native/cuda/CuFFTPlanCache.h for more details.
-int64_t _cufft_get_plan_cache_max_size() {
-  return detail::getCUDAHooks().cuFFTGetPlanCacheMaxSize();
+int64_t _cufft_get_plan_cache_max_size(int64_t device_index) {
+  return detail::getCUDAHooks().cuFFTGetPlanCacheMaxSize(device_index);
 }
 
-void _cufft_set_plan_cache_max_size(int64_t max_size) {
-  detail::getCUDAHooks().cuFFTSetPlanCacheMaxSize(max_size);
+void _cufft_set_plan_cache_max_size(int64_t device_index, int64_t max_size) {
+  detail::getCUDAHooks().cuFFTSetPlanCacheMaxSize(device_index, max_size);
 }
 
-int64_t _cufft_get_plan_cache_size() {
-  return detail::getCUDAHooks().cuFFTGetPlanCacheSize();
+int64_t _cufft_get_plan_cache_size(int64_t device_index) {
+  return detail::getCUDAHooks().cuFFTGetPlanCacheSize(device_index);
 }
 
-void _cufft_clear_plan_cache() {
-  detail::getCUDAHooks().cuFFTClearPlanCache();
+void _cufft_clear_plan_cache(int64_t device_index) {
+  detail::getCUDAHooks().cuFFTClearPlanCache(device_index);
 }
 
 Tensor fft(const Tensor& self, const int64_t signal_ndim, const bool normalized) {
@@ -177,11 +179,11 @@ Tensor stft(const Tensor& self, const int64_t n_fft, const optional<int64_t> hop
             const optional<int64_t> win_lengthOpt, const Tensor& window,
             const bool normalized, const bool onesided) {
   #define REPR(SS) \
-    SS << "stft(" << self.type() << self.sizes() << ", n_fft=" << n_fft \
+    SS << "stft(" << self.toString() << self.sizes() << ", n_fft=" << n_fft \
        << ", hop_length=" << hop_length << ", win_length=" << win_length \
        << ", window="; \
     if (window.defined()) { \
-      SS << window.type() << "{" << window.sizes() << "}"; \
+      SS << window.toString() << "{" << window.sizes() << "}"; \
     } else { \
       SS << "None"; \
     } \
@@ -253,6 +255,142 @@ Tensor stft(const Tensor& self, const int64_t n_fft, const optional<int64_t> hop
   } else {
     return out;
   }
+}
+
+Tensor istft(const Tensor& self, const int64_t n_fft, const optional<int64_t> hop_lengthOpt,
+             const optional<int64_t> win_lengthOpt, const Tensor& window,
+             const bool center, const bool normalized, const bool onesided,
+             const optional<int64_t> lengthOpt) {
+  #define REPR(SS) \
+    SS << "istft(" << self.toString() << self.sizes() << ", n_fft=" << n_fft \
+       << ", hop_length=" << hop_length << ", win_length=" << win_length \
+       << ", window="; \
+    if (window.defined()) { \
+      SS << window.toString() << "{" << window.sizes() << "}"; \
+    } else { \
+      SS << "None"; \
+    } \
+    SS << ", center=" << center << ", normalized=" << normalized << ", onesided=" << onesided << ", length="; \
+    if (lengthOpt.has_value()) { \
+      SS << lengthOpt.value(); \
+    } else { \
+      SS << "None"; \
+    } \
+    SS << ")"
+
+  // default_init hop_length and win_length
+  const auto hop_length = hop_lengthOpt.value_or(n_fft >> 2);
+  const auto win_length = win_lengthOpt.value_or(n_fft);
+
+  const auto input_dim = self.dim();
+  const auto n_frames = self.size(-2);
+  const auto fft_size = self.size(-3);
+
+  const auto expected_output_signal_len = n_fft + hop_length * (n_frames - 1);
+
+  const auto options = at::device(self.device()).dtype(self.dtype());
+  if (self.numel() == 0) {
+    std::ostringstream ss;
+    REPR(ss) << ": input tensor cannot be empty.";
+    AT_ERROR(ss.str());
+  }
+  if (input_dim != 3 && input_dim != 4) {
+    std::ostringstream ss;
+    REPR(ss) << ": expected a tensor with 3 or 4 dimensions, but got " << input_dim;
+    AT_ERROR(ss.str());
+  }
+ if (self.size(-1) != 2) {
+    std::ostringstream ss;
+    REPR(ss) << ": expected the last dimension to be 2 (corresponding to real and imaginary parts), but got " << self.size(-1);
+    AT_ERROR(ss.str());
+  }
+
+  if (onesided) {
+    if (n_fft / 2 + 1 != fft_size) {
+      std::ostringstream ss;
+      REPR(ss) << ": expected the frequency dimension (3rd to the last) of the input tensor to match n_fft / 2 + 1 when onsided=True, but got " << fft_size;
+      AT_ERROR(ss.str());
+    }
+  } else {
+    if (n_fft != fft_size) {
+      std::ostringstream ss;
+      REPR(ss) << ": expected the frequency dimension (3rd to the last) of the input tensor to match n_fft when onsided=False, but got " << fft_size;
+      AT_ERROR(ss.str());
+    }
+  }
+
+  if (!(0 < hop_length && hop_length <= win_length)) {
+    std::ostringstream ss;
+    REPR(ss) << ": expected 0 < hop_length <= win_length";
+    AT_ERROR(ss.str());
+  }
+
+  if (!(0 < win_length && win_length <= n_fft)) {
+    std::ostringstream ss;
+    REPR(ss) << ": expected 0 < win_length <= n_fft";
+    AT_ERROR(ss.str());
+  }
+  if (window.defined()) {
+    if (window.dim() != 1 || window.size(0) != win_length) {
+      std::ostringstream ss;
+      REPR(ss) << ": Invalid window shape. window has to be 1D and length of `win_length`";
+      AT_ERROR(ss.str());
+    }
+  }
+
+  Tensor window_tmp = window.defined() ? window : at::ones({win_length,}, options);
+  if (win_length != n_fft) {
+    // center window by padding zeros on right and left side
+    int64_t left = (n_fft - win_length) / 2;
+    window_tmp = at::constant_pad_nd(window_tmp, {left, n_fft - win_length - left}, 0);
+    TORCH_INTERNAL_ASSERT(window_tmp.size(0) == n_fft);
+  }
+
+  Tensor input = self;
+  if (input_dim == 3) {
+    input = input.unsqueeze(0);
+  }
+
+  input = input.transpose(1, 2);  // size: (channel, n_frames, fft_size, 2)
+  input = at::native::irfft(input, 1, normalized, onesided, {n_fft, });  // size: (channel, n_frames, n_fft)
+  TORCH_INTERNAL_ASSERT(input.size(2) == n_fft);
+
+  Tensor y_tmp = input * window_tmp.view({1, 1, n_fft});  // size: (channel, n_frames, n_fft)
+  y_tmp = y_tmp.transpose(1, 2);  // size: (channel, n_fft, frame)
+
+  const Tensor eye = at::native::eye(n_fft, options).unsqueeze(1);
+  Tensor y = at::conv_transpose1d(y_tmp, eye,
+                                  /*bias*/ Tensor(),
+                                  /*stride*/ {hop_length,},
+                                  /*padding*/{0,});  // size: (channel, n_frames, n_fft)
+  window_tmp = window_tmp.pow(2).view({n_fft, 1}).repeat({1, n_frames}).unsqueeze(0);  // size: (1, n_fft, n_frames)
+  Tensor window_envelop = at::conv_transpose1d(window_tmp, eye,
+                                               /*bias*/ Tensor(),
+                                               /*stride*/ {hop_length, },
+                                               /*padding*/{0, });  // size: (1, 1, expected_output_signal_len)
+  TORCH_INTERNAL_ASSERT(expected_output_signal_len == y.size(2));
+  TORCH_INTERNAL_ASSERT(expected_output_signal_len == window_envelop.size(2));
+
+  // We need to trim the front padding away if centered
+  const auto start = center ? n_fft / 2 : 0;
+  const auto end = lengthOpt.has_value()? start + lengthOpt.value() : - n_fft / 2;
+
+  y = y.slice(2, start, end, 1);
+  window_envelop = window_envelop.slice(2, start, end, 1);
+  const auto window_envelop_lowest = window_envelop.abs().min().item().toDouble();
+  if (window_envelop_lowest < 1e-11) {
+    std::ostringstream ss;
+    REPR(ss) << "window overlap add min: " << window_envelop_lowest;
+    AT_ERROR(ss.str());
+  }
+
+  y = (y / window_envelop).squeeze(1);  // size: (channel, expected_output_signal_len)
+  if (input_dim == 3) {
+    y = y.squeeze(0);
+  }
+  return y;
+
+  #undef REPR
 }
 
 }} // at::native

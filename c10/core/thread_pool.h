@@ -14,14 +14,10 @@
 
 namespace c10 {
 
-namespace ivalue {
-struct Future;
-} // namespace ivalue
-
 // TODO: move this to C10 and make it C10_API
 class C10_API TaskThreadPoolBase {
  public:
-  virtual void run(const std::function<void()>& func) = 0;
+  virtual void run(std::function<void()> func) = 0;
 
   virtual size_t size() const = 0;
 
@@ -36,6 +32,14 @@ class C10_API TaskThreadPoolBase {
   virtual bool inThreadPool() const = 0;
 
   virtual ~TaskThreadPoolBase() noexcept {}
+
+  static size_t defaultNumThreads() {
+    auto num_threads = std::thread::hardware_concurrency();
+#if defined(_M_X64) || defined(__x86_64__)
+    num_threads /= 2;
+#endif
+    return num_threads;
+  }
 };
 
 class C10_API ThreadPool : public c10::TaskThreadPoolBase {
@@ -45,10 +49,10 @@ class C10_API ThreadPool : public c10::TaskThreadPoolBase {
     const std::function<void()> no_id;
     const std::function<void(std::size_t)> with_id;
 
-    explicit task_element_t(const std::function<void()>& f)
-        : run_with_id(false), no_id(f), with_id(nullptr) {}
-    explicit task_element_t(const std::function<void(std::size_t)>& f)
-        : run_with_id(true), no_id(nullptr), with_id(f) {}
+    explicit task_element_t(std::function<void()> f)
+      : run_with_id(false), no_id(std::move(f)), with_id(nullptr) {}
+    explicit task_element_t(std::function<void(std::size_t)> f)
+      : run_with_id(true), no_id(nullptr), with_id(std::move(f)) {}
   };
 
   std::queue<task_element_t> tasks_;
@@ -66,8 +70,9 @@ class C10_API ThreadPool : public c10::TaskThreadPoolBase {
   ThreadPool() = delete;
 
   explicit ThreadPool(
-      std::size_t pool_size,
-      int numa_node_id = -1);
+      int pool_size,
+      int numa_node_id = -1,
+      std::function<void()> init_thread = nullptr);
 
   ~ThreadPool();
 
@@ -77,7 +82,7 @@ class C10_API ThreadPool : public c10::TaskThreadPoolBase {
 
   bool inThreadPool() const override;
 
-  void run(const std::function<void()>& func) override;
+  void run(std::function<void()> func) override;
 
   template <typename Task>
   void runTaskWithID(Task task) {
@@ -85,8 +90,7 @@ class C10_API ThreadPool : public c10::TaskThreadPoolBase {
 
     // Set task and signal condition variable so that a worker thread will
     // wake up and use the task.
-    tasks_.push(
-        task_element_t(static_cast<std::function<void(std::size_t)>>(task)));
+    tasks_.emplace(static_cast<std::function<void(std::size_t)>>(task));
     complete_ = false;
     condition_.notify_one();
   }
@@ -94,30 +98,20 @@ class C10_API ThreadPool : public c10::TaskThreadPoolBase {
   /// @brief Wait for queue to be empty
   void waitWorkComplete();
 
- protected:
-  virtual void init_thread() {}
-
  private:
   // @brief Entry point for pool threads.
   void main_loop(std::size_t index);
 };
-
-C10_API void setNumThreads(size_t v);
-
-C10_API TaskThreadPoolBase& global_work_queue();
 
 class C10_API TaskThreadPool : public c10::ThreadPool {
  public:
   explicit TaskThreadPool(
       std::size_t pool_size,
       int numa_node_id = -1)
-      : ThreadPool(pool_size, numa_node_id) {}
-
-  // TODO move this to ATen/core/thread_pool.h
-  void init_thread() override {
-    setThreadName("CaffeTaskThread");
-    NUMABind(numa_node_id_);
-  }
+      : ThreadPool(pool_size, numa_node_id, [numa_node_id](){
+        setThreadName("CaffeTaskThread");
+        NUMABind(numa_node_id);
+      }) {}
 };
 
 C10_DECLARE_SHARED_REGISTRY(

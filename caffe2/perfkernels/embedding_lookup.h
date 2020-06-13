@@ -17,7 +17,7 @@ namespace caffe2 {
  * Behavior is roughly equivalent to pseudocode:
  *
  * pos = 0
- * for (i = 0..index_size-1)
+ * for (i = 0..output_size-1)
  *   for (k = 0..block_size-1)
  *     out[i*block_size + k] = 0
  *   for (j = 0..lengths[i]-1)
@@ -28,6 +28,9 @@ namespace caffe2 {
  *   if (normalize_weights && lengths[i] > 0)
  *     for (k = 0..block_size-1)
  *       out[i*block_size + k] /= lengths[i]
+ *
+ * TODO: make this API also take "offsets" rather than "lengths" to match the
+ *       API for PyTorch's EmbeddingBag
  */
 template <
     typename IndexType,

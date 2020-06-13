@@ -2,6 +2,7 @@
 
 namespace at {
 
+// NOTE: are_expandable did a similar check, please keep them sync if change is needed
 std::vector<int64_t> infer_size(IntArrayRef a, IntArrayRef b) {
   size_t dimsA = a.size();
   size_t dimsB = b.size();
@@ -16,7 +17,7 @@ std::vector<int64_t> infer_size(IntArrayRef a, IntArrayRef b) {
     int64_t sizeA = (dimA >= 0) ? a[dimA] : 1;
     int64_t sizeB = (dimB >= 0) ? b[dimB] : 1;
 
-    AT_CHECK(
+    TORCH_CHECK(
         sizeA == sizeB || sizeA == 1 || sizeB == 1,
         "The size of tensor a (", sizeA,
         ") must match the size of tensor b (", sizeB,
@@ -53,7 +54,7 @@ std::tuple<std::vector<int64_t>, std::vector<int64_t>> inferExpandGeometry(
                                 : expandedSizes[i + 1] * expandedStrides[i + 1];
     int64_t targetSize = sizes[i];
     if (targetSize == -1) {
-      AT_CHECK(
+      TORCH_CHECK(
           dim >= 0,
           "The expanded size of the tensor (",
           targetSize,
@@ -62,7 +63,7 @@ std::tuple<std::vector<int64_t>, std::vector<int64_t>> inferExpandGeometry(
       targetSize = size;
     }
     if (size != targetSize) {
-      AT_CHECK(
+      TORCH_CHECK(
           size == 1,
           "The expanded size of the tensor (",
           targetSize,

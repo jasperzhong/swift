@@ -3,7 +3,7 @@ from numbers import Number
 import torch
 from torch.distributions import constraints
 from torch.distributions.exp_family import ExponentialFamily
-from torch.distributions.utils import broadcast_all, lazy_property
+from torch.distributions.utils import broadcast_all
 
 
 def _standard_gamma(concentration):
@@ -63,6 +63,7 @@ class Gamma(ExponentialFamily):
         return value
 
     def log_prob(self, value):
+        value = torch.as_tensor(value, dtype=self.rate.dtype, device=self.rate.device)
         if self._validate_args:
             self._validate_sample(value)
         return (self.concentration * torch.log(self.rate) +

@@ -1,6 +1,8 @@
 #include <caffe2/ideep/ideep_utils.h>
 
-namespace caffe2 {
+using namespace caffe2;
+
+namespace {
 
 class IDEEPSpatialBNOp final : public IDEEPOperator {
  public:
@@ -35,8 +37,9 @@ class IDEEPSpatialBNOp final : public IDEEPOperator {
     if (is_test_) {
       const auto& est_mean = Input(EST_MEAN);
       const auto& est_var = Input(EST_VAR);
+      auto X_ = X.get_data_type() != idtype::f32 ? X.dequantize() : X;
       ideep::batch_normalization_forward_inference::compute(
-          X, est_mean, est_var, scale, bias, *Y, epsilon_);
+          X_, est_mean, est_var, scale, bias, *Y, epsilon_);
     } else {
       auto* saved_mean = Output(SAVED_MEAN);
       auto* saved_var = Output(SAVED_VAR);
@@ -99,4 +102,4 @@ class IDEEPSpatialBNGradientOp final : public IDEEPOperator {
 REGISTER_IDEEP_OPERATOR(SpatialBN, IDEEPSpatialBNOp);
 REGISTER_IDEEP_OPERATOR(SpatialBNGradient, IDEEPSpatialBNGradientOp)
 
-}  // namespace caffe2
+}  // namespace

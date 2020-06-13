@@ -1,10 +1,11 @@
-ir_version: 4
+ir_version: 6
 producer_name: "pytorch"
-producer_version: "1.1"
+producer_version: "XXX"
 graph {
   node {
-    input: "x"
+    input: "0"
     output: "1"
+    name: "ArgMax_0"
     op_type: "ArgMax"
     attribute {
       name: "axis"
@@ -19,7 +20,7 @@ graph {
   }
   name: "torch-jit-export"
   input {
-    name: "x"
+    name: "0"
     type {
       tensor_type {
         elem_type: 1

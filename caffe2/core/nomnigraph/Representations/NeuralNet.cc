@@ -62,12 +62,16 @@ void NNModule::replaceSubgraph(
   auto sg_outputs = nn::getOutputs(sg);
 
   auto sg_inputs_copy = sg_inputs;
+  auto sg_outputs_copy = sg_outputs;
+
   for (const auto& input : node_inputs) {
     sg_inputs_copy.erase(input);
+    // outputs may contain inputs that have additional
+    // consumers external to the subgraph
+    sg_outputs_copy.erase(input);
   }
   assert(sg_inputs_copy.size() == 0 && "Not all inputs were listed");
 
-  auto sg_outputs_copy = sg_outputs;
   for (const auto& output : node_outputs) {
     sg_outputs_copy.erase(output);
   }
@@ -309,21 +313,26 @@ void coalesceInsertedDataDependencies(repr::NNModule* m) {
   // Finally we reconcile any data dependency issues (if we can).
   for (auto& bbNode : m->controlFlow.getMutableNodes()) {
     auto bb = bbNode->mutableData();
-    std::unordered_set<repr::NNGraph::NodeRef> seen;
-    for (auto instr_iter = bb->getMutableInstructions()->begin();
-         instr_iter != bb->getMutableInstructions()->end();
-         ++instr_iter) {
-      // This cannot be auto& because *iter is pure R-ref
-      auto instr = *instr_iter;
-      for (auto& output : getOutputs(instr)) {
-        for (auto& consumer : getConsumers(output)) {
-          if (seen.count(consumer)) {
-            bb->moveInstructionBefore(instr, consumer);
+    int permutation;
+    do {
+      permutation = 0;
+      std::unordered_set<repr::NNGraph::NodeRef> seen;
+      for (auto instr_iter = bb->getMutableInstructions()->begin();
+           instr_iter != bb->getMutableInstructions()->end();
+           ++instr_iter) {
+        // This cannot be auto& because *iter is pure R-ref
+        auto instr = *instr_iter;
+        for (auto& output : getOutputs(instr)) {
+          for (auto& consumer : getConsumers(output)) {
+            if (seen.count(consumer)) {
+              bb->moveInstructionBefore(instr, consumer);
+              ++permutation;
+            }
           }
         }
+        seen.insert(instr);
       }
-      seen.insert(instr);
-    }
+    } while (permutation);
   }
 }
 

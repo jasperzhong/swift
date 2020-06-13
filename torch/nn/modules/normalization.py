@@ -2,13 +2,11 @@ import torch
 import numbers
 from torch.nn.parameter import Parameter
 from .module import Module
-from .batchnorm import _BatchNorm
+from ._functions import CrossMapLRN2d as _cross_map_lrn2d
 from .. import functional as F
 from .. import init
-from ..._jit_internal import weak_module, weak_script_method
 
 
-@weak_module
 class LocalResponseNorm(Module):
     r"""Applies local response normalization over an input signal composed
     of several input planes, where channels occupy the second dimension.
@@ -46,7 +44,6 @@ class LocalResponseNorm(Module):
         self.beta = beta
         self.k = k
 
-    @weak_script_method
     def forward(self, input):
         return F.local_response_norm(input, self.size, self.alpha, self.beta,
                                      self.k)
@@ -65,17 +62,16 @@ class CrossMapLRN2d(Module):
         self.k = k
 
     def forward(self, input):
-        return self._backend.CrossMapLRN2d(self.size, self.alpha, self.beta,
-                                           self.k)(input)
+        return _cross_map_lrn2d.apply(input, self.size, self.alpha, self.beta,
+                                      self.k)
 
     def extra_repr(self):
         return '{size}, alpha={alpha}, beta={beta}, k={k}'.format(**self.__dict__)
 
 
-@weak_module
 class LayerNorm(Module):
     r"""Applies Layer Normalization over a mini-batch of inputs as described in
-    the paper `Layer Normalization`_ .
+    the paper `Layer Normalization <https://arxiv.org/abs/1607.06450>`__
 
     .. math::
         y = \frac{x - \mathrm{E}[x]}{ \sqrt{\mathrm{Var}[x] + \epsilon}} * \gamma + \beta
@@ -127,16 +123,14 @@ class LayerNorm(Module):
         >>> m = nn.LayerNorm(10)
         >>> # Activating the module
         >>> output = m(input)
-
-    .. _`Layer Normalization`: https://arxiv.org/abs/1607.06450
     """
-    __constants__ = ['normalized_shape', 'weight', 'bias', 'eps']
+    __constants__ = ['normalized_shape', 'eps', 'elementwise_affine']
 
     def __init__(self, normalized_shape, eps=1e-5, elementwise_affine=True):
         super(LayerNorm, self).__init__()
         if isinstance(normalized_shape, numbers.Integral):
             normalized_shape = (normalized_shape,)
-        self.normalized_shape = torch.Size(normalized_shape)
+        self.normalized_shape = tuple(normalized_shape)
         self.eps = eps
         self.elementwise_affine = elementwise_affine
         if self.elementwise_affine:
@@ -152,7 +146,6 @@ class LayerNorm(Module):
             init.ones_(self.weight)
             init.zeros_(self.bias)
 
-    @weak_script_method
     def forward(self, input):
         return F.layer_norm(
             input, self.normalized_shape, self.weight, self.bias, self.eps)
@@ -162,10 +155,9 @@ class LayerNorm(Module):
             'elementwise_affine={elementwise_affine}'.format(**self.__dict__)
 
 
-@weak_module
 class GroupNorm(Module):
     r"""Applies Group Normalization over a mini-batch of inputs as described in
-    the paper `Group Normalization`_ .
+    the paper `Group Normalization <https://arxiv.org/abs/1803.08494>`__
 
     .. math::
         y = \frac{x - \mathrm{E}[x]}{ \sqrt{\mathrm{Var}[x] + \epsilon}} * \gamma + \beta
@@ -173,7 +165,7 @@ class GroupNorm(Module):
     The input channels are separated into :attr:`num_groups` groups, each containing
     ``num_channels / num_groups`` channels. The mean and standard-deviation are calculated
     separately over the each group. :math:`\gamma` and :math:`\beta` are learnable
-    per-channel affine transform parameter vectorss of size :attr:`num_channels` if
+    per-channel affine transform parameter vectors of size :attr:`num_channels` if
     :attr:`affine` is ``True``.
 
     This layer uses statistics computed from input data in both training and
@@ -202,11 +194,8 @@ class GroupNorm(Module):
         >>> m = nn.GroupNorm(1, 6)
         >>> # Activating the module
         >>> output = m(input)
-
-    .. _`Group Normalization`: https://arxiv.org/abs/1803.08494
     """
-    __constants__ = ['num_groups', 'num_channels', 'eps', 'affine', 'weight',
-                     'bias']
+    __constants__ = ['num_groups', 'num_channels', 'eps', 'affine']
 
     def __init__(self, num_groups, num_channels, eps=1e-5, affine=True):
         super(GroupNorm, self).__init__()
@@ -227,7 +216,6 @@ class GroupNorm(Module):
             init.ones_(self.weight)
             init.zeros_(self.bias)
 
-    @weak_script_method
     def forward(self, input):
         return F.group_norm(
             input, self.num_groups, self.weight, self.bias, self.eps)

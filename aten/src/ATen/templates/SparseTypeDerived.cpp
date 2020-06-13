@@ -13,9 +13,11 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/Utils.h>
 #include <ATen/WrapDimUtils.h>
+#include <ATen/Dispatch.h>
 #include <c10/util/Half.h>
 #include <c10/core/UndefinedTensorImpl.h>
 #include <c10/util/Optional.h>
+#include <torch/library.h>
 
 #include <cstddef>
 #include <functional>
@@ -25,28 +27,23 @@
 #include <ATen/Config.h>
 $extra_cuda_headers
 
+namespace {
+static const char* named_tensors_unsupported_error =
+  " is not yet supported with named tensors. Please drop names via "
+  "`tensor = tensor.rename(None)`, call the op with an unnamed tensor, "
+  "and set names on the result of the operation.";
+}
+
 namespace at {
 
-${Type}::${Type}()
-  : ${DenseBackend}TypeDefault(${Backend}TensorId(), /*is_variable=*/false, /*is_undefined=*/false) {}
-ScalarType ${Type}::scalarType() const {
-  return ScalarType::${ScalarName};
-}
-caffe2::TypeMeta ${Type}::typeMeta() const {
-  return caffe2::TypeMeta::Make<${ScalarType}>();
-}
-Backend ${Type}::backend() const {
-  return Backend::${Backend};
-}
-
-const char * ${Type}::toString() const {
-  return "${Type}";
-}
-
-TypeID ${Type}::ID() const {
-  return ${TypeID};
-}
+namespace ${Type} {
 
 ${type_derived_method_definitions}
 
+}  // namespace ${Type}
+
+TORCH_LIBRARY_IMPL(aten, ${Backend}, m) {
+  ${function_registrations};
 }
+
+} // namespace at

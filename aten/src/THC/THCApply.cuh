@@ -117,6 +117,9 @@ template <typename Op,
           typename Ta,
           typename IndexType,
           int ADims>
+#if defined __HIP_PLATFORM_HCC__
+C10_LAUNCH_BOUNDS_2(THC_APPLY_THREADS_PER_BLOCK, THC_APPLY_BLOCKS_PER_SM)
+#endif
 __global__ void
 kernelPointwiseApply1(const OffsetInfo<Ta, IndexType, ADims> a,
                       IndexType totalElements,
@@ -134,6 +137,9 @@ template <typename Op,
           typename Ta, typename Tb,
           typename IndexType,
           int ADims, int BDims>
+#if defined __HIP_PLATFORM_HCC__
+C10_LAUNCH_BOUNDS_2(THC_APPLY_THREADS_PER_BLOCK, THC_APPLY_BLOCKS_PER_SM)
+#endif
 __global__ void
 kernelPointwiseApply2(const OffsetInfo<Ta, IndexType, ADims> a,
                       const OffsetInfo<Tb, IndexType, BDims> b,
@@ -150,6 +156,9 @@ template <typename Op,
           typename Ta, typename Tb, typename Tc,
           typename IndexType,
           int ADims, int BDims, int CDims>
+#if defined __HIP_PLATFORM_HCC__
+C10_LAUNCH_BOUNDS_2(THC_APPLY_THREADS_PER_BLOCK, THC_APPLY_BLOCKS_PER_SM)
+#endif
 __global__ void
 kernelPointwiseApply3(const OffsetInfo<Ta, IndexType, ADims> a,
                       const OffsetInfo<Tb, IndexType, BDims> b,
@@ -237,7 +246,7 @@ bool THC_pointwiseApply1(THCState* state,
   kernelPointwiseApply1<Op,                                             \
                         ScalarTypeA,                                    \
                         TYPE, A>                                        \
-    <<<grid, block, 0, THCState_getCurrentStreamOnDevice(state, curDevice)>>>(             \
+    <<<grid, block, 0, c10::cuda::getCurrentCUDAStream(curDevice)>>>(   \
       OffsetInfo<ScalarTypeA, TYPE, A>  \
           (aInfo),                                                      \
       (TYPE) totalElements, op);
@@ -287,7 +296,7 @@ bool THC_pointwiseApply1(THCState* state,
       kernelPointwiseApply1<Op,
                             ScalarTypeA,
                             uint64_t, 1>
-        <<<grid, block, 0, THCState_getCurrentStream(state)>>>(
+        <<<grid, block, 0, c10::cuda::getCurrentCUDAStream()>>>(
           aOffset, (uint64_t) totalElements, op);
     } else {
 
@@ -299,7 +308,7 @@ bool THC_pointwiseApply1(THCState* state,
       kernelPointwiseApply1<Op,
                             ScalarTypeA,
                             uint64_t, -1>
-        <<<grid, block, 0, THCState_getCurrentStream(state)>>>(
+        <<<grid, block, 0, c10::cuda::getCurrentCUDAStream()>>>(
           aOffset, (uint64_t) totalElements, op);
     }
   }
@@ -387,7 +396,7 @@ bool THC_pointwiseApply2(THCState* state,
                         ScalarTypeA,                                    \
                         ScalarTypeB,                                    \
                         TYPE, A, B>                                     \
-    <<<grid, block, 0, THCState_getCurrentStreamOnDevice(state, curDevice)>>>(             \
+    <<<grid, block, 0, c10::cuda::getCurrentCUDAStream(curDevice)>>>(   \
       OffsetInfo<ScalarTypeA, TYPE, A>  \
           (aInfo),                                                      \
       OffsetInfo<ScalarTypeB, TYPE, B>                                  \
@@ -463,7 +472,7 @@ bool THC_pointwiseApply2(THCState* state,
                             ScalarTypeA,
                             ScalarTypeB,
                             uint64_t, 1, 1>
-        <<<grid, block, 0, THCState_getCurrentStream(state)>>>(
+        <<<grid, block, 0, c10::cuda::getCurrentCUDAStream()>>>(
           aOffset, bOffset, (uint64_t) totalElements, op);
     } else {
 #if CUDA_VERSION < 9000
@@ -477,7 +486,7 @@ bool THC_pointwiseApply2(THCState* state,
                             ScalarTypeA,
                             ScalarTypeB,
                             uint64_t, -1, -1>
-        <<<grid, block, 0, THCState_getCurrentStream(state)>>>(
+        <<<grid, block, 0, c10::cuda::getCurrentCUDAStream()>>>(
           aOffset, bOffset, (uint64_t) totalElements, op);
     }
   }
@@ -582,7 +591,7 @@ bool THC_pointwiseApply3(THCState* state,
                         ScalarTypeB,                                    \
                         ScalarTypeC,                                    \
                         TYPE, A, B, C>                                  \
-    <<<grid, block, 0, THCState_getCurrentStreamOnDevice(state, curDevice)>>>(             \
+    <<<grid, block, 0, c10::cuda::getCurrentCUDAStream(curDevice)>>>(   \
       OffsetInfo<ScalarTypeA, TYPE, A>                                  \
           (aInfo),                                                      \
       OffsetInfo<ScalarTypeB, TYPE, B>                                  \
@@ -686,7 +695,7 @@ bool THC_pointwiseApply3(THCState* state,
                             ScalarTypeB,
                             ScalarTypeC,
                             uint64_t, 1, 1, 1>
-        <<<grid, block, 0, THCState_getCurrentStream(state)>>>(
+        <<<grid, block, 0, c10::cuda::getCurrentCUDAStream()>>>(
           aOffset, bOffset, cOffset, (uint64_t) totalElements, op);
     } else {
 #if CUDA_VERSION < 9000
@@ -704,7 +713,7 @@ bool THC_pointwiseApply3(THCState* state,
                             ScalarTypeB,
                             ScalarTypeC,
                             uint64_t, -1, -1, -1>
-        <<<grid, block, 0, THCState_getCurrentStream(state)>>>(
+        <<<grid, block, 0, c10::cuda::getCurrentCUDAStream()>>>(
           aOffset, bOffset, cOffset, (uint64_t) totalElements, op);
     }
   }

@@ -7,10 +7,10 @@
 #include <limits>
 #include <sstream>
 
-#include "c10/macros/Macros.h"
-#include "c10/util/Exception.h"
-#include "c10/util/Flags.h"
-#include "c10/util/StringUtil.h"
+#include <c10/macros/Macros.h>
+#include <c10/util/Exception.h>
+#include <c10/util/Flags.h>
+#include <c10/util/StringUtil.h>
 
 // CAFFE2_LOG_THRESHOLD is a compile time flag that would allow us to turn off
 // logging at compile time so no logging message below that level is produced
@@ -23,9 +23,9 @@
 
 // Below are different implementations for glog and non-glog cases.
 #ifdef C10_USE_GLOG
-#include "c10/util/logging_is_google_glog.h"
+#include <c10/util/logging_is_google_glog.h>
 #else // !C10_USE_GLOG
-#include "c10/util/logging_is_not_google_glog.h"
+#include <c10/util/logging_is_not_google_glog.h>
 #endif // C10_USE_GLOG
 
 C10_DECLARE_int(caffe2_log_level);
@@ -40,6 +40,20 @@ C10_DECLARE_bool(caffe2_use_fatal_for_enforce);
 #define C10_LOG_EVERY_MS(severity, ms) LOG(severity)
 #endif
 
+// Same for LOG_FIRST_N
+#ifdef LOG_FIRST_N
+#define C10_LOG_FIRST_N(severity, n) LOG_FIRST_N(severity, n)
+#else
+#define C10_LOG_FIRST_N(severity, n) LOG(severity)
+#endif
+
+// Same for LOG_EVERY_N
+#ifdef LOG_EVERY_N
+#define C10_LOG_EVERY_N(severity, n) LOG_EVERY_N(severity, n)
+#else
+#define C10_LOG_EVERY_N(severity, n) LOG(severity)
+#endif
+
 namespace c10 {
 
 using std::string;
@@ -48,7 +62,14 @@ using std::string;
 C10_API bool InitCaffeLogging(int* argc, char** argv);
 C10_API void UpdateLoggingLevelsFromFlags();
 
-C10_API C10_NORETURN void ThrowEnforceNotMet(
+[[noreturn]] C10_API void ThrowEnforceNotMet(
+    const char* file,
+    const int line,
+    const char* condition,
+    const std::string& msg,
+    const void* caller = nullptr);
+
+[[noreturn]] C10_API void ThrowEnforceFiniteNotMet(
     const char* file,
     const int line,
     const char* condition,
@@ -79,15 +100,23 @@ using EnforceNotMet = ::c10::Error;
 
 #define CAFFE_ENFORCE(condition, ...)                               \
   do {                                                              \
-    if (!(condition)) {                                             \
+    if (C10_UNLIKELY(!(condition))) {                               \
       ::c10::ThrowEnforceNotMet(                                    \
           __FILE__, __LINE__, #condition, ::c10::str(__VA_ARGS__)); \
     }                                                               \
   } while (false)
 
+#define CAFFE_ENFORCE_FINITE(condition, ...)                        \
+    do {                                                            \
+      if (C10_UNLIKELY(!(condition))) {                             \
+        ::c10::ThrowEnforceFiniteNotMet(                            \
+          __FILE__, __LINE__, #condition, ::c10::str(__VA_ARGS__)); \
+      }                                                             \
+    } while (false)
+
 #define CAFFE_ENFORCE_WITH_CALLER(condition, ...)                         \
   do {                                                                    \
-    if (!(condition)) {                                                   \
+    if (C10_UNLIKELY(!(condition))) {                                     \
       ::c10::ThrowEnforceNotMet(                                          \
           __FILE__, __LINE__, #condition, ::c10::str(__VA_ARGS__), this); \
     }                                                                     \
@@ -156,12 +185,12 @@ class C10_API EnforceFailMessage {
   inline bool bad() const {
     return msg_ != nullptr;
   }
-  std::string get_message_and_free(std::string&& extra) const {
+  std::string get_message_and_free(const std::string& extra) const {
     std::string r;
     if (extra.empty()) {
       r = std::move(*msg_);
     } else {
-      r = ::c10::str(std::move(*msg_), ". ", std::move(extra));
+      r = ::c10::str(std::move(*msg_), ". ", extra);
     }
     delete msg_;
     return r;
@@ -191,7 +220,7 @@ BINARY_COMP_HELPER(LessEquals, <=)
   do {                                                                  \
     using namespace ::c10::enforce_detail;                              \
     const EnforceFailMessage& CAFFE_ENFORCE_THAT_IMPL_r_ = (condition); \
-    if (CAFFE_ENFORCE_THAT_IMPL_r_.bad()) {                             \
+    if (C10_UNLIKELY(CAFFE_ENFORCE_THAT_IMPL_r_.bad())) {               \
       ::c10::ThrowEnforceNotMet(                                        \
           __FILE__,                                                     \
           __LINE__,                                                     \
@@ -206,7 +235,7 @@ BINARY_COMP_HELPER(LessEquals, <=)
     using namespace ::c10::enforce_detail;                             \
     const EnforceFailMessage& CAFFE_ENFORCE_THAT_IMPL_WITH_CALLER_r_ = \
         (condition);                                                   \
-    if (CAFFE_ENFORCE_THAT_IMPL_WITH_CALLER_r_.bad()) {                \
+    if (C10_UNLIKELY(CAFFE_ENFORCE_THAT_IMPL_WITH_CALLER_r_.bad())) {  \
       ::c10::ThrowEnforceNotMet(                                       \
           __FILE__,                                                    \
           __LINE__,                                                    \
@@ -250,6 +279,32 @@ BINARY_COMP_HELPER(LessEquals, <=)
 #define CAFFE_ENFORCE_GT_WITH_CALLER(x, y, ...) \
   CAFFE_ENFORCE_THAT_IMPL_WITH_CALLER(          \
       Greater((x), (y)), #x " > " #y, __VA_ARGS__)
+
+/**
+ * Very lightweight logging for the first time API usage. It's beneficial for
+ * tracking of individual functionality usage in larger applications.
+ *
+ * In order to ensure light-weightness of logging, we utilize static variable
+ * trick - LogAPIUsage will be invoked only once and further invocations will
+ * just do an atomic check.
+ *
+ * Example:
+ *   // Logs caller info with an arbitrary text event, if there is a usage.
+ *   C10_LOG_API_USAGE_ONCE("my_api");
+ */
+#define C10_LOG_API_USAGE_ONCE(...)             \
+  C10_UNUSED static bool C10_ANONYMOUS_VARIABLE(logFlag) = \
+      ::c10::detail::LogAPIUsageFakeReturn(__VA_ARGS__);
+
+// API usage logging capabilities
+C10_API void SetAPIUsageLogger(std::function<void(const std::string&)> logger);
+C10_API void LogAPIUsage(const std::string& context);
+
+namespace detail {
+// Return value is needed to do the static variable initialization trick
+C10_API bool LogAPIUsageFakeReturn(const std::string& context);
+}
+
 } // namespace c10
 
 #endif // C10_UTIL_LOGGING_H_

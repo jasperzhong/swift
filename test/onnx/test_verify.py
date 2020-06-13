@@ -1,3 +1,8 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import torch
 from torch.autograd import Function
 from torch.nn import Module, Parameter
@@ -5,8 +10,6 @@ import caffe2.python.onnx.backend as backend
 from verify import verify
 
 from test_pytorch_common import TestCase, run_tests
-
-import unittest
 
 
 class TestVerify(TestCase):
@@ -73,7 +76,8 @@ class TestVerify(TestCase):
                 return y
 
         x = torch.tensor([1, 2])
-        self.assertVerifyExpectFail(MyModel(), x, backend)
+        # To keep the unused model parameter, need to set constant folding to False
+        self.assertVerifyExpectFail(MyModel(), x, backend, do_constant_folding=False)
 
     def test_dynamic_model_structure(self):
         class MyModel(Module):
@@ -92,7 +96,6 @@ class TestVerify(TestCase):
         x = torch.tensor([1, 2])
         self.assertVerifyExpectFail(MyModel(), x, backend)
 
-    @unittest.skip("Indexing is broken by #3725")
     def test_embedded_constant_difference(self):
         class MyModel(Module):
             def __init__(self):

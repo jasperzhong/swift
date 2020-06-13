@@ -3,18 +3,28 @@
 """
 This script is the source of truth for config.yml.
 Please see README.md in this directory for details.
-
-In this module,
 """
 
 import os
 import sys
-from collections import OrderedDict
+import shutil
+from collections import namedtuple
 
-import cimodel.pytorch_build_definitions as pytorch_build_definitions
-import cimodel.binary_build_definitions as binary_build_definitions
-import cimodel.caffe2_build_definitions as caffe2_build_definitions
-import cimodel.miniyaml as miniyaml
+import cimodel.data.pytorch_build_definitions as pytorch_build_definitions
+import cimodel.data.windows_build_definitions as windows_build_definitions
+import cimodel.data.binary_build_definitions as binary_build_definitions
+import cimodel.data.caffe2_build_definitions as caffe2_build_definitions
+import cimodel.data.simple.macos_definitions
+import cimodel.data.simple.mobile_definitions
+import cimodel.data.simple.bazel_definitions
+import cimodel.data.simple.ge_config_tests
+import cimodel.data.simple.binary_smoketest
+import cimodel.data.simple.ios_definitions
+import cimodel.data.simple.android_gradle
+import cimodel.data.simple.nightly_android
+import cimodel.data.simple.nightly_ios
+import cimodel.lib.miniutils as miniutils
+import cimodel.lib.miniyaml as miniyaml
 
 
 class File(object):
@@ -26,72 +36,114 @@ class File(object):
 
     def write(self, output_filehandle):
         with open(os.path.join("verbatim-sources", self.filename)) as fh:
-            output_filehandle.write(fh.read())
+            shutil.copyfileobj(fh, output_filehandle)
 
 
-class Treegen(object):
+class FunctionGen(namedtuple('FunctionGen', 'function depth')):
+    __slots__ = ()
+
+
+class Treegen(FunctionGen):
     """
     Insert the content of a YAML tree into config.yml
     """
-    def __init__(self, function, depth):
-        self.function = function
-        self.depth = depth
-
-    def write(self, output_filehandle):
-        build_dict = OrderedDict()
-        self.function(build_dict)
-        miniyaml.render(output_filehandle, build_dict, self.depth)
-
-
-class Listgen(object):
-    """
-    Insert the content of a YAML list into config.yml
-    """
-    def __init__(self, function, depth):
-        self.function = function
-        self.depth = depth
 
     def write(self, output_filehandle):
         miniyaml.render(output_filehandle, self.function(), self.depth)
 
 
+class Listgen(FunctionGen):
+    """
+    Insert the content of a YAML list into config.yml
+    """
+    def write(self, output_filehandle):
+        miniyaml.render(output_filehandle, self.function(), self.depth)
+
+
+def horizontal_rule():
+    return "".join("#" * 78)
+
+
+class Header(object):
+
+    def __init__(self, title, summary=None):
+        self.title = title
+        self.summary_lines = summary or []
+
+    def write(self, output_filehandle):
+        text_lines = [self.title] + self.summary_lines
+        comment_lines = ["# " + x for x in text_lines]
+        lines = miniutils.sandwich([horizontal_rule()], comment_lines)
+
+        for line in filter(None, lines):
+            output_filehandle.write(line + "\n")
+
+
+def gen_build_workflows_tree():
+    build_workflows_functions = [
+        pytorch_build_definitions.get_workflow_jobs,
+        cimodel.data.simple.macos_definitions.get_workflow_jobs,
+        cimodel.data.simple.android_gradle.get_workflow_jobs,
+        cimodel.data.simple.ios_definitions.get_workflow_jobs,
+        cimodel.data.simple.mobile_definitions.get_workflow_jobs,
+        cimodel.data.simple.ge_config_tests.get_workflow_jobs,
+        cimodel.data.simple.bazel_definitions.get_workflow_jobs,
+        caffe2_build_definitions.get_workflow_jobs,
+        cimodel.data.simple.binary_smoketest.get_workflow_jobs,
+        cimodel.data.simple.nightly_ios.get_workflow_jobs,
+        cimodel.data.simple.nightly_android.get_workflow_jobs,
+        windows_build_definitions.get_windows_workflows,
+    ]
+
+    binary_build_functions = [
+        binary_build_definitions.get_binary_build_jobs,
+        binary_build_definitions.get_nightly_tests,
+        binary_build_definitions.get_nightly_uploads,
+        binary_build_definitions.get_post_upload_jobs,
+        binary_build_definitions.get_binary_smoke_test_jobs,
+    ]
+
+    return {
+        "workflows": {
+            "binary_builds": {
+                "when": r"<< pipeline.parameters.run_binary_tests >>",
+                "jobs": [f() for f in binary_build_functions]
+            },
+            "build": {
+                "jobs": [f() for f in build_workflows_functions],
+            },
+        },
+    }
+
+
 # Order of this list matters to the generated config.yml.
 YAML_SOURCES = [
     File("header-section.yml"),
-    File("linux-build-defaults.yml"),
-    File("macos-build-defaults.yml"),
+    File("commands.yml"),
     File("nightly-binary-build-defaults.yml"),
-    File("linux-binary-build-defaults.yml"),
-    File("macos-binary-build-defaults.yml"),
-    File("nightly-build-smoke-tests-defaults.yml"),
-    File("job-specs-header.yml"),
-    Treegen(pytorch_build_definitions.add_build_env_defs, 0),
-    File("job-specs-custom.yml"),
-    Treegen(caffe2_build_definitions.add_caffe2_builds, 1),
-    File("job-specs-html-update.yml"),
-    File("binary-build-specs-header.yml"),
-    Treegen(binary_build_definitions.add_binary_build_specs, 1),
-    File("binary-build-tests-header.yml"),
-    Treegen(binary_build_definitions.add_binary_build_tests, 1),
-    File("binary-build-tests.yml"),
-    File("binary-build-uploads-header.yml"),
-    Treegen(binary_build_definitions.add_binary_build_uploads, 1),
-    File("smoke-test-specs-header.yml"),
-    Treegen(binary_build_definitions.add_smoke_test_specs, 1),
-    File("workflows.yml"),
-    Listgen(pytorch_build_definitions.get_workflow_list, 3),
-    File("workflows-pytorch-macos-builds.yml"),
-    Listgen(caffe2_build_definitions.get_caffe2_workflows, 3),
-    File("workflows-binary-builds-smoke-subset.yml"),
-    File("workflows-binary-smoke-header.yml"),
-    Treegen(binary_build_definitions.add_binary_smoke_test_jobs, 1),
-    File("workflows-binary-build-header.yml"),
-    Treegen(binary_build_definitions.add_binary_build_jobs, 1),
-    File("workflows-nightly-tests-header.yml"),
-    Listgen(binary_build_definitions.get_nightly_tests, 3),
-    File("workflows-nightly-uploads-header.yml"),
-    Listgen(binary_build_definitions.get_nightly_uploads, 3),
-    File("workflows-s3-html.yml"),
+
+    Header("Build parameters"),
+    File("build-parameters/pytorch-build-params.yml"),
+    File("build-parameters/caffe2-build-params.yml"),
+    File("build-parameters/binary-build-params.yml"),
+    File("build-parameters/promote-build-params.yml"),
+
+    Header("Job specs"),
+    File("job-specs/pytorch-job-specs.yml"),
+    File("job-specs/caffe2-job-specs.yml"),
+    File("job-specs/binary-job-specs.yml"),
+    File("job-specs/job-specs-custom.yml"),
+    File("job-specs/job-specs-promote.yml"),
+    File("job-specs/binary_update_htmls.yml"),
+    File("job-specs/binary-build-tests.yml"),
+    File("job-specs/docker_jobs.yml"),
+
+    Header("Workflows"),
+    Treegen(gen_build_workflows_tree, 0),
+
+    File("workflows/workflows-docker-builder.yml"),
+    File("workflows/workflows-ecr-gc.yml"),
+    File("workflows/workflows-promote.yml"),
 ]
 
 

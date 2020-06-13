@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "c10/util/Flags.h"
+#include <c10/util/Flags.h>
 
 // Log severity level constants.
 const int FATAL = 3;
@@ -105,6 +105,12 @@ static_assert(
 
 #define VLOG_IS_ON(verboselevel) (CAFFE2_LOG_THRESHOLD <= -(verboselevel))
 
+// Log with source location information override (to be used in generic
+// warning/error handlers implemented as functions, not macros)
+#define LOG_AT_FILE_LINE(n, file, line) \
+  if (n >= CAFFE2_LOG_THRESHOLD)        \
+  ::c10::MessageLogger(file, line, n).stream()
+
 // Log only if condition is met.  Otherwise evaluates to void.
 #define FATAL_IF(condition)            \
   condition ? (void)0                  \
@@ -120,12 +126,14 @@ static_assert(
 #else
 // Optimized version - generates no code.
 #define DCHECK(condition) \
-  if (false)              \
+  while (false)           \
   CHECK(condition)
 #endif // NDEBUG
 
-#define CHECK_OP(val1, val2, op) \
-  FATAL_IF((val1 op val2)) << "Check failed: " #val1 " " #op " " #val2 " "
+#define CHECK_OP(val1, val2, op)                      \
+  FATAL_IF(((val1) op (val2)))                        \
+    << "Check failed: " #val1 " " #op " " #val2 " ("  \
+    << (val1) << " vs. " << (val2) << ") "
 
 // Check_op macro definitions
 #define CHECK_EQ(val1, val2) CHECK_OP(val1, val2, ==)
@@ -146,22 +154,22 @@ static_assert(
 #else // !NDEBUG
 // These versions generate no code in optimized mode.
 #define DCHECK_EQ(val1, val2) \
-  if (false)                  \
+  while (false)               \
   CHECK_OP(val1, val2, ==)
 #define DCHECK_NE(val1, val2) \
-  if (false)                  \
+  while (false)               \
   CHECK_OP(val1, val2, !=)
 #define DCHECK_LE(val1, val2) \
-  if (false)                  \
+  while (false)               \
   CHECK_OP(val1, val2, <=)
 #define DCHECK_LT(val1, val2) \
-  if (false)                  \
+  while (false)               \
   CHECK_OP(val1, val2, <)
 #define DCHECK_GE(val1, val2) \
-  if (false)                  \
+  while (false)               \
   CHECK_OP(val1, val2, >=)
 #define DCHECK_GT(val1, val2) \
-  if (false)                  \
+  while (false)               \
   CHECK_OP(val1, val2, >)
 #endif // NDEBUG
 
@@ -178,7 +186,7 @@ static_assert(
 #else // !NDEBUG
 // Optimized version - generates no code.
 #define DCHECK_NOTNULL(val) \
-  if (false)                \
+  while (false)             \
   CHECK_NOTNULL(val)
 #endif // NDEBUG
 
@@ -218,6 +226,12 @@ inline std::ostream& operator<<(
     std::ostream& out,
     const std::pair<First, Second>& p) {
   out << '(' << p.first << ", " << p.second << ')';
+  return out;
+}
+
+inline std::ostream& operator<<(
+    std::ostream& out, const std::nullptr_t&) {
+  out << "(null)";
   return out;
 }
 } // namespace std

@@ -18,9 +18,14 @@ from caffe2.proto import caffe2_pb2
 import numpy as np
 import warnings
 
-dyndep.InitOpsLibrary("@/caffe2/caffe2/contrib/nccl:nccl_ops")
 dyndep.InitOpsLibrary("@/caffe2/caffe2/contrib/gloo:gloo_ops")
-dyndep.InitOpsLibrary("@/caffe2/caffe2/contrib/gloo:gloo_ops_gpu")
+
+# We only import nccl operators when the machine has GPUs
+# Otherwise the binary can be compiled with CPU-only mode, and
+# will not be able to find those modules
+if workspace.NumGpuDevices() > 0:
+    dyndep.InitOpsLibrary("@/caffe2/caffe2/contrib/nccl:nccl_ops")
+    dyndep.InitOpsLibrary("@/caffe2/caffe2/contrib/gloo:gloo_ops_gpu")
 
 log = logging.getLogger("data_parallel_model")
 log.setLevel(logging.INFO)
@@ -833,7 +838,7 @@ def ConvertNetForDevice(net, device=None):
     namescope = "{}_{}/".format(device_prefix, device.device_id)
     for op in mnet.Proto().op:
         if "RecurrentNetwork" in op.type:
-            raise("RecurrentNetwork conversion not yet supported")
+            raise NotImplementedError("RecurrentNetwork conversion not yet supported")
         for i, inputb in enumerate(op.input):
             op.input[i] = namescope + inputb
         for i, outputb in enumerate(op.output):
@@ -1062,7 +1067,7 @@ def _AllReduce(devices, model, net, param, use_nccl=False, control_input=None):
             for i, peer in enumerate(devices):
                 if i == 0:
                     continue  # Skip the first device
-                if p2p_access_pattern is not None and not p2p_access_pattern[
+                if p2p_access_pattern is not None and p2p_access_pattern.size and not p2p_access_pattern[
                     devices[0], peer
                 ]:
                     # Copy from peer to d0

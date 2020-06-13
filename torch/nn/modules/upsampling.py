@@ -1,12 +1,7 @@
-from numbers import Integral
-import warnings
-
 from .module import Module
 from .. import functional as F
-from ..._jit_internal import weak_module, weak_script_method
 
 
-@weak_module
 class Upsample(Module):
     r"""Upsamples a given multi-channel 1D (temporal), 2D (spatial) or 3D (volumetric) data.
 
@@ -22,11 +17,10 @@ class Upsample(Module):
     calculate the output size. (You cannot give both, as it is ambiguous)
 
     Args:
-        size (int or Tuple[int] or Tuple[int, int] or Tuple[int, int, int],
-            optional): output spatial sizes
-        scale_factor (float or Tuple[float] or Tuple[float, float] or
-            Tuple[float, float, float], optional): multiplier for spatial size.
-            Has to match input size if it is a tuple.
+        size (int or Tuple[int] or Tuple[int, int] or Tuple[int, int, int], optional):
+            output spatial sizes
+        scale_factor (float or Tuple[float] or Tuple[float, float] or Tuple[float, float, float], optional):
+            multiplier for spatial size. Has to match input size if it is a tuple.
         mode (str, optional): the upsampling algorithm: one of ``'nearest'``,
             ``'linear'``, ``'bilinear'``, ``'bicubic'`` and ``'trilinear'``.
             Default: ``'nearest'``
@@ -126,11 +120,13 @@ class Upsample(Module):
         super(Upsample, self).__init__()
         self.name = type(self).__name__
         self.size = size
-        self.scale_factor = float(scale_factor) if scale_factor else None
+        if isinstance(scale_factor, tuple):
+            self.scale_factor = tuple(float(factor) for factor in scale_factor)
+        else:
+            self.scale_factor = float(scale_factor) if scale_factor else None
         self.mode = mode
         self.align_corners = align_corners
 
-    @weak_script_method
     def forward(self, input):
         return F.interpolate(input, self.size, self.scale_factor, self.mode, self.align_corners)
 
@@ -143,7 +139,6 @@ class Upsample(Module):
         return info
 
 
-@weak_module
 class UpsamplingNearest2d(Upsample):
     r"""Applies a 2D nearest neighbor upsampling to an input signal composed of several input
     channels.
@@ -189,7 +184,6 @@ class UpsamplingNearest2d(Upsample):
         super(UpsamplingNearest2d, self).__init__(size, scale_factor, mode='nearest')
 
 
-@weak_module
 class UpsamplingBilinear2d(Upsample):
     r"""Applies a 2D bilinear upsampling to an input signal composed of several input
     channels.

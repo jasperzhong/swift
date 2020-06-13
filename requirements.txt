@@ -1,6 +1,6 @@
 future
 numpy
 pyyaml
+requests
 setuptools
 six
-typing

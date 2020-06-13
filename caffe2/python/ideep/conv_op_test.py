@@ -4,14 +4,16 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import unittest
+import sys
 import hypothesis.strategies as st
 from hypothesis import given, settings
 import numpy as np
 from caffe2.proto import caffe2_pb2
 from caffe2.python import core, workspace
-from caffe2.python.transformations import optimizeForIDEEP
+from caffe2.python.transformations import optimizeForMKLDNN
 import caffe2.python.hypothesis_test_util as hu
 import caffe2.python.ideep_test_util as mu
+
 
 @unittest.skipIf(not workspace.C.use_mkldnn, "No MKLDNN support.")
 class ConvTest(hu.HypothesisTestCase):
@@ -133,7 +135,7 @@ class ConvTest(hu.HypothesisTestCase):
         old_net = caffe2_pb2.NetDef()
         old_net.op.extend([op1])
         net.Proto().CopyFrom(old_net)
-        optimizeForIDEEP(net)
+        optimizeForMKLDNN(net)
         workspace.RunOperatorOnce(net.Proto().op[0])
         Y1 = workspace.FetchBlob('Y')
 
@@ -155,6 +157,7 @@ class ConvTest(hu.HypothesisTestCase):
             print(Y0.flatten())
             print(np.max(np.abs(Y2 - Y0)))
             self.assertTrue(False)
+
 
 
 if __name__ == "__main__":

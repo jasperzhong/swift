@@ -22,7 +22,7 @@ Let's bisect the various parts of this "schema":
 
 1. ``<function-name>`` is the name of the function you would like to invoke,
 2. ``<functions-specific-options>`` are any required or optional parameters a particular factory function accepts,
-3. ``<sizes>`` is an object of type ``IntList`` and specifies the shape of the resulting tensor,
+3. ``<sizes>`` is an object of type ``IntArrayRef`` and specifies the shape of the resulting tensor,
 4. ``<tensor-options>`` is an instance of ``TensorOptions`` and configures the data type, device, layout and other properties of the resulting tensor.
 
 Picking a Factory Function
@@ -58,26 +58,26 @@ a vector with 5 components, initially all set to 1:
 
 
 What if we wanted to instead create a ``3 x 5`` matrix, or a ``2 x 3 x 4``
-tensor? In general, an ``IntList`` -- the type of the size parameter of factory
+tensor? In general, an ``IntArrayRef`` -- the type of the size parameter of factory
 functions -- is constructed by specifying the size along each dimension in
 curly braces. For example, ``{2, 3}`` for a tensor (in this case matrix) with
 two rows and three columns, ``{3, 4, 5}`` for a three-dimensional tensor, and
 ``{2}`` for a one-dimensional tensor with two components. In the one
 dimensional case, you can omit the curly braces and just pass the single
 integer like we did above. Note that the squiggly braces are just one way of
-constructing an ``IntList``. You can also pass an ``std::vector<int64_t>`` and
+constructing an ``IntArrayRef``. You can also pass an ``std::vector<int64_t>`` and
 a few other types. Either way, this means we can construct a three-dimensional
 tensor filled with values from a unit normal distribution by writing:
 
 .. code-block:: cpp
 
   torch::Tensor tensor = torch::randn({3, 4, 5});
-  assert(tensor.sizes() == torch::IntList{3, 4, 5});
+  assert(tensor.sizes() == std::vector<int64_t>{3, 4, 5});
 
-Notice how we use ``tensor.sizes()`` to get back an ``IntList`` containing the
-sizes we passed to the tensor. You can also write ``tensor.size(i)`` to access
-a single dimension, which is equivalent to but preferred over
-``tensor.sizes()[i]``.
+``tensor.sizes()`` returns an ``IntArrayRef`` which can be compared against an
+``std::vector<int64_t>``, and we can see that it contains the sizes we passed
+to the tensor. You can also write ``tensor.size(i)`` to access a single dimension,
+which is equivalent to but preferred over ``tensor.sizes()[i]``.
 
 Passing Function-Specific Parameters
 ************************************
@@ -145,10 +145,10 @@ allowed values for these axes at the moment are:
 
 .. tip::
 
-	There exist "Rust-style" shorthands for dtypes, like ``kF32`` instead of
-	``kFloat32``. See `here
-	<https://github.com/pytorch/pytorch/blob/master/torch/csrc/api/include/torch/types.h>`_
-	for the full list.
+        There exist "Rust-style" shorthands for dtypes, like ``kF32`` instead of
+        ``kFloat32``. See `here
+        <https://github.com/pytorch/pytorch/blob/master/torch/csrc/api/include/torch/types.h>`_
+        for the full list.
 
 
 An instance of ``TensorOptions`` stores a concrete value for each of these
@@ -281,7 +281,9 @@ change one property, this is quite practical.
 In conclusion, we can now compare how ``TensorOptions`` defaults, together with
 the abbreviated API for creating ``TensorOptions`` using free functions, allow
 tensor creation in C++ with the same convenience as in Python. Compare this
-call in Python::
+call in Python:
+
+.. code-block:: python
 
   torch.randn(3, 4, dtype=torch.float32, device=torch.device('cuda', 1), requires_grad=True)
 
@@ -314,8 +316,8 @@ we can convert it from ``int64`` to ``float32``:
 
 .. attention::
 
-	The result of the conversion, ``float_tensor``, is a new tensor pointing to
-	new memory, unrelated to the source ``source_tensor``.
+        The result of the conversion, ``float_tensor``, is a new tensor pointing to
+        new memory, unrelated to the source ``source_tensor``.
 
 We can then move it from CPU memory to GPU memory:
 

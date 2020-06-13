@@ -4,6 +4,7 @@
 #include <ATen/Dispatch.h>
 #include <ATen/Utils.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/detail/CUDAHooksInterface.h>
 #include <ATen/native/SpectralOpsUtils.h>
 #include <ATen/native/cuda/CuFFTUtils.h>
 #include <ATen/native/cuda/CuFFTPlanCache.h>
@@ -14,6 +15,7 @@
 #include <thrust/unique.h>
 #include <cufft.h>
 #include <cufftXt.h>
+#include <vector>
 #include <cmath>
 
 namespace at { namespace native {
@@ -65,7 +67,7 @@ struct dst_idx_to_src_functor : public thrust::unary_function<int64_t, scalar_t>
 
   dst_idx_to_src_functor(const Tensor& batched_complex_signal)
     : signal_ndim(batched_complex_signal.dim() - 1),
-      data(batched_complex_signal.data<scalar_t>()) {
+      data(batched_complex_signal.data_ptr<scalar_t>()) {
     for (int64_t i = 0; i < signal_ndim; i++) {
       sizes[i] = batched_complex_signal.size(i);
       strides[i] = batched_complex_signal.stride(i);
@@ -123,7 +125,7 @@ static void _fft_fill_with_conjugate_symmetry_(Tensor& input,
 
     dst_idx_iterator dst_idxs(counter(0), cnt_to_dst_idx_functor(size_last_dim, last_dim_start_slice));
 
-    auto data = device_ptr(input.data<scalar_t>());
+    auto data = device_ptr(input.data_ptr<scalar_t>());
     dst_iterator dsts(data, dst_idxs);
     src_iterator srcs(dst_idxs, dst_idx_to_src_functor<scalar_t>(input));
     thrust::copy_n(policy, srcs, n, dsts);
@@ -177,7 +179,7 @@ static inline Tensor _run_cufft(
     IntArrayRef output_sizes, bool input_was_cloned
 ) {
   if (config.should_clone_input() && !input_was_cloned) {
-    input = input.clone();
+    input = input.clone(at::MemoryFormat::Contiguous);
   }
 
   auto& plan = config.plan();
@@ -259,30 +261,61 @@ static inline Tensor _run_cufft(
   return output;
 }
 
-// The cuFFT plan cache, defined in CuFFTUtils.h
-struct CuFFTParamsLRUCache plan_cache;
-std::mutex plan_cache_mutex;
+// The cuFFT plan cache
+// unique_ptr for nullability and to avoid reference invalidation on vector resize
+static std::vector<std::unique_ptr<CuFFTParamsLRUCache>> plan_caches;
+static std::mutex plan_caches_mutex;
+
+static inline
+CuFFTParamsLRUCache &cufft_get_plan_cache(int64_t device_index) {
+  std::lock_guard<std::mutex> guard(plan_caches_mutex);
+
+  AT_ASSERT(device_index >= 0);
+
+  if (device_index >= plan_caches.size()) {
+    plan_caches.resize(device_index + 1);
+  }
+
+  if (!plan_caches[device_index]) {
+    plan_caches[device_index] = std::make_unique<CuFFTParamsLRUCache>();
+  }
+
+  return *plan_caches[device_index];
+}
+
 
 namespace detail {
 
-int64_t cufft_get_plan_cache_max_size_impl() {
-  std::lock_guard<std::mutex> guard(plan_cache_mutex);
-  return plan_cache.max_size();
+int64_t cufft_get_plan_cache_max_size_impl(int64_t device_index) {
+  TORCH_CHECK(0 <= device_index && device_index < at::detail::getCUDAHooks().getNumGPUs(),
+    "cufft_get_plan_cache_max_size: expected 0 <= device_index < ",
+    at::detail::getCUDAHooks().getNumGPUs(), "], but got device_index=",
+    device_index);
+  return cufft_get_plan_cache(device_index).max_size();
 }
 
-void cufft_set_plan_cache_max_size_impl(int64_t max_size) {
-  std::lock_guard<std::mutex> guard(plan_cache_mutex);
-  plan_cache.resize(max_size);
+void cufft_set_plan_cache_max_size_impl(int64_t device_index, int64_t max_size) {
+  TORCH_CHECK(0 <= device_index && device_index < at::detail::getCUDAHooks().getNumGPUs(),
+    "cufft_set_plan_cache_max_size: expected 0 <= device_index < ",
+    at::detail::getCUDAHooks().getNumGPUs(), "], but got device_index=",
+    device_index);
+  return cufft_get_plan_cache(device_index).resize(max_size);
 }
 
-int64_t cufft_get_plan_cache_size_impl() {
-  std::lock_guard<std::mutex> guard(plan_cache_mutex);
-  return plan_cache.size();
+int64_t cufft_get_plan_cache_size_impl(int64_t device_index) {
+  TORCH_CHECK(0 <= device_index && device_index < at::detail::getCUDAHooks().getNumGPUs(),
+    "cufft_get_plan_cache_size: expected 0 <= device_index < ",
+    at::detail::getCUDAHooks().getNumGPUs(), "], but got device_index=",
+    device_index);
+  return cufft_get_plan_cache(device_index).size();
 }
 
-void cufft_clear_plan_cache_impl() {
-  std::lock_guard<std::mutex> guard(plan_cache_mutex);
-  return plan_cache.clear();
+void cufft_clear_plan_cache_impl(int64_t device_index) {
+  TORCH_CHECK(0 <= device_index && device_index < at::detail::getCUDAHooks().getNumGPUs(),
+    "cufft_clear_plan_cache: expected 0 <= device_index < ",
+    at::detail::getCUDAHooks().getNumGPUs(), "], but got device_index=",
+    device_index);
+  return cufft_get_plan_cache(device_index).clear();
 }
 
 } // namespace at::native::detail
@@ -293,6 +326,9 @@ Tensor _fft_cufft(const Tensor& self, int64_t signal_ndim,
                   bool complex_input, bool complex_output, bool inverse,
                   IntArrayRef checked_signal_sizes, bool normalized, bool onesided,
                   IntArrayRef output_sizes) {
+
+  CuFFTParamsLRUCache& plan_cache = cufft_get_plan_cache(self.device().index());
+
   Tensor input = self;
   bool input_was_cloned = false;
 
@@ -314,13 +350,13 @@ Tensor _fft_cufft(const Tensor& self, int64_t signal_ndim,
   // from a slicing.
   auto complex_size_bytes = 2 * input.element_size();
   if (reinterpret_cast<std::uintptr_t>(input.data_ptr()) % complex_size_bytes != 0) {
-    input = input.clone();
+    input = input.clone(at::MemoryFormat::Contiguous);
     input_was_cloned = true;
   }
 
   // Now that we have done error check and data_ptr checks, we delegate all
-  // futher cuFFT parameter computation and plan creation to the helper class
-  // CuFFTConfig in CuFFTUtils.h.
+  // further cuFFT parameter computation and plan creation to the helper class
+  // CuFFTConfig in CuFFTPlanCache.h.
 
   // If plan caching is enabled, we check the cache. Note that this accesses
   // plan_cache.max_size() and thus makes this function less functional.
@@ -334,7 +370,7 @@ Tensor _fft_cufft(const Tensor& self, int64_t signal_ndim,
     CuFFTParams params;
     setCuFFTParams(&params, input, signal_ndim, complex_input,
       complex_output, checked_signal_sizes, onesided);
-    std::lock_guard<std::mutex> guard(plan_cache_mutex);
+    std::lock_guard<std::mutex> guard(plan_cache.mutex);
     if (plan_cache.max_size() > 0) {  // check again after acquiring the lock
       const CuFFTConfig &config = plan_cache.try_emplace_value(std::move(params),
                                              input, signal_ndim, complex_input,

@@ -20,6 +20,19 @@ void trace() {
   ASSERT_FLOAT_EQ(foo.trace().item<float>(), trace);
 }
 
+TEST(atest, operators) {
+  int a = 0b10101011;
+  int b = 0b01111011;
+
+  auto a_tensor = tensor({a});
+  auto b_tensor = tensor({b});
+
+  ASSERT_TRUE(tensor({~a}).equal(~a_tensor));
+  ASSERT_TRUE(tensor({a | b}).equal(a_tensor | b_tensor));
+  ASSERT_TRUE(tensor({a & b}).equal(a_tensor & b_tensor));
+  ASSERT_TRUE(tensor({a ^ b}).equal(a_tensor ^ b_tensor));
+}
+
 // TEST_CASE( "atest", "[]" ) {
 TEST(atest, atest) {
   manual_seed(123);
@@ -36,7 +49,7 @@ TEST(atest, atest) {
   float b = a.to<float>();
   ASSERT_EQ(b, 4);
 
-  foo = (foo * foo) == (foo.pow(3));
+  foo = ((foo * foo) == (foo.pow(3))).to(kByte);
   foo = 2 + (foo + 1);
   // foo = foo[3];
   auto foo_v = foo.accessor<uint8_t, 2>();
@@ -53,7 +66,7 @@ TEST(atest, atest) {
 
   float data[] = {1, 2, 3, 4, 5, 6};
 
-  auto f = CPU(kFloat).tensorFromBlob(data, {1, 2, 3});
+  auto f = from_blob(data, {1, 2, 3});
   auto f_a = f.accessor<float, 3>();
 
   ASSERT_EQ(f_a[0][0][0], 1.0);
@@ -72,7 +85,7 @@ TEST(atest, atest) {
     int isgone = 0;
     {
       auto f2 =
-          CPU(kFloat).tensorFromBlob(data, {1, 2, 3}, [&](void*) { isgone++; });
+          from_blob(data, {1, 2, 3}, [&](void*) { isgone++; });
     }
     ASSERT_EQ(isgone, 1);
   }
@@ -81,7 +94,7 @@ TEST(atest, atest) {
     Tensor a_view;
     {
       auto f2 =
-          CPU(kFloat).tensorFromBlob(data, {1, 2, 3}, [&](void*) { isgone++; });
+          from_blob(data, {1, 2, 3}, [&](void*) { isgone++; });
       a_view = f2.view({3, 2, 1});
     }
     ASSERT_EQ(isgone, 0);
@@ -93,9 +106,16 @@ TEST(atest, atest) {
     int isgone = 0;
     {
       auto base = at::empty({1,2,3}, TensorOptions(kCUDA));
-      auto f2 = CUDA(kFloat).tensorFromBlob(
-          base.data_ptr(), {1, 2, 3}, [&](void*) { isgone++; });
+      auto f2 = from_blob(base.data_ptr(), {1, 2, 3}, [&](void*) { isgone++; });
     }
     ASSERT_EQ(isgone, 1);
+
+    // Attempt to specify the wrong device in from_blob
+    auto t = at::empty({1,2,3}, TensorOptions(kCUDA, 0));
+    EXPECT_ANY_THROW(from_blob(t.data_ptr(), {1,2,3}, at::Device(kCUDA, 1)));
+
+    // Infers the correct device
+    auto t_ = from_blob(t.data_ptr(), {1,2,3}, kCUDA);
+    ASSERT_EQ(t_.device(), at::Device(kCUDA, 0));
   }
 }

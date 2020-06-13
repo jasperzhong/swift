@@ -7,15 +7,22 @@ import hypothesis.strategies as st
 import numpy as np
 from caffe2.python import core, dyndep, utils, workspace
 from caffe2.quantization.server import utils as dnnlowp_utils
-from dnnlowp_test_utils import (
+from caffe2.quantization.server.dnnlowp_test_utils import (
     check_quantized_results_close,
-    generate_conv_inputs,
+    run_conv_or_fc
 )
 from hypothesis import assume, given
 
 
 dyndep.InitOpsLibrary("//caffe2/caffe2/quantization/server:dnnlowp_ops")
-workspace.GlobalInit(["caffe2", "--caffe2_omp_num_threads=11"])
+workspace.GlobalInit(
+    [
+        "caffe2",
+        "--caffe2_omp_num_threads=11",
+        # Increase this threshold to test acc16 with randomly generated data
+        "--caffe2_dnnlowp_acc16_density_threshold=0.5",
+    ]
+)
 
 
 class DNNLowPOpConvAcc16OpTest(hu.HypothesisTestCase):
@@ -29,7 +36,7 @@ class DNNLowPOpConvAcc16OpTest(hu.HypothesisTestCase):
         group=st.integers(1, 4),
         input_channels_per_group=st.sampled_from([2, 3, 4, 5, 8, 16, 32]),
         output_channels_per_group=st.integers(2, 16),
-        batch_size=st.integers(1, 3),
+        batch_size=st.integers(0, 3),
         order=st.sampled_from(["NCHW", "NHWC"]),
         weight_quantized=st.booleans(),
         share_col_buffer=st.booleans(),
@@ -78,7 +85,8 @@ class DNNLowPOpConvAcc16OpTest(hu.HypothesisTestCase):
         X = np.random.rand(batch_size, size, size, input_channels) * 4 + X_min
         X = np.round(X).astype(np.float32)
         X[..., 0] = X_min
-        X[0, 0, 0, 1] = X_max
+        if batch_size != 0:
+            X[0, 0, 0, 1] = X_max
 
         if preserve_weight_sparsity:
             W_min = -128
@@ -141,8 +149,10 @@ class DNNLowPOpConvAcc16OpTest(hu.HypothesisTestCase):
                 net.Proto().op.extend([int8_given_tensor_fill])
 
                 # Bias
+                X_min = 0 if X.size == 0 else X.min()
+                X_max = 0 if X.size == 0 else X.max()
                 x_q_param = dnnlowp_utils.choose_quantization_params(
-                    X.min(), X.max(), preserve_activation_sparsity
+                    X_min, X_max, preserve_activation_sparsity
                 )
                 int8_bias_tensor_fill = dnnlowp_utils.create_int8_bias_tensor_fill(
                     b, "b_q", x_q_param, w_q_param
@@ -185,12 +195,9 @@ class DNNLowPOpConvAcc16OpTest(hu.HypothesisTestCase):
                 )
                 net.Proto().op.extend([dequantize])
 
-            self.ws.create_blob("X").feed(X, device_option=gc)
-            self.ws.create_blob("W").feed(W, device_option=gc)
-            self.ws.create_blob("b").feed(b, device_option=gc)
-            self.ws.run(net)
-            Y = self.ws.blobs["Y"].fetch()
-            outputs.append(Output(Y=Y, op_type=op_type, engine=engine, order=order))
+            run_conv_or_fc(
+                self, None, net, X, W, b, op_type, engine, order, gc, outputs
+            )
 
         check_quantized_results_close(outputs, symmetric=preserve_activation_sparsity)
 
@@ -203,7 +210,7 @@ class DNNLowPOpConvAcc16OpTest(hu.HypothesisTestCase):
         group=st.integers(1, 4),
         input_channels_per_group=st.sampled_from([2, 3, 4, 5, 8, 16, 32]),
         output_channels_per_group=st.integers(2, 16),
-        batch_size=st.integers(1, 3),
+        batch_size=st.integers(0, 3),
         order=st.sampled_from(["NHWC"]),
         weight_quantized=st.booleans(),
         prepack_weight=st.booleans(),
@@ -245,7 +252,8 @@ class DNNLowPOpConvAcc16OpTest(hu.HypothesisTestCase):
         X = np.random.rand(batch_size, size, size, input_channels) * 4 + X_min
         X = np.round(X).astype(np.float32)
         X[..., 0] = X_min
-        X[0, 0, 0, 1] = X_max
+        if batch_size != 0:
+            X[0, 0, 0, 1] = X_max
 
         if preserve_weight_sparsity:
             W_min = -128
@@ -254,9 +262,7 @@ class DNNLowPOpConvAcc16OpTest(hu.HypothesisTestCase):
             W_min = -100
             W_max = W_min + 255
         W = (
-            np.random.rand(
-                output_channels, kernel, kernel, input_channels_per_group
-            )
+            np.random.rand(output_channels, kernel, kernel, input_channels_per_group)
             * 4
             - 2
             + W_min
@@ -302,8 +308,10 @@ class DNNLowPOpConvAcc16OpTest(hu.HypothesisTestCase):
                 )
                 net.Proto().op.extend([quantize])
 
+            X_min = 0 if X.size == 0 else X.min()
+            X_max = 0 if X.size == 0 else X.max()
             x_q_param = dnnlowp_utils.choose_quantization_params(
-                X.min(), X.max(), preserve_activation_sparsity
+                X_min, X_max, preserve_activation_sparsity
             )
             if do_quantize_weight:
                 int8_given_tensor_fill, w_q_param = dnnlowp_utils.create_int8_given_tensor_fill(
@@ -325,11 +333,15 @@ class DNNLowPOpConvAcc16OpTest(hu.HypothesisTestCase):
                     "Int8ConvPackWeight",
                     inputs,
                     ["W_packed"],
-                    group=group,
+                    stride=stride,
+                    kernel=kernel,
+                    dilation=dilation,
+                    pad=pad,
                     nbits_in_non_outlier=nbits_in_non_outlier,
                     preserve_weight_sparsity=preserve_weight_sparsity,
-                    in_scale=x_q_param.scale,
                     engine=engine,
+                    group=group,
+                    in_scale=x_q_param.scale,
                 )
                 init_net.Proto().op.extend([pack])
 
@@ -372,12 +384,8 @@ class DNNLowPOpConvAcc16OpTest(hu.HypothesisTestCase):
                 )
                 net.Proto().op.extend([dequantize])
 
-            self.ws.create_blob("X").feed(X, device_option=gc)
-            self.ws.create_blob("W").feed(W, device_option=gc)
-            self.ws.create_blob("b").feed(b, device_option=gc)
-            self.ws.run(init_net)
-            self.ws.run(net)
-            Y = self.ws.blobs["Y"].fetch()
-            outputs.append(Output(Y=Y, op_type=op_type, engine=engine, order=order))
+            run_conv_or_fc(
+                self, init_net, net, X, W, b, op_type, engine, order, gc, outputs
+            )
 
         check_quantized_results_close(outputs, symmetric=preserve_activation_sparsity)

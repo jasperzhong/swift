@@ -3,8 +3,7 @@ import math
 import torch
 from torch.distributions import constraints
 from torch.distributions.distribution import Distribution
-from torch.distributions.multivariate_normal import (_batch_mahalanobis, _batch_mv,
-                                                     _batch_trtrs_lower)
+from torch.distributions.multivariate_normal import _batch_mahalanobis, _batch_mv
 from torch.distributions.utils import _standard_normal, lazy_property
 
 
@@ -48,12 +47,13 @@ class LowRankMultivariateNormal(Distribution):
     r"""
     Creates a multivariate normal distribution with covariance matrix having a low-rank form
     parameterized by :attr:`cov_factor` and :attr:`cov_diag`::
+
         covariance_matrix = cov_factor @ cov_factor.T + cov_diag
 
     Example:
 
-        >>> m = LowRankMultivariateNormal(torch.zeros(2), torch.tensor([1, 0]), torch.tensor([1, 1]))
-        >>> m.sample()  # normally distributed with mean=`[0,0]`, cov_factor=`[1,0]`, cov_diag=`[1,1]`
+        >>> m = LowRankMultivariateNormal(torch.zeros(2), torch.tensor([[1.], [0.]]), torch.ones(2))
+        >>> m.sample()  # normally distributed with mean=`[0,0]`, cov_factor=`[[1],[0]]`, cov_diag=`[1,1]`
         tensor([-0.2102, -0.5429])
 
     Args:
@@ -70,6 +70,7 @@ class LowRankMultivariateNormal(Distribution):
         `matrix determinant lemma <https://en.wikipedia.org/wiki/Matrix_determinant_lemma>`_.
         Thanks to these formulas, we just need to compute the determinant and inverse of
         the small size "capacitance" matrix::
+
             capacitance = I + cov_factor.T @ inv(cov_diag) @ cov_factor
     """
     arg_constraints = {"loc": constraints.real,
@@ -163,7 +164,7 @@ class LowRankMultivariateNormal(Distribution):
         # where :math:`C` is the capacitance matrix.
         Wt_Dinv = (self._unbroadcasted_cov_factor.transpose(-1, -2)
                    / self._unbroadcasted_cov_diag.unsqueeze(-2))
-        A = _batch_trtrs_lower(Wt_Dinv, self._capacitance_tril)
+        A = torch.triangular_solve(Wt_Dinv, self._capacitance_tril, upper=False)[0]
         precision_matrix = (torch.diag_embed(self._unbroadcasted_cov_diag.reciprocal())
                             - torch.matmul(A.transpose(-1, -2), A))
         return precision_matrix.expand(self._batch_shape + self._event_shape +

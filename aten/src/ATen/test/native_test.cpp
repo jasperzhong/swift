@@ -21,32 +21,28 @@ void requireEqualTensorList(TensorList t1, TensorList t2) {
   }
 }
 
-// split: test method, type, namespace give same result
-void TestSplit(Type& T, Tensor& t) {
+// split: test method, namespace give same result
+void TestSplit(TensorOptions T, Tensor& t) {
   auto splitMethod = t.split(1, 0);
-  auto splitType = T.split(t, 1, 0);
   auto splitNs = at::split(t, 1, 0);
-  requireEqualTensorList(splitMethod, splitType);
   requireEqualTensorList(splitMethod, splitNs);
 
   // test rebuilding with cat
   ASSERT_EQUAL(at::cat(splitMethod, 0), t);
 }
 
-// chunk: test method, type, namespace give same result
-void TestChunk(Type& T, Tensor& t) {
+// chunk: test method, namespace give same result
+void TestChunk(TensorOptions T, Tensor& t) {
   // test method, type, namespace give same result
   auto chunkMethod = t.chunk(3, 0);
-  auto chunkType = T.chunk(t, 3, 0);
   auto chunkNs = at::chunk(t, 3, 0);
-  requireEqualTensorList(chunkMethod, chunkType);
   requireEqualTensorList(chunkMethod, chunkNs);
 
   // test rebuilding with cat
   ASSERT_EQUAL(at::cat(chunkMethod, 0), t);
 }
 
-void TestStack(Type& T, Tensor& t) {
+void TestStack(TensorOptions T, Tensor& t) {
   auto x = rand({2, 3, 4});
   auto y = rand({2, 3, 4});
   auto z = rand({2, 3, 4});
@@ -69,7 +65,7 @@ void TestStack(Type& T, Tensor& t) {
 }
 
 // size / stride
-void TestSize(Type& T, Tensor& t) {
+void TestSize(TensorOptions T, Tensor& t) {
   auto scalar = randn({}, T);
   // Throw StartsWith("dimension specified as 0 but tensor has no dimensions")
   ASSERT_ANY_THROW(scalar.size(0));
@@ -87,7 +83,7 @@ void TestSize(Type& T, Tensor& t) {
   ASSERT_EQ(empty.stride(-1), 1);
 }
 
-void TestMatmul(Type& T, Tensor& t, Type& AccT) {
+void TestMatmul(TensorOptions T, Tensor& t, TensorOptions AccT) {
   auto scalar = randn({}, T);
   auto d1 = randn({3}, T);
   auto d2 = randn({2, 3}, T);
@@ -133,10 +129,10 @@ void TestMatmul(Type& T, Tensor& t, Type& AccT) {
   double rtol = 1e-06;
   d2 = randn({3, 4}, T);
   d2o = randn({4, 2}, T);
-  auto result = d5.matmul(d2).toType(AccT);
+  auto result = d5.matmul(d2).to(AccT);
 
-  auto d5Acc = d5.toType(AccT);
-  auto d2Acc = d2.toType(AccT);
+  auto d5Acc = d5.to(AccT);
+  auto d2Acc = d2.to(AccT);
   auto acc_result = d5Acc.view({24, 2, 3})
                         .bmm(d2Acc.expand({24, 3, 4}))
                         .view({3, 2, 4, 2, 4});
@@ -160,7 +156,7 @@ void TestMatmul(Type& T, Tensor& t, Type& AccT) {
   ASSERT_ANY_THROW(d5.matmul(d5wrong));
 }
 
-void TestStandardGammaGrad(Type& T, Tensor& t) {
+void TestStandardGammaGrad(TensorOptions T, Tensor& t) {
   // check empty
   auto empty = ones({0}, T);
   ASSERT_EQUAL(empty, at::_standard_gamma_grad(empty, empty));
@@ -179,10 +175,10 @@ void TestStandardGammaGrad(Type& T, Tensor& t) {
   ASSERT_ANY_THROW(at::_standard_gamma_grad(t1, t2));
 }
 
-void TestWhere(Type& T, Tensor& t) {
+void TestWhere(TensorOptions T, Tensor& t) {
   // empty
   auto empty = ones({0}, T);
-  auto& bT = T.toScalarType(ScalarType::Byte);
+  auto bT = T.dtype(kByte);
   auto empty_byte = ones({0}, bT);
   ASSERT_EQUAL(empty, at::where(empty_byte, empty, empty));
 
@@ -198,7 +194,7 @@ void TestWhere(Type& T, Tensor& t) {
       at::where(cond_1d, x_1d, y_1d));
 }
 
-void test(Type& T, Type& AccT) {
+void test(TensorOptions T, TensorOptions AccT) {
   auto t = randn({3, 3}, T);
   TestSplit(T, t);
   TestChunk(T, t);
@@ -212,13 +208,15 @@ void test(Type& T, Type& AccT) {
 TEST(TestNative, NativeTestCPU) {
   manual_seed(123);
 
-  test(CPU(kFloat), CPU(kDouble));
+  test(at::device(kCPU).dtype(kFloat),
+       at::device(kCPU).dtype(kDouble));
 }
 
 TEST(TestNative, NativeTestGPU) {
   manual_seed(123);
 
   if (at::hasCUDA()) {
-    test(CUDA(kFloat), CUDA(kDouble));
+    test(at::device(kCUDA).dtype(kFloat),
+         at::device(kCUDA).dtype(kDouble));
   }
 }

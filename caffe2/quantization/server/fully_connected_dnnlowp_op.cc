@@ -6,6 +6,7 @@
 
 #include "caffe2/core/flags.h"
 #include "caffe2/core/tensor_int8.h"
+#include "caffe2/operators/fc_inference.h"
 #include "caffe2/utils/cpuid.h"
 #include "fbgemm_pack_matrix_cache.h"
 #include "fbgemm_pack_op.h"
@@ -19,13 +20,14 @@ C10_DEFINE_bool(
     "(currently only honored by FC)");
 
 C10_DECLARE_bool(caffe2_dnnlowp_dump_tensors);
+C10_DECLARE_bool(caffe2_dnnlowp_force_slow_path);
 
 namespace caffe2 {
 
 using namespace std;
 
-template <typename T>
-FullyConnectedDNNLowPOp<T>::FullyConnectedDNNLowPOp(
+template <typename T, bool ReluFused>
+FullyConnectedDNNLowPOp<T, ReluFused>::FullyConnectedDNNLowPOp(
     const OperatorDef& operator_def,
     Workspace* ws)
     : BaseType(operator_def, ws),
@@ -50,12 +52,17 @@ FullyConnectedDNNLowPOp<T>::FullyConnectedDNNLowPOp(
   VLOG(2) << "DNNLOWP FC with output " << operator_def.output(0);
 }
 
-template <typename T>
-bool FullyConnectedDNNLowPOp<T>::RunOnDevice() {
+template <typename T, bool ReluFused>
+bool FullyConnectedDNNLowPOp<T, ReluFused>::RunOnDevice() {
   using namespace std;
   using namespace dnnlowp;
 
+  bool first_invocation = !this->arguments_parsed_;
   this->ParseDNNLowPOperatorArguments_();
+  if (first_invocation && ReluFused) {
+    followed_by_ = "Relu";
+    AdjustOutputTensorQuantizationParamsWithFollowedBy(this, followed_by_);
+  }
 
   if ((!GetCpuId().avx2() || FLAGS_caffe2_dnnlowp_enforce_default_operators) &&
       dequantize_output_) {
@@ -199,9 +206,7 @@ bool FullyConnectedDNNLowPOp<T>::RunOnDevice() {
             row_offsets_.data());
 
         if (quantize_channelwise_) {
-          ReQuantizeOutput<
-              false /* FUSE_RELU */,
-              QuantizationGranularity::OUT_CHANNEL>
+          ReQuantizeOutput<ReluFused, QuantizationGranularity::OUT_CHANNEL>
               outputProcObj(
                   doNothingObj,
                   requantization_multipliers_.data(),
@@ -224,7 +229,7 @@ bool FullyConnectedDNNLowPOp<T>::RunOnDevice() {
               0, // thread_id
               1); // num_threads
         } else {
-          ReQuantizeOutput<false /* FUSE_RELU */> outputProcObj(
+          ReQuantizeOutput<ReluFused> outputProcObj(
               doNothingObj,
               requantization_multipliers_.data(),
               out_qparams_.zero_point,
@@ -258,7 +263,7 @@ bool FullyConnectedDNNLowPOp<T>::RunOnDevice() {
             X_pack_buf_.data(), // buffer for packed matrix
             1); // group
 
-        ReQuantizeOutput<false /* FUSE_RELU */> outputProcObj(
+        ReQuantizeOutput<ReluFused> outputProcObj(
             doNothingObj,
             requantization_multipliers_.data(),
             out_qparams_.zero_point,
@@ -305,9 +310,7 @@ bool FullyConnectedDNNLowPOp<T>::RunOnDevice() {
         DoNothing<float, float> doNothingObj{};
 
         if (quantize_channelwise_) {
-          ReQuantizeForFloat<
-              false /* FUSE_RELU*/,
-              QuantizationGranularity::OUT_CHANNEL>
+          ReQuantizeForFloat<ReluFused, QuantizationGranularity::OUT_CHANNEL>
               outputProcObj(
                   doNothingObj,
                   in_qparams_[0].scale,
@@ -329,7 +332,7 @@ bool FullyConnectedDNNLowPOp<T>::RunOnDevice() {
               0, // thread_id
               1); // num_threads
         } else {
-          ReQuantizeForFloat<false /* FUSE_RELU*/> outputProcObj(
+          ReQuantizeForFloat<ReluFused> outputProcObj(
               doNothingObj,
               in_qparams_[0].scale,
               filter_scales_.data(),
@@ -367,9 +370,7 @@ bool FullyConnectedDNNLowPOp<T>::RunOnDevice() {
         DoNothing<float, float> doNothingObj{};
 
         if (quantize_channelwise_) {
-          ReQuantizeForFloat<
-              false /* FUSE_RELU*/,
-              QuantizationGranularity::OUT_CHANNEL>
+          ReQuantizeForFloat<ReluFused, QuantizationGranularity::OUT_CHANNEL>
               outputProcObj(
                   doNothingObj,
                   in_qparams_[0].scale,
@@ -391,7 +392,7 @@ bool FullyConnectedDNNLowPOp<T>::RunOnDevice() {
               0, // thread_id
               1); // num_threads
         } else {
-          ReQuantizeForFloat<false /* FUSE_RELU*/> outputProcObj(
+          ReQuantizeForFloat<ReluFused> outputProcObj(
               doNothingObj,
               in_qparams_[0].scale,
               filter_scales_.data(),
@@ -435,17 +436,79 @@ bool FullyConnectedDNNLowPOp<T>::RunOnDevice() {
     }
 #endif
 
+// #define DNNLOWP_DETAILED_LOG_IN_SLOW_PATH
+#ifdef DNNLOWP_DETAILED_LOG_IN_SLOW_PATH
+    int overflow_cnt = 0, underflow_cnt = 0;
+#endif
+
     Y_int32_.resize(Y->size());
     for (int i = 0; i < M; ++i) {
       for (int j = 0; j < N; ++j) {
         int32_t sum = 0;
         for (int k = 0; k < K; ++k) {
+          int x = Xdata[i * K + k];
           int w = Wdata[j * K + k];
-          sum += Xdata[i * K + k] * w;
+          sum += x * w;
+#ifdef DNNLOWP_DETAILED_LOG_IN_SLOW_PATH
+          if (k < K - 1) {
+            int x2 = Xdata[i * K + k + 1];
+            int w2 = Wdata[j * K + k + 1];
+            int sum2 = x * w + x2 * w2;
+            bool overflowed = false, underflowed = false;
+            if (sum2 > numeric_limits<int16_t>::max()) {
+              overflowed = true;
+              ++overflow_cnt;
+            } else if (sum2 < numeric_limits<int16_t>::min()) {
+              underflowed = true;
+              ++underflow_cnt;
+            }
+            if (overflowed || underflowed) {
+              LOG(INFO) << "i " << i << " j " << j << " k " << k << " " << x
+                        << " * " << w << " + " << x2 << " * " << w2 << " = "
+                        << sum2;
+            }
+          }
+#endif
         }
         Y_int32_[i * N + j] = sum;
       } // for each output element
     } // for each row
+
+    // Expose the quantized X, W and Y for debugging if debug outputs are
+    // attached to the operator and caffe2_dnnlowp_force_slow_path flag is set
+    if (OutputSize() == 4) {
+      auto* X_q = OutputTensorCPU_(1);
+      auto* W_q = OutputTensorCPU_(2);
+      auto* Y_q = OutputTensorCPU_(3);
+
+      X_q->Resize(std::vector<std::int64_t>{M, K});
+      W_q->Resize(std::vector<std::int64_t>{N, K});
+      Y_q->Resize(std::vector<std::int64_t>{M, N});
+
+      float* X_q_data = X_q->template mutable_data<float>();
+      float* W_q_data = W_q->template mutable_data<float>();
+      float* Y_q_data = Y_q->template mutable_data<float>();
+
+      size_t X_size = M * K;
+      size_t W_size = N * K;
+      size_t Y_size = M * N;
+      for (int i = 0; i < X_size; i++) {
+        X_q_data[i] = Xdata[i];
+      }
+      for (int i = 0; i < W_size; i++) {
+        W_q_data[i] = Wdata[i];
+      }
+      for (int i = 0; i < Y_size; i++) {
+        Y_q_data[i] = Y_int32_[i];
+      }
+    }
+
+#ifdef DNNLOWP_DETAILED_LOG_IN_SLOW_PATH
+    LOG(INFO) << "underflow_cnt " << underflow_cnt << " ("
+              << static_cast<float>(underflow_cnt) / (M * N * K) * 100
+              << ") overflow_cnt " << overflow_cnt << " ("
+              << static_cast<float>(overflow_cnt) / (M * N * K) * 100 << ")";
+#endif
   }
 
   if (FLAGS_caffe2_dnnlowp_dump_tensors) {
@@ -491,6 +554,9 @@ bool FullyConnectedDNNLowPOp<T>::RunOnDevice() {
           Ydata[i * N + j] = Y_int32_[i * N + j] * in_qparams_[0].scale *
                   filter_qparams_[quant_group].scale +
               b_dequantized_data_[j];
+          if (ReluFused) {
+            Ydata[i * N + j] = std::max(Ydata[i * N + j], 0.0f);
+          }
         }
       }
     }
@@ -516,6 +582,10 @@ bool FullyConnectedDNNLowPOp<T>::RunOnDevice() {
 
           Ydata[i * N + j] = fbgemm::Requantize<T>(
               Y_int32_[i * N + j], requantization_params_[quant_group]);
+          if (ReluFused) {
+            Ydata[i * N + j] =
+                std::max<T>(out_qparams_.zero_point, Ydata[i * N + j]);
+          }
         }
       }
     }
@@ -546,8 +616,8 @@ bool FullyConnectedDNNLowPOp<T>::RunOnDevice() {
   return true;
 }
 
-template <typename T>
-bool FullyConnectedDNNLowPOp<T>::GetQuantizationParameters_() {
+template <typename T, bool ReluFused>
+bool FullyConnectedDNNLowPOp<T, ReluFused>::GetQuantizationParameters_() {
   using namespace dnnlowp;
 
 #ifdef DNNLOWP_MEASURE_TIME_BREAKDOWN
@@ -581,7 +651,8 @@ bool FullyConnectedDNNLowPOp<T>::GetQuantizationParameters_() {
   int signed_min = -(1 << (qfactory_->GetWeightPrecision() - 1));
   if (is_weight_constant_) {
     bool fast_path = is_same<T, uint8_t>::value && GetCpuId().avx2() &&
-        this->debug_def().engine() != "DNNLOWP_ACC16";
+        this->debug_def().engine() != "DNNLOWP_ACC16" &&
+        !FLAGS_caffe2_dnnlowp_force_slow_path;
 
     if ((fast_path && !Wq_packed_) || (!fast_path && W_quantized_.empty())) {
       if (this->template InputIsType<Int8FCDNNLowPPackedWeightBlob>(1)) {
@@ -631,11 +702,13 @@ bool FullyConnectedDNNLowPOp<T>::GetQuantizationParameters_() {
           reason = "fbgemm only supports AVX2";
         } else if (this->debug_def().engine() == "DNNLOWP_ACC16") {
           reason = "";
+        } else if (FLAGS_caffe2_dnnlowp_force_slow_path) {
+          reason = "slow path enforced";
         } else {
           assert(false);
         }
         if (!reason.empty()) {
-          LOG(WARNING) << "Conv with weight " << this->debug_def().input(1)
+          LOG(WARNING) << "FC with weight " << this->debug_def().input(1)
                        << " falls back to slow path because " << reason;
         }
       }
@@ -704,8 +777,7 @@ bool FullyConnectedDNNLowPOp<T>::GetQuantizationParameters_() {
       const auto& packed_filter =
           this->template Input<Int8FCDNNLowPPackedWeightBlob>(1);
       CAFFE_ENFORCE(!dequantize_output_);
-      b_quantized_ = packed_filter.bias;
-      b_quantized_data_ = b_quantized_->data();
+      b_quantized_data_ = packed_filter.bias->data();
     } else {
       const auto& bias = InputTensorCPU_(2);
       if (this->template InputIsType<int8::Int8TensorCPU>(2)) {
@@ -713,11 +785,14 @@ bool FullyConnectedDNNLowPOp<T>::GetQuantizationParameters_() {
         bias_qparams.scale = this->template Input<int8::Int8TensorCPU>(2).scale;
         bias_qparams.zero_point =
             this->template Input<int8::Int8TensorCPU>(2).zero_point;
-        CAFFE_ENFORCE_LE(
-            std::abs(
-                bias_qparams.scale -
-                in_qparams_[0].scale * filter_qparams_[0].scale),
-            1e-4);
+        const auto M = X.size_to_dim(canonical_axis);
+        if (M > 0) {
+          CAFFE_ENFORCE_LE(
+              std::abs(
+                  bias_qparams.scale -
+                  in_qparams_[0].scale * filter_qparams_[0].scale),
+              1e-4);
+        }
         CAFFE_ENFORCE_EQ(bias_qparams.zero_point, 0);
         b_quantized_data_ = bias.template data<int32_t>();
         if (dequantize_output_) {
@@ -751,6 +826,8 @@ bool FullyConnectedDNNLowPOp<T>::GetQuantizationParameters_() {
     if (in_qparams_[0].zero_point && column_offsets_->empty() &&
         b_quantized_data_) {
       if (b_quantized_->empty()) {
+        // When b_quantized_data_ is from pre-packed bias or Int8TensorCPU,
+        // we can't inplace modify so copy to internal b_quantized_ vector.
         b_quantized_->assign(b_quantized_data_, b_quantized_data_ + N);
         b_quantized_data_ = b_quantized_->data();
       }
@@ -827,6 +904,8 @@ bool FullyConnectedDNNLowPOp<T>::GetQuantizationParameters_() {
   return true;
 }
 
+template class FullyConnectedDNNLowPOp<uint8_t>;
+
 REGISTER_CPU_OPERATOR_WITH_ENGINE(
     FC,
     DNNLOWP,
@@ -854,5 +933,21 @@ REGISTER_CPU_OPERATOR_WITH_ENGINE(
     Int8FC,
     DNNLOWP_ROWWISE,
     FullyConnectedDNNLowPOp<uint8_t>);
+
+REGISTER_CPU_OPERATOR_WITH_ENGINE(
+    Int8FCRelu,
+    DNNLOWP,
+    FullyConnectedDNNLowPOp<uint8_t, true>);
+REGISTER_CPU_OPERATOR_WITH_ENGINE(
+    Int8FCRelu,
+    DNNLOWP_ROWWISE,
+    FullyConnectedDNNLowPOp<uint8_t, true>);
+
+using namespace std::placeholders;
+OPERATOR_SCHEMA(Int8FCRelu)
+    .NumInputs(3)
+    .NumOutputs(1)
+    .TensorInferenceFunction(std::bind(FCShapeInference, _1, _2, false))
+    .CostInferenceFunction(std::bind(CostInferenceForFC, _1, _2, false));
 
 } // namespace caffe2

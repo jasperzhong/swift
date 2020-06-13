@@ -2,6 +2,8 @@ import time
 from collections import defaultdict
 from functools import partial
 
+import torch
+
 
 # Unfortunately it doesn't seem as if there was any way to get TensorBoard to do
 # anything without having TF installed, and so this file has a hard dependency on it
@@ -27,7 +29,7 @@ def visualize(graph, name_prefix='', pb_graph=None, executors_it=None):
     value_map = {}
     pb_graph = pb_graph or graph_pb2.GraphDef()
 
-    if isinstance(graph, (torch._C.GraphExecutor, torch._C.GraphExecutorState)):
+    if isinstance(graph, torch._C.GraphExecutorState):
         visualize_graph_executor(graph, name_prefix, pb_graph,
                                  partial(visualize, pb_graph=pb_graph))
         return pb_graph
@@ -65,9 +67,6 @@ def visualize_graph_executor(state, name_prefix, pb_graph, inline_graph):
     The strategy is to embed all different configurations as independent subgraphs,
     while inlining the original graph as the one that actually produces the values.
     """
-    if isinstance(state, torch._C.GraphExecutor):
-        state = state.get_debug_state()
-
     if state.autograd_fallback_graph is not None:
         visualize(graph=state.autograd_fallback_graph,
                   name_prefix=name_prefix + 'autograd_fallback/',

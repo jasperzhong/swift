@@ -456,7 +456,7 @@ class TestOperators(hu.HypothesisTestCase):
         self.assertReferenceChecks(gc, op, inputs, depth_concat_with_order)
 
     @given(X=hu.arrays(dims=[5, 2],
-                       elements=st.floats(min_value=1.0, max_value=10.0)),
+                       elements=hu.floats(min_value=1.0, max_value=10.0)),
            **hu.gcs_cpu_only)
     def test_last_n_windows(self, X, gc, dc):
         workspace.FeedBlob('input', X)
@@ -773,13 +773,12 @@ class TestOperators(hu.HypothesisTestCase):
         self.assertReferenceChecks(gc, op, [var, nz, indices, grad, alpha],
                                    ftrl)
 
-    # TODO: (bddppq) test_unique keeps running into segfault on rocm 1.8.2
     @given(input=hu.tensor(max_value=20,
                            max_dim=1,
                            dtype=np.int32,
                            elements=st.integers(min_value=0, max_value=10)),
            with_remapping=st.booleans(),
-           **hu.gcs_no_hip)
+           **hu.gcs)
     def test_unique(self, input, with_remapping, gc, dc):
         op = core.CreateOperator(
             "Unique",
@@ -800,7 +799,7 @@ class TestOperators(hu.HypothesisTestCase):
         self.assertValidationChecks(gc, op, [input], unique_valid)
 
     @given(prediction=hu.arrays(dims=[10, 3],
-                                elements=st.floats(allow_nan=False,
+                                elements=hu.floats(allow_nan=False,
                                                    allow_infinity=False,
                                                    min_value=0,
                                                    max_value=1)),
@@ -845,7 +844,7 @@ class TestOperators(hu.HypothesisTestCase):
             reference=op_ref)
 
     @given(target_probabilities=hu.arrays(
-        dims=[10], elements=st.floats(allow_nan=False,
+        dims=[10], elements=hu.floats(allow_nan=False,
                                       allow_infinity=False,
                                       min_value=0.01,
                                       max_value=1)),
@@ -966,7 +965,7 @@ class TestOperators(hu.HypothesisTestCase):
             reference=op_ref)
 
     @given(prediction=hu.arrays(dims=[10, 3],
-                                elements=st.floats(allow_nan=False,
+                                elements=hu.floats(allow_nan=False,
                                                    allow_infinity=False,
                                                    min_value=0,
                                                    max_value=1)),
@@ -1081,7 +1080,7 @@ class TestOperators(hu.HypothesisTestCase):
             reference=lengths_to_weights)
 
     @given(input_tensor=hu.arrays(
-        dims=[10], elements=st.floats(allow_nan=False,
+        dims=[10], elements=hu.floats(allow_nan=False,
                                       allow_infinity=False)),
            **hu.gcs)
     def test_abs(self, input_tensor, gc, dc):
@@ -1101,7 +1100,7 @@ class TestOperators(hu.HypothesisTestCase):
             reference=abs_ref)
 
     @given(input_tensor=hu.arrays(
-        dims=[10], elements=st.floats(min_value=-10,
+        dims=[10], elements=hu.floats(min_value=-10,
                                       max_value=10)),
            **hu.gcs)
     def test_cos(self, input_tensor, gc, dc):
@@ -1121,7 +1120,7 @@ class TestOperators(hu.HypothesisTestCase):
             reference=cos_ref)
 
     @given(input_tensor=hu.arrays(
-        dims=[10], elements=st.floats(min_value=-10,
+        dims=[10], elements=hu.floats(min_value=-10,
                                       max_value=10)),
            **hu.gcs)
     def test_sin(self, input_tensor, gc, dc):
@@ -1141,7 +1140,7 @@ class TestOperators(hu.HypothesisTestCase):
             reference=sin_ref)
 
     @given(input_tensor=hu.arrays(
-        dims=[10], elements=st.floats(allow_nan=False,
+        dims=[10], elements=hu.floats(allow_nan=False,
                                       allow_infinity=False)),
            **hu.gcs)
     def test_exp(self, input_tensor, gc, dc):
@@ -1161,7 +1160,7 @@ class TestOperators(hu.HypothesisTestCase):
             reference=exp_ref)
 
     @given(input_tensor=hu.arrays(
-        dims=[10], elements=st.floats(min_value=1,
+        dims=[10], elements=hu.floats(min_value=1,
                                       max_value=10000)),
            **hu.gcs_cpu_only)
     def test_log(self, input_tensor, gc, dc):
@@ -1526,10 +1525,7 @@ class TestOperators(hu.HypothesisTestCase):
            net_type=st.sampled_from(
                ["simple", "dag"] +
                (["async_dag"] if workspace.has_gpu_support else [])),
-           # This test is flaky on rocm caused by race condition in
-           # hcc HSAQueue, the fix will be coming in rocm 2.2 (see
-           # https://github.com/pytorch/pytorch/issues/16229
-           **hu.gcs_no_hip)
+           **hu.gcs)
     def test_dag_net_forking(self, net_type, num_workers, gc, dc):
         from caffe2.python.model_helper import ModelHelper
         from caffe2.python import brew
@@ -1596,9 +1592,7 @@ class TestOperators(hu.HypothesisTestCase):
             self.assertAlmostEqual(np.sum(np.square(output)), 91.81752,
                                    delta=1e-2)
 
-    @given(input=hu.tensor(min_dim=2, max_dim=6, dtype=np.int32,
-                           elements=st.integers(min_value=0,
-                                                max_value=2**32 - 1)),
+    @given(input=hu.tensor(min_dim=2, max_dim=6),
            slice_dim=st.integers(),
            a=st.integers(),
            b=st.integers(),
@@ -1629,6 +1623,7 @@ class TestOperators(hu.HypothesisTestCase):
 
         self.assertReferenceChecks(gc, op, [input, start_vec, end_vec],
                                    slice_ref)
+        self.assertGradientChecks(gc, op, [input, start_vec, end_vec], 0, [0])
 
     @given(data=hu.tensor(), **hu.gcs_cpu_only)
     def test_shape(self, data, gc, dc):
@@ -1643,13 +1638,13 @@ class TestOperators(hu.HypothesisTestCase):
         op = core.CreateOperator("Shape", ["data"], ["shape"], axes=axes)
         self.assertReferenceChecks(gc, op, [data, axes], shape_ref)
 
-    @given(data=hu.tensor(), **hu.gcs_cpu_only)
-    def test_has_elements(self, data, gc, dc):
-        op = core.CreateOperator("HasElements", ["data"], ["has_elements"])
-        self.assertReferenceChecks(gc, op, [data], lambda x: (len(x) > 0, ))
+    @given(x=hu.tensor(), y=hu.tensor(), **hu.gcs_cpu_only)
+    def test_has_elements(self, x, y, gc, dc):
+        op = core.CreateOperator("HasElements", ["x", "y"], ["has_elements"])
+        self.assertReferenceChecks(gc, op, [x, y], lambda x, y: (len(x) > 0 or len(y) > 0, ))
 
-        op = core.CreateOperator("IsEmpty", ["data"], ["is_empty"])
-        self.assertReferenceChecks(gc, op, [data], lambda x: (len(x) == 0, ))
+        op = core.CreateOperator("IsEmpty", ["x"], ["is_empty"])
+        self.assertReferenceChecks(gc, op, [x], lambda x: (len(x) == 0, ))
 
     @given(initial_iters=st.integers(0, 100),
            max_iters=st.integers(0, 100))
@@ -1829,7 +1824,7 @@ class TestOperators(hu.HypothesisTestCase):
 
     @given(a=hu.tensor(),
            eps=st.floats(min_value=1e-4, max_value=1e-2),
-           a_grad=hu.tensor(elements=st.floats(min_value=0.01, max_value=0.99)),
+           a_grad=hu.tensor(elements=hu.floats(min_value=0.01, max_value=0.99)),
            eps_grad=st.floats(min_value=1e-4, max_value=1e-3),
            **hu.gcs)
     def test_logit(self, a, eps, a_grad, eps_grad, gc, dc):
@@ -1843,7 +1838,7 @@ class TestOperators(hu.HypothesisTestCase):
         # error increases dramtically when input is close to 0 or 1
         # and it will fail the test.
         # So we only run gradient test in the range of (0.01, 0.99)
-        # very occationally, test may fail due to random accumulated error
+        # very occasionally, test may fail due to random accumulated error
         # reduce test range to (0.02, 0.98) will improve test stability
         op = core.CreateOperator('Logit', ["X"], ["Y"], eps=eps)
         self.assertDeviceChecks(dc, op, [a], [0])
@@ -1852,7 +1847,7 @@ class TestOperators(hu.HypothesisTestCase):
         self.assertGradientChecks(gc, op_grad, [a_grad], 0, [0],
                                   threshold=0.04, stepsize=2e-3)
 
-    @given(a=hu.tensor(elements=st.floats(allow_nan=True)),
+    @given(a=hu.tensor(elements=hu.floats(allow_nan=True)),
            value=st.floats(min_value=-10, max_value=10),
            **hu.gcs)
     def test_replace_nan(self, a, value, gc, dc):
@@ -2227,7 +2222,7 @@ class TestOperators(hu.HypothesisTestCase):
             np.testing.assert_array_equal(ws.blobs[blob].fetch(), arr)
 
     @given(inp=_dtypes().flatmap(lambda dt: _tensor_and_indices(
-        elements=st.floats(min_value=0, max_value=1), dtype=dt)),
+        elements=hu.floats(min_value=0, max_value=1), dtype=dt)),
         **hu.gcs)
     def test_sparse_to_dense(self, inp, gc, dc):
         first_dim, X, I = inp

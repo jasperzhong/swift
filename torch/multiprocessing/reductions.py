@@ -1,11 +1,11 @@
 import torch
 import torch.utils.hooks
+from torch._namedtensor_internals import check_serializing_named_tensor
 import os
-import weakref
 import threading
 import multiprocessing
+from multiprocessing.util import register_after_fork
 from multiprocessing.reduction import ForkingPickler
-import sys
 try:
     # Early load resource_sharer to prevent a partially initialized instance
     # from being inherited in a forked child process. The reduce_storage method
@@ -43,6 +43,13 @@ class SharedCache(dict):
         # free_dead_references() is called if the len exceeds the current
         # limit. The limit scales with the number of remaining live objects.
         self.limit = 128
+        # `fork` inherits lock state, so in case we fork when the lock is held,
+        # we register a function to reset the lock to a new object to avoid
+        # possible deadlocks, following python multiprocessing library design.
+        self._after_fork()
+        register_after_fork(self, SharedCache._after_fork)
+
+    def _after_fork(self):
         self.lock = threading.Lock()
 
     def __setitem__(self, key, storage_ref):
@@ -80,14 +87,18 @@ def rebuild_tensor(cls, storage, metadata):
     storage_offset, size, stride, requires_grad = metadata
     t = torch._utils._rebuild_tensor(storage, storage_offset, size, stride)
     if cls == torch.nn.parameter.Parameter:
-        t = torch.nn.parameter.Parameter(t)
-    t.requires_grad = requires_grad
+        # we have to pass requires_grad into constructor, rather than set it as an
+        # attribute later, because it's an important check for Integer Tensors to
+        # have requires_grad=False (or else they raise an error)
+        t = torch.nn.parameter.Parameter(t, requires_grad=requires_grad)
+    else:
+        t.requires_grad = requires_grad
     return t
 
 
 def rebuild_cuda_tensor(tensor_cls, tensor_size, tensor_stride, tensor_offset,
                         storage_cls, storage_device, storage_handle, storage_size_bytes, storage_offset_bytes,
-                        requires_grad):
+                        requires_grad, ref_counter_handle, ref_counter_offset, event_handle, event_sync_required):
     # If storage_handle is None, storage points to nullptr.
     if storage_handle is None or storage_size_bytes == 0:
         storage = storage_cls(0)
@@ -99,8 +110,15 @@ def rebuild_cuda_tensor(tensor_cls, tensor_size, tensor_stride, tensor_offset,
                 storage_device,
                 storage_handle,
                 storage_size_bytes,
-                storage_offset_bytes)
+                storage_offset_bytes,
+                ref_counter_handle,
+                ref_counter_offset,
+                event_handle,
+                event_sync_required)
             shared_cache[(storage_handle, storage_offset_bytes)] = StorageWeakRef(storage)
+        else:
+            # We already ref counting this Storage, but producer needs new ref-counters to be released.
+            storage_cls._release_ipc_counter(ref_counter_handle, ref_counter_offset)
 
     t = torch._utils._rebuild_tensor(storage, tensor_offset, tensor_size, tensor_stride)
     if tensor_cls == torch.nn.parameter.Parameter:
@@ -118,6 +136,7 @@ def reduce_tensor(tensor):
                            "If you just want to transfer the data, call detach() on the tensor "
                            "before serializing (e.g., putting it on the queue).")
 
+    check_serializing_named_tensor(tensor)
     torch.utils.hooks.warn_if_has_hooks(tensor)
 
     # Note [CUDA IPC and the caching allocator]
@@ -154,7 +173,7 @@ def reduce_tensor(tensor):
     # the old ones alives.
     # See [https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__DEVICE.html]
     #
-    # This is fine, because all we need to do is to save our position in the allocaiton,
+    # This is fine, because all we need to do is to save our position in the allocation,
     # and reconstruct storage and tensor from it.
     # 0xA000 ->  -------CUDA Allocation------
     #           |                            |
@@ -187,7 +206,7 @@ def reduce_tensor(tensor):
     # On receiver side:
     #   1. Get the devPtr of the MemHandle to access the memory, reconstruct a storage
     #      of the same type using (basePtr, offset, size).
-    #   2. we can reconstruct the tensor on top of the recontructed storage
+    #   2. we can reconstruct the tensor on top of the reconstructed storage
     #   Tensor(size=0x040, offset=0x020, storage=Storage(data=basePtr+0xA100, size=0x0100))
     #
     # This strategy has a few implications:
@@ -211,11 +230,16 @@ def reduce_tensor(tensor):
     # thing.
     #
     if storage.is_cuda:
-        (device, handle, storage_size_bytes, storage_offset_bytes) = storage._share_cuda_()
+        (device,
+         handle,
+         storage_size_bytes,
+         storage_offset_bytes,
+         ref_counter_handle,
+         ref_counter_offset,
+         event_handle,
+         event_sync_required) = storage._share_cuda_()
         tensor_offset = tensor.storage_offset()
-
         shared_cache[handle] = StorageWeakRef(storage)
-
         # _backward_hooks purposely omitted here, see
         # Note [Don't serialize hooks]
         return (rebuild_cuda_tensor,
@@ -228,7 +252,11 @@ def reduce_tensor(tensor):
                  handle,  # identifier which CUDA allocation is the storage in.
                  storage_size_bytes,  # size(in bytes) of the storage
                  storage_offset_bytes,  # offset(in bytes) of the storage in the CUDA allocation
-                 tensor.requires_grad))
+                 tensor.requires_grad,
+                 ref_counter_handle,
+                 ref_counter_offset,
+                 event_handle,
+                 event_sync_required))
 
     # _backward_hooks purposely omitted here, see Note [Don't serialize hooks]
     metadata = (tensor.storage_offset(), tensor.size(), tensor.stride(), tensor.requires_grad)
@@ -251,10 +279,7 @@ def storage_from_cache(cls, key):
 
 
 def rebuild_storage_fd(cls, df, size):
-    if sys.version_info[0] == 2:
-        fd = multiprocessing.reduction.rebuild_handle(df)
-    else:
-        fd = df.detach()
+    fd = df.detach()
     try:
         storage = storage_from_cache(cls, fd_id(fd))
         if storage is not None:
@@ -294,10 +319,7 @@ def reduce_storage(storage):
         return (rebuild_storage_empty, (type(storage),))
     else:
         fd, size = storage._share_fd_()
-        if sys.version_info[0] == 2:
-            df = multiprocessing.reduction.reduce_handle(fd)
-        else:
-            df = multiprocessing.reduction.DupFd(fd)
+        df = multiprocessing.reduction.DupFd(fd)
         cache_key = fd_id(fd)
         metadata = (df, size)
         rebuild = rebuild_storage_fd

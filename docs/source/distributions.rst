@@ -77,6 +77,15 @@ Probability distributions - torch.distributions
     :undoc-members:
     :show-inheritance:
 
+:hidden:`ContinuousBernoulli`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. currentmodule:: torch.distributions.continuous_bernoulli
+.. autoclass:: ContinuousBernoulli
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 :hidden:`Dirichlet`
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -185,6 +194,15 @@ Probability distributions - torch.distributions
     :undoc-members:
     :show-inheritance:
 
+:hidden:`MixtureSameFamily`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. currentmodule:: torch.distributions.mixture_same_family
+.. autoclass:: MixtureSameFamily
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 :hidden:`Multinomial`
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -258,7 +276,7 @@ Probability distributions - torch.distributions
     :show-inheritance:
 
 :hidden:`LogitRelaxedBernoulli`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. currentmodule:: torch.distributions.relaxed_bernoulli
 .. autoclass:: LogitRelaxedBernoulli
@@ -298,6 +316,15 @@ Probability distributions - torch.distributions
 
 .. currentmodule:: torch.distributions.uniform
 .. autoclass:: Uniform
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+:hidden:`VonMises`
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. currentmodule:: torch.distributions.von_mises
+.. autoclass:: VonMises
     :members:
     :undoc-members:
     :show-inheritance:

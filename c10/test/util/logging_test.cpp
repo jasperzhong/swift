@@ -34,7 +34,7 @@ TEST(LoggingTest, TestEnforceEquals) {
     // This should never be triggered.
     ADD_FAILURE();
   } catch (const ::c10::Error& err) {
-    EXPECT_NE(err.msg().find("5 vs 6"), string::npos);
+    EXPECT_NE(std::string(err.what()).find("5 vs 6"), string::npos);
   }
 
   // arguments are expanded only once
@@ -75,6 +75,13 @@ TEST(LoggingTest, Join) {
   EXPECT_EQ(s, "");
   s = c10::Join(", ", set<int>({3, 1, 2}));
   EXPECT_EQ(s, "1, 2, 3");
+}
+
+TEST(LoggingTest, TestDanglingElse) {
+  if (true)
+    DCHECK_EQ(1, 1);
+  else
+    GTEST_FAIL();
 }
 
 #if GTEST_HAS_DEATH_TEST

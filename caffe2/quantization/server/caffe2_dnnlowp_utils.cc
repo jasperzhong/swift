@@ -17,6 +17,8 @@ C10_DECLARE_bool(caffe2_dnnlowp_preserve_activation_sparsity);
 C10_DECLARE_bool(caffe2_dnnlowp_preserve_weight_sparsity);
 C10_DECLARE_string(caffe2_dnnlowp_activation_quantization_kind);
 C10_DECLARE_string(caffe2_dnnlowp_weight_quantization_kind);
+C10_DECLARE_double(caffe2_dnnlowp_weight_p99_threshold);
+C10_DECLARE_double(caffe2_dnnlowp_activation_p99_threshold);
 
 namespace dnnlowp {
 
@@ -69,7 +71,20 @@ TensorQuantizationParams GetInputTensorQuantizationParamsOf(
     float min, max;
     fbgemm::FindMinMax(
         tensor->template data<float>(), &min, &max, tensor->numel());
-
+    auto activation_quantization_kind = qfactory->GetActivationKind();
+    if (activation_quantization_kind !=
+        QuantizationFactory::QuantizationKind::MIN_MAX_QUANTIZATION) {
+      LOG(WARNING)
+          << "DNNLOWP dynamic int8 FC uses min_max as the only activation_quantization kind. Qparams will be assigned based on min_max regardless of activation_quantization_kind args.";
+    }
+    if (is_weight) {
+      auto weight_quantization_kind = qfactory->GetWeightKind();
+      if (weight_quantization_kind !=
+          QuantizationFactory::QuantizationKind::MIN_MAX_QUANTIZATION) {
+        LOG(WARNING)
+            << "DNNLOWP dynamic int8 FC weight is not constant, assigning qparams to weight based on min_max, regardless of weight_quantization_kind args.";
+      }
+    }
     return qfactory->ChooseQuantizationParams(min, max, is_weight);
   }
 }
@@ -237,7 +252,8 @@ void ReportQuantizationError(
     const QuantizationErrorStats& stat) {
   if (stat.sum_sq == 0) {
     LOG(INFO) << " output " << op->debug_def().output(0) << " of operator "
-              << op << " with type " << op->debug_def().type()
+              << op << " with type " << op->debug_def().type() << " and engine "
+              << op->debug_def().engine()
               << " has l2 relative error nan (stat.sum_err_sq "
               << stat.sum_err_sq << " stat.sum_sq 0)"
               << " and max abs error " << stat.max_abs_err << " (reference is "
@@ -247,8 +263,8 @@ void ReportQuantizationError(
               << " cnt " << stat.measure_cnt;
   } else {
     LOG(INFO) << " output " << op->debug_def().output(0) << " of operator "
-              << op << " with type " << op->debug_def().type()
-              << " has l2 relative error "
+              << op << " with type " << op->debug_def().type() << " and engine "
+              << op->debug_def().engine() << " has l2 relative error "
               << std::sqrt(stat.sum_err_sq) / std::sqrt(stat.sum_sq)
               << " and max abs error " << stat.max_abs_err << " (reference is "
               << stat.max_err_ref << " and actual is " << stat.max_err_actual
@@ -304,19 +320,36 @@ static unique_ptr<QuantizationFactory> GetQuantizationFactoryOf_(
           op_def,
           "weight_quantization_kind",
           FLAGS_caffe2_dnnlowp_weight_quantization_kind);
-
-  VLOG(2) << "Quantization method for op with output " << op_def.output(0)
-          << " activation_precision " << activation_precision
-          << " weight_precision " << weight_precision
-          << " requantization_multiplier_precision "
-          << requantization_multiplier_precision
-          << " eltwise_quantization_precision "
-          << eltwise_quantization_precision << " preserve_activation_sparsity "
-          << preserve_activation_sparsity << " preserve_weight_sparsity "
-          << preserve_weight_sparsity << " force_scale_power_of_two "
-          << force_scale_power_of_two << " activation_quantization_kind "
-          << activation_quantization_kind << " weight_quantization_kind "
-          << weight_quantization_kind;
+  float weight_p99_threshold =
+      ArgumentHelper::GetSingleArgument<OperatorDef, float>(
+          op_def,
+          "weight_p99_threshold",
+          FLAGS_caffe2_dnnlowp_weight_p99_threshold);
+  float activation_p99_threshold =
+      ArgumentHelper::GetSingleArgument<OperatorDef, float>(
+          op_def,
+          "activation_p99_threshold",
+          FLAGS_caffe2_dnnlowp_activation_p99_threshold);
+  std::stringstream ss;
+  ss << "Quantization method for op with output " << op_def.output(0)
+     << " engine " << op_def.engine() << " activation_precision "
+     << activation_precision << " weight_precision " << weight_precision
+     << " requantization_multiplier_precision "
+     << requantization_multiplier_precision
+     << " eltwise_quantization_precision " << eltwise_quantization_precision
+     << " preserve_activation_sparsity " << preserve_activation_sparsity
+     << " preserve_weight_sparsity " << preserve_weight_sparsity
+     << " force_scale_power_of_two " << force_scale_power_of_two
+     << " activation_quantization_kind " << activation_quantization_kind
+     << " weight_quantization_kind " << weight_quantization_kind;
+  if (weight_quantization_kind == "p99" || weight_quantization_kind == "P99") {
+    ss << " weight p99 threshold " << weight_p99_threshold;
+  }
+  if (activation_quantization_kind == "p99" ||
+      activation_quantization_kind == "P99") {
+    ss << " activation p99 threshold " << activation_p99_threshold;
+  }
+  VLOG(2) << ss.str();
 
   return unique_ptr<QuantizationFactory>(new QuantizationFactory(
       activation_precision,
@@ -327,7 +360,9 @@ static unique_ptr<QuantizationFactory> GetQuantizationFactoryOf_(
       preserve_weight_sparsity,
       force_scale_power_of_two,
       StringToKind(activation_quantization_kind),
-      StringToKind(weight_quantization_kind)));
+      StringToKind(weight_quantization_kind),
+      weight_p99_threshold,
+      activation_p99_threshold));
 }
 
 unique_ptr<QuantizationFactory> GetQuantizationFactoryOf(

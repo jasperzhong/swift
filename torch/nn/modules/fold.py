@@ -1,10 +1,8 @@
 # coding=utf-8
 from .module import Module
 from .. import functional as F
-from ..._jit_internal import weak_module, weak_script_method
 
 
-@weak_module
 class Fold(Module):
     r"""Combines an array of sliding local blocks into a large containing
     tensor.
@@ -12,9 +10,9 @@ class Fold(Module):
     Consider a batched :attr:`input` tensor containing sliding local blocks,
     e.g., patches of images, of shape :math:`(N, C \times  \prod(\text{kernel\_size}), L)`,
     where :math:`N` is batch dimension, :math:`C \times \prod(\text{kernel\_size})`
-    is the number of values with in a block (a block has :math:`\prod(\text{kernel\_size})`
+    is the number of values within a block (a block has :math:`\prod(\text{kernel\_size})`
     spatial locations each containing a :math:`C`-channeled vector), and
-    :math:`L` is the total number of blocks. (This is exacly the
+    :math:`L` is the total number of blocks. (This is exactly the
     same specification as the output shape of :class:`~torch.nn.Unfold`.) This
     operation combines these local blocks into the large :attr:`output` tensor
     of shape :math:`(N, C, \text{output\_size}[0], \text{output\_size}[1], \dots)`
@@ -70,6 +68,32 @@ class Fold(Module):
         copying from the large tensor. So, if the blocks overlap, they are not
         inverses of each other.
 
+        In general, folding and unfolding operations are related as
+        follows. Consider :class:`~torch.nn.Fold` and
+        :class:`~torch.nn.Unfold` instances created with the same
+        parameters:
+
+        >>> fold_params = dict(kernel_size=..., dilation=..., padding=..., stride=...)
+        >>> fold = nn.Fold(output_size=..., **fold_params)
+        >>> unfold = nn.Unfold(**fold_params)
+
+        Then for any (supported) ``input`` tensor the following
+        equality holds:
+
+        ::
+
+            fold(unfold(input)) == divisor * input
+
+        where ``divisor`` is a tensor that depends only on the shape
+        and dtype of the ``input``:
+
+        >>> input_ones = torch.ones(input.shape, dtype=input.dtype)
+        >>> divisor = fold(unfold(input_ones))
+
+        When the ``divisor`` tensor contains no zero elements, then
+        ``fold`` and ``unfold`` operations are inverses of each
+        other (up to constant divisor).
+
     .. warning::
         Currently, only 4-D output tensors (batched image-like tensors) are
         supported.
@@ -101,7 +125,6 @@ class Fold(Module):
         self.padding = padding
         self.stride = stride
 
-    @weak_script_method
     def forward(self, input):
         return F.fold(input, self.output_size, self.kernel_size, self.dilation,
                       self.padding, self.stride)
@@ -113,18 +136,17 @@ class Fold(Module):
             )
 
 
-@weak_module
 class Unfold(Module):
     r"""Extracts sliding local blocks from a batched input tensor.
 
-    Consider an batched :attr:`input` tensor of shape :math:`(N, C, *)`,
+    Consider a batched :attr:`input` tensor of shape :math:`(N, C, *)`,
     where :math:`N` is the batch dimension, :math:`C` is the channel dimension,
     and :math:`*` represent arbitrary spatial dimensions. This operation flattens
     each sliding :attr:`kernel_size`-sized block within the spatial dimensions
     of :attr:`input` into a column (i.e., last dimension) of a 3-D :attr:`output`
     tensor of shape :math:`(N, C \times \prod(\text{kernel\_size}), L)`, where
     :math:`C \times \prod(\text{kernel\_size})` is the total number of values
-    with in each block (a block has :math:`\prod(\text{kernel\_size})` spatial
+    within each block (a block has :math:`\prod(\text{kernel\_size})` spatial
     locations each containing a :math:`C`-channeled vector), and :math:`L` is
     the total number of such blocks:
 
@@ -175,6 +197,32 @@ class Unfold(Module):
         copying from the large tensor. So, if the blocks overlap, they are not
         inverses of each other.
 
+        In general, folding and unfolding operations are related as
+        follows. Consider :class:`~torch.nn.Fold` and
+        :class:`~torch.nn.Unfold` instances created with the same
+        parameters:
+
+        >>> fold_params = dict(kernel_size=..., dilation=..., padding=..., stride=...)
+        >>> fold = nn.Fold(output_size=..., **fold_params)
+        >>> unfold = nn.Unfold(**fold_params)
+
+        Then for any (supported) ``input`` tensor the following
+        equality holds:
+
+        ::
+
+            fold(unfold(input)) == divisor * input
+
+        where ``divisor`` is a tensor that depends only on the shape
+        and dtype of the ``input``:
+
+        >>> input_ones = torch.ones(input.shape, dtype=input.dtype)
+        >>> divisor = fold(unfold(input_ones))
+
+        When the ``divisor`` tensor contains no zero elements, then
+        ``fold`` and ``unfold`` operations are inverses of each
+        other (up to constant divisor).
+
     .. warning::
         Currently, only 4-D input tensors (batched image-like tensors) are
         supported.
@@ -217,7 +265,6 @@ class Unfold(Module):
         self.padding = padding
         self.stride = stride
 
-    @weak_script_method
     def forward(self, input):
         return F.unfold(input, self.kernel_size, self.dilation,
                         self.padding, self.stride)

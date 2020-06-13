@@ -1,18 +1,33 @@
 #include <ATen/ATen.h>
 #include <ATen/MemoryOverlap.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/TensorUtils.h>
 #include <ATen/detail/CUDAHooksInterface.h>
 #include <c10/util/Exception.h>
+#include <c10/core/Storage.h>
 
 namespace at {
 namespace native {
 
+bool is_pinned(const Tensor& self) {
+  return detail::getCUDAHooks().isPinnedPtr(self.storage().data());
+}
+
 Tensor pin_memory(const Tensor& self) {
-  if (self.type().backend() != Backend::CPU) {
-    AT_ERROR("cannot pin '", self.type().toString(), "' only CPU memory can be pinned");
+  if (self.options().backend() != Backend::CPU) {
+    AT_ERROR("cannot pin '", self.toString(), "' only dense CPU tensors can be pinned");
+  }
+  if (self.is_pinned()) {
+    return self;
   }
   auto* allocator = detail::getCUDAHooks().getPinnedMemoryAllocator();
-  auto tensor = self.type().tensorWithAllocator(self.sizes(), self.strides(), allocator);
+  auto storage = Storage(
+      Storage::use_byte_size_t(),
+      detail::computeStorageNbytes(
+          self.sizes(), self.strides(), self.dtype().itemsize()),
+      allocator,
+      /*resizable=*/false);
+  auto tensor = at::empty({0}, self.options()).set_(storage, 0, self.sizes(), self.strides());
   tensor.copy_(self);
   return tensor;
 }
