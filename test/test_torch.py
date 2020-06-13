@@ -3290,6 +3290,7 @@ class AbstractTestCases:
                 self.assertEqual(split.size(), target_size)
                 self.assertEqual(tensor.narrow(dim, start, target_size[dim]), split,
                                  atol=0, rtol=0)
+                self.assertIs(split._base, tensor)  # split should return a view
                 start = start + target_size[dim]
 
             # Variable sections split
@@ -3303,6 +3304,7 @@ class AbstractTestCases:
                 self.assertEqual(split.size(), target_size)
                 self.assertEqual(tensor.narrow(dim, start, target_size[dim]), split,
                                  atol=0, rtol=0)
+                self.assertIs(split._base, tensor)  # split should return a view
                 start = start + target_size[dim]
 
             split_sizes = [2, 2, 6]
@@ -3327,6 +3329,7 @@ class AbstractTestCases:
                 self.assertEqual(split.size(), target_size)
                 self.assertEqual(tensor.narrow(dim, start, target_size[dim]), split,
                                  atol=0, rtol=0)
+                self.assertIs(split._base, tensor)  # chunk should return a view
                 start = start + target_size[dim]
 
             # Invalid chunk sizes
