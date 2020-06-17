@@ -41,6 +41,8 @@ from torch.testing._internal.jit_utils import get_forward_graph
 
 from torch.jit._recursive import wrap_cpp_module
 
+from torch.nn.utils.fusion import fuse_conv_bn_script
+
 # Standard library
 import itertools
 import unittest
@@ -80,7 +82,8 @@ class TestQuantizeScriptJitPasses(QuantizationTestCase):
                 .run(str(get_forward(scripted_or_traced._c).graph))
 
             # Run FoldConvBatchnorm2d pass.
-            scripted_or_traced = wrap_cpp_module(torch._C._jit_pass_fold_convbn(scripted_or_traced._c))
+            scripted_or_traced = fuse_conv_bn_script(scripted_or_traced)
+
 
             # Check that after the pass one of the CallMethods is gone (supposedly,
             # the bn.forward).
@@ -124,7 +127,7 @@ class TestQuantizeScriptJitPasses(QuantizationTestCase):
                 .run(str(get_forward_graph(scripted_or_traced._c)))
 
             # Run FoldConvBatchnorm2d pass.
-            scripted_or_traced = wrap_cpp_module(torch._C._jit_pass_fold_convbn(scripted_or_traced._c))
+            scripted_or_traced = fuse_conv_bn_script(scripted_or_traced)
 
             # Check that after the pass one of the CallMethods is gone (supposedly,
             # the bn.forward).
@@ -170,7 +173,7 @@ class TestQuantizeScriptJitPasses(QuantizationTestCase):
             FileCheck().check_count("prim::CallMethod[name=\"forward\"]", 2, exactly=True) \
                 .run(str(get_forward_graph(scripted_or_traced.sub._c)))
 
-            scripted_or_traced = wrap_cpp_module(torch._C._jit_pass_fold_convbn(scripted_or_traced._c))
+            scripted_or_traced = fuse_conv_bn_script(scripted_or_traced)
 
             FileCheck().check_count("prim::CallMethod[name=\"forward\"]", 1, exactly=True) \
                 .run(str(get_forward_graph(scripted_or_traced.sub._c)))
@@ -221,7 +224,7 @@ class TestQuantizeScriptJitPasses(QuantizationTestCase):
             FileCheck().check_count("prim::CallMethod[name=\"forward\"]", 2, exactly=True) \
                 .run(str(get_forward_graph(scripted_or_traced.sub._c)))
 
-            scripted_or_traced = wrap_cpp_module(torch._C._jit_pass_fold_convbn(scripted_or_traced._c))
+            scripted_or_traced = fuse_conv_bn_script(scripted_or_traced)
 
             FileCheck().check_count("prim::CallMethod[name=\"forward\"]", 2, exactly=True) \
                 .run(str(get_forward_graph(scripted_or_traced.sub._c)))
@@ -262,7 +265,7 @@ class TestQuantizeScriptJitPasses(QuantizationTestCase):
                 else:
                     scripted_or_traced = torch.jit.script(eager).copy()
                 torch._C._jit_pass_dedup_module_uses(scripted_or_traced ._c)
-                folded = wrap_cpp_module(torch._C._jit_pass_fold_convbn(scripted_or_traced ._c))
+                folded = fuse_conv_bn_script(scripted_or_traced)
                 x = torch.rand(1, 5, 6, 6)
                 self.assertEqual(eager(x), scripted_or_traced(x))
 
@@ -315,7 +318,7 @@ class TestQuantizeScriptJitPasses(QuantizationTestCase):
             FileCheck().check_count("prim::CallMethod[name=\"forward\"]", num_layers * 2, exactly=True) \
                 .run(str(get_forward_graph(scripted_or_traced.sub.layers._c)))
 
-            scripted_or_traced = wrap_cpp_module(torch._C._jit_pass_fold_convbn(scripted_or_traced._c))
+            scripted_or_traced = fuse_conv_bn_script(scripted_or_traced)
 
             FileCheck().check_count("prim::CallMethod[name=\"forward\"]", num_layers, exactly=True) \
                 .run(str(get_forward_graph(scripted_or_traced.sub.layers._c)))
