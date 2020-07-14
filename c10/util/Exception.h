@@ -242,7 +242,6 @@ inline std::string if_empty_then(std::string x, std::string y) {
 // ----------------------------------------------------------------------------
 // Error reporting macros
 // ----------------------------------------------------------------------------
-
 #ifdef STRIP_ERROR_MESSAGES
 #define TORCH_RETHROW(e, ...) throw
 #else
@@ -276,8 +275,7 @@ inline std::string if_empty_then(std::string x, std::string y) {
 #define TORCH_INTERNAL_ASSERT(cond, ...)      \
   if (C10_UNLIKELY_OR_CONST(!(cond))) {       \
     C10_THROW_ERROR(Error,                    \
-        #cond " INTERNAL ASSERT FAILED at"    \
-        C10_STRINGIZE(__FILE__)               \
+        ::c10::error_value(__VA_ARGS__)       \
     );                                        \
   }
 #else
@@ -321,8 +319,7 @@ inline std::string if_empty_then(std::string x, std::string y) {
 #define TORCH_CHECK_WITH_MSG(error_t, cond, type, ...)  \
   if (C10_UNLIKELY_OR_CONST(!(cond))) {                 \
     C10_THROW_ERROR(Error,                              \
-        #cond #type " CHECK FAILED at "                 \
-        C10_STRINGIZE(__FILE__)                         \
+        ::c10::error_value(__VA_ARGS__)                 \
     );                                                  \
   }
 #else
@@ -340,7 +337,7 @@ inline std::string if_empty_then(std::string x, std::string y) {
 #endif
 #define TORCH_CHECK(cond, ...) TORCH_CHECK_WITH(Error, cond, __VA_ARGS__)
 
-// An utility macro that does what `TORCH_CHECK` does if compiled in the host code, 
+// An utility macro that does what `TORCH_CHECK` does if compiled in the host code,
 // otherwise does nothing. Supposed to be used in the code shared between host and
 // device code as an alternative for `TORCH_CHECK`.
 #if defined(__CUDACC__) || defined(__HIPCC__)
