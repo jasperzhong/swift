@@ -51,6 +51,13 @@ void Context::setUserEnabledMkldnn(bool e) {
   enabled_mkldnn = e;
 }
 
+bool Context::userEnabledCost() const {
+  return enabled_cost;
+}
+void Context::setUserEnabledCost(bool e) {
+  enabled_cost = e;
+}
+
 bool Context::deterministicCuDNN() const {
   return deterministic_cudnn;
 }

@@ -102,6 +102,8 @@ class CAFFE2_API Context {
   void setUserEnabledCuDNN(bool e);
   bool userEnabledMkldnn() const;
   void setUserEnabledMkldnn(bool e);
+  bool userEnabledCost() const;
+  void setUserEnabledCost(bool e);
   bool benchmarkCuDNN() const;
   void setBenchmarkCuDNN(bool);
   bool deterministicCuDNN() const;
@@ -137,6 +139,7 @@ class CAFFE2_API Context {
   bool _deterministic = false;
   bool benchmark_cudnn = false;
   bool enabled_mkldnn = true;
+  bool enabled_cost = false;
   #ifdef C10_MOBILE
   bool release_original_weights = true;
   #else
