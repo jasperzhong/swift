@@ -3,14 +3,50 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <random>
 #include <string>
 #include <vector>
+
+#include <ATen/native/autotune/definitions.h>
+#include <ATen/native/autotune/estimator.h>
 
 namespace bandits {
 
 static size_t thompson_k = 1;
 using callback = std::function<void(double)>;
+
+
+class GaussianBandit {
+ public:
+  GaussianBandit(autotune::cost_priors priors, uint64_t seed);
+  autotune::DispatchChoice select();
+  void update(autotune::DispatchChoice choice, double value);
+
+ private:
+  std::map<autotune::DispatchChoice, autotune::GaussianEstimator> distributions_;
+  std::mt19937 engine_;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class Bandit {

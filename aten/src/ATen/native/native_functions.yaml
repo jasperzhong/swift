@@ -2431,7 +2431,7 @@
 - func: silu(Tensor self) -> Tensor
   use_c10_dispatcher: full
   python_module: nn
-  
+
 - func: silu_(Tensor(a!) self) -> Tensor(a!)
   python_module: nn
 
@@ -6563,3 +6563,6 @@
   python_module: nn
   dispatch:
     CPU: _test_optional_intlist
+
+- func: autotune_debug() -> bool
+  variants: function

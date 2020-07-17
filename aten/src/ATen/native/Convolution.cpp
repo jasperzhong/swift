@@ -670,9 +670,6 @@ at::Tensor _convolution(
     params.transposed,
     params.is_depthwise(input, weight),
     params.groups);
-  std::chrono::time_point<std::chrono::high_resolution_clock> t0;
-  std::chrono::time_point<std::chrono::high_resolution_clock> t1;
-  double delta_time;
   Tensor out_autotune;
   switch (dispatch_choice.first) {
     case autotune::Conv2D_Dispatch::Native:

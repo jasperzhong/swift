@@ -7,6 +7,9 @@
 #include <ATen/ATen.h>
 #include <c10/util/ArrayRef.h>
 
+#include <ATen/native/autotune/dispatch.h>
+
+
 namespace cost {
 
 // Placeholder. These should be determined on a system by system basis.
@@ -23,6 +26,29 @@ static double approx_latency = 10.0 * 1e-9;
 static double cpu_hz = 2'394'444'000;
 static int64_t cpu_vector_size = 16; // Broadwell, fp32
 static int64_t cache_line_size = 64;
+
+
+autotune::cost_priors conv_priors(
+  c10::IntArrayRef input_sizes,
+  c10::IntArrayRef input_strides,
+  c10::IntArrayRef weight_sizes,
+  c10::IntArrayRef weight_strides,
+  c10::IntArrayRef output_sizes,
+  int64_t itemsize
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 namespace conv2d {
 

@@ -2,16 +2,85 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <numeric>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
+
 namespace bandits {
+
+GaussianBandit::GaussianBandit(autotune::cost_priors priors, uint64_t seed)
+    : engine_(seed) {
+  for (auto p : priors){
+    auto choice = p.first;
+    auto mean = p.second;
+
+    // TODO: This is a placeholder until backend
+    //       specific priors are integrated.
+    auto variance = std::pow(mean, 2) / 9.0;
+
+    distributions_.emplace(
+        std::piecewise_construct,
+        std::forward_as_tuple(choice),
+        std::forward_as_tuple(mean, variance));
+  }
+}
+
+autotune::DispatchChoice GaussianBandit::select() {
+    auto choice = autotune::DispatchChoice::kUnsupported;
+    auto cost = std::numeric_limits<double>::max();
+
+    for (auto& d : distributions_) {
+      auto mv = d.second.get(); // Current posterior mean and variance;
+      std::normal_distribution<double> generator(
+          /*mean=*/mv.first, /*stddev=*/std::sqrt(mv.second));
+
+      double choice_cost = 0.0;
+      for (size_t i = 0; i < thompson_k; i++)
+        choice_cost += generator(engine_);
+
+      if (choice_cost < cost) {
+          choice = d.first;
+          cost = choice_cost;
+      }
+    }
+
+    return choice;
+}
+
+void GaussianBandit::update(autotune::DispatchChoice choice, double value) {
+    auto& d = distributions_.at(choice);
+    std::cout << "  " << d << std::endl;
+
+    d.update(value);
+    std::cout << "  " << d << std::endl;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 Bandit::Bandit(std::vector<double> priors, uint64_t seed, std::string repr)
     : repr_(repr), n_(priors.size()), mu_(n_), counts_(n_) {

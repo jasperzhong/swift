@@ -12,12 +12,8 @@
 
 #include <ATen/ATen.h>
 #include <c10/util/ArrayRef.h>
+#include <ATen/native/autotune/definitions.h>
 
-
-// https://www.boost.org/doc/libs/1_35_0/doc/html/boost/hash_combine_id241013.html
-void hash_combine(size_t & seed, c10::IntArrayRef v){
-    for (auto vi : v) seed ^= std::hash<int64_t>{}(vi) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-}
 
 namespace cost {
 
@@ -36,6 +32,66 @@ size_t bytes_span(c10::IntArrayRef sizes, c10::IntArrayRef strides, int64_t item
   return output * itemsize;
 }
 
+autotune::cost_priors conv_priors(
+    c10::IntArrayRef input_sizes,
+    c10::IntArrayRef input_strides,
+    c10::IntArrayRef weight_sizes,
+    c10::IntArrayRef weight_strides,
+    c10::IntArrayRef output_sizes,
+    int64_t itemsize) {
+  auto read_bytes =
+      (bytes_span(input_sizes, input_strides, itemsize) +
+       bytes_span(weight_sizes, weight_strides, itemsize));
+
+  int64_t output_numel = 1;
+  for (auto i : output_sizes)
+    output_numel *= i;
+
+  auto N = input_sizes[0];
+  auto C_out = output_sizes[0];
+  auto C_in = output_sizes[1];
+  auto kernel_hw = weight_sizes[2] * weight_sizes[3];
+  auto output_hw = output_sizes[2] * output_sizes[3];
+
+  // Naive rooflines.
+  double memory_roofline = (
+      (double)read_bytes / main_memory::bandwidth::sequential_read +
+      (double)output_numel * itemsize / main_memory::bandwidth::sequential_write);
+
+  double compute_roofline =
+      (double)(N * C_in * C_out * kernel_hw * output_hw) / cpu_hz;
+
+  double roofline = std::max(memory_roofline, compute_roofline);
+
+  // For now use the same roofline for both implementations.
+  // This will be refined later.
+  return {
+      {autotune::DispatchChoice::kConv2D_Native, roofline},
+      {autotune::DispatchChoice::kConv2D_MKL,    roofline}
+  };
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// https://www.boost.org/doc/libs/1_35_0/doc/html/boost/hash_combine_id241013.html
+void hash_combine(size_t & seed, c10::IntArrayRef v){
+    for (auto vi : v) seed ^= std::hash<int64_t>{}(vi) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+
+
 namespace conv2d {
 
 size_t Roofline::key() {
@@ -49,20 +105,10 @@ size_t Roofline::key() {
 }
 
 
-// https://stackoverflow.com/a/26221725
-template<typename ... Args>
-std::string string_format( const std::string& format, Args ... args )
-{
-    size_t size = snprintf( nullptr, 0, format.c_str(), args ... ) + 1; // Extra space for '\0'
-    if( size <= 0 ){ throw std::runtime_error( "Error during formatting." ); }
-    std::unique_ptr<char[]> buf( new char[ size ] );
-    snprintf( buf.get(), size, format.c_str(), args ... );
-    return std::string( buf.get(), buf.get() + size - 1 ); // We don't want the '\0' inside
-}
 
 
 std::string Roofline::repr() {
-    return string_format(
+    return autotune::string_format(
         "Input sizes  (strides):   %d, %d, %d, %d     (%d, %d, %d, %d)\n"
         "Weight sizes (strides):   %d, %d, %d, %d     (%d, %d, %d, %d)\n"
         "Output sizes:             %d, %d, %d, %d",
