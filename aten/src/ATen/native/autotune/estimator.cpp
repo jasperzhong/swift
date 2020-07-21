@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <cstddef>
-#include <cmath>
 #include <iostream>
 #include <utility>
 
@@ -10,47 +9,51 @@
 
 namespace autotune {
 
-GaussianEstimator::GaussianEstimator(double prior_mean, double prior_variance)
-    : prior_mean_(prior_mean), prior_variance_(prior_variance) {}
-
-std::ostream& operator<<(std::ostream & out, GaussianEstimator& e){
-    auto mv = e.get();
-    out << autotune::string_format(
-        "Mean: %9.1f us,  Std: %9.1f us",
-        mv.first * 1e6, std::sqrt(mv.second) * 1e6);
-    return out;
+void StreamingVariance::update(double sample) {
+  count_++;
+  double m_old = m_;
+  m_ += (sample - m_old) / count_;
+  s_ += (sample - m_) * (sample - m_old);
 }
 
-void GaussianEstimator::update(double sample){
-    total_ += sample;
-    count_++;
-
-    double m_old = variance_m_;
-
-    variance_m_ += (sample - m_old) / count_;
-    variance_s_ += (sample - variance_m_) * (sample - m_old);
+double StreamingVariance::get() {
+  return count_ > 1 ? s_ / (double)(count_ - 1) : 0.0;
 }
 
-double GaussianEstimator::sample_variance() {
-  return count_ > 1 ? variance_s_ / (double)(count_ - 1) : 0.0;
-}
-
-std::pair<double, double> GaussianEstimator::get() {
+Gaussian GaussianEstimatorBase::posterior() {
   // Based loosely on https://math.mit.edu/~dav/05.dir/class15-slides-all.pdf
-  auto count = (double)count_;
+  auto p = prior();
+  auto ct = count();
+  auto n = (double)ct;
 
-  // This is a hack. The posterior of a normal prior is only normal if the
-  // sample variance is known, but as a practical matter we substitute the
-  // sample variance since it only matters when bootstrapping.
-  double variance = count_ > 1 ? sample_variance() : prior_variance_;
-  double mean = count_ > 0 ? total_ / count : 0.0;
+  // This is a temporary hack. The posterior of a normal prior is only normal
+  // if the sample variance is known, but this is intended to bootstrap out
+  // of the low sample count regime. Very much still WIP.
+  double variance = ct > 1 ? sample_variance_.get() : p.variance;
 
-  double posterior_variance =
-      1.0 / (1.0 / prior_variance_ + count / variance);
-  double posterior_mean = posterior_variance *
-      (prior_mean_ / prior_variance_ + count * mean / variance);
+  double mean = ct > 0 ? total_ / ct : 0.0;
+
+  double posterior_variance = 1.0 / (1.0 / p.variance + n / variance);
+  double posterior_mean =
+      posterior_variance * (p.mean / p.variance + n * mean / variance);
 
   return {posterior_mean, posterior_variance};
+}
+
+void GaussianEstimatorBase::update(double value) {
+  sample_variance_.update(value);
+  total_ += value;
+}
+
+std::ostream& operator<<(std::ostream & out, MovingPriorGaussianEstimator* e) {
+    auto posterior = e->posterior();
+    out << autotune::string_format(
+        "M: %6.1f us,   S / M:  %6.2f,   Ct: %4d,   Corr:  %5.2f  (included)",
+        posterior.mean * 1e6,
+        std::sqrt(posterior.variance) / posterior.mean,
+        e->count(),
+        e->correction_->posterior().mean);
+    return out;
 }
 
 } // namespace autotune

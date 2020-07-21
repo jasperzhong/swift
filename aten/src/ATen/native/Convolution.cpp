@@ -660,46 +660,46 @@ at::Tensor _convolution(
     return out.view(o);
   }
 
-  std::vector<int64_t> output_size = conv_output_size(
-      input.sizes(), weight_sizes, params.padding, params.stride, params.dilation);
-  auto dispatch_choice = autotune::dispatch_conv2d(
-    input_r,
-    weight_r,
-    output_size,
-    params.dilation,
-    params.transposed,
-    params.is_depthwise(input, weight),
-    params.groups);
-  Tensor out_autotune;
-  switch (dispatch_choice.first) {
-    case autotune::Conv2D_Dispatch::Native:
-      // std::cout << "Autotune: TH" << std::endl;
-      dispatch_choice.second.start();
+  // std::vector<int64_t> output_size = conv_output_size(
+  //     input.sizes(), weight_sizes, params.padding, params.stride, params.dilation);
+  // auto dispatch_choice = autotune::dispatch_conv2d(
+  //   input_r,
+  //   weight_r,
+  //   output_size,
+  //   params.dilation,
+  //   params.transposed,
+  //   params.is_depthwise(input, weight),
+  //   params.groups);
+  // Tensor out_autotune;
+  // switch (dispatch_choice.first) {
+  //   case autotune::Conv2D_Dispatch::Native:
+  //     // std::cout << "Autotune: TH" << std::endl;
+  //     dispatch_choice.second.start();
 
-      out_autotune = at::_convolution_nogroup(
-          input.contiguous(), weight, bias, params.stride, params.padding, params.dilation, params.transposed, params.output_padding);
-      dispatch_choice.second.end();
-      return out_autotune;
-    case autotune::Conv2D_Dispatch::MKLDNN:
-      // std::cout << "Autotune: MKLDNN" << std::endl;
-      dispatch_choice.second.start();
+  //     out_autotune = at::_convolution_nogroup(
+  //         input.contiguous(), weight, bias, params.stride, params.padding, params.dilation, params.transposed, params.output_padding);
+  //     dispatch_choice.second.end();
+  //     return out_autotune;
+  //   case autotune::Conv2D_Dispatch::MKLDNN:
+  //     // std::cout << "Autotune: MKLDNN" << std::endl;
+  //     dispatch_choice.second.start();
 
-      if (!input_is_mkldnn) {
-        out_autotune = at::mkldnn_convolution(input.contiguous(), weight.contiguous(), bias.defined() ? bias.contiguous() : bias,
-                                        params.padding, params.stride, params.dilation, params.groups);
-      } else {
-        // do not call contiguous on mkldnn tensor
-        out_autotune = at::mkldnn_convolution(input, weight, bias,
-                                        params.padding, params.stride, params.dilation, params.groups);
-      }
+  //     if (!input_is_mkldnn) {
+  //       out_autotune = at::mkldnn_convolution(input.contiguous(), weight.contiguous(), bias.defined() ? bias.contiguous() : bias,
+  //                                       params.padding, params.stride, params.dilation, params.groups);
+  //     } else {
+  //       // do not call contiguous on mkldnn tensor
+  //       out_autotune = at::mkldnn_convolution(input, weight, bias,
+  //                                       params.padding, params.stride, params.dilation, params.groups);
+  //     }
 
-      dispatch_choice.second.end();
-      return out_autotune;
-    case autotune::Conv2D_Dispatch::Fallback:
-      break;
-    case autotune::Conv2D_Dispatch::Unsupported:
-      TORCH_CHECK(false, "Should never be reached.");
-  }
+  //     dispatch_choice.second.end();
+  //     return out_autotune;
+  //   case autotune::Conv2D_Dispatch::Fallback:
+  //     break;
+  //   case autotune::Conv2D_Dispatch::Unsupported:
+  //     TORCH_CHECK(false, "Should never be reached.");
+  // }
 
 
   if (k == 3) {

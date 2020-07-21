@@ -7,8 +7,7 @@
 #include <ATen/ATen.h>
 #include <c10/util/ArrayRef.h>
 
-#include <ATen/native/autotune/dispatch.h>
-
+#include <ATen/native/autotune/definitions.h>
 
 namespace cost {
 
@@ -27,53 +26,13 @@ static double cpu_hz = 2'394'444'000;
 static int64_t cpu_vector_size = 16; // Broadwell, fp32
 static int64_t cache_line_size = 64;
 
+autotune::EntryPoint dispatch_conv(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    c10::IntArrayRef output_sizes,
+    c10::IntArrayRef dilation,
+    bool is_transposed,
+    bool is_depthwise,
+    int64_t groups);
 
-autotune::cost_priors conv_priors(
-  c10::IntArrayRef input_sizes,
-  c10::IntArrayRef input_strides,
-  c10::IntArrayRef weight_sizes,
-  c10::IntArrayRef weight_strides,
-  c10::IntArrayRef output_sizes,
-  int64_t itemsize
-);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-namespace conv2d {
-
-class Roofline {
- public:
-  Roofline(
-      const at::Tensor& input,
-      const at::Tensor& weight,
-      c10::IntArrayRef output_sizes)
-      : input_sizes_(input.sizes()), input_strides_(input.strides()),
-        weight_sizes_(weight.sizes()), weight_strides_(weight.strides()),
-        output_sizes_(output_sizes), itemsize_(input.itemsize()) {};
-
-  size_t key();
-  std::string repr();
-  std::vector<double> compute();
-
- private:
-  c10::IntArrayRef input_sizes_;
-  c10::IntArrayRef input_strides_;
-  c10::IntArrayRef weight_sizes_;
-  c10::IntArrayRef weight_strides_;
-  c10::IntArrayRef output_sizes_;
-  int64_t itemsize_;
-};
-
-} // namespace conv2d
 } // namespace cost
