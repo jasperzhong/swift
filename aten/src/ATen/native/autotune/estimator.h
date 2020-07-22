@@ -20,6 +20,64 @@ struct Gaussian {
   }
 };
 
+
+
+
+
+
+
+
+struct MeanVariance {
+  double mean;
+  double variance;
+};
+
+static MeanVariance merge_normal(MeanVariance d0, MeanVariance d1) {
+  auto v = 1.0 / (1.0 / d0.variance + 1.0 / v1.variance);
+  auto m = (d0.mean * d1.variance + d1.mean * d0.variance);
+  return {m, v};
+}
+
+static double sample_normal(MeanVariance d, std::mt19937& engine) {
+  return std::normal_distribution<double>(d.mean, std::sqrt(d.variance))(engine);
+}
+
+constexpr double default_forgetfulness = 0.4;
+class RunningMeanVariance {
+ public:
+  RunningMeanVariance(
+      double prior_mean,
+      size_t prior_count,
+      double forgetfulness = default_forgetfulness)
+      : m_(prior_mean),
+        count_(prior_count),
+        prior_mean_(prior_mean),
+        prior_count_(prior_count),
+        forgetfulness_(forgetfulness){};
+  RunningMeanVariance() : RunningMeanVariance(0, 0, 0){};
+
+  void update(double sample);
+  MeanVariance get();
+
+ private:
+  // Underlying streaming variance equations:
+  //   https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
+  //   https://www.johndcook.com/blog/standard_deviation/
+  double m_;
+  double s_ = 0;
+  size_t count_ = 0;
+
+  void add_sample(double sample);
+  void remove_sample(double sample);
+
+  double prior_mean_;
+  size_t prior_count_;
+  double forgetfulness_;
+  void maybe_forget_prior(double sample);
+
+  friend std::ostream& operator<<(std::ostream & out, RunningMeanVariance r);
+};
+
 class StreamingVariance {
  public:
   void update(double sample);
