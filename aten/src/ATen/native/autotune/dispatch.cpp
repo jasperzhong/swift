@@ -23,47 +23,52 @@
 
 namespace autotune {
 
-CostDispatcher::RAII_Choice::RAII_Choice(EntryPoint::map_key key, DispatchChoice choice, bandit_ptr b)
-  : key_(key), choice_(choice), b_(b) {
+std::shared_ptr<ImplStats> CostDispatcher::get_impl_stats(autotune::DispatchChoice choice) {
+  return impl_stats_[static_cast<size_t>(choice)];
+}
+
+std::shared_ptr<ImplStats> get_impl_stats(DispatchChoice choice) {
+  return CostDispatcher::singleton().get_impl_stats(choice);
+}
+
+CostDispatcher::RAII_Choice::RAII_Choice(DispatchChoice choice, bandit_ptr b)
+  : choice_(choice), b_(b) {
   start_ = std::chrono::high_resolution_clock::now();
 }
 
-CostDispatcher::RAII_Choice::~RAII_Choice(){
+
+void CostDispatcher::RAII_Choice::finished() {
   auto end = std::chrono::high_resolution_clock::now();
   if (b_ == nullptr)
     return;
 
   auto delta_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start_).count();
-
-  //TODO: remove `key_` once I remove this print line.
-  std::cout << "~RAII_Choice: "
-            << static_cast<size_t>(std::get<0>(key_)) << "  "
-            << std::get<1>(key_) << "  "
-            << std::get<2>(key_) << "  "
-            << static_cast<size_t>(choice_) << "  "
-            << delta_ns / 1000 << " us" << std::endl;
+  std::cout << autotune::string_format(
+                   "~RAII_Choice: %d   %6.1f us",
+                   static_cast<size_t>(choice_),
+                   (double)delta_ns / 1.0e3)
+            << std::endl;
 
   b_->update(choice_, (double)delta_ns / 1.0e9);
 }
 
+// CostDispatcher::RAII_Choice::~RAII_Choice(){
+//   finished();
+// }
+
+
+
 CostDispatcher::RAII_Choice CostDispatcher::choose(EntryPoint e){
   auto key = e.key();
   if (std::get<0>(key) == DispatchGroup::kNotApplicable)
-    return {key, e.value()[0].impl, nullptr};
+    return {e.value()[0].impl, nullptr};
 
   if (bandits_.find(key) == bandits_.end()){
-    bandits::gaussian_bandit_estimates priors;
+    bandits::gaussian_bandit_results priors;
     for (auto implementation_prior : e.value()) {
-      auto choice = implementation_prior.impl;
-      auto choice_as_index = static_cast<size_t>(choice);
-      auto cost = implementation_prior.cost;
-
-      // TODO: This is a placeholder until a better
-      //       heuristic is chosen.
-      auto variance = std::pow(cost, 2) / 9.0;
-
-      priors[choice] = std::make_unique<autotune::MovingPriorGaussianEstimator>(
-        cost, variance, prior_correction_[choice_as_index]);
+      auto roofline = implementation_prior.cost;
+      priors[implementation_prior.impl] =
+          std::make_unique<bandits::Results>(roofline);
     }
 
     bandits_[key] = std::make_shared<bandits::GaussianBandit>(priors, next_seed_);
@@ -73,7 +78,7 @@ CostDispatcher::RAII_Choice CostDispatcher::choose(EntryPoint e){
   auto bandit = bandits_.at(key);
   auto choice = bandit->select();
 
-  return {key, choice, bandit};
+  return {choice, bandit};
 }
 
 }  // autotune

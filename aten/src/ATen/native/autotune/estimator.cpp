@@ -2,129 +2,90 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <iostream>
 #include <utility>
 
 #include <ATen/native/autotune/definitions.h>
+#include <c10/util/Exception.h>
 
-namespace autotune {
+namespace stats {
 
-
-
-
-
-void RunningMeanVariance::update(double sample) {
-  maybe_forget_prior(sample);
-  add_sample(sample);
+void RunningStatistics::add_sample(RunningStatistics::State sample) {
+  auto mean_old = mean();
+  state_.weight_sum += sample.weight_sum;
+  state_.mean += (sample.weight_sum / weight_sum()) * (sample.mean - mean_old);
+  state_.s += sample.s +
+      sample.weight_sum * (sample.mean - mean_old) * (sample.mean - mean());
 }
 
+void RunningStatistics::remove_sample(RunningStatistics::State sample) {
+  TORCH_INTERNAL_ASSERT(weight_sum() - sample.weight_sum > 0.0);
+  TORCH_INTERNAL_ASSERT(s() >= 0.0);
+  auto mean_old = mean();
 
-void RunningMeanVariance::add_sample(double sample) {
-  count_++;
-  auto m_old = m_;
-  m_ += (sample - m_old) / (double)count_;
-  s_ += (sample - m_) * (sample - m_old);
+  state_.mean = (mean_old - sample.weight_sum / weight_sum() * sample.mean ) / (1.0 - sample.weight_sum / weight_sum());
+  state_.s -= sample.s + sample.weight_sum * (sample.mean - mean_old) * (sample.mean - mean());
+  state_.weight_sum -= sample.weight_sum;
+
+  TORCH_INTERNAL_ASSERT(state_.s >= 0.0);
 }
 
-void RunningMeanVariance::remove_sample(double sample) {
-  if (count_ < 2) {
-    m_ = 0;
-    s_ = 0;
-    count_ = 0;
-    return;
-  }
-
-  auto m_kminus1 = ((double)count_ * m_ - sample) / (double)(count_ - 1);
-  s_ -= (sample - m_) * (sample - m_kminus1);
-  s_ = std::max(s_, 0.0); // Prevent underflow.
-  m_ = m_kminus1;
-  count_--;
+void RunningStatistics::decay(double factor) {
+  state_ = discount(state_, factor);
 }
 
-void RunningMeanVariance::maybe_forget_prior(double sample) {
-  if (!prior_count_)
-    return;
+double RunningStatistics::mean() {
+  return state_.mean;
+};
 
-  auto current = get();
-  auto forget_range = std::sqrt(current.variance) * forgetfulness_;
-  auto lower_bound = current.mean - forget_range;
-  auto upper_bound = current.mean + forget_range;
-  if (sample >= lower_bound && sample <= upper_bound) {
-    prior_count_--;
-    remove_sample(prior_mean_);
-  }
+double RunningStatistics::variance() {
+  TORCH_INTERNAL_ASSERT(weight_sum() > 1.0);
+  TORCH_INTERNAL_ASSERT(s() >= 0);
+  return s() / (weight_sum() - 1.0);
+};
+
+double RunningStatistics::weight_sum() {
+  TORCH_INTERNAL_ASSERT(state_.weight_sum >= 0.0);
+  return state_.weight_sum;
+};
+
+double RunningStatistics::s() {
+  TORCH_INTERNAL_ASSERT(state_.s >= 0.0);
+  return state_.s;
+};
+
+RunningStatistics::State scale(RunningStatistics::State rs, double factor) {
+  return {rs.mean * factor, rs.weight_sum, rs.s * std::pow(factor, 2)};
 }
 
-MeanVariance RunningMeanVariance::get() {
-  return {m_, (count_ > 1) ? s_ / (double)(count_ - 1) : 0.0};
+RunningStatistics::State discount(RunningStatistics::State rs, double factor) {
+  return {rs.mean, rs.weight_sum * factor, rs.s * factor};
 }
 
-std::ostream& operator<<(std::ostream & out, RunningMeanVariance r) {
-  auto mv = r.get();
-  out << autotune::string_format(
-    "%6.2f   %6.2f    %d", mv.mean, std::sqrt(mv.variance), r.count_
-  );
+RunningStatistics::State merge(RunningStatistics::State first, RunningStatistics::State second) {
+  RunningStatistics out {first};
+  out.add_sample(second);
   return out;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-void StreamingVariance::update(double sample) {
-  count_++;
-  double m_old = m_;
-  m_ += (sample - m_old) / count_;
-  s_ += (sample - m_) * (sample - m_old);
+double sample_normal(RunningStatistics::State s, std::mt19937& engine) {
+  RunningStatistics rs {s};
+  return std::normal_distribution<double>(rs.mean(), std::sqrt(rs.variance()))(engine);
 }
 
-double StreamingVariance::get() {
-  return count_ > 1 ? s_ / (double)(count_ - 1) : 0.0;
+std::ostream& operator<<(std::ostream & out, RunningStatistics& s) {
+  auto v = s.weight_sum() > 1 ? s.variance() : 0.0;
+  auto m = s.mean();
+  auto s_over_m = m > 0 ? std::sqrt(v) / m : 0.0;
+  out << autotune::string_format("M: %12.10f   %5.3f", m, s_over_m);
+  return out;
 }
 
-Gaussian GaussianEstimatorBase::posterior() {
-  // Based loosely on https://math.mit.edu/~dav/05.dir/class15-slides-all.pdf
-  auto p = prior();
-  auto ct = count();
-  auto n = (double)ct;
-
-  // This is a temporary hack. The posterior of a normal prior is only normal
-  // if the sample variance is known, but this is intended to bootstrap out
-  // of the low sample count regime. Very much still WIP.
-  double variance = ct > 1 ? sample_variance_.get() : p.variance;
-
-  double mean = ct > 0 ? total_ / ct : 0.0;
-
-  double posterior_variance = 1.0 / (1.0 / p.variance + n / variance);
-  double posterior_mean =
-      posterior_variance * (p.mean / p.variance + n * mean / variance);
-
-  return {posterior_mean, posterior_variance};
+std::ostream& operator<<(std::ostream& out, RunningStatistics::State s) {
+  RunningStatistics rs (s);
+  out << rs;
+  return out;
 }
 
-void GaussianEstimatorBase::update(double value) {
-  sample_variance_.update(value);
-  total_ += value;
-}
-
-std::ostream& operator<<(std::ostream & out, MovingPriorGaussianEstimator* e) {
-    auto posterior = e->posterior();
-    out << autotune::string_format(
-        "M: %6.1f us,   S / M:  %6.2f,   Ct: %4d,   Corr:  %5.2f  (included)",
-        posterior.mean * 1e6,
-        std::sqrt(posterior.variance) / posterior.mean,
-        e->count(),
-        e->correction_->posterior().mean);
-    return out;
-}
-
-} // namespace autotune
+} // namespace stats

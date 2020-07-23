@@ -26,6 +26,7 @@ static double cpu_hz = 2'394'444'000;
 static int64_t cpu_vector_size = 16; // Broadwell, fp32
 static int64_t cache_line_size = 64;
 
+constexpr double conv2d_overhead = 20e-6;  // 20 us
 autotune::EntryPoint dispatch_conv(
     const at::Tensor& input,
     const at::Tensor& weight,

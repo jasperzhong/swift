@@ -50,8 +50,8 @@ autotune::EntryPoint conv_priors(
     output_numel *= i;
 
   auto N = input_sizes[0];
-  auto C_out = output_sizes[0];
-  auto C_in = output_sizes[1];
+  auto C_out = weight_sizes[0];
+  auto C_in = weight_sizes[1];
   auto kernel_hw = weight_sizes[2] * weight_sizes[3];
   auto output_hw = output_sizes[2] * output_sizes[3];
 
@@ -64,7 +64,7 @@ autotune::EntryPoint conv_priors(
   double compute_roofline =
       (double)(N * C_in * C_out * kernel_hw * output_hw) / cpu_hz;
 
-  double roofline = std::max(memory_roofline, compute_roofline);
+  double roofline = std::max({memory_roofline, compute_roofline}) + conv2d_overhead;
 
   // For now use the same roofline for both implementations.
   // This will be refined later.
