@@ -9,7 +9,7 @@ namespace at { namespace native {
 namespace {
 
 // checks whether index.dtype == int64
-// and self.dtyp == src.dtype if src is a Tensor
+// and self.dtype == src.dtype if src is a Tensor
 static void scatter_gather_dtype_check(
   const std::string& method_name,
   const Tensor& self,
@@ -32,9 +32,9 @@ static void scatter_gather_dtype_check(
 
 // Used for `gather`-like methods
 // Test:
-// 1. index.size(d) == self.size(d) for all d != dim
-// 2. index.size(d) <= src.size(d) for all d != dim
-// 3. index.dim() == self.dim() == src.dim()
+// 1. index.dim() == self.dim() == src.dim()
+// 2. index.size(d) == self.size(d) for all d
+// 3. index.size(d) <= src.size(d) for all d != dim
 static void gather_shape_check(const Tensor& self, int64_t dim,
   const Tensor& index, const Tensor& src
 ) {
@@ -49,14 +49,14 @@ static void gather_shape_check(const Tensor& self, int64_t dim,
   );
 
   for (int64_t i = 0; i < self_dims; ++i) {
-    if (i != dim) {
-      TORCH_CHECK(
-        ensure_nonempty_size(index, i) == ensure_nonempty_size(self, i),
-        "Size does not match at dimension ", i,
-        " get ", ensure_nonempty_size(self, i),
-        " vs ", ensure_nonempty_size(index, i)
-      );
+    TORCH_CHECK(
+      ensure_nonempty_size(index, i) == ensure_nonempty_size(self, i),
+      "Size does not match at dimension ", i,
+      " get ", ensure_nonempty_size(self, i),
+      " vs ", ensure_nonempty_size(index, i)
+    );
 
+    if (i != dim) {
       TORCH_CHECK(
         ensure_nonempty_size(index, i) <= ensure_nonempty_size(src, i),
         "Size does not match at dimension ", i,
@@ -69,9 +69,9 @@ static void gather_shape_check(const Tensor& self, int64_t dim,
 }
 // Used for `scatter` and `scatter_add`
 // Tests:
-//  1. index.size(d) <= self.size(d) for all d != dim
-//  2. index.size(d) <= src.size(d) for all d if src is a Tensor
-//  3. index.dim() == self.dim() == src.dim()
+//  1. index.dim() == self.dim() == src.dim()
+//  2. index.size(d) <= self.size(d) for all d != dim
+//  3. index.size(d) <= src.size(d) for all d if src is a Tensor
 static void scatter_shape_check(
   const Tensor& self, int64_t dim, const Tensor& index,
   const c10::optional<Tensor>& src_opt = c10::nullopt
