@@ -33,9 +33,9 @@ def modeldef(request, net_name):
 
 @pytest.mark.benchmark(
     warmup=True,
-    warmup_iterations=5,
+    warmup_iterations=3,
     disable_gc=True,
-    max_time=0.3,
+    max_time=0.1,
 )
 class TestBenchNetwork:
     def test_forward(self, modeldef, benchmark):
