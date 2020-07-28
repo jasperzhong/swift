@@ -10,6 +10,9 @@
 #include <ATen/native/vulkan/VulkanConvolution.h>
 #include <ATen/native/vulkan/VulkanOps.h>
 
+#define COUT_FLF std::cout << __FILE__ << __LINE__ << __FUNCTION__
+#define COUT_FLFE COUT_FLF << std::endl
+
 namespace at {
 namespace native {
 namespace vulkan {
@@ -220,6 +223,263 @@ void max_pool2d(
   vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 }
 
+void avg_pool2d(
+    VulkanTensor& output,
+    const VulkanTensor& input,
+    const int iH,
+    const int iW,
+    const int oH,
+    const int oW,
+    const int _n,
+    const int _c,
+    const int kH,
+    const int kW,
+    const int dH,
+    const int dW,
+    const int padH,
+    const int padW) {
+  auto device = context().device();
+  const auto c = _n * _c;
+  struct ConstBlock {
+    int32_t inputSize[4];
+    int32_t outputSize[4];
+    int32_t kernelSize[2];
+    int32_t stride[2];
+    int32_t padding[2];
+    int32_t dilate[2];
+  };
+  ConstBlock cb{
+      {iW, iH, c, 0},
+      {oW, oH, c, 0},
+      {kW, kH},
+      {dW, dH},
+      {padW, padH},
+      {1, 1},
+  };
+  VBuffer constBuffer = makeUniformConstBuffer((void*)&cb, sizeof(cb));
+
+  VkDescriptorSetLayout descriptorSetLayout{};
+  VkDescriptorPool descriptorPool{};
+  VkDescriptorSet descriptorSet{};
+  std::vector<VkDescriptorType> descriptorTypes{
+      VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER};
+  createDescriptorSetLayoutSinglePool(
+      device,
+      descriptorTypes,
+      &descriptorSetLayout,
+      &descriptorPool,
+      &descriptorSet);
+
+  output.image()->bindStorageImage(descriptorSet, 0);
+  input.image()->bindShaderRead(descriptorSet, 1);
+  constBuffer.bind(descriptorSet, 2);
+
+  WorkGroupSize workGroupSize{8, 8, 1};
+  auto& computeUnit = context().computeUnitFactory().get(
+      GLSL_SPV(avg_pool2d), descriptorSetLayout, workGroupSize);
+  computeUnit.createCommandBuffer(descriptorSet);
+  input.image()->addImageMemoryBarrierToShaderRead(computeUnit.commandBuffer());
+  computeUnit.dispatchCommandBuffer(oW, oH, c, workGroupSize);
+  computeUnit.endCommandBuffer();
+  computeUnit.submitAndWaitCommandBuffer();
+  vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+  vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+}
+
+VulkanTensor transpose(const VulkanTensor& input, int64_t dim0, int64_t dim1) {
+  auto idim = input.dim();
+  TORCH_INTERNAL_ASSERT(
+      idim <= 8, "Vulkan transpose is implemented only for dim <= 8");
+  auto device = context().device();
+  struct ConstBlock {
+    int32_t istrides[8];
+    int32_t ostrides[8];
+    int32_t odims[8];
+    int32_t storageOffset;
+  };
+
+  auto isizes = input.sizes();
+  auto osizes = isizes;
+  std::swap(osizes[dim0], osizes[dim1]);
+  COUT_FLFE;
+  for (int i = 0; i < isizes.size(); i++) {
+    std::cout << "isizes[" << i << "]:" << isizes[i] << std::endl;
+  }
+
+  for (int i = 0; i < osizes.size(); i++) {
+    std::cout << "osizes[" << i << "]:" << osizes[i] << std::endl;
+  }
+  COUT_FLFE;
+  VulkanTensor output{osizes};
+  output.allocate_storage();
+  COUT_FLFE;
+
+  int32_t idims8[8] = {1, 1, 1, 1, 1, 1, 1, 1};
+  int32_t odims8[8] = {1, 1, 1, 1, 1, 1, 1, 1};
+  for (int i = 0; i < idim; i++) {
+    idims8[8 - idim + i] = isizes[i];
+    odims8[8 - idim + i] = osizes[i];
+  }
+  int32_t istrides8[8] = {1, 1, 1, 1, 1, 1, 1, 1};
+  int32_t ostrides8[8] = {1, 1, 1, 1, 1, 1, 1, 1};
+  COUT_FLFE;
+  for (int i = 6; i >= 0; --i) {
+    istrides8[i] = idims8[i + 1] * istrides8[i + 1];
+    ostrides8[i] = odims8[i + 1] * ostrides8[i + 1];
+  }
+  std::swap(istrides8[8 - idim + dim0], istrides8[8 - idim + dim1]);
+
+  ConstBlock cb{};
+  std::copy(
+      std::begin(istrides8), std::end(istrides8), std::begin(cb.istrides));
+  std::copy(
+      std::begin(ostrides8), std::end(ostrides8), std::begin(cb.ostrides));
+  std::copy(std::begin(odims8), std::end(odims8), std::begin(cb.odims));
+  cb.storageOffset = 0;
+
+  VBuffer constBuffer = makeUniformConstBuffer((void*)&cb, sizeof(cb));
+
+  VkDescriptorSetLayout descriptorSetLayout{};
+  VkDescriptorPool descriptorPool{};
+  VkDescriptorSet descriptorSet{};
+  std::vector<VkDescriptorType> descriptorTypes{
+      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER};
+  createDescriptorSetLayoutSinglePool(
+      device,
+      descriptorTypes,
+      &descriptorSetLayout,
+      &descriptorPool,
+      &descriptorSet);
+
+  output.buffer()->bind(descriptorSet, 0);
+  input.buffer()->bind(descriptorSet, 1);
+  constBuffer.bind(descriptorSet, 2);
+
+  WorkGroupSize workGroupSize{8, 8, 1};
+  auto& computeUnit = context().computeUnitFactory().get(
+      GLSL_SPV(permute), descriptorSetLayout, workGroupSize);
+  computeUnit.createCommandBuffer(descriptorSet);
+  input.buffer()->addBufferMemoryBarrier(
+      computeUnit.commandBuffer(), 0, input.buffer()->sizeBytes());
+  computeUnit.dispatchCommandBuffer(
+      odims8[6] * odims8[7],
+      odims8[4] * odims8[5],
+      odims8[2] * odims8[3],
+      workGroupSize);
+  computeUnit.endCommandBuffer();
+  computeUnit.submitAndWaitCommandBuffer();
+  vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+  vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+  COUT_FLFE;
+  return output;
+}
+
+VulkanTensor slice(
+    const VulkanTensor& input,
+    int64_t dim,
+    int64_t start,
+    int64_t end,
+    int64_t step) {
+  auto isizes = input.sizes();
+  auto osizes = isizes;
+  if (start < 0) {
+    start += isizes[dim];
+  }
+  if (end < 0) {
+    end += isizes[dim];
+  }
+  if (start < 0) {
+    start = 0;
+  } else if (start >= isizes[dim]) {
+    start = isizes[dim];
+  }
+  if (end < start) {
+    end = start;
+  } else if (end >= isizes[dim]) {
+    end = isizes[dim];
+  }
+  auto len = end - start;
+  osizes[dim] = (len + step - 1) / step;
+
+  VulkanTensor output{osizes};
+  output.allocate_storage();
+
+  auto idim = input.dim();
+  int32_t idims8[8] = {1, 1, 1, 1, 1, 1, 1, 1};
+  int32_t odims8[8] = {1, 1, 1, 1, 1, 1, 1, 1};
+  for (int i = 0; i < idim; i++) {
+    idims8[8 - idim + i] = isizes[i];
+    odims8[8 - idim + i] = osizes[i];
+  }
+  int32_t istrides8[8] = {1, 1, 1, 1, 1, 1, 1, 1};
+  int32_t ostrides8[8] = {1, 1, 1, 1, 1, 1, 1, 1};
+  for (int i = 6; i >= 0; --i) {
+    istrides8[i] = idims8[i + 1] * istrides8[i + 1];
+    ostrides8[i] = odims8[i + 1] * ostrides8[i + 1];
+  }
+  ostrides8[8 - idim + dim] *= step;
+  auto storage_offset = start * istrides8[8 - idim + dim];
+
+  auto device = context().device();
+  struct ConstBlock {
+    int32_t istrides[8];
+    int32_t ostrides[8];
+    int32_t odims[8];
+    int32_t storageOffset;
+  };
+
+  // as_strided (osizes, ostrudes, storage_offset)
+  ConstBlock cb{};
+  std::copy(
+      std::begin(istrides8), std::end(istrides8), std::begin(cb.istrides));
+  std::copy(
+      std::begin(ostrides8), std::end(ostrides8), std::begin(cb.ostrides));
+  std::copy(std::begin(odims8), std::end(odims8), std::begin(cb.odims));
+  cb.storageOffset = storage_offset;
+
+  VBuffer constBuffer = makeUniformConstBuffer((void*)&cb, sizeof(cb));
+
+  VkDescriptorSetLayout descriptorSetLayout{};
+  VkDescriptorPool descriptorPool{};
+  VkDescriptorSet descriptorSet{};
+  std::vector<VkDescriptorType> descriptorTypes{
+      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER};
+  createDescriptorSetLayoutSinglePool(
+      device,
+      descriptorTypes,
+      &descriptorSetLayout,
+      &descriptorPool,
+      &descriptorSet);
+
+  output.buffer()->bind(descriptorSet, 0);
+  input.buffer()->bind(descriptorSet, 1);
+  constBuffer.bind(descriptorSet, 2);
+
+  WorkGroupSize workGroupSize{8, 8, 1};
+  auto& computeUnit = context().computeUnitFactory().get(
+      GLSL_SPV(permute), descriptorSetLayout, workGroupSize);
+  computeUnit.createCommandBuffer(descriptorSet);
+  input.buffer()->addBufferMemoryBarrier(
+      computeUnit.commandBuffer(), 0, input.buffer()->sizeBytes());
+  computeUnit.dispatchCommandBuffer(
+      odims8[6] * odims8[7],
+      odims8[4] * odims8[5],
+      odims8[2] * odims8[3],
+      workGroupSize);
+  computeUnit.endCommandBuffer();
+  computeUnit.submitAndWaitCommandBuffer();
+  vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+  vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+  COUT_FLFE;
+  return output;
+}
+
 void add(
     VulkanTensor& output,
     const VulkanTensor& input0,
@@ -293,6 +553,103 @@ void add(
   output.image()->addImageMemoryBarrierToGeneral(commandBuffer);
   input0.image()->addImageMemoryBarrierToShaderRead(commandBuffer);
   input1.image()->addImageMemoryBarrierToShaderRead(commandBuffer);
+  computeUnit.dispatchCommandBuffer(W, H, C, workGroupSize);
+  computeUnit.endCommandBuffer();
+  computeUnit.submitAndWaitCommandBuffer();
+  vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+  vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+}
+
+void add(VulkanTensor& output, const VulkanTensor& input, const float s) {
+  COUT_FLFE;
+  const auto sizes = input.sizes();
+
+  const auto C = std::accumulate(
+      sizes.cbegin(), sizes.cend() - 2, 1, std::multiplies<int64_t>());
+  const auto H = sizes[2];
+  const auto W = sizes[3];
+
+  auto device = context().device();
+  struct ConstBlock {
+    int32_t inputSize[4];
+    float s;
+  };
+  ConstBlock cb{{W, H, C, 0}, s};
+  VBuffer constBuffer = makeUniformConstBuffer((void*)&cb, sizeof(cb));
+
+  VkDescriptorSetLayout descriptorSetLayout{};
+  VkDescriptorPool descriptorPool{};
+  VkDescriptorSet descriptorSet{};
+  std::vector<VkDescriptorType> descriptorTypes{
+      VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER};
+  createDescriptorSetLayoutSinglePool(
+      device,
+      descriptorTypes,
+      &descriptorSetLayout,
+      &descriptorPool,
+      &descriptorSet);
+
+  output.image()->bindStorageImage(descriptorSet, 0);
+  input.image()->bindShaderRead(descriptorSet, 1);
+  constBuffer.bind(descriptorSet, 2);
+
+  WorkGroupSize workGroupSize{8, 8, 1};
+  auto& computeUnit = context().computeUnitFactory().get(
+      GLSL_SPV(add_scalar), descriptorSetLayout, workGroupSize);
+  computeUnit.createCommandBuffer(descriptorSet);
+  auto commandBuffer = computeUnit.commandBuffer();
+  output.image()->addImageMemoryBarrierToGeneral(commandBuffer);
+  input.image()->addImageMemoryBarrierToShaderRead(commandBuffer);
+  computeUnit.dispatchCommandBuffer(W, H, C, workGroupSize);
+  computeUnit.endCommandBuffer();
+  computeUnit.submitAndWaitCommandBuffer();
+  vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+  vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+}
+
+void mul(VulkanTensor& output, const VulkanTensor& input, const float s) {
+  const auto sizes = input.sizes();
+
+  const auto C = std::accumulate(
+      sizes.cbegin(), sizes.cend() - 2, 1, std::multiplies<int64_t>());
+  const auto H = sizes[2];
+  const auto W = sizes[3];
+
+  auto device = context().device();
+  struct ConstBlock {
+    int32_t inputSize[4];
+    float s;
+  };
+  ConstBlock cb{{W, H, C, 0}, s};
+  VBuffer constBuffer = makeUniformConstBuffer((void*)&cb, sizeof(cb));
+
+  VkDescriptorSetLayout descriptorSetLayout{};
+  VkDescriptorPool descriptorPool{};
+  VkDescriptorSet descriptorSet{};
+  std::vector<VkDescriptorType> descriptorTypes{
+      VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER};
+  createDescriptorSetLayoutSinglePool(
+      device,
+      descriptorTypes,
+      &descriptorSetLayout,
+      &descriptorPool,
+      &descriptorSet);
+
+  output.image()->bindStorageImage(descriptorSet, 0);
+  input.image()->bindShaderRead(descriptorSet, 1);
+  constBuffer.bind(descriptorSet, 2);
+
+  WorkGroupSize workGroupSize{8, 8, 1};
+  auto& computeUnit = context().computeUnitFactory().get(
+      GLSL_SPV(mul_scalar), descriptorSetLayout, workGroupSize);
+  computeUnit.createCommandBuffer(descriptorSet);
+  auto commandBuffer = computeUnit.commandBuffer();
+  output.image()->addImageMemoryBarrierToGeneral(commandBuffer);
+  input.image()->addImageMemoryBarrierToShaderRead(commandBuffer);
   computeUnit.dispatchCommandBuffer(W, H, C, workGroupSize);
   computeUnit.endCommandBuffer();
   computeUnit.submitAndWaitCommandBuffer();

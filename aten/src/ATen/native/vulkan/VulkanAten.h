@@ -44,5 +44,20 @@ at::Tensor vulkan_max_pool2d(
 
 at::Tensor vulkan_reshape(at::Tensor const& input, IntArrayRef shape);
 
+Tensor vulkan_transpose(const Tensor& self, int64_t dim0, int64_t dim1);
+
+Tensor& vulkan_transpose_(Tensor& self, int64_t dim0, int64_t dim1);
+
+Tensor vulkan_slice(
+    const Tensor& self,
+    int64_t dim,
+    int64_t start,
+    int64_t end,
+    int64_t step);
+
+Tensor vulkan_select(const Tensor& self, int64_t dim, int64_t index);
+
+Tensor vulkan_unsqueeze(const Tensor& self, int64_t dim);
+
 } // namespace native
 } // namespace at
