@@ -61,7 +61,8 @@ file(GLOB mkl_cpp "mkl/*.cpp")
 file(GLOB mkldnn_cpp "mkldnn/*.cpp")
 
 file(GLOB native_cpp "native/*.cpp")
-file(GLOB native_autotune_cpp "native/autotune/*.cpp")
+file(GLOB native_autotune_cpp "native/autotune/*.cpp" "native/autotune/**/*.cpp")
+list(FILTER native_autotune_cpp EXCLUDE REGEX ".*native/autotune/test_scripts/.*.cpp")
 file(GLOB native_mkl_cpp "native/mkl/*.cpp")
 file(GLOB native_mkldnn_cpp "native/mkldnn/*.cpp")
 file(GLOB native_vulkan_cpp "native/vulkan/*.cpp")
@@ -71,8 +72,9 @@ file(GLOB native_quantized_cpp
             "native/quantized/*.cpp"
             "native/quantized/cpu/*.cpp")
 file(GLOB native_h "native/*.h")
-file(GLOB native_autotune_h "native/autotune/*.h")
-file(GLOB native_quantized_h "native/quantized/*.h" "native/quantized/cpu/*.h")
+file(GLOB native_autotune_h "native/autotune/*.h" "native/autotune/**/*.h")
+list(FILTER native_autotune_h EXCLUDE REGEX "native/autotune/test_scripts/*.h")
+file(GLOB native_quantized_h "native/quantized/*.h" ".*native/quantized/cpu/.*.h")
 file(GLOB native_cpu_h "native/cpu/*.h")
 
 file(GLOB native_cuda_cu_sp "native/cuda/Unique.cu" "native/cuda/TensorFactories.cu")

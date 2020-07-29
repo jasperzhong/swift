@@ -51,11 +51,11 @@ void Context::setUserEnabledMkldnn(bool e) {
   enabled_mkldnn = e;
 }
 
-bool Context::userEnabledCost() const {
-  return enabled_cost;
+bool Context::userEnabledAutotune() const {
+  return enabled_autotune;
 }
-void Context::setUserEnabledCost(bool e) {
-  enabled_cost = e;
+void Context::setUserEnabledAutotune(bool e) {
+  enabled_autotune = e;
 }
 
 bool Context::deterministicCuDNN() const {

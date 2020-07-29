@@ -6787,6 +6787,3 @@
   python_module: nn
   dispatch:
     CPU: _test_optional_floatlist
-
-- func: autotune_debug() -> bool
-  variants: function

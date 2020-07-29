@@ -6,6 +6,9 @@
 #include <torch/csrc/api/include/torch/types.h>
 #include <cstdint>
 
+// TODO: remove. For hacking only.
+#include <ATen/native/autotune/api.h>
+
 namespace torch {
 
 /// A RAII, thread-local guard that disabled gradient calculation.
