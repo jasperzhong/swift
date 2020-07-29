@@ -496,6 +496,14 @@ inline IValue toIValue(
     py::handle obj,
     const TypePtr& type,
     c10::optional<int32_t> N) {
+  if (py::hasattr(obj, "__to_ivalue__")) {
+    auto method = obj.attr("__to_ivalue__");
+    // Precondition here is that `type` has already been set up to refer to the
+    // type of the result of `__to_ivalue__` instead of the type of `obj`
+    //
+    // Currently, this is done in the recursive scripting API on the frontend
+    return toIValue(method(), type, N);
+  }
   switch (type->kind()) {
     case TypeKind::TensorType: {
       auto var = py::cast<autograd::Variable>(obj);
