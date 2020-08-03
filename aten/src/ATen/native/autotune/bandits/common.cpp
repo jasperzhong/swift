@@ -1,6 +1,6 @@
 #include <ATen/native/autotune/bandits/common.h>
 
-#include <ATen/native/autotune/kernels/common.h>
+#include <ATen/native/autotune/api.h>
 
 namespace autotune {
 namespace bandits {
@@ -15,7 +15,7 @@ Bandit::Bandit(
   }
 };
 
-kernels::Implementation Bandit::choose_safe(
+api::Implementation Bandit::choose_safe(
     const selection::KernelEntryPoint::supported_implementations
         implementations) {
   TORCH_INTERNAL_ASSERT(implementations.size() == implementations_.size());

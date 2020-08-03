@@ -51,13 +51,6 @@ void Context::setUserEnabledMkldnn(bool e) {
   enabled_mkldnn = e;
 }
 
-bool Context::userEnabledAutotune() const {
-  return enabled_autotune;
-}
-void Context::setUserEnabledAutotune(bool e) {
-  enabled_autotune = e;
-}
-
 bool Context::deterministicCuDNN() const {
   return deterministic_cudnn;
 }

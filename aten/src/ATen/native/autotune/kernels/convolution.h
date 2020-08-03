@@ -1,8 +1,9 @@
 #pragma once
 
-#include <tuple>
+#include <string>
 
 #include <ATen/ATen.h>
+#include <ATen/native/autotune/api.h>
 #include <ATen/native/autotune/dispatch/common.h>
 #include <c10/util/ArrayRef.h>
 
@@ -26,16 +27,14 @@ class ConvolutionEntryPoint : public selection::KernelEntryPoint {
   using Args = ConvolutionArgs;
   ConvolutionEntryPoint(const ConvolutionArgs&);
   bool fallback() override;
-  Task task() override;
+  api::Task task() override;
   cost_estimates costs() override;
   supported_implementations implementations() override;
   std::string repr() override;
 
  private:
   c10::IntArrayRef input_sizes_;
-  c10::IntArrayRef input_strides_;
   c10::IntArrayRef weight_sizes_;
-  c10::IntArrayRef weight_strides_;
   c10::IntArrayRef output_sizes_;
   size_t itemsize_;
   bool fallback_;

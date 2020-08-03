@@ -1,19 +1,44 @@
 #include <ATen/native/autotune/bandits/gaussian.h>
 
+#include <array>
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <string>
 
+#include <ATen/native/autotune/api.h>
 #include <ATen/native/autotune/bandits/common.h>
-#include <ATen/native/autotune/bandits/util.h>
 #include <ATen/native/autotune/dispatch/common.h>
 #include <ATen/native/autotune/dispatch/core.h>
+#include <ATen/native/autotune/utils/common.h>
+#include <ATen/native/autotune/utils/stats.h>
 
 namespace autotune {
 namespace bandits {
 
-using WorkingState = selection::DispatchWorkingState<GaussianBandit>;
+class WorkingState {
+ public:
+  static WorkingState& singleton() {
+    static WorkingState _singleton;
+    return _singleton;
+  }
+  GaussianBandit::GlobalImplState* get(api::Implementation impl) {
+    return state_[static_cast<size_t>(impl)].get();
+  }
+
+ private:
+  WorkingState() {
+    for (size_t i = 0; i < api::NumImplementations; i++) {
+      state_[i] = std::make_unique<GaussianBandit::GlobalImplState>();
+    }
+  }
+  std::array<
+      std::unique_ptr<GaussianBandit::GlobalImplState>,
+      api::NumImplementations>
+      state_;
+};
 
 GaussianBandit::GaussianBandit(
     selection::KernelEntryPoint::cost_estimates& costs,
@@ -25,14 +50,15 @@ GaussianBandit::GaussianBandit(
   }
 }
 
-kernels::Implementation GaussianBandit::choose() {
-  auto choice = kernels::Implementation::kUnsupported;
+// TODO: this update is not thread safe.
+api::Implementation GaussianBandit::choose() {
+  auto choice = api::Implementation::kUnsupported;
   auto cost = std::numeric_limits<double>::max();
 
   for (auto& l : local_state_) {
     auto current_choice = l.first;
     auto& local_state = l.second;
-    auto global_stats = WorkingState::singleton().bandit_state(current_choice);
+    auto global_stats = WorkingState::singleton().get(current_choice);
 
     auto distribution =
         (global_stats->roofline_correction.get_state() + roofline_prior) *
@@ -54,35 +80,27 @@ kernels::Implementation GaussianBandit::choose() {
       distribution = m + discount_prior(distribution);
     }
 
-    double choice_cost = 0.0;
-    for (size_t i = 0; i < thompson_k; i++) {
-      choice_cost += stats::sample_normal(distribution, engine_);
-    }
-
+    double choice_cost =
+        stats::sample_normal(distribution, engine_, thompson_k(local_count));
     if (choice_cost < cost) {
       choice = current_choice;
       cost = choice_cost;
     }
   }
   return choice;
-
-
-  // // Temporarially randomly choose
-  // std::uniform_int_distribution<size_t> distribution(
-  //     0, implementations().size() - 1);
-  // auto choice_index = distribution(engine_);
-  // return implementations()[choice_index];
 }
 
 // TODO: this update is not thread safe.
-void GaussianBandit::update(kernels::Implementation choice, size_t delta_ns) {
+void GaussianBandit::update(api::Implementation choice, size_t delta_ns) {
   stats::MovingStatistics::State sample((double)delta_ns * 1.0e-9);
-  auto global_stats = WorkingState::singleton().bandit_state(choice);
+  auto global_stats = WorkingState::singleton().get(choice);
 
   global_stats->count++;
-  if (global_stats->count < warmup)
-    //   The first few times we see a kernel, the times tend to be wildly
-    //   high due to (presumably) lazy initialization.
+  if (selection::DispatchInterface::singleton().times_chosen(choice) < warmup)
+    // The first few times we see a kernel, the times tend to be wildly
+    // high due to (presumably) lazy initialization. We use the global count
+    // rather than just that of GaussianBandit, as these initializations are
+    // not tied to a particular bandit.
     return;
 
   auto& local_stats = local_state_.at(choice);

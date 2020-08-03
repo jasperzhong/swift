@@ -1,49 +1,17 @@
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <functional>
 #include <type_traits>
 
+#include <ATen/native/autotune/api.h>
 #include <ATen/native/autotune/bandits/common.h>
 #include <ATen/native/autotune/dispatch/common.h>
-#include <ATen/native/autotune/kernels/common.h>
 #include <ATen/native/autotune/kernels/convolution.h>
 
 namespace autotune {
 namespace selection {
-
-// Holds active Bandits, as well as any running statistics that may be
-// needed for the bandits or debugging.
-template <typename T>
-class DispatchWorkingState {
- public:
-  static_assert(std::is_base_of<bandits::Bandit, T>::value);
-  static DispatchWorkingState<T>& singleton() {
-    static DispatchWorkingState<T> _singleton;
-    return _singleton;
-  }
-
-  kernels::Implementation choose(
-      KernelEntryPoint::map_key,
-      KernelEntryPoint::supported_implementations,
-      std::function<KernelEntryPoint::cost_estimates()>);
-
-  void update(KernelEntryPoint::map_key, kernels::Implementation, size_t);
-
-  std::shared_ptr<typename T::ImplState> bandit_state(
-      kernels::Implementation impl) {
-    return bandit_state_[static_cast<size_t>(impl)];
-  }
-
- private:
-  DispatchWorkingState();
-  friend class DispatchInterface;
-  std::map<KernelEntryPoint::map_key, std::unique_ptr<T>> bandits_;
-  std::
-      array<std::shared_ptr<typename T::ImplState>, kernels::NumImplementations>
-          bandit_state_;
-  size_t next_seed_{0};
-};
 
 class DispatchInterface {
  public:
@@ -52,29 +20,27 @@ class DispatchInterface {
     return _singleton;
   }
 
-  enum class AvailableBandits {
-    kRandomChoice,
-    kGaussian,
+  api::AvailableBandits active_bandit();
+  void setActiveBandit(api::AvailableBandits);
 
-    kNone,
-  };
-
-  AvailableBandits active_bandit();
-  void setActiveBandit(AvailableBandits);
-
-  kernels::Implementation choose(
-      DispatchInterface::AvailableBandits,
-      KernelEntryPoint::map_key,
+  api::Implementation choose(
+      api::AvailableBandits,
+      KernelEntryPoint::MapKey,
       KernelEntryPoint::supported_implementations,
       std::function<KernelEntryPoint::cost_estimates()>);
+
   void update(
-      DispatchInterface::AvailableBandits,
-      KernelEntryPoint::map_key,
-      kernels::Implementation,
+      api::AvailableBandits,
+      KernelEntryPoint::MapKey,
+      api::Implementation,
       size_t);
 
+  size_t times_chosen(api::Implementation);
+
  private:
-  AvailableBandits active_bandit_{AvailableBandits::kRandomChoice};
+  DispatchInterface() {};
+  api::AvailableBandits active_bandit_{api::AvailableBandits::kNone};
+  std::array<size_t, api::NumImplementations> chosen_counts_;
 };
 
 template <typename T>
@@ -88,14 +54,13 @@ class SelectImplementation {
   // each task define an Args struct.
   SelectImplementation(typename T::Args);
 
-  kernels::Implementation choice();
+  api::Implementation choice();
   void finish();
 
  private:
   T entry_point_;
-  DispatchInterface::AvailableBandits bandit_type_{
-      DispatchInterface::AvailableBandits::kNone};
-  kernels::Implementation choice_;
+  api::AvailableBandits bandit_type_;
+  api::Implementation choice_;
   bool record_duration_{false};
   bool record_finished_{false};
   std::chrono::time_point<std::chrono::high_resolution_clock> start_;

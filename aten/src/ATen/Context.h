@@ -102,8 +102,6 @@ class CAFFE2_API Context {
   void setUserEnabledCuDNN(bool e);
   bool userEnabledMkldnn() const;
   void setUserEnabledMkldnn(bool e);
-  bool userEnabledAutotune() const;
-  void setUserEnabledAutotune(bool e);
   bool benchmarkCuDNN() const;
   void setBenchmarkCuDNN(bool);
   bool deterministicCuDNN() const;
@@ -142,7 +140,6 @@ class CAFFE2_API Context {
   bool benchmark_cudnn = false;
   bool allow_tf32_cublas = true;
   bool enabled_mkldnn = true;
-  bool enabled_autotune = false;
   #ifdef C10_MOBILE
   bool release_original_weights = true;
   #else

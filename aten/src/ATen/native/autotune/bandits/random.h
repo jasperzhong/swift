@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ATen/native/autotune/api.h>
 #include <ATen/native/autotune/bandits/common.h>
 #include <ATen/native/autotune/dispatch/common.h>
 
@@ -10,10 +11,8 @@ class DrunkenBandit : public Bandit {
   DrunkenBandit(
       selection::KernelEntryPoint::cost_estimates& costs,
       unsigned seed);
-  kernels::Implementation choose() override;
-  void update(kernels::Implementation, size_t) override;
-
-  struct ImplState {};
+  api::Implementation choose() override;
+  void update(api::Implementation, size_t) override;
 
  private:
   selection::KernelEntryPoint::supported_implementations implementations_;

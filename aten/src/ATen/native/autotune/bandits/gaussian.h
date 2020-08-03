@@ -2,19 +2,23 @@
 
 #include <map>
 
+#include <ATen/native/autotune/api.h>
 #include <ATen/native/autotune/bandits/common.h>
-#include <ATen/native/autotune/bandits/util.h>
 #include <ATen/native/autotune/dispatch/common.h>
+#include <ATen/native/autotune/utils/stats.h>
 
 namespace autotune {
 namespace bandits {
 
+static int64_t thompson_k(size_t count) {
+  return (count + 1 > 4) ? 4 : count + 1;
+}
+
 static size_t warmup = 50;
+// static size_t thompson_k = 3;
 static double global_discount_rate = 0.99;
 static double prior_discount_rate = 0.5;
 static double local_discount_rate = 0.99;
-
-static size_t thompson_k = 3;
 static const stats::MovingStatistics::State roofline_prior({
     1.0,
     /*weight= */ 3.0,
@@ -31,13 +35,13 @@ class GaussianBandit : public Bandit {
   GaussianBandit(
       selection::KernelEntryPoint::cost_estimates& costs,
       unsigned seed);
-  kernels::Implementation choose() override;
-  void update(kernels::Implementation choice, size_t delta_ns) override;
+  api::Implementation choose() override;
+  void update(api::Implementation choice, size_t delta_ns) override;
 
   // Global results. (Across keys)
-  struct ImplState {
-    ImplState() = default;
-    ImplState(const ImplState&) = delete;
+  struct GlobalImplState {
+    GlobalImplState() = default;
+    GlobalImplState(const GlobalImplState&) = delete;
 
     stats::MovingStatistics roofline_correction{};
     stats::MovingStatistics run_time_variation{};
@@ -54,7 +58,7 @@ class GaussianBandit : public Bandit {
 
  private:
   selection::KernelEntryPoint::supported_implementations implementations_;
-  std::map<kernels::Implementation, std::unique_ptr<LocalImplState>>
+  std::map<api::Implementation, std::unique_ptr<LocalImplState>>
       local_state_;
 };
 } // namespace bandits

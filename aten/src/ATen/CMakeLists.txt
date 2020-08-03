@@ -74,7 +74,7 @@ file(GLOB native_quantized_cpp
 file(GLOB native_h "native/*.h")
 file(GLOB native_autotune_h "native/autotune/*.h" "native/autotune/**/*.h")
 list(FILTER native_autotune_h EXCLUDE REGEX "native/autotune/test_scripts/*.h")
-file(GLOB native_quantized_h "native/quantized/*.h" ".*native/quantized/cpu/.*.h")
+file(GLOB native_quantized_h "native/quantized/*.h" "native/quantized/cpu/*.h")
 file(GLOB native_cpu_h "native/cpu/*.h")
 
 file(GLOB native_cuda_cu_sp "native/cuda/Unique.cu" "native/cuda/TensorFactories.cu")

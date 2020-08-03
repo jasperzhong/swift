@@ -3,8 +3,9 @@
 #include <forward_list>
 #include <string>
 #include <tuple>
+#include <vector>
 
-#include <ATen/native/autotune/kernels/common.h>
+#include <ATen/native/autotune/api.h>
 #include <c10/util/ArrayRef.h>
 #include <c10/util/SmallVector.h>
 
@@ -34,21 +35,20 @@ Standardize kernel specific logic at the boundaries of dispatch.
 class KernelEntryPoint {
  public:
   struct CostEstimate {
-    kernels::Implementation impl;
+    api::Implementation impl;
     double cost;
   };
 
   using cost_estimates =
       c10::SmallVector<CostEstimate, approx_implementations_per_task>;
   using supported_implementations = c10::
-      SmallVector<kernels::Implementation, approx_implementations_per_task>;
-  using map_key = std::tuple<kernels::Task, uint32_t, uint64_t>;
+      SmallVector<api::Implementation, approx_implementations_per_task>;
 
   // Default behavior:
   //   fallback() returns false
   //   implementations() calls costs() and extracts implementations.
   virtual bool fallback();
-  virtual kernels::Task task() = 0;
+  virtual api::Task task() = 0;
   virtual cost_estimates costs() = 0;
   virtual std::string repr() = 0;
   virtual supported_implementations implementations();
@@ -57,17 +57,22 @@ class KernelEntryPoint {
   // with any features which affect the cost. (Unless they plan to return
   // true to `fallback()`, which allows them to skip hashing and save overhead
   // for cases where autotuning will not be used.)
-  void compute_hash(std::forward_list<c10::IntArrayRef> features);
-  map_key key();
+  void declare_features(std::forward_list<c10::IntArrayRef> features);
+
+  struct MapKey {
+    std::vector<int64_t> data;
+    bool operator==(const MapKey&) const;
+  };
+  const MapKey& key();
+
+  struct Hash {
+    size_t operator()(const KernelEntryPoint::MapKey&) const;
+  };
 
  private:
-  void hash(uint64_t& x, c10::IntArrayRef features);
-  bool hash_computed_{false};
-  uint64_t hash_x0_;
-  uint64_t hash_x1_;
+  friend class Hash;
+  MapKey key_;
 };
-
-static_assert(sizeof(KernelEntryPoint::map_key) == 16);
 
 } // namespace selection
 } // namespace autotune

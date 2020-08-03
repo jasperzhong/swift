@@ -2,26 +2,30 @@
 
 #include <algorithm>
 #include <string>
+#include <vector>
 
 #include <ATen/ATen.h>
+#include <ATen/native/ConvUtils.h>
+#include <ATen/native/autotune/api.h>
+#include <ATen/native/autotune/dispatch/common.h>
+#include <ATen/native/autotune/dispatch/core.h>
 #include <ATen/native/autotune/utils/common.h>
+#include <c10/util/Exception.h>
 
 namespace autotune {
 namespace kernels {
 
 ConvolutionEntryPoint::ConvolutionEntryPoint(const ConvolutionArgs& args)
     : input_sizes_(args.input.sizes()),
-      input_strides_(args.input.strides()),
       weight_sizes_(args.weight.sizes()),
-      weight_strides_(args.weight.strides()),
       output_sizes_(args.output_sizes),
       itemsize_(args.input.itemsize()) {
   // Autotuning is only prototyped on a subset of Conv2D.
   bool supported =
       (args.input.options().backend() == at::Backend::CPU &&
        args.input.scalar_type() == at::kFloat &&
-       args.weight.scalar_type() == at::kFloat &&
-       args.weight.ndimension() == 4 &&
+       args.weight.scalar_type() == at::kFloat && args.input.is_contiguous() &&
+       args.weight.is_contiguous() && args.weight.ndimension() == 4 &&
        std::all_of(
            args.dilation.begin(),
            args.dilation.end(),
@@ -30,26 +34,23 @@ ConvolutionEntryPoint::ConvolutionEntryPoint(const ConvolutionArgs& args)
 
   fallback_ = !supported;
   if (supported)
-    compute_hash({input_sizes_,
-                  input_strides_,
-                  weight_sizes_,
-                  weight_strides_,
-                  output_sizes_,
-                  {itemsize_}});
+    declare_features({input_sizes_, weight_sizes_, output_sizes_, {itemsize_}});
 }
 
 bool ConvolutionEntryPoint::fallback() {
   return fallback_;
 }
 
-Task ConvolutionEntryPoint::task() {
-  return Task::kConv2D;
+api::Task ConvolutionEntryPoint::task() {
+  return api::Task::kConv2D;
+}
+
+int64_t product(c10::IntArrayRef x) {
+  return std::accumulate(x.begin(), x.end(), 1, std::multiplies<int>());
 }
 
 selection::KernelEntryPoint::cost_estimates ConvolutionEntryPoint::costs() {
-  int64_t output_numel = 1;
-  for (auto i : output_sizes_)
-    output_numel *= i;
+  int64_t output_numel = product(output_sizes_);
 
   // This currently assumes Conv2D, which is enforced when determining whether
   // to fallback.
@@ -61,10 +62,9 @@ selection::KernelEntryPoint::cost_estimates ConvolutionEntryPoint::costs() {
   auto kernel_hw = weight_sizes_[2] * weight_sizes_[3];
   auto output_hw = output_sizes_[2] * output_sizes_[3];
 
-  auto read_bytes =
-      (util::bytes_span(input_sizes_, input_strides_, itemsize_) +
-       util::bytes_span(weight_sizes_, weight_strides_, itemsize_));
-  auto write_bytes = output_numel * itemsize_;
+  auto read_numel = product(input_sizes_) + product(weight_sizes_);
+  auto read_bytes = read_numel * itemsize_;
+  auto write_bytes = product(output_sizes_) * itemsize_;
 
   // Naive rooflines.
   double memory_roofline =
@@ -80,23 +80,21 @@ selection::KernelEntryPoint::cost_estimates ConvolutionEntryPoint::costs() {
 
   // For now use the same roofline for all implementations.
   // This will be refined later.
-  return {{Implementation::kConv2D_Native, roofline},
-          {Implementation::kConv2D_NNPack, roofline},
-          {Implementation::kConv2D_MKL, roofline}};
+  return {{api::Implementation::kConv2D_Native, roofline},
+          {api::Implementation::kConv2D_NNPack, roofline},
+          {api::Implementation::kConv2D_MKL, roofline}};
 }
 
 selection::KernelEntryPoint::supported_implementations ConvolutionEntryPoint::
     implementations() {
-  return {Implementation::kConv2D_Native,
-          Implementation::kConv2D_NNPack,
-          Implementation::kConv2D_MKL};
+  return {api::Implementation::kConv2D_Native,
+          api::Implementation::kConv2D_NNPack,
+          api::Implementation::kConv2D_MKL};
 }
 
 std::string ConvolutionEntryPoint::repr() {
-  // Ignore strides for now, and output size is
-  // a function of input size and kernel size since
-  // we are ignoring convolution padding/strides/etc.
-  // for now.
+  // Output size is a function of input size and kernel size since
+  // we are ignoring convolution padding/strides/etc. for now.
   return autotune::utils::string_format(
       "Convolution: input_size = (%d,%d,%d,%d), "
       "weight_size = (%d,%d,%d,%d)",
@@ -111,4 +109,74 @@ std::string ConvolutionEntryPoint::repr() {
 }
 
 } // namespace kernels
+
+// Temporary. Evenentually this should be rolled into at::_convolution.
+static std::vector<int64_t> conv2d_stride{1, 1};
+static std::vector<int64_t> conv2d_dilation{1, 1};
+static std::vector<int64_t> conv2d_padding{0, 0};
+static std::vector<int64_t> conv2d_output_padding{0, 0};
+at::Tensor CAFFE2_API convolution_2D(at::Tensor& x, at::Tensor& weight) {
+  // This will also initialize NNPack.
+  TORCH_INTERNAL_ASSERT(at::_nnpack_available());
+
+  auto output_sizes = at::native::conv_output_size(
+      x.sizes(),
+      weight.sizes(),
+      conv2d_padding,
+      conv2d_stride,
+      conv2d_dilation);
+  auto bias = at::ones({output_sizes[1]});
+
+  auto dispatch = selection::DispatchConvolution( //
+      {/*input=         */ x,
+       /*weight=        */ weight,
+       /*output_sizes=  */ output_sizes,
+       /*dilation=      */ conv2d_dilation,
+       /*is_transposed= */ false,
+       /*is_depthwise=  */ false,
+       /*groups=        */ 1});
+
+  at::Tensor output;
+  switch (dispatch.choice()) {
+    case api::Implementation::kDisabled:
+    case api::Implementation::kFallback:
+      return at::native::conv2d(
+          x,
+          weight,
+          bias,
+          conv2d_stride,
+          conv2d_padding,
+          conv2d_dilation,
+          /*groups=*/1);
+    case api::Implementation::kConv2D_Native:
+      output = at::thnn_conv2d(
+          x,
+          weight,
+          weight.sizes().slice(2),
+          bias,
+          conv2d_stride,
+          conv2d_padding);
+      break;
+    case api::Implementation::kConv2D_NNPack:
+      output = at::_nnpack_spatial_convolution(
+          x, weight, bias, conv2d_padding, conv2d_stride);
+      break;
+    case api::Implementation::kConv2D_MKL:
+      output = at::mkldnn_convolution(
+          x.contiguous(),
+          weight.contiguous(),
+          bias.contiguous(),
+          conv2d_padding,
+          conv2d_stride,
+          conv2d_dilation,
+          /*groups=*/1);
+      break;
+    case api::Implementation::kUnsupported:
+    default:
+      AT_ERROR("Unknown error");
+  }
+  dispatch.finish();
+  return output;
+}
+
 } // namespace autotune

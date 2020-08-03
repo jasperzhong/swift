@@ -4,6 +4,7 @@
 #include <functional>
 #include <limits>
 
+#include <ATen/native/autotune/api.h>
 #include <c10/util/Exception.h>
 
 namespace autotune {
@@ -13,38 +14,60 @@ bool KernelEntryPoint::fallback() {
   return false;
 }
 
-KernelEntryPoint::supported_implementations KernelEntryPoint::implementations() {
-    KernelEntryPoint::supported_implementations output;
-    for (auto c : costs()) {
-        output.push_back(c.impl);
-    }
-    return output;
+KernelEntryPoint::supported_implementations KernelEntryPoint::
+    implementations() {
+  KernelEntryPoint::supported_implementations output;
+  for (auto c : costs()) {
+    output.push_back(c.impl);
+  }
+  return output;
 }
 
-KernelEntryPoint::map_key KernelEntryPoint::key() {
-  return {
-      task(),
-      static_cast<uint32_t>(hash_x0_ % std::numeric_limits<uint32_t>::max()),
-      hash_x1_};
-}
-
-void KernelEntryPoint::compute_hash(
+void KernelEntryPoint::declare_features(
     std::forward_list<c10::IntArrayRef> features) {
-  hash_x0_ = 0;
-  hash_x1_ = 1;
+  key_.data.clear();
+
+  auto t = task();
+  auto impls = implementations();
+  size_t feature_size = 1 + impls.size();
   for (auto f : features) {
-    hash(hash_x0_, f);
-    hash(hash_x1_, f);
+    feature_size += 1 + f.size();
   }
 
-  hash_computed_ = true;
+  key_.data.reserve(feature_size);
+  key_.data.push_back(static_cast<int64_t>(t));
+  for (auto impl : impls) {
+    key_.data.push_back(static_cast<int64_t>(impl));
+  }
+
+  for (auto f : features) {
+    // int64_t min serves to demarkate the otherwise flat vector.
+    key_.data.push_back(std::numeric_limits<int64_t>::min());
+    for (auto fi : f) {
+      key_.data.push_back(fi);
+    }
+  }
+}
+
+bool KernelEntryPoint::MapKey::operator==(const KernelEntryPoint::MapKey& other) const {
+  TORCH_INTERNAL_ASSERT(data.size() && other.data.size());
+  return (
+      data.size() == other.data.size() &&
+      std::equal(data.begin(), data.end(), other.data.begin()));
+}
+
+const KernelEntryPoint::MapKey& KernelEntryPoint::key() {
+  return key_;
 }
 
 // https://www.boost.org/doc/libs/1_35_0/doc/html/boost/hash_combine_id241013.html
-void KernelEntryPoint::hash(uint64_t& x, c10::IntArrayRef features) {
-  for (auto f : features) {
-    x ^= std::hash<int64_t>{}(f) + 0x9e3779b9 + (x << 6) + (x >> 2);
+size_t KernelEntryPoint::Hash::operator()(const KernelEntryPoint::MapKey& key) const {
+  TORCH_INTERNAL_ASSERT(key.data.size());
+  auto x = std::hash<int64_t>{}(0);
+  for (auto i : key.data) {
+    x ^= std::hash<int64_t>{}(i) + 0x9e3779b9 + (x << 6) + (x >> 2);
   }
+  return x;
 }
 
 } // namespace selection

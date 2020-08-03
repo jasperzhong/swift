@@ -6,7 +6,7 @@
 #include <torch/csrc/api/include/torch/types.h>
 #include <cstdint>
 
-// TODO: remove. For hacking only.
+// TODO: remove.
 #include <ATen/native/autotune/api.h>
 
 namespace torch {

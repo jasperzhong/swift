@@ -1,6 +1,5 @@
 #include <ATen/native/autotune/dispatch/core.h>
 
-#include <array>
 #include <chrono>
 #include <map>
 #include <memory>
@@ -9,84 +8,102 @@
 #include <vector>
 
 #include <ATen/Context.h>
+#include <ATen/native/autotune/api.h>
 #include <ATen/native/autotune/bandits/common.h>
 #include <ATen/native/autotune/bandits/gaussian.h>
 #include <ATen/native/autotune/bandits/random.h>
-#include <ATen/native/autotune/dispatch/logging.h>
-#include <ATen/native/autotune/kernels/common.h>
+#include <ATen/native/autotune/utils/logging.h>
 #include <c10/util/Exception.h>
+#include <c10/util/flat_hash_map.h>
 
 namespace autotune {
 namespace selection {
 
-template <typename T>
-DispatchWorkingState<T>::DispatchWorkingState() {
-  for (size_t i = 0; i < bandit_state_.size();i++){
-    bandit_state_[i] = std::make_shared<typename T::ImplState>();
-  }
-}
 
 template <typename T>
-kernels::Implementation DispatchWorkingState<T>::choose(
-    KernelEntryPoint::map_key key,
-    KernelEntryPoint::supported_implementations supported_implementations,
-    std::function<KernelEntryPoint::cost_estimates()> cost_fn) {
-  if (bandits_.find(key) == bandits_.end()) {
-    auto cost_estimates = cost_fn();
-    bandits_[key] = std::make_unique<T>(cost_estimates, next_seed_);
-    next_seed_++;
+class ActiveBandits {
+ public:
+  static_assert(std::is_base_of<bandits::Bandit, T>::value);
+  static ActiveBandits<T>& singleton() {
+    static ActiveBandits<T> _singleton;
+    return _singleton;
   }
 
-  return bandits_.at(key)->choose_safe(
-      // The bandit will check that its supported_implementations matches.
-      supported_implementations);
-}
+  std::unique_ptr<T>& get(
+      KernelEntryPoint::MapKey key,
+      std::function<KernelEntryPoint::cost_estimates()> cost_fn) {
+    if (bandits_.find(key) == bandits_.end()) {
+      auto cost_estimates = cost_fn();
+      bandits_[key] = std::make_unique<T>(cost_estimates, next_seed_);
+      next_seed_++;
+    }
 
-template <typename T>
-void DispatchWorkingState<T>::update(
-    KernelEntryPoint::map_key key,
-    kernels::Implementation impl,
-    size_t delta_ns) {
-  bandits_.at(key)->update(impl, delta_ns);
-}
+    return bandits_.at(key);
+  }
 
-DispatchInterface::AvailableBandits DispatchInterface::active_bandit() {
+  std::unique_ptr<T>& get(KernelEntryPoint::MapKey key) {
+    return bandits_.at(key);
+  }
+
+ private:
+  ActiveBandits() {};
+  size_t next_seed_{0};
+  ska::flat_hash_map<
+      KernelEntryPoint::MapKey,
+      std::unique_ptr<T>,
+      KernelEntryPoint::Hash>
+      bandits_;
+};
+
+const auto& DrunkenBandits = ActiveBandits<bandits::DrunkenBandit>::singleton;
+const auto& GaussianBandits = ActiveBandits<bandits::GaussianBandit>::singleton;
+
+
+api::AvailableBandits DispatchInterface::active_bandit() {
   return active_bandit_;
 }
 
-void DispatchInterface::setActiveBandit(AvailableBandits b) {
+void DispatchInterface::setActiveBandit(api::AvailableBandits b) {
   active_bandit_ = b;
 }
 
-kernels::Implementation DispatchInterface::choose(
-    DispatchInterface::AvailableBandits bandit,
-    KernelEntryPoint::map_key key,
+api::Implementation DispatchInterface::choose(
+    api::AvailableBandits bandit,
+    KernelEntryPoint::MapKey key,
     KernelEntryPoint::supported_implementations implementations,
     std::function<KernelEntryPoint::cost_estimates()> cost_estimates) {
+  api::Implementation choice;
   switch (bandit) {
-    case AvailableBandits::kRandomChoice:
-      return DispatchWorkingState<bandits::DrunkenBandit>::singleton().choose(
-          key, implementations, cost_estimates);
-    case AvailableBandits::kGaussian:
-      return DispatchWorkingState<bandits::GaussianBandit>::singleton().choose(
-          key, implementations, cost_estimates);
+    case api::AvailableBandits::kRandomChoice:
+      choice = DrunkenBandits().get(key, cost_estimates)->choose_safe(implementations);
+      break;
+    case api::AvailableBandits::kGaussian:
+      choice = GaussianBandits().get(key, cost_estimates)->choose_safe(implementations);
+      break;
     default:
       TORCH_INTERNAL_ASSERT(false, "Could not select bandit.")
   }
+  chosen_counts_[static_cast<size_t>(choice)]++;
+  return choice;
+}
+
+size_t DispatchInterface::times_chosen(api::Implementation choice) {
+  TORCH_INTERNAL_ASSERT(choice != api::Implementation::TOTAL_COUNT);
+  return chosen_counts_[static_cast<size_t>(choice)];
 }
 
 void DispatchInterface::update(
-      DispatchInterface::AvailableBandits bandit,
-      KernelEntryPoint::map_key key,
-      kernels::Implementation choice,
+      api::AvailableBandits bandit,
+      KernelEntryPoint::MapKey key,
+      api::Implementation choice,
       size_t delta_ns) {
   switch (bandit) {
-    case AvailableBandits::kRandomChoice:
-      return DispatchWorkingState<bandits::DrunkenBandit>::singleton().update(
-          key, choice, delta_ns);
-    case AvailableBandits::kGaussian:
-      return DispatchWorkingState<bandits::GaussianBandit>::singleton().update(
-          key, choice, delta_ns);
+    case api::AvailableBandits::kRandomChoice:
+      DrunkenBandits().get(key)->update(choice, delta_ns);
+      break;
+    case api::AvailableBandits::kGaussian:
+      GaussianBandits().get(key)->update(choice, delta_ns);
+      break;
     default:
       TORCH_INTERNAL_ASSERT(false, "Could not select bandit.")
   }
@@ -95,10 +112,11 @@ void DispatchInterface::update(
 template <typename T>
 SelectImplementation<T>::SelectImplementation(typename T::Args args)
     : entry_point_(args) {
-  if (!at::globalContext().userEnabledAutotune()) {
-    choice_ = kernels::Implementation::kDisabled;
+  bandit_type_ = DispatchInterface::singleton().active_bandit();
+  if (bandit_type_ == api::AvailableBandits::kNone) {
+    choice_ = api::Implementation::kDisabled;
   } else if (entry_point_.fallback()) {
-    choice_ = kernels::Implementation::kFallback;
+    choice_ = api::Implementation::kFallback;
   } else {
     auto available_implementations = entry_point_.implementations();
     TORCH_INTERNAL_ASSERT(
@@ -106,7 +124,6 @@ SelectImplementation<T>::SelectImplementation(typename T::Args args)
         "Autotuning is enabled and kernel did not request a fallback, "
         "however no implemenations are available.");
 
-    bandit_type_ = DispatchInterface::singleton().active_bandit();
     choice_ = DispatchInterface::singleton().choose(
         bandit_type_, entry_point_.key(), available_implementations, [&]() {
           return entry_point_.costs();
@@ -118,7 +135,7 @@ SelectImplementation<T>::SelectImplementation(typename T::Args args)
 }
 
 template <typename T>
-kernels::Implementation SelectImplementation<T>::choice() {
+api::Implementation SelectImplementation<T>::choice() {
   return choice_;
 }
 
@@ -135,4 +152,10 @@ void SelectImplementation<T>::finish() {
 }
 
 } // namespace selection
+
+namespace api {
+void set_active_bandit(AvailableBandits b) {
+  selection::DispatchInterface::singleton().setActiveBandit(b);
+}
+}
 } // namespace autotune
