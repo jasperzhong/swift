@@ -6,13 +6,6 @@
 #include <torch/torch.h>
 
 
-void flush_cache(at::Tensor& t) {
-    auto t_data = t.data_ptr();
-
-    ptrdiff_t t_size = t.numel() * t.itemsize();
-    __clear_cache(t_data, t_data + t_size);
-}
-
 void debug(int argc, char* argv[]) {
   torch::set_num_threads(1);
   autotune::api::enable_logging();
@@ -30,23 +23,23 @@ void debug(int argc, char* argv[]) {
   autotune::api::set_active_bandit(
       autotune::api::AvailableBandits::kGaussian);
 
-  {
-    auto x = at::ones({1, 36, 128, 128});
-    auto weight = at::ones({32, 36, 1, 1});
-    for (size_t i = 0; i < 40; i++) {
-      autotune::convolution_2D(x, weight);
-    }
-  }
+//   {
+//     auto x = at::ones({1, 36, 128, 128});
+//     auto weight = at::ones({32, 36, 1, 1});
+//     for (size_t i = 0; i < 40; i++) {
+//       autotune::convolution_2D(x, weight);
+//     }
+//   }
 
-  autotune::api::log("");
-  {
-    auto x = at::ones({1, 36, 128, 128});
-    auto weight = at::ones({32, 36, 1, 1});
-    for (size_t i = 0; i < 40; i++) {
-      auto evict = at::ones({16, 32, 128, 128});
-      autotune::convolution_2D(x, weight);
-    }
-  }
+//   autotune::api::log("");
+//   {
+//     auto x = at::ones({1, 36, 128, 128});
+//     auto weight = at::ones({32, 36, 1, 1});
+//     for (size_t i = 0; i < 40; i++) {
+//       auto evict = at::ones({16, 32, 128, 128});
+//       autotune::convolution_2D(x, weight);
+//     }
+//   }
 
   autotune::api::log("");
   {

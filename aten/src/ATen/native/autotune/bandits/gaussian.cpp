@@ -142,6 +142,14 @@ void GaussianBandit::update(api::Implementation choice, size_t delta_ns) {
   local_stats->global_count_at_last_update = global_stats->count;
   global_stats->roofline_correction.set_state(roofline_correction);
   global_stats->run_time_variation.set_state(run_time_variation);
+  if (local_stats->count > 1){
+    printf(
+      "%d    %10.8f    %10.8f\n",
+      static_cast<int>(choice),
+      local_stats->measured.mean(),
+      std::sqrt(local_stats->measured.variance()) / local_stats->measured.mean());
+  }
+
 }
 
 } // namespace bandits

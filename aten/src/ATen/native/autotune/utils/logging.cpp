@@ -68,12 +68,11 @@ void record(
   if (!logging_enabled)
     return;
   records.push_back(utils::string_format(
-    "%s     %s     %-14s     %10d",
-    bandit_str.at(bandit).c_str(),
-    key_reprs.at(key).c_str(),
-    impl_str.at(choice).c_str(),
-    delta_ns
-  ));
+      "%s     %s     %-14s     %10d",
+      bandit_str.at(bandit).c_str(),
+      key_reprs.at(key).c_str(),
+      impl_str.at(choice).c_str(),
+      delta_ns));
 }
 
 } // namespace logging
