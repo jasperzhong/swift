@@ -1,6 +1,6 @@
 from __future__ import print_function
 import pytest
-
+import torch
 from .runner import get_nn_runners
 
 default_rnns = ['cudnn', 'aten', 'jit', 'jit_premul', 'jit_premul_bias', 'jit_simple',
@@ -31,6 +31,11 @@ def modeldef(request, net_name):
     }
     return rnn_creator(**creator_args)
 
+def wrap_sync(func, *args, **kwargs):
+    out = func(*args, **kwargs)
+    torch.cuda.synchronize()
+    return out
+
 @pytest.mark.benchmark(
     warmup=True,
     warmup_iterations=3,
@@ -39,7 +44,7 @@ def modeldef(request, net_name):
 )
 class TestBenchNetwork:
     def test_forward(self, modeldef, benchmark):
-        forward_output = benchmark(modeldef.forward, *modeldef.inputs)
+        forward_output = benchmark(wrap_sync, modeldef.forward, *modeldef.inputs)
 
     def test_backward(self, modeldef, benchmark):
         forward_output = modeldef.forward(*modeldef.inputs)
@@ -50,7 +55,7 @@ class TestBenchNetwork:
 
 
         if modeldef.backward is not None:
-            benchmark(modeldef.backward, *backward_input, retain_graph=True)
+            benchmark(wrap_sync, modeldef.backward, *backward_input, retain_graph=True)
 
         if modeldef.backward is not None:
             for param in modeldef.params:
