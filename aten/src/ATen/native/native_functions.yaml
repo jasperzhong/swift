@@ -6947,3 +6947,6 @@
   python_module: nn
   dispatch:
     CPU: _test_optional_floatlist
+
+- func: set_autotune(str command) -> bool
+  variants: function

@@ -33,6 +33,7 @@ class ActiveBandits {
       KernelEntryPoint::MapKey key,
       std::function<KernelEntryPoint::cost_estimates()> cost_fn) {
     if (bandits_.find(key) == bandits_.end()) {
+      ordered_keys_.push_back(key);  // Preserve order for debugging.
       auto cost_estimates = cost_fn();
       bandits_[key] = std::make_unique<T>(cost_estimates, next_seed_);
       next_seed_++;
@@ -45,9 +46,16 @@ class ActiveBandits {
     return bandits_.at(key);
   }
 
+  void summarize() {
+    for (auto& k : ordered_keys_) {
+      bandits_[k]->summarize(k);
+    }
+  }
+
  private:
   ActiveBandits() {};
   size_t next_seed_{0};
+  std::vector<KernelEntryPoint::MapKey> ordered_keys_;
   ska::flat_hash_map<
       KernelEntryPoint::MapKey,
       std::unique_ptr<T>,
@@ -109,6 +117,20 @@ void DispatchInterface::update(
   }
 }
 
+void DispatchInterface::summarize() {
+  auto bandit = DispatchInterface::singleton().active_bandit();
+  switch (bandit) {
+    case api::AvailableBandits::kRandomChoice:
+      DrunkenBandits().summarize();
+      break;
+    case api::AvailableBandits::kGaussian:
+      GaussianBandits().summarize();
+      break;
+    default:
+      TORCH_INTERNAL_ASSERT(false, "Could not select bandit.")
+  }
+}
+
 template <typename T>
 SelectImplementation<T>::SelectImplementation(typename T::Args args)
     : entry_point_(args) {
@@ -141,7 +163,10 @@ api::Implementation SelectImplementation<T>::choice() {
 
 template <typename T>
 void SelectImplementation<T>::finish() {
-  TORCH_INTERNAL_ASSERT(record_duration_ && !record_finished_);
+  if (!record_duration_)
+    return;
+  TORCH_INTERNAL_ASSERT(!record_finished_, "finish() called twice.");
+  record_finished_ = true;
   auto delta_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                       std::chrono::high_resolution_clock::now() - start_)
                       .count();
@@ -157,5 +182,14 @@ namespace api {
 void set_active_bandit(AvailableBandits b) {
   selection::DispatchInterface::singleton().setActiveBandit(b);
 }
+
+bool enabled() {
+  return selection::DispatchInterface::singleton().active_bandit() !=
+      AvailableBandits::kNone;
 }
+
+void summarize() {
+  selection::DispatchInterface::singleton().summarize();
+}
+} // namespace api
 } // namespace autotune

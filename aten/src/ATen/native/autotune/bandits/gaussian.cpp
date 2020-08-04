@@ -13,32 +13,11 @@
 #include <ATen/native/autotune/dispatch/common.h>
 #include <ATen/native/autotune/dispatch/core.h>
 #include <ATen/native/autotune/utils/common.h>
+#include <ATen/native/autotune/utils/logging.h>
 #include <ATen/native/autotune/utils/stats.h>
 
 namespace autotune {
 namespace bandits {
-
-class WorkingState {
- public:
-  static WorkingState& singleton() {
-    static WorkingState _singleton;
-    return _singleton;
-  }
-  GaussianBandit::GlobalImplState* get(api::Implementation impl) {
-    return state_[static_cast<size_t>(impl)].get();
-  }
-
- private:
-  WorkingState() {
-    for (size_t i = 0; i < api::NumImplementations; i++) {
-      state_[i] = std::make_unique<GaussianBandit::GlobalImplState>();
-    }
-  }
-  std::array<
-      std::unique_ptr<GaussianBandit::GlobalImplState>,
-      api::NumImplementations>
-      state_;
-};
 
 GaussianBandit::GaussianBandit(
     selection::KernelEntryPoint::cost_estimates& costs,
@@ -55,33 +34,39 @@ api::Implementation GaussianBandit::choose() {
   auto choice = api::Implementation::kUnsupported;
   auto cost = std::numeric_limits<double>::max();
 
+  double roofline_shift = 1.0;
+  for (auto& l : local_state_) {
+    auto& local_stats = l.second;
+    auto measured = local_stats->measured.get_state();
+    auto roofline = local_stats->roofline;
+    if (measured.weight >= 1.0) {
+      roofline_shift = std::max({roofline_shift, roofline / measured.mean});
+    }
+  }
+
   for (auto& l : local_state_) {
     auto current_choice = l.first;
-    auto& local_state = l.second;
-    auto global_stats = WorkingState::singleton().get(current_choice);
+    auto& local_stats = l.second;
 
+    auto local_count = local_stats->count;
+    auto prior = roofline_prior;
+    auto prior_discount = std::pow(prior_discount_rate, local_count);
     auto distribution =
-        (global_stats->roofline_correction.get_state() + roofline_prior) *
-        local_state->roofline;
-
-    auto local_count = local_state->count;
-    auto prior_discount_factor = std::pow(prior_discount_rate, local_count);
-    auto discount_prior = [prior_discount_factor](stats::MovingStatistics::State s) {
-      return s.discount(prior_discount_factor);
-    };
+        (prior.discount(prior_discount) * (local_stats->roofline / roofline_shift));
 
     if (local_count) {
-      auto run_time_variation =
-          (global_stats->run_time_variation.get_state() +
-           run_time_variation_prior);
-
-      auto m = local_state->measured.get_state();
-      m = m + discount_prior(run_time_variation * m.mean);
-      distribution = m + discount_prior(distribution);
+      distribution = distribution + local_stats->measured.get_state();
     }
 
+    // double choice_cost =
+    //     stats::sample_normal(distribution, engine_, thompson_k(local_count));
+
+    stats::MovingStatistics d = distribution;
+    // auto variance = std::min({d.variance(), variance_clip});
+    auto variance = d.variance() / distribution.weight;
     double choice_cost =
-        stats::sample_normal(distribution, engine_, thompson_k(local_count));
+        stats::sample_normal(d.mean(), variance, engine_, thompson_k(local_count));
+
     if (choice_cost < cost) {
       choice = current_choice;
       cost = choice_cost;
@@ -93,9 +78,7 @@ api::Implementation GaussianBandit::choose() {
 // TODO: this update is not thread safe.
 void GaussianBandit::update(api::Implementation choice, size_t delta_ns) {
   stats::MovingStatistics::State sample((double)delta_ns * 1.0e-9);
-  auto global_stats = WorkingState::singleton().get(choice);
 
-  global_stats->count++;
   if (selection::DispatchInterface::singleton().times_chosen(choice) < warmup)
     // The first few times we see a kernel, the times tend to be wildly
     // high due to (presumably) lazy initialization. We use the global count
@@ -104,52 +87,29 @@ void GaussianBandit::update(api::Implementation choice, size_t delta_ns) {
     return;
 
   auto& local_stats = local_state_.at(choice);
-  auto roofline = local_stats->roofline;
   auto old_state = local_stats->measured.get_state();
   auto new_state = old_state.discount(local_discount_rate) + sample;
-
-  // Other kernels may have decayed our last contribution, so we need to
-  // correct for that when updating this key's contribution
-  auto update_correction = std::pow(
-      global_discount_rate,
-      global_stats->count - local_stats->global_count_at_last_update);
-
-  auto roofline_correction =
-      // Discount current state
-      global_stats->roofline_correction.get_state().discount(
-          global_discount_rate) +
-
-      // Add the new contribution.
-      (new_state * (1.0 / roofline) -
-
-       // And remove the old.
-       (old_state * (1.0 / roofline)).discount(update_correction));
-
-  auto run_time_variation =
-      // Discount current state
-      global_stats->run_time_variation.get_state().discount(
-          global_discount_rate) +
-
-      // Add the new contribution.
-      (new_state * (1.0 / new_state.mean) -
-
-       // And remove the old.
-       (old_state * (1.0 / (local_stats->count ? old_state.mean : 1)))
-           .discount(update_correction));
-
   local_stats->measured.set_state(new_state);
   local_stats->count++;
-  local_stats->global_count_at_last_update = global_stats->count;
-  global_stats->roofline_correction.set_state(roofline_correction);
-  global_stats->run_time_variation.set_state(run_time_variation);
-  if (local_stats->count > 1){
-    printf(
-      "%d    %10.8f    %10.8f\n",
-      static_cast<int>(choice),
-      local_stats->measured.mean(),
-      std::sqrt(local_stats->measured.variance()) / local_stats->measured.mean());
-  }
+}
 
+void GaussianBandit::summarize(selection::KernelEntryPoint::MapKey key) {
+  printf("  %s\n", logging::to_string(key).c_str());
+  for (auto i : implementations()) {
+    auto& state = local_state_.at(i);
+    auto count = state->count;
+    auto mean = state->measured.mean();
+    auto variance = (count > 1) ? state->measured.variance() : 0.0;
+    printf(
+      "  %-14s   %4d   %5.2f   %10.5f   %10.5f\n",
+      logging::to_string(i).c_str(),
+      (int)(count),
+      mean / state->roofline,
+      mean * 1.0e3,
+      std::sqrt(variance) / mean
+    );
+  }
+  printf("\n");
 }
 
 } // namespace bandits

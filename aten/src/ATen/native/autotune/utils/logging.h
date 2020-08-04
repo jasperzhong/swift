@@ -13,6 +13,10 @@ void register_key(
     selection::KernelEntryPoint::MapKey key,
     std::function<std::string()> repr);
 
+std::string to_string(selection::KernelEntryPoint::MapKey);
+std::string to_string(api::AvailableBandits);
+std::string to_string(api::Implementation);
+
 void record(
     api::AvailableBandits bandit,
     selection::KernelEntryPoint::MapKey key,

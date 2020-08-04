@@ -1,6 +1,9 @@
 #include <limits>
 #include <ATen/ATen.h>
 #include <ATen/NativeFunctions.h>
+#include <ATen/Parallel.h>
+#include <ATen/native/autotune/api.h>
+#include <ATen/native/autotune/dispatch/core.h>
 #include <ATen/native/cpu/DepthwiseConvKernel.h>
 #include <ATen/native/utils/ParamUtils.h>
 #include <ATen/native/ConvUtils.h>
@@ -665,6 +668,52 @@ at::Tensor _convolution(
     params.view1d_as_2d();
     input = view4d(input);
     weight = view4d(weight);
+  }
+
+  if (k == 4 && autotune::api::enabled()) {
+    auto output_sizes = conv_output_size(
+        input.sizes(), weight.sizes(), params.padding, params.stride, params.dilation);
+    auto dispatch = autotune::selection::DispatchConvolution( //
+        {/*input=         */ input,
+         /*weight=        */ weight,
+         /*output_sizes=  */ output_sizes,
+         /*dilation=      */ params.dilation,
+         /*is_transposed= */ transposed_,
+         /*is_depthwise=  */ params.is_depthwise(input, weight),
+         /*groups=        */ groups_,
+         /*num_threads=   */ at::get_num_threads()});
+
+    at::Tensor output;
+    bool fallback {false};
+    switch (dispatch.choice()) {
+      case autotune::api::Implementation::kConv2D_Native:
+        output = at::thnn_conv2d(
+            input, weight, weight.sizes().slice(2), bias, params.stride, params.padding);
+        break;
+      case autotune::api::Implementation::kConv2D_NNPack:
+        output =
+            at::_nnpack_spatial_convolution(input, weight, bias, params.padding, params.stride);
+        break;
+      case autotune::api::Implementation::kConv2D_MKL:
+        output = at::mkldnn_convolution(
+            input.contiguous(),
+            weight.contiguous(),
+            bias.contiguous(),
+            params.padding,
+            params.stride,
+            params.dilation,
+            /*groups=*/1);
+        break;
+      case autotune::api::Implementation::kDisabled:
+      case autotune::api::Implementation::kFallback:
+      case autotune::api::Implementation::kUnsupported:
+      default:
+        fallback = true;
+    }
+    if (!fallback){
+      dispatch.finish();
+      return output;
+    }
   }
 
   at::MemoryFormat cudnn_memory_format = cudnn_conv_use_channels_last(input, weight) ?

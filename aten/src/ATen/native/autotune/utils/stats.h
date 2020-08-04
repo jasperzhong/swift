@@ -63,6 +63,7 @@ class MovingStatistics {
 };
 
 double sample_normal(MovingStatistics::State s, std::mt19937& engine, int64_t n = 1);
+double sample_normal(double mean, double variance, std::mt19937& engine, int64_t n = 1);
 
 } // namespace stats
 } // namespace autotune

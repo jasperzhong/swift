@@ -102,5 +102,10 @@ double sample_normal(State state, std::mt19937& engine, int64_t n) {
   return std::normal_distribution<double>(s.mean(), stddev)(engine);
 }
 
+double sample_normal(double mean, double variance, std::mt19937& engine, int64_t n) {
+  double stddev = std::sqrt(variance / (double)n);
+  return std::normal_distribution<double>(mean, stddev)(engine);
+}
+
 } // namespace stats
 } // namespace autotune

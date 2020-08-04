@@ -34,32 +34,32 @@ ska::flat_hash_map<
     selection::KernelEntryPoint::Hash>
     key_reprs;
 
-// struct Record {
-//   api::AvailableBandits bandit;
-//   selection::KernelEntryPoint::MapKey key;
-//   api::Implementation choice;
-//   size_t delta_ns;
-
-//  private:
-//   friend std::ostream& operator<<(std::ostream& out, const Record& r) {
-//     out << bandit_str.at(r.bandit) << "      " << key_reprs.at(r.key)
-//         << "      " << impl_str.at(r.choice) << "      " << r.delta_ns;
-//     return out;
-//   }
-// };
-
 std::vector<std::string> records;
+bool logging_enabled{false};
 
 void register_key(
     selection::KernelEntryPoint::MapKey key,
     std::function<std::string()> repr) {
+  if (!logging_enabled)
+    return;
   if (key_reprs.find(key) == key_reprs.end()) {
     key_reprs[key] = repr();
-    std::cout << "Repr: " << key_reprs[key] << std::endl;
+    records.push_back(utils::string_format("Repr: %s", key_reprs[key].c_str()));
   }
 }
 
-bool logging_enabled{false};
+std::string to_string(selection::KernelEntryPoint::MapKey key) {
+  return key_reprs.at(key);
+}
+
+std::string to_string(api::AvailableBandits bandit) {
+  return bandit_str.at(bandit);
+}
+
+std::string to_string(api::Implementation choice) {
+  return impl_str.at(choice);
+}
+
 void record(
     api::AvailableBandits bandit,
     selection::KernelEntryPoint::MapKey key,
@@ -68,10 +68,10 @@ void record(
   if (!logging_enabled)
     return;
   records.push_back(utils::string_format(
-      "%s     %s     %-14s     %10d",
-      bandit_str.at(bandit).c_str(),
-      key_reprs.at(key).c_str(),
-      impl_str.at(choice).c_str(),
+      "%s     %-70s     %-14s     %10d",
+      to_string(bandit).c_str(),
+      to_string(key).c_str(),
+      to_string(choice).c_str(),
       delta_ns));
 }
 

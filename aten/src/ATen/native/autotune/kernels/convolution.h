@@ -20,6 +20,7 @@ struct ConvolutionArgs {
   bool is_transposed;
   bool is_depthwise;
   int64_t groups;
+  int num_threads;
 };
 
 class ConvolutionEntryPoint : public selection::KernelEntryPoint {
@@ -38,6 +39,7 @@ class ConvolutionEntryPoint : public selection::KernelEntryPoint {
   c10::IntArrayRef output_sizes_;
   size_t itemsize_;
   bool fallback_;
+  int num_threads_;
 };
 } // namespace kernels
 } // namespace autotune

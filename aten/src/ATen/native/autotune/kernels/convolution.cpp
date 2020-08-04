@@ -19,7 +19,8 @@ ConvolutionEntryPoint::ConvolutionEntryPoint(const ConvolutionArgs& args)
     : input_sizes_(args.input.sizes()),
       weight_sizes_(args.weight.sizes()),
       output_sizes_(args.output_sizes),
-      itemsize_(args.input.itemsize()) {
+      itemsize_(args.input.itemsize()),
+      num_threads_(args.num_threads) {
   // Autotuning is only prototyped on a subset of Conv2D.
   bool supported =
       (args.input.options().backend() == at::Backend::CPU &&
@@ -34,7 +35,7 @@ ConvolutionEntryPoint::ConvolutionEntryPoint(const ConvolutionArgs& args)
 
   fallback_ = !supported;
   if (supported)
-    declare_features({input_sizes_, weight_sizes_, output_sizes_, {itemsize_}});
+    declare_features({input_sizes_, weight_sizes_, output_sizes_, {itemsize_, num_threads_}});
 }
 
 bool ConvolutionEntryPoint::fallback() {
@@ -76,7 +77,7 @@ selection::KernelEntryPoint::cost_estimates ConvolutionEntryPoint::costs() {
       system::cpu_hz;
 
   double roofline =
-      std::max({memory_roofline, compute_roofline}) + convolution_overhead;
+      std::max({memory_roofline, compute_roofline}) / (double)num_threads_ + convolution_overhead;
 
   // For now use the same roofline for all implementations.
   // This will be refined later.
@@ -140,14 +141,17 @@ at::Tensor CAFFE2_API convolution_2D(at::Tensor& x, at::Tensor& weight) {
   switch (dispatch.choice()) {
     case api::Implementation::kDisabled:
     case api::Implementation::kFallback:
-      return at::native::conv2d(
+      return at::convolution(
           x,
           weight,
           bias,
           conv2d_stride,
           conv2d_padding,
           conv2d_dilation,
+          /*transposed=*/false,
+          conv2d_output_padding,
           /*groups=*/1);
+
     case api::Implementation::kConv2D_Native:
       output = at::thnn_conv2d(
           x,

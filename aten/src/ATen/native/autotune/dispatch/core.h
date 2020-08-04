@@ -35,6 +35,8 @@ class DispatchInterface {
       api::Implementation,
       size_t);
 
+  void summarize();
+
   size_t times_chosen(api::Implementation);
 
  private:

@@ -15,6 +15,8 @@ Bandit::Bandit(
   }
 };
 
+void Bandit::summarize(selection::KernelEntryPoint::MapKey) {}
+
 api::Implementation Bandit::choose_safe(
     const selection::KernelEntryPoint::supported_implementations
         implementations) {

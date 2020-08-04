@@ -72,3 +72,28 @@ size_t KernelEntryPoint::Hash::operator()(const KernelEntryPoint::MapKey& key) c
 
 } // namespace selection
 } // namespace autotune
+
+namespace at {
+namespace native {
+bool set_autotune(std::string command) {
+  using namespace autotune::api;
+  if (command == "on") {
+    at::_nnpack_available(); // Init NNPack
+    set_active_bandit(AvailableBandits::kGaussian);
+  } else if (command == "random on") {
+    at::_nnpack_available(); // Init NNPack
+    set_active_bandit(AvailableBandits::kRandomChoice);
+  } else if (command == "logging on") {
+    enable_logging();
+  } else if (command == "off") {
+    set_active_bandit(AvailableBandits::kNone);
+    disable_logging();
+  } else if (command == "flush") {
+    flush_logs(std::cout);
+  } else if (command == "summarize") {
+    summarize();
+  }
+  return true;
+}
+}
+}

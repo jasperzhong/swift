@@ -19,12 +19,14 @@ namespace api {
 enum class CAFFE2_API Task;
 enum class CAFFE2_API Implementation;
 enum class CAFFE2_API AvailableBandits;
+bool enabled();
 void CAFFE2_API set_active_bandit(AvailableBandits);
 void CAFFE2_API enable_logging();
 void CAFFE2_API disable_logging();
 void CAFFE2_API log(std::string);
 void CAFFE2_API flush_logs(std::string filename);
 void CAFFE2_API flush_logs(std::ostream& out);
+void CAFFE2_API summarize();
 
 
 // ============================================================================
