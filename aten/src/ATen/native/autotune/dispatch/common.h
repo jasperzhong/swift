@@ -41,8 +41,8 @@ class KernelEntryPoint {
 
   using cost_estimates =
       c10::SmallVector<CostEstimate, approx_implementations_per_task>;
-  using supported_implementations = c10::
-      SmallVector<api::Implementation, approx_implementations_per_task>;
+  using supported_implementations =
+      c10::SmallVector<api::Implementation, approx_implementations_per_task>;
 
   // Default behavior:
   //   fallback() returns false

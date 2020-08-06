@@ -19,7 +19,6 @@
 namespace autotune {
 namespace selection {
 
-
 template <typename T>
 class ActiveBandits {
  public:
@@ -33,7 +32,7 @@ class ActiveBandits {
       KernelEntryPoint::MapKey key,
       std::function<KernelEntryPoint::cost_estimates()> cost_fn) {
     if (bandits_.find(key) == bandits_.end()) {
-      ordered_keys_.push_back(key);  // Preserve order for debugging.
+      ordered_keys_.push_back(key); // Preserve order for debugging.
       auto cost_estimates = cost_fn();
       bandits_[key] = std::make_unique<T>(cost_estimates, next_seed_);
       next_seed_++;
@@ -52,8 +51,14 @@ class ActiveBandits {
     }
   }
 
+  void reset() {
+    next_seed_ = 0;
+    ordered_keys_.clear();
+    bandits_.clear();
+  }
+
  private:
-  ActiveBandits() {};
+  ActiveBandits(){};
   size_t next_seed_{0};
   std::vector<KernelEntryPoint::MapKey> ordered_keys_;
   ska::flat_hash_map<
@@ -66,31 +71,30 @@ class ActiveBandits {
 const auto& DrunkenBandits = ActiveBandits<bandits::DrunkenBandit>::singleton;
 const auto& GaussianBandits = ActiveBandits<bandits::GaussianBandit>::singleton;
 
-
 api::AvailableBandits DispatchInterface::active_bandit() {
   return active_bandit_;
 }
 
-void DispatchInterface::setActiveBandit(api::AvailableBandits b) {
+void DispatchInterface::set_active_bandit(api::AvailableBandits b) {
   active_bandit_ = b;
 }
 
 api::Implementation DispatchInterface::choose(
     api::AvailableBandits bandit,
     KernelEntryPoint::MapKey key,
-    KernelEntryPoint::supported_implementations implementations,
     std::function<KernelEntryPoint::cost_estimates()> cost_estimates) {
   api::Implementation choice;
   switch (bandit) {
     case api::AvailableBandits::kRandomChoice:
-      choice = DrunkenBandits().get(key, cost_estimates)->choose_safe(implementations);
+      choice = DrunkenBandits().get(key, cost_estimates)->choose();
       break;
     case api::AvailableBandits::kGaussian:
-      choice = GaussianBandits().get(key, cost_estimates)->choose_safe(implementations);
+      choice = GaussianBandits().get(key, cost_estimates)->choose();
       break;
     default:
       TORCH_INTERNAL_ASSERT(false, "Could not select bandit.")
   }
+  TORCH_INTERNAL_ASSERT(choice != api::Implementation::TOTAL_COUNT);
   chosen_counts_[static_cast<size_t>(choice)]++;
   return choice;
 }
@@ -101,10 +105,10 @@ size_t DispatchInterface::times_chosen(api::Implementation choice) {
 }
 
 void DispatchInterface::update(
-      api::AvailableBandits bandit,
-      KernelEntryPoint::MapKey key,
-      api::Implementation choice,
-      size_t delta_ns) {
+    api::AvailableBandits bandit,
+    KernelEntryPoint::MapKey key,
+    api::Implementation choice,
+    size_t delta_ns) {
   switch (bandit) {
     case api::AvailableBandits::kRandomChoice:
       DrunkenBandits().get(key)->update(choice, delta_ns);
@@ -131,6 +135,15 @@ void DispatchInterface::summarize() {
   }
 }
 
+void DispatchInterface::reset() {
+  DrunkenBandits().reset();
+  GaussianBandits().reset();
+  active_bandit_ = api::AvailableBandits::kNone;
+  for (size_t i = 0; i < chosen_counts_.size(); i++) {
+    chosen_counts_[i] = 0;
+  }
+}
+
 template <typename T>
 SelectImplementation<T>::SelectImplementation(typename T::Args args)
     : entry_point_(args) {
@@ -142,12 +155,12 @@ SelectImplementation<T>::SelectImplementation(typename T::Args args)
   } else {
     auto available_implementations = entry_point_.implementations();
     TORCH_INTERNAL_ASSERT(
-        available_implementations.size(),
+        entry_point_.implementations().size(),
         "Autotuning is enabled and kernel did not request a fallback, "
         "however no implemenations are available.");
 
     choice_ = DispatchInterface::singleton().choose(
-        bandit_type_, entry_point_.key(), available_implementations, [&]() {
+        bandit_type_, entry_point_.key(), [&]() {
           return entry_point_.costs();
         });
 
@@ -165,11 +178,12 @@ template <typename T>
 void SelectImplementation<T>::finish() {
   if (!record_duration_)
     return;
+  auto end = std::chrono::high_resolution_clock::now();
+  auto delta_ns =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(end - start_)
+          .count();
   TORCH_INTERNAL_ASSERT(!record_finished_, "finish() called twice.");
   record_finished_ = true;
-  auto delta_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                      std::chrono::high_resolution_clock::now() - start_)
-                      .count();
   auto key = entry_point_.key();
   DispatchInterface::singleton().update(bandit_type_, key, choice_, delta_ns);
   logging::register_key(key, [&]() { return entry_point_.repr(); });
@@ -177,19 +191,4 @@ void SelectImplementation<T>::finish() {
 }
 
 } // namespace selection
-
-namespace api {
-void set_active_bandit(AvailableBandits b) {
-  selection::DispatchInterface::singleton().setActiveBandit(b);
-}
-
-bool enabled() {
-  return selection::DispatchInterface::singleton().active_bandit() !=
-      AvailableBandits::kNone;
-}
-
-void summarize() {
-  selection::DispatchInterface::singleton().summarize();
-}
-} // namespace api
 } // namespace autotune

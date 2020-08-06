@@ -1,5 +1,6 @@
 #pragma once
 
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -8,9 +9,6 @@
 
 
 namespace autotune {
-// Temporary. Evenentually this should be rolled into at::_convolution.
-at::Tensor CAFFE2_API convolution_2D(at::Tensor& x, at::Tensor& weight);
-
 namespace api {
 
 // ============================================================================
@@ -27,6 +25,7 @@ void CAFFE2_API log(std::string);
 void CAFFE2_API flush_logs(std::string filename);
 void CAFFE2_API flush_logs(std::ostream& out);
 void CAFFE2_API summarize();
+void CAFFE2_API reset();
 
 
 // ============================================================================
@@ -63,4 +62,24 @@ enum class AvailableBandits {
   kNone,
 };
 } // namespace api
+
+// Temporary. Evenentually this should be rolled into at::_convolution.
+at::Tensor CAFFE2_API convolution_2D(at::Tensor& x, at::Tensor& weight);
+at::Tensor CAFFE2_API convolution_2D(at::Tensor& x, at::Tensor& weight, api::Implementation);
+
+namespace utils {
+// https://stackoverflow.com/a/26221725
+template <typename... Args>
+std::string string_format(const std::string& format, Args... args) {
+  size_t size =
+      snprintf(nullptr, 0, format.c_str(), args...) + 1; // Extra space for '\0'
+  if (size <= 0) {
+    throw std::runtime_error("Error during formatting.");
+  }
+  std::unique_ptr<char[]> buf(new char[size]);
+  snprintf(buf.get(), size, format.c_str(), args...);
+  return std::string(
+      buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
+}
+} // namespace utils
 } // namespace autotune

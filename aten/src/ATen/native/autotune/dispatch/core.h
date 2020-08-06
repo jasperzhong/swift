@@ -21,12 +21,11 @@ class DispatchInterface {
   }
 
   api::AvailableBandits active_bandit();
-  void setActiveBandit(api::AvailableBandits);
+  void set_active_bandit(api::AvailableBandits);
 
   api::Implementation choose(
       api::AvailableBandits,
       KernelEntryPoint::MapKey,
-      KernelEntryPoint::supported_implementations,
       std::function<KernelEntryPoint::cost_estimates()>);
 
   void update(
@@ -36,6 +35,7 @@ class DispatchInterface {
       size_t);
 
   void summarize();
+  void reset();
 
   size_t times_chosen(api::Implementation);
 

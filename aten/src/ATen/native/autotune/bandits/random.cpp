@@ -13,8 +13,8 @@ DrunkenBandit::DrunkenBandit(
     : Bandit(costs, seed) {}
 
 api::Implementation DrunkenBandit::choose() {
-  std::uniform_int_distribution<size_t> distribution(
-      0, implementations().size() - 1);
+  auto n = implementations().size();
+  std::uniform_int_distribution<size_t> distribution(0, n - 1);
   auto choice = distribution(engine_);
   return implementations()[choice];
 }

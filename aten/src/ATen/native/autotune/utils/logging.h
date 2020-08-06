@@ -9,6 +9,12 @@
 namespace autotune {
 namespace logging {
 
+void enable();
+void disable();
+void log(std::string s);
+void flush(std::string filename);
+void flush(std::ostream& out);
+
 void register_key(
     selection::KernelEntryPoint::MapKey key,
     std::function<std::string()> repr);

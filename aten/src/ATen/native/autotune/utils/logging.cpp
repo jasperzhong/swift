@@ -14,6 +14,8 @@
 namespace autotune {
 namespace logging {
 
+bool logging_enabled = false;
+
 std::map<api::AvailableBandits, std::string> bandit_str = {
     {api::AvailableBandits::kRandomChoice, "DrunkenBandit"},
     {api::AvailableBandits::kGaussian, "GaussianBandit"},
@@ -35,7 +37,37 @@ ska::flat_hash_map<
     key_reprs;
 
 std::vector<std::string> records;
-bool logging_enabled{false};
+
+void enable() {
+  logging_enabled = true;
+}
+
+void disable() {
+  logging_enabled = false;
+}
+
+void log(std::string s) {
+  if (!logging_enabled)
+    return;
+  records.push_back(s);
+}
+
+void flush(std::string filename) {
+  std::ofstream out;
+  out.open(filename, std::ios_base::app);
+  for (auto r : records) {
+    out << r << std::endl;
+  }
+  records.clear();
+  out.close();
+}
+
+void flush(std::ostream& out) {
+  for (auto r : records) {
+    out << r << std::endl;
+  }
+  records.clear();
+}
 
 void register_key(
     selection::KernelEntryPoint::MapKey key,
@@ -76,36 +108,4 @@ void record(
 }
 
 } // namespace logging
-
-namespace api {
-void enable_logging() {
-  logging::logging_enabled = true;
-}
-void disable_logging() {
-  logging::logging_enabled = false;
-}
-
-void log(std::string s) {
-  if (!logging::logging_enabled)
-    return;
-  logging::records.push_back(s);
-}
-
-void flush_logs(std::string filename) {
-  std::ofstream out;
-  out.open(filename, std::ios_base::app);
-  for (auto r : logging::records) {
-    out << r << std::endl;
-  }
-  logging::records.clear();
-  out.close();
-}
-
-void flush_logs(std::ostream& out) {
-  for (auto r : logging::records) {
-    out << r << std::endl;
-  }
-  logging::records.clear();
-}
-} // namespace api
 } // namespace autotune

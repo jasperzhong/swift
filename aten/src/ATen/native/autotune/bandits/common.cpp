@@ -1,6 +1,7 @@
 #include <ATen/native/autotune/bandits/common.h>
 
 #include <ATen/native/autotune/api.h>
+#include <ATen/native/autotune/dispatch/common.h>
 
 namespace autotune {
 namespace bandits {
@@ -17,20 +18,9 @@ Bandit::Bandit(
 
 void Bandit::summarize(selection::KernelEntryPoint::MapKey) {}
 
-api::Implementation Bandit::choose_safe(
-    const selection::KernelEntryPoint::supported_implementations
-        implementations) {
-  TORCH_INTERNAL_ASSERT(implementations.size() == implementations_.size());
-  for (size_t i = 0; i < implementations.size(); i++) {
-    TORCH_INTERNAL_ASSERT(implementations[i] == implementations_[i]);
-  }
-  return choose();
-}
-
-selection::KernelEntryPoint::supported_implementations Bandit::
-    implementations() {
+const selection::KernelEntryPoint::supported_implementations& Bandit::
+    implementations() const {
   return implementations_;
 }
-
 } // namespace bandits
 } // namespace autotune

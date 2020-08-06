@@ -70,7 +70,7 @@ double MovingStatistics::variance(bool run_checks) {
     return state_.m2 / (state_.weight - 1.0);
 }
 
-State State::operator+(State other) {
+State State::operator+(const State& other) const {
   auto weight_new = weight + other.weight;
   auto delta = other.mean - mean;
   auto mean_new = mean + (other.weight / weight_new) * delta;
@@ -80,7 +80,7 @@ State State::operator+(State other) {
   return {mean_new, weight_new, m2_new};
 }
 
-State State::operator-(State other) {
+State State::operator-(const State& other) const {
   auto mean_new = (mean - other.weight / weight * other.mean) /
       (1.0 - other.weight / weight);
   auto m2_new = m2 - other.m2 -
@@ -88,23 +88,12 @@ State State::operator-(State other) {
   return {mean_new, weight - other.weight, m2_new};
 }
 
-State State::operator*(double factor) {
+State State::operator*(const double factor) const {
   return {mean * factor, weight, m2 * std::pow(factor, 2)};
 }
 
 State State::discount(double factor) {
     return {mean, weight * factor, m2 * factor};
-}
-
-double sample_normal(State state, std::mt19937& engine, int64_t n) {
-  MovingStatistics s {state};
-  double stddev = std::sqrt(s.variance() / (double)n);
-  return std::normal_distribution<double>(s.mean(), stddev)(engine);
-}
-
-double sample_normal(double mean, double variance, std::mt19937& engine, int64_t n) {
-  double stddev = std::sqrt(variance / (double)n);
-  return std::normal_distribution<double>(mean, stddev)(engine);
 }
 
 } // namespace stats

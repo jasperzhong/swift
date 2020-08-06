@@ -52,18 +52,15 @@ class MovingStatistics {
 
     // These methods do not enforce weight >=0 and m2 >= 0
     // MovingStatistics::add and MovingStatistics::remove do.
-    State operator+(State);
-    State operator-(State);
-    State operator*(double);
+    State operator+(const State&) const;
+    State operator-(const State&) const;
+    State operator*(const double) const;
     State discount(double);
   };
 
  private:
   State state_;
 };
-
-double sample_normal(MovingStatistics::State s, std::mt19937& engine, int64_t n = 1);
-double sample_normal(double mean, double variance, std::mt19937& engine, int64_t n = 1);
 
 } // namespace stats
 } // namespace autotune

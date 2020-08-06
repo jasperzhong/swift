@@ -13,9 +13,6 @@ class DrunkenBandit : public Bandit {
       unsigned seed);
   api::Implementation choose() override;
   void update(api::Implementation, size_t) override;
-
- private:
-  selection::KernelEntryPoint::supported_implementations implementations_;
 };
 } // namespace bandits
 } // namespace autotune

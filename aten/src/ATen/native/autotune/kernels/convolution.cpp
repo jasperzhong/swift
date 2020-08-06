@@ -10,6 +10,7 @@
 #include <ATen/native/autotune/dispatch/common.h>
 #include <ATen/native/autotune/dispatch/core.h>
 #include <ATen/native/autotune/utils/common.h>
+#include <ATen/native/autotune/utils/logging.h>
 #include <c10/util/Exception.h>
 
 namespace autotune {
@@ -35,7 +36,11 @@ ConvolutionEntryPoint::ConvolutionEntryPoint(const ConvolutionArgs& args)
 
   fallback_ = !supported;
   if (supported)
-    declare_features({input_sizes_, weight_sizes_, output_sizes_, {itemsize_, num_threads_}});
+    // Only bother to set up the feature vector if it might be used.
+    declare_features({input_sizes_,
+                      weight_sizes_,
+                      output_sizes_,
+                      {itemsize_, num_threads_}});
 }
 
 bool ConvolutionEntryPoint::fallback() {
@@ -77,7 +82,8 @@ selection::KernelEntryPoint::cost_estimates ConvolutionEntryPoint::costs() {
       system::cpu_hz;
 
   double roofline =
-      std::max({memory_roofline, compute_roofline}) / (double)num_threads_ + convolution_overhead;
+      std::max({memory_roofline, compute_roofline}) / (double)num_threads_ +
+      convolution_overhead;
 
   // For now use the same roofline for all implementations.
   // This will be refined later.
@@ -108,7 +114,6 @@ std::string ConvolutionEntryPoint::repr() {
       weight_sizes_[2],
       weight_sizes_[3]);
 }
-
 } // namespace kernels
 
 // Temporary. Evenentually this should be rolled into at::_convolution.
@@ -116,31 +121,15 @@ static std::vector<int64_t> conv2d_stride{1, 1};
 static std::vector<int64_t> conv2d_dilation{1, 1};
 static std::vector<int64_t> conv2d_padding{0, 0};
 static std::vector<int64_t> conv2d_output_padding{0, 0};
-at::Tensor CAFFE2_API convolution_2D(at::Tensor& x, at::Tensor& weight) {
-  // This will also initialize NNPack.
-  TORCH_INTERNAL_ASSERT(at::_nnpack_available());
 
-  auto output_sizes = at::native::conv_output_size(
-      x.sizes(),
-      weight.sizes(),
-      conv2d_padding,
-      conv2d_stride,
-      conv2d_dilation);
-  auto bias = at::ones({output_sizes[1]});
+at::Tensor convolution_2D(
+    at::Tensor& x,
+    at::Tensor& weight,
+    api::Implementation choice) {
+  auto bias = at::ones({weight.sizes()[0]});
 
-  auto dispatch = selection::DispatchConvolution( //
-      {/*input=         */ x,
-       /*weight=        */ weight,
-       /*output_sizes=  */ output_sizes,
-       /*dilation=      */ conv2d_dilation,
-       /*is_transposed= */ false,
-       /*is_depthwise=  */ false,
-       /*groups=        */ 1});
-
-  at::Tensor output;
-  switch (dispatch.choice()) {
+  switch (choice) {
     case api::Implementation::kDisabled:
-    case api::Implementation::kFallback:
       return at::convolution(
           x,
           weight,
@@ -153,20 +142,21 @@ at::Tensor CAFFE2_API convolution_2D(at::Tensor& x, at::Tensor& weight) {
           /*groups=*/1);
 
     case api::Implementation::kConv2D_Native:
-      output = at::thnn_conv2d(
+      return at::thnn_conv2d(
           x,
           weight,
           weight.sizes().slice(2),
           bias,
           conv2d_stride,
           conv2d_padding);
-      break;
+
     case api::Implementation::kConv2D_NNPack:
-      output = at::_nnpack_spatial_convolution(
+      TORCH_INTERNAL_ASSERT(at::_nnpack_available());
+      return at::_nnpack_spatial_convolution(
           x, weight, bias, conv2d_padding, conv2d_stride);
-      break;
+
     case api::Implementation::kConv2D_MKL:
-      output = at::mkldnn_convolution(
+      return at::mkldnn_convolution(
           x.contiguous(),
           weight.contiguous(),
           bias.contiguous(),
@@ -174,12 +164,41 @@ at::Tensor CAFFE2_API convolution_2D(at::Tensor& x, at::Tensor& weight) {
           conv2d_stride,
           conv2d_dilation,
           /*groups=*/1);
-      break;
+    case api::Implementation::kFallback:
     case api::Implementation::kUnsupported:
     default:
-      AT_ERROR("Unknown error");
+      AT_ERROR("Currently unsupported: ", logging::to_string(choice));
   }
-  dispatch.finish();
+}
+
+at::Tensor convolution_2D(at::Tensor& x, at::Tensor& weight) {
+  // This will also initialize NNPack.
+  TORCH_INTERNAL_ASSERT(at::_nnpack_available());
+
+  auto output_sizes = at::native::conv_output_size(
+      x.sizes(),
+      weight.sizes(),
+      conv2d_padding,
+      conv2d_stride,
+      conv2d_dilation);
+
+  auto dispatch = selection::DispatchConvolution( //
+      {/*input=         */ x,
+       /*weight=        */ weight,
+       /*output_sizes=  */ output_sizes,
+       /*dilation=      */ conv2d_dilation,
+       /*is_transposed= */ false,
+       /*is_depthwise=  */ false,
+       /*groups=        */ 1});
+
+  auto choice = dispatch.choice();
+  auto output = convolution_2D(x, weight, choice);
+  if (choice == api::Implementation::kConv2D_Native or
+      choice == api::Implementation::kConv2D_Native or
+      choice == api::Implementation::kConv2D_NNPack) {
+    dispatch.finish();
+  }
+
   return output;
 }
 
