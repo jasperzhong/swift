@@ -21,7 +21,7 @@ ConvolutionEntryPoint::ConvolutionEntryPoint(const ConvolutionArgs& args)
       weight_sizes_(args.weight.sizes()),
       output_sizes_(args.output_sizes),
       itemsize_(args.input.itemsize()),
-      num_threads_(args.num_threads) {
+      num_threads_(std::max(args.num_threads, 1)) {
   // Autotuning is only prototyped on a subset of Conv2D.
   bool supported =
       (args.input.options().backend() == at::Backend::CPU &&
@@ -193,9 +193,12 @@ at::Tensor convolution_2D(at::Tensor& x, at::Tensor& weight) {
 
   auto choice = dispatch.choice();
   auto output = convolution_2D(x, weight, choice);
+
+  // This is only necessary because of the overload which
+  // bypasses dispatch alltogether.
   if (choice == api::Implementation::kConv2D_Native or
-      choice == api::Implementation::kConv2D_Native or
-      choice == api::Implementation::kConv2D_NNPack) {
+      choice == api::Implementation::kConv2D_NNPack or
+      choice == api::Implementation::kConv2D_MKL) {
     dispatch.finish();
   }
 

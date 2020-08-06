@@ -81,6 +81,7 @@ api::Implementation GaussianBandit::choose() {
       cost = choice_cost;
     }
   }
+  TORCH_INTERNAL_ASSERT(choice != api::Implementation::kUnsupported);
   return choice;
 }
 

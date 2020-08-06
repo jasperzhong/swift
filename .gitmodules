@@ -130,3 +130,9 @@
     ignore = dirty
     path = third_party/tensorpipe
     url = https://github.com/pytorch/tensorpipe.git
+[submodule "aten/src/ATen/native/autotune/benchmark/real_models/stargan"]
+	path = aten/src/ATen/native/autotune/benchmark/real_models/stargan
+	url = https://github.com/zou3519/stargan
+[submodule "aten/src/ATen/native/autotune/benchmark/real_models/Pytorch-UNet"]
+	path = aten/src/ATen/native/autotune/benchmark/real_models/Pytorch-UNet
+	url = https://github.com/supriyar/Pytorch-UNet
