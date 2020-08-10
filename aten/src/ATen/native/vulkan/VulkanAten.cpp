@@ -271,6 +271,25 @@ const VulkanTensor& vtensor(const Tensor& t) {
   return vtensor_from_vulkan(tv);
 }
 
+Tensor add_scalar(const Tensor& self, const Scalar other, const Scalar alpha) {
+  const auto& x = vtensor_from_vulkan(self);
+  const float s = other.to<float>();
+  const float a = alpha.to<float>();
+  VulkanTensor output{self.sizes().vec()};
+  output.allocate_storage();
+  vulkan::detail::add(output, x, s * a);
+  return new_with_vtensor_vulkan(std::move(output), self.options());
+}
+
+Tensor mul_scalar(const Tensor& self, const Scalar other) {
+  const auto& x = vtensor_from_vulkan(self);
+  const float s = other.to<float>();
+  VulkanTensor output{self.sizes().vec()};
+  output.allocate_storage();
+  vulkan::detail::mul(output, x, s);
+  return new_with_vtensor_vulkan(std::move(output), self.options());
+}
+
 Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha) {
   auto& x = vtensor(self);
   const auto& y = vtensor(other);
@@ -417,6 +436,8 @@ TORCH_LIBRARY_IMPL(aten, Vulkan, m) {
   m.impl("empty.memory_format", TORCH_FN(at::native::vulkan::aten::empty));
   m.impl("empty_strided", TORCH_FN(at::native::vulkan::aten::empty_strided));
   m.impl("add.Tensor", TORCH_FN(at::native::vulkan::aten::add));
+  m.impl("mul.Scalar", TORCH_FN(at::native::vulkan::aten::mul_scalar));
+  m.impl("add.Scalar", TORCH_FN(at::native::vulkan::aten::add_scalar));
   m.impl("clamp", TORCH_FN(at::native::vulkan::aten::clamp));
   m.impl("mean.dim", TORCH_FN(at::native::vulkan::aten::mean));
   m.impl("mm", TORCH_FN(at::native::vulkan::aten::mm));
