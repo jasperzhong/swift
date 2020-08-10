@@ -1,6 +1,7 @@
 #include <ATen/native/vulkan/VulkanAten.h>
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
+#include <ATen/InferSize.h>
 #include <ATen/native/Pool.h>
 #include <ATen/native/UpSample.h>
 #include <ATen/native/utils/ParamUtils.h>
@@ -296,6 +297,40 @@ Tensor cat(TensorList tensors, int64_t dim) {
   return new_with_vtensor_vulkan(std::move(output), tensor.options());
 }
 
+Tensor transpose(const Tensor& self, int64_t dim0, int64_t dim1) {
+  return new_with_vtensor_vulkan(
+      vulkan::detail::transpose(vtensor_from_vulkan(self), dim0, dim1),
+      self.options());
+}
+
+Tensor& transpose_(Tensor& self, int64_t dim0, int64_t dim1) {
+  auto& x = vtensor_from_vulkan(self);
+  x = vulkan::detail::transpose(x, dim0, dim1);
+  return self;
+}
+
+Tensor view(const Tensor& self, IntArrayRef size) {
+  return new_with_vtensor_vulkan(
+      vulkan::detail::reshape_copy(
+          vtensor_from_vulkan(self), at::infer_size(size, self.numel())),
+      self.options());
+}
+
+Tensor contiguous(const Tensor& self, MemoryFormat memory_format) {
+  return self;
+}
+
+Tensor slice(
+    const Tensor& self,
+    int64_t dim,
+    int64_t start,
+    int64_t end,
+    int64_t step) {
+  return new_with_vtensor_vulkan(
+      vulkan::detail::slice(vtensor_from_vulkan(self), dim, start, end, step),
+      self.options());
+}
+
 Tensor add(const Tensor& self, const Tensor& other, const Scalar alpha) {
   auto xt = self.is_vulkan() ? self : self.vulkan();
   const auto& x = vtensor_from_vulkan(xt);
@@ -341,6 +376,19 @@ Tensor mul_scalar(const Tensor& self, const Scalar other) {
   output.allocate_storage();
   vulkan::detail::mul(output, x, s);
   return new_with_vtensor_vulkan(std::move(output), self.options());
+}
+
+Tensor select(const Tensor& self, int64_t dim, int64_t index) {
+  auto sliced = vulkan::aten::slice(self, dim, index, index + 1, 1);
+  auto sizes = self.sizes().vec();
+  sizes.erase(sizes.begin() + dim);
+  return vulkan::aten::reshape(sliced, sizes);
+}
+
+Tensor unsqueeze(const Tensor& self, int64_t dim) {
+  auto sizes = self.sizes().vec();
+  sizes.insert(sizes.begin() + dim, 1);
+  return vulkan::aten::reshape(self, sizes);
 }
 
 Tensor& add_(Tensor& self, const Tensor& other, Scalar alpha) {
@@ -510,6 +558,13 @@ TORCH_LIBRARY_IMPL(aten, Vulkan, m) {
   m.impl_UNBOXED("hardtanh_", at::native::vulkan::aten::hardtanh_);
   m.impl_UNBOXED("relu_", at::native::vulkan::aten::relu_);
   m.impl_UNBOXED("add_.Tensor", at::native::vulkan::aten::add_);
+  m.impl("slice.Tensor", TORCH_FN(at::native::vulkan::aten::slice));
+  m.impl("reshape", TORCH_FN(at::native::vulkan::aten::reshape));
+  m.impl("select.int", TORCH_FN(at::native::vulkan::aten::select));
+  m.impl("transpose.int", TORCH_FN(at::native::vulkan::aten::transpose));
+  m.impl_UNBOXED("transpose_", at::native::vulkan::aten::transpose_);
+  m.impl("view", TORCH_FN(at::native::vulkan::aten::view));
+  m.impl("unsqueeze", TORCH_FN(at::native::vulkan::aten::unsqueeze));
 }
 
 Tensor& copy_from_vulkan_(Tensor& self, const Tensor& src) {
