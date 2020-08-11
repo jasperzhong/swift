@@ -841,3 +841,6 @@ endif()
 
 include(cmake/Summary.cmake)
 caffe2_print_configuration_summary()
+
+# ---[ WHC TorchPY experiment
+add_subdirectory(torchpy)
