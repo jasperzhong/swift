@@ -55,6 +55,8 @@ _INVALID = {("InceptionV3", "1,3,64,64")}
 
 
 _RESULT_FILE = "/tmp/torchvision_results.txt"
+PYTHONPATH = os.getenv("PYTHONPATH")
+assert PYTHONPATH is not None  # Subprocess will fail
 _REPEATS = 5
 _MAIN, _SUBPROCESS = "main", "subprocess"
 _WORKERS = int(multiprocessing.cpu_count() / 2)
@@ -98,16 +100,23 @@ def benchmark_model(name, size, result_file):
         "off": [],
     }
 
-    for i in range(40):
+    for i in range(50):
         for autotune in ("off", "on"):
             torch.set_autotune(autotune)
+            if result_file is None:
+                torch.set_autotune("logging on")
             st = timeit.default_timer()
             model(x)
             results[autotune].append(timeit.default_timer() - st)
             print(f"{autotune:<3}  {results[autotune][-1]}")
 
-    with open(result_file, "wt") as f:
-        json.dump(results, f)
+    if result_file is not None:
+        with open(result_file, "wt") as f:
+            json.dump(results, f)
+    else:
+        pass
+        # torch.set_autotune("flush")
+        torch.set_autotune("summarize")
 
 
 def run_subprocess(args):
@@ -122,7 +131,7 @@ def run_subprocess(args):
             cmd,
             env={
                 "PATH": os.getenv("PATH"),
-                "PYTHONPATH": os.getenv("PYTHONPATH"),
+                "PYTHONPATH": PYTHONPATH,
             },
             stdout=subprocess.PIPE,
             shell=True

@@ -34,6 +34,7 @@ GaussianBandit::GaussianBandit(
 api::Implementation GaussianBandit::choose() {
   auto choice = api::Implementation::kUnsupported;
   auto cost = std::numeric_limits<double>::max();
+  int64_t local_count_sum = 0;
 
   // If the roofline predictions are overly pessimistic, (e.g. they neglect
   // vectorization), then the first implementation chosen appears much more
@@ -42,11 +43,24 @@ api::Implementation GaussianBandit::choose() {
   double roofline_pessimism = 1.0;
   for (auto& l : local_state_) {
     auto& local_stats = l.second;
+    local_count_sum += local_stats->count;
     if (local_stats->count) {
       auto pessimism = best_roofline_ / local_stats->measured.mean();
       roofline_pessimism = std::max({roofline_pessimism, pessimism});
     }
   }
+
+  // Given the tendency of bandits to transition from explore-heavy
+  // to exploit-heavy behavior, the presence of a ramp in the opposite
+  // direction is curious. The reason is simple: an operation may only
+  // be called a few times with a given configuration, and for such
+  // dynamic workloads an early explore-heavy selection is little better
+  // than a random bandit. So instead, the sampling rate ramps **down**
+  // based on how many times a given configuration has been called
+  // (regardless of which implementation was selected), and then if
+  // a configuration is called many times it gracefully transitions to
+  // the per-impl sampling rate ramp.
+  int64_t min_k = std::max(thompson_k_max - local_count_sum / 2, (int64_t)1);
 
   for (auto& l : local_state_) {
     auto current_choice = l.first;
@@ -69,7 +83,7 @@ api::Implementation GaussianBandit::choose() {
     // What wikipedia calls "beta", C++ calls "1 / beta".
     auto inv_sigma_sq_dist = std::gamma_distribution<double>(alpha, 1.0 / beta);
 
-    auto k = std::min(thompson_k_max, (int64_t)local_count + 1);
+    auto k = std::max(std::min(thompson_k_max, (int64_t)local_count + 1), min_k);
     double choice_cost = 0.0;
     for (size_t i = 0; i < k; i++) {
       auto stddev = std::sqrt(1.0 / inv_sigma_sq_dist(engine_) / nu);
@@ -111,12 +125,13 @@ void GaussianBandit::summarize(selection::KernelEntryPoint::MapKey key) {
     auto mean = state->measured.mean();
     auto variance = (count > 1) ? state->measured.variance() : 0.0;
     printf(
-      "  %-14s   %4d   %5.2f   %10.5f   %10.5f\n",
+      "  %-14s   %4d   %5.2f   %10.5f   %10.5f   %10.5f\n",
       logging::to_string(i).c_str(),
       (int)(count),
       mean / state->roofline,
       mean * 1.0e3,
-      std::sqrt(variance) / mean
+      std::sqrt(variance) / mean,
+      state->roofline
     );
   }
   printf("\n");

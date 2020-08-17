@@ -152,6 +152,23 @@ void unfolded2d_acc_kernel(
 }
 
 template <typename scalar_t>
+static inline void loopcpy(scalar_t* dest, scalar_t* src, size_t num) {
+  /*
+  Mirrors the semantics of:
+    memcpy(dest, src, sizeof(scalar_t) * num);
+
+  However this formulation is faster because it allows the compiler to
+  better optimize the transfer. (Including converting the loop back to memcpy
+  if appropriate.)
+  */
+  for (size_t i = 0; i < num; i++) {
+    *dest = *src;
+    dest++;
+    src++;
+  }
+}
+
+template <typename scalar_t>
 static void unfolded2d_copy(
     scalar_t* input_data,
     scalar_t* finput_data,
@@ -170,9 +187,9 @@ static void unfolded2d_copy(
       0, (int64_t)n_input_plane * kH * kW, 0, [&](int64_t start, int64_t end) {
         for (auto k = start; k < end; k++) {
           int64_t nip = k / (kH * kW);
-          int64_t rest = k % (kH * kW);
+          int64_t rest = k - nip * kH * kW;
           int64_t kh = rest / kW;
-          int64_t kw = rest % kW;
+          int64_t kw = rest - kh * kW;
           int64_t x, y;
           int64_t ix, iy;
           scalar_t* dst = finput_data +
@@ -206,10 +223,11 @@ static void unfolded2d_copy(
                           dst + (size_t)y * output_width,
                           0,
                           sizeof(scalar_t) * lpad);
-                    memcpy(
-                        dst + (size_t)y * output_width + lpad,
-                        src + (size_t)iy * input_width + ix + lpad,
-                        sizeof(scalar_t) * (output_width - rpad - lpad));
+                    loopcpy(
+                      dst + (size_t)y * output_width + lpad,
+                      src + (size_t)iy * input_width + ix + lpad,
+                      output_width - rpad - lpad
+                    );
                     if (rpad > 0)
                       memset(
                           dst + (size_t)y * output_width + output_width - rpad,
@@ -225,10 +243,11 @@ static void unfolded2d_copy(
                           0,
                           sizeof(scalar_t) * 1);
                     else
-                      memcpy(
-                          dst + (size_t)y * output_width + x,
-                          src + (size_t)iy * input_width + ix,
-                          sizeof(scalar_t) * (1));
+                      loopcpy(
+                        dst + (size_t)y * output_width + x,
+                        src + (size_t)iy * input_width + ix,
+                        1
+                      );
                   }
                 }
               }
@@ -238,16 +257,18 @@ static void unfolded2d_copy(
               iy = (int64_t)y * dH + kh;
               ix = 0 + kw;
               if (dW == 1)
-                memcpy(
-                    dst + (size_t)y * output_width,
-                    src + (size_t)iy * input_width + ix,
-                    sizeof(scalar_t) * output_width);
+                loopcpy(
+                  dst + (size_t)y * output_width,
+                  src + (size_t)iy * input_width + ix,
+                  output_width
+                );
               else {
                 for (x = 0; x < output_width; x++)
-                  memcpy(
-                      dst + (size_t)y * output_width + x,
-                      src + (size_t)iy * input_width + ix + (int64_t)x * dW,
-                      sizeof(scalar_t) * (1));
+                  loopcpy(
+                    dst + (size_t)y * output_width + x,
+                    src + (size_t)iy * input_width + ix + (int64_t)x * dW,
+                    1
+                  );
               }
             }
           }

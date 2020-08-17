@@ -5,6 +5,7 @@
 
 #include <ATen/native/autotune/api.h>
 #include <ATen/native/autotune/dispatch/common.h>
+#include <c10/util/ArrayRef.h>
 
 namespace autotune {
 namespace logging {
@@ -22,6 +23,7 @@ void register_key(
 std::string to_string(selection::KernelEntryPoint::MapKey);
 std::string to_string(api::AvailableBandits);
 std::string to_string(api::Implementation);
+std::string to_string(c10::IntArrayRef);
 
 void record(
     api::AvailableBandits bandit,

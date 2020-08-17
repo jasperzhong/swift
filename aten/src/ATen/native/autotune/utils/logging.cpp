@@ -2,13 +2,17 @@
 
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <map>
+#include <regex>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include <ATen/native/autotune/api.h>
 #include <ATen/native/autotune/dispatch/common.h>
 #include <ATen/native/autotune/utils/common.h>
+#include <c10/util/ArrayRef.h>
 #include <c10/util/flat_hash_map.h>
 
 namespace autotune {
@@ -92,6 +96,17 @@ std::string to_string(api::Implementation choice) {
   return impl_str.at(choice);
 }
 
+std::string to_string(c10::IntArrayRef x) {
+  std::stringstream ss;
+  for (auto xi : x) {
+    ss << xi << ", ";
+  }
+  auto out = ss.str();
+  out.pop_back();
+  out.pop_back();
+  return out;
+}
+
 void record(
     api::AvailableBandits bandit,
     selection::KernelEntryPoint::MapKey key,
@@ -99,10 +114,18 @@ void record(
     size_t delta_ns) {
   if (!logging_enabled)
     return;
+
+  auto key_str = std::regex_replace(
+      to_string(key.data),
+      std::regex(
+          std::string(", ") +
+          std::to_string(std::numeric_limits<int64_t>::min())),
+      "    ");
+
   records.push_back(utils::string_format(
-      "%s     %-70s     %-14s     %10d",
+      "%s  (%-80s)   %-14s   %10d",
       to_string(bandit).c_str(),
-      to_string(key).c_str(),
+      key_str.c_str(),
       to_string(choice).c_str(),
       delta_ns));
 }

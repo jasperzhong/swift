@@ -18,7 +18,7 @@ static double local_discount_rate = 0.99;
 static const stats::MovingStatistics::State roofline_prior({
     /*mean=   */ 1.0,
     /*weight= */ 2.0,
-    /*m2=     */ 2.0 * 1.0 / 9.0 // w * sigma ** 2
+    /*m2=     */ 2.0 * 1.0 / 16.0 // w * sigma ** 2
 });
 
 class GaussianBandit : public Bandit {
