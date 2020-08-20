@@ -7,8 +7,10 @@
 #include <ATen/core/dispatch/OperatorOptions.h>
 #include <ATen/core/stack.h>
 #include <c10/util/Exception.h>
+#include <c10/util/string_view.h>
 #include <torch/csrc/jit/frontend/function_schema_parser.h>
 #include <torch/csrc/jit/runtime/operator_options.h>
+#include <ATen/core/op_registration/op_whitelist.h>
 
 #include <ATen/ATen.h>
 #include <ATen/core/function_schema.h>
@@ -192,6 +194,17 @@ struct TORCH_API Operator {
 
   c10::either<C10Operator, JitOnlyOperator> op_;
 };
+
+template <bool enabled, typename Func>
+__attribute__((always_inline))
+c10::optional<Operator> OperatorGenerator(
+    std::string&& schema_str,
+    Func&& op,
+    AliasAnalysisKind alias_analysis) {
+  return c10::guts::if_constexpr<enabled> (
+      [&] {return c10::optional<Operator>(Operator(std::move(schema_str), std::forward<Func>(op), alias_analysis));},
+      [] {return c10::nullopt;});
+}
 
 TORCH_API std::string canonicalSchemaString(const FunctionSchema& schema);
 
