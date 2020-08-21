@@ -4,6 +4,8 @@
 #include <ATen/NativeFunctions.h>
 #include <ATen/native/CPUBlas.h>
 #include <ATen/native/LinearAlgebraUtils.h>
+#include <ATen/native/xnnpack/Common.h>
+#include <ATen/native/xnnpack/Engine.h>
 #include <ATen/TensorUtils.h>
 #include <ATen/Parallel.h>
 #include <ATen/LegacyTHFunctionsCPU.h>
@@ -13,6 +15,8 @@
 #include <vector>
 #include <limits>
 #include <ATen/NamedTensorUtils.h>
+#include <TH/THGeneral.h>
+
 
 namespace at {
 namespace native {
@@ -357,6 +361,20 @@ Tensor addbmm_cpu(const Tensor& self, const Tensor& batch1, const Tensor& batch2
 Tensor& addmm_cpu_out(Tensor &result, const Tensor& self, const Tensor& mat1, const Tensor& mat2, Scalar beta, Scalar alpha) {
   TORCH_CHECK(mat1.dim() == 2, "mat1 must be a matrix, got ", mat1.dim(), "-D tensor");
   TORCH_CHECK(mat2.dim() == 2, "mat2 must be a matrix, got ", mat2.dim(), "-D tensor");
+  #if defined(USE_XNNPACK) && !defined(USE_BLAS)
+  using namespace xnnpack::internal;
+  if (alpha.type() == at::kInt && alpha.to<int>() == 1
+      && beta.type() == at::kInt && beta.to<int>() == 1
+      && self.scalar_type() == at::kFloat && mat1.scalar_type() == at::kFloat && mat2.scalar_type() == at::kFloat
+      && !self.requires_grad() && !mat1.requires_grad() && !mat2.requires_grad()
+      && self.dim() == 1 && mat1.size(Layout::Filter::output) == self.size(0)
+      && mat2.t().contiguous().size(Layout::Filter::input) > 0 && mat2.t().contiguous().size(Layout::Filter::output) > 0) {
+    result.resize_({mat1.size(0), mat2.size(1)});
+    result.copy_(xnnpack::linear(mat1, mat2.t(), self));
+    at::namedinference::propagate_names_for_addmm(result, mat1, mat2, self);
+    return result;
+  }
+  #endif
   Tensor b_self = std::get<0>(expand_size(self, {mat1.sizes()[0], mat2.sizes()[1]}, "addmm_out"));
   {
     at::NoNamesGuard guard;
@@ -378,6 +396,16 @@ Tensor &addmm_cpu_(Tensor& self, const Tensor& mat1, const Tensor& mat2, Scalar 
 Tensor& mm_cpu_out(Tensor & result, const Tensor & self, const Tensor & mat2) {
   TORCH_CHECK(self.dim() == 2, "self must be a matrix");
   TORCH_CHECK(mat2.dim() == 2, "mat2 must be a matrix");
+  #if defined(USE_XNNPACK) && !defined(USE_BLAS)
+  using namespace xnnpack::internal;
+  if (self.scalar_type() == at::kFloat && mat2.scalar_type() == at::kFloat
+      && !self.requires_grad() && !mat2.requires_grad()
+      && mat2.t().contiguous().size(Layout::Filter::input) > 0 && mat2.t().contiguous().size(Layout::Filter::output) > 0) {
+    result.resize_({self.size(0), mat2.size(1)});
+    result.copy_(xnnpack::linear(self, mat2.t(), {}));
+    return result;
+  }
+  #endif
   native::resize_(result, {self.sizes()[0], mat2.sizes()[1]});
   return addmm_cpu_out(result, result, self, mat2, 0, 1);
 }
@@ -721,7 +749,7 @@ Tensor _allocate_buffer(const Tensor& a, int n_copies, bool is_zero = false) {
     {n_copies, a.size(0), a.size(1), a.size(2)},
     a.options().memory_format(at::MemoryFormat::Contiguous)
   );
-  
+
   if (is_zero) {
     res.zero_();
   }
@@ -829,7 +857,7 @@ Tensor compute_T4(const Tensor& A) {
   auto As = _allocate_buffer(A, 4);
   // 3 for {I, A, A^2}
   _fill_matrix_powers(As, A, 3);
-  
+
   at::native::matmul(
     // output for A^2 * (I / 2 + A / 6 + A^2 / 24)
     As.select(0, 3),
@@ -1080,7 +1108,7 @@ Tensor mexp_impl(
   if (!compute_highest_degree_approx) {
     constexpr std::array<
       Tensor(*)(const Tensor&),
-      total_n_degs - 1> 
+      total_n_degs - 1>
     compute_Ts = {
       compute_T1, compute_T2, compute_T4<scalar_t>,
       compute_T8<scalar_t>, compute_T12<scalar_t>
@@ -1171,7 +1199,7 @@ Tensor mexp(const Tensor& a, bool compute_highest_degree_approx = false) {
 
 // Based on:
 //
-// Mathias, Roy. 
+// Mathias, Roy.
 // A Chain Rule for Matrix Functions and Applications.
 // SIAM J. Matrix Anal. Appl. 17 (1996): 610-620.
 //
@@ -1206,8 +1234,8 @@ Tensor backward_analytic_function_of_a_matrix(
 // Mathematics 2019, 7, 1174.
 //
 Tensor matrix_exp(const Tensor& a) {
-  TORCH_CHECK(a.dim() >= 2 
-          && (at::isFloatingType(a.scalar_type()) 
+  TORCH_CHECK(a.dim() >= 2
+          && (at::isFloatingType(a.scalar_type())
            || at::isComplexType(a.scalar_type())),
               "matrix_exp(", a.scalar_type(), "{", a.sizes(), "}): expected a tensor "
               "of floating or complex types with dim at least 2");
