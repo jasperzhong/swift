@@ -857,7 +857,7 @@ inline void pytorch_duplicate_guard() {
   static int initialized = 0;
   if (initialized) {
     fprintf(stderr, "pytorch: _C shared library re-initialized\n");
-    abort();
+    // abort();
   }
   initialized = 1;
 ;}
