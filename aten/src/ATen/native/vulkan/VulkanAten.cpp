@@ -1,6 +1,11 @@
 #include <ATen/native/vulkan/VulkanAten.h>
 #include <ATen/ATen.h>
 #include <ATen/Config.h>
+<<<<<<< HEAD
+=======
+#include <ATen/InferSize.h>
+#include <ATen/NativeFunctions.h>
+>>>>>>> [vulkan] Permtute ops: transpose,view,slice,unsqueeze,select
 #include <ATen/native/Pool.h>
 #include <ATen/native/UpSample.h>
 #include <ATen/native/utils/ParamUtils.h>
@@ -254,7 +259,7 @@ Tensor reshape(at::Tensor const& input, IntArrayRef shape) {
       input.options());
 }
 
-Tensor cat(TensorList tensors, int64_t dim) {
+at::Tensor cat(const TensorList tensors, int64_t dim) {
   TORCH_INTERNAL_ASSERT(
       dim == 0 || dim == 1,
       "Vulkan cat is implemented only for batch and channels dimensions");
@@ -287,6 +292,40 @@ Tensor cat(TensorList tensors, int64_t dim) {
 
   vulkan::detail::cat(output, vTensors, dim);
   return new_with_vtensor_vulkan(std::move(output), tensor.options());
+}
+
+Tensor transpose(const Tensor& self, int64_t dim0, int64_t dim1) {
+  return new_with_vtensor_vulkan(
+      vulkan::detail::transpose(vtensor_from_vulkan(self), dim0, dim1),
+      self.options());
+}
+
+Tensor& transpose_(Tensor& self, int64_t dim0, int64_t dim1) {
+  auto& x = vtensor_from_vulkan(self);
+  x = vulkan::detail::transpose(x, dim0, dim1);
+  return self;
+}
+
+Tensor view(const Tensor& self, IntArrayRef size) {
+  return new_with_vtensor_vulkan(
+      vulkan::detail::reshape_copy(
+          vtensor_from_vulkan(self), at::infer_size(size, self.numel())),
+      self.options());
+}
+
+Tensor contiguous(const Tensor& self, MemoryFormat memory_format) {
+  return self;
+}
+
+Tensor slice(
+    const Tensor& self,
+    int64_t dim,
+    int64_t start,
+    int64_t end,
+    int64_t step) {
+  return new_with_vtensor_vulkan(
+      vulkan::detail::slice(vtensor_from_vulkan(self), dim, start, end, step),
+      self.options());
 }
 
 Tensor add(const Tensor& self, const Tensor& other, const Scalar alpha) {
@@ -345,6 +384,19 @@ Tensor vulkan_mul_scalar(const Tensor& self, Scalar other) {
   output.allocate_storage();
   vulkan::detail::mul(output, x, s);
   return new_with_vtensor_vulkan(std::move(output), self.options());
+}
+
+Tensor vulkan_select(const Tensor& self, int64_t dim, int64_t index) {
+  auto sliced = vulkan_slice(self, dim, index, index + 1, 1);
+  auto sizes = self.sizes().vec();
+  sizes.erase(sizes.begin() + dim);
+  return vulkan_reshape(sliced, sizes);
+}
+
+Tensor vulkan_unsqueeze(const Tensor& self, int64_t dim) {
+  auto sizes = self.sizes().vec();
+  sizes.insert(sizes.begin() + dim, 1);
+  return vulkan_reshape(self, sizes);
 }
 
 Tensor convolution(
@@ -478,7 +530,17 @@ Tensor mean(
 }
 
 TORCH_LIBRARY_IMPL(aten, Vulkan, m) {
-<<<<<<< HEAD
+  m.impl("slice.Tensor", TORCH_FN(vulkan_slice));
+  m.impl("reshape", TORCH_FN(vulkan_reshape));
+  m.impl("select.int", TORCH_FN(vulkan_select));
+  m.impl("transpose.int", TORCH_FN(vulkan_transpose));
+  m.impl("_cat", TORCH_FN(vulkan_cat));
+  m.impl_UNBOXED("transpose_", vulkan_transpose_);
+  m.impl("view", TORCH_FN(vulkan_view));
+  m.impl("unsqueeze", TORCH_FN(vulkan_unsqueeze));
+  m.impl("mul.Scalar", TORCH_FN(vulkan_mul_scalar));
+  m.impl("add.Scalar", TORCH_FN(vulkan_add_scalar));
+  m.impl("avg_pool2d", TORCH_FN(vulkan_avg_pool2d));
   m.impl_UNBOXED("empty.memory_format", at::native::vulkan::aten::empty);
   m.impl("empty_strided", TORCH_FN(at::native::vulkan::aten::empty_strided));
   m.impl("add.Tensor", TORCH_FN(at::native::vulkan::aten::add));
@@ -495,9 +557,6 @@ TORCH_LIBRARY_IMPL(aten, Vulkan, m) {
   m.impl("max_pool2d", TORCH_FN(at::native::vulkan::aten::max_pool2d));
   m.impl("reshape", TORCH_FN(at::native::vulkan::aten::reshape));
   m.impl("_cat", TORCH_FN(at::native::vulkan::aten::cat));
-  m.impl("mul.Scalar", TORCH_FN(vulkan_mul_scalar));
-  m.impl("add.Scalar", TORCH_FN(vulkan_add_scalar));
-<<<<<<< HEAD
   m.impl_UNBOXED(
       "convolution_overrideable", at::native::vulkan::aten::convolution);
   m.impl_UNBOXED("hardtanh_", at::native::vulkan::aten::hardtanh_);
@@ -637,9 +696,6 @@ Tensor convolution_prepacked(
         output_max);
   }
   return aten::new_with_vtensor_vulkan(std::move(voutput), input.options());
-=======
-  m.impl("avg_pool2d", TORCH_FN(vulkan_avg_pool2d));
->>>>>>> [vulkan][op] avg_pool2d
 }
 
 } // namespace vulkan
