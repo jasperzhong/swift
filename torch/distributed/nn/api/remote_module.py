@@ -6,6 +6,8 @@ import torch
 import torch.distributed.rpc as rpc
 from torch import nn
 from torch.distributed.nn.jit import instantiator
+from torch.nn.parameter import Parameter
+from typing import List
 
 
 _NON_SCRIPTABLE_REMOTE_MODULE_MODULE = (
@@ -28,6 +30,13 @@ def _create_module(module_cls, args, kwargs, module_interface_cls=None):
     if module_interface_cls is not None:
         module = torch.jit.script(module)
     return rpc.RRef(module, module_interface_cls)
+
+
+def _param_rrefs(module_rref, recurse):
+    def param_rref_iterator():
+        for param in module_rref.local_value().parameters(recurse):
+            yield rpc.RRef[param]
+    return list(param_rref_iterator())
 
 
 class _RemoteModule(nn.Module):
@@ -111,6 +120,8 @@ class _RemoteModule(nn.Module):
         args = args if args is not None else ()
         kwargs = kwargs if kwargs is not None else {}
 
+        self.on = on
+
         if _module_interface_cls is not None:
             # Users reply on this field to know if this generated RemoteModule is TorchScript-able.
             self.is_scriptable = True
@@ -142,6 +153,20 @@ class _RemoteModule(nn.Module):
             method_name = method.__name__
             method = torch.jit.export(method)
             setattr(self, method_name, types.MethodType(method, self))
+
+    def remote_parameters(self, recurse: bool = True) -> List[rpc.RRef[Parameter]]:
+        r"""Returns a list of RRefs of remote module parameters.
+        This is typically passed to a distributed optimizer.
+        Args:
+            recurse (bool): if True, then yields parameters of the remote module
+                and all submodules. Otherwise, yields only parameters that
+                are direct members of the remote module.
+
+        Returns:
+            A list of RRefs of remote module parameters.
+        """
+        param_rrefs_rref = rpc.remote(self.on, _param_rrefs, (self.module_rref, recurse))
+        return param_rrefs_rref.to_here()
 
 
 class RemoteModule(_RemoteModule):

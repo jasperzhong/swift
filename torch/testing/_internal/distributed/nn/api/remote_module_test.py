@@ -193,3 +193,8 @@ class RemoteModuleTest(RpcAgentTestFixture):
 
             ret = remote_module.forward(*args, **kwargs)
             self.assertEqual(ret, tuple(reversed(args + ("3",))))
+
+
+    @dist_utils.dist_init
+    def test_param_rrefs(self):
+        pass
