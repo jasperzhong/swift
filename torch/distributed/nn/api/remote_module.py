@@ -50,6 +50,21 @@ class _RemoteModule(nn.Module):
         The arguments of ``forward_async`` and ``forward`` are the same as
         the ``forward`` method of the module returned by the ``module_cls``.
 
+        Since all the other methods except ``forward`` and ``forward_async``
+        directly inherit from ``nn.Module``,
+        these methods are only applied to the caller on the local side,
+        instead of the user-provided ``module_cls`` that will be executed on the remote node.
+        Therefore, normally these methods should not be used.
+        Specifically:
+        1) The methods like ``register_XXX`` and ``add_module`` only modify the caller
+        on the local side, which will not affect the execution of ``module_cls`` on the remote node.
+        To create a hybrid model, typically the local modules should be
+        in parallel with remote modules, rather than as submodules of any remote module.
+        See the hybrid model example:
+        fbsource/fbcode/caffe2/torch/fb/distributed/model_parallel/docs/README.md
+        2) The methods like ``children`` and ``named_parameters`` only reflect
+        the state of the caller on the local side, and hence the results are usually empty.
+
         For example, if ``module_cls`` returns an instance of ``nn.Linear``,
         that has ``forward`` method signature, ``def forward(input: Tensor) -> Tensor:``,
         the generated ``RemoteModule`` will have 2 methods in signature of
@@ -132,9 +147,7 @@ class _RemoteModule(nn.Module):
 
         # Create the module on the remote side.
         self.module_rref = rpc.rpc_sync(
-            on,
-            _create_module,
-            (module_cls, args, kwargs, _module_interface_cls),
+            on, _create_module, (module_cls, args, kwargs, _module_interface_cls)
         )
 
         # Install generated methods.
