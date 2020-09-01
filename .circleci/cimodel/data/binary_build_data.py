@@ -21,7 +21,7 @@ LINKING_DIMENSIONS = [
 
 DEPS_INCLUSION_DIMENSIONS = [
     "with-deps",
-    "without-deps",
+    # "without-deps",
 ]
 
 
@@ -31,36 +31,38 @@ def get_processor_arch_name(cuda_version):
 
 LINUX_PACKAGE_VARIANTS = OrderedDict(
     manywheel=[
-        "3.6m",
-        "3.7m",
+        # "3.6m",
+        # "3.7m",
         "3.8m",
     ],
-    conda=dimensions.STANDARD_PYTHON_VERSIONS,
+    conda=[
+        "3.8"
+    ],
     libtorch=[
         "3.7m",
     ],
 )
 
 CONFIG_TREE_DATA = OrderedDict(
-    linux=(dimensions.CUDA_VERSIONS, LINUX_PACKAGE_VARIANTS),
-    macos=([None], OrderedDict(
-        wheel=dimensions.STANDARD_PYTHON_VERSIONS,
-        conda=dimensions.STANDARD_PYTHON_VERSIONS,
-        libtorch=[
-            "3.7",
-        ],
-    )),
+    linux=([None, "102"], LINUX_PACKAGE_VARIANTS),
+    # macos=([None], OrderedDict(
+    #     wheel=dimensions.STANDARD_PYTHON_VERSIONS,
+    #     conda=dimensions.STANDARD_PYTHON_VERSIONS,
+    #     libtorch=[
+    #         "3.7",
+    #     ],
+    # )),
     # Skip CUDA-9.2 builds on Windows
-    windows=(
-        [v for v in dimensions.CUDA_VERSIONS if v not in ['92', '110']],
-        OrderedDict(
-            wheel=dimensions.STANDARD_PYTHON_VERSIONS,
-            conda=dimensions.STANDARD_PYTHON_VERSIONS,
-            libtorch=[
-                "3.7",
-            ],
-        )
-    ),
+    # windows=(
+    #     [v for v in dimensions.CUDA_VERSIONS if v not in ['92', '110']],
+    #     OrderedDict(
+    #         wheel=dimensions.STANDARD_PYTHON_VERSIONS,
+    #         conda=dimensions.STANDARD_PYTHON_VERSIONS,
+    #         libtorch=[
+    #             "3.7",
+    #         ],
+    #     )
+    # ),
 )
 
 # GCC config variants:
