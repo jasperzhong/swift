@@ -459,6 +459,20 @@ class ProcessGroupNCCL : public ProcessGroup {
       Fn fn,
       PreProcess pre,
       PostProcess post);
+  template <typename Fn>
+  std::shared_ptr<ProcessGroup::Work> collective(
+      std::vector<at::Tensor>& input,
+      std::vector<at::Tensor>& output,
+      std::vector<at::cuda::CUDAStream> cudaStreams,
+      Fn fn);
+  template <typename Fn, typename PreProcess, typename PostProcess>
+  std::shared_ptr<ProcessGroup::Work> collective(
+      std::vector<at::Tensor>& input,
+      std::vector<at::Tensor>& output,
+      std::vector<at::cuda::CUDAStream> cudaStreams,
+      Fn fn,
+      PreProcess pre,
+      PostProcess post);
 
   // Checks for NCCL errors on each of the communicators and returns an
   // appropriate exception_ptr (nullptr if no errors).
@@ -580,6 +594,10 @@ class ProcessGroupNCCL : public ProcessGroup {
   // Dedicated CUDA stream for each available device that runs FutureNCCL then
   // callbacks.
   std::vector<std::shared_ptr<at::cuda::CUDAStream>> futureNCCLCallbackStreams_;
+};
+
+struct NCCLAllreduceOptions : public AllreduceOptions {
+  std::vector<at::cuda::CUDAStream> cudaStreams = {};
 };
 
 } // namespace c10d

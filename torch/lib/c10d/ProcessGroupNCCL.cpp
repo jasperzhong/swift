@@ -801,6 +801,7 @@ template <typename Fn, typename PreProcess, typename PostProcess>
 std::shared_ptr<ProcessGroup::Work> ProcessGroupNCCL::collective(
     std::vector<at::Tensor>& inputs,
     std::vector<at::Tensor>& outputs,
+    std::vector<at::cuda::CUDAStream> cudaStreams,
     Fn fn,
     PreProcess pre,
     PostProcess post) {
@@ -808,8 +809,17 @@ std::shared_ptr<ProcessGroup::Work> ProcessGroupNCCL::collective(
   const auto key = getKeyFromDevices(devices);
   auto& ncclComms = getNCCLComm(key, devices);
 
+  auto& streams = cudaStreams.empty() ? ncclStreams_[key] : cudaStreams;
+
+  // Check the size of the streams vector (this is necessary when we're using
+  // the user-supplied CUDA streams).
+  if (streams.size() != ncclStreams_[key].size()) {
+    throw std::runtime_error(
+        "Length of cudaStreams Vector must equal number of GPUs in Process Group.");
+  }
+
   // First let NCCL streams wait for input tensors allocation streams
-  syncStreams(devices, ncclEvents_[key], ncclStreams_[key]);
+  syncStreams(devices, ncclEvents_[key], streams);
 
   // Work itself will create the CUDA events on all GPUs of tensors
   auto work = initWork(devices);
@@ -821,11 +831,11 @@ std::shared_ptr<ProcessGroup::Work> ProcessGroupNCCL::collective(
 
   at::cuda::OptionalCUDAGuard gpuGuard;
 
-  pre(ncclStreams_[key]);
+  pre(streams);
 
   for (size_t i = 0; i < inputs.size(); ++i) {
     gpuGuard.set_index(devices[i].index());
-    at::cuda::CUDAStream& ncclStream = ncclStreams_[key][i];
+    at::cuda::CUDAStream& ncclStream = streams[i];
 
     // Both `inputs' and `outputs' are created on a worker stream and used in
     // different ncclStreams.  Hence, both must record the ncclStream to
@@ -843,17 +853,17 @@ std::shared_ptr<ProcessGroup::Work> ProcessGroupNCCL::collective(
     AutoNcclGroup nccl_group_guard;
     for (size_t i = 0; i < inputs.size(); ++i) {
       gpuGuard.set_index(devices[i].index());
-      at::cuda::CUDAStream& ncclStream = ncclStreams_[key][i];
+
       C10D_NCCL_CHECK(
-          fn(inputs[i], outputs[i], ncclComms[i]->getNcclComm(), ncclStream));
+          fn(inputs[i], outputs[i], ncclComms[i]->getNcclComm(), streams[i]));
     }
   }
 
-  post(ncclStreams_[key]);
+  post(streams);
 
   // Event should only be recorded after the ncclGroupEnd()
   for (size_t i = 0; i < inputs.size(); ++i) {
-    at::cuda::CUDAStream& ncclStream = ncclStreams_[key][i];
+    at::cuda::CUDAStream& ncclStream = streams[i];
     (*work->cudaEvents_)[i].record(ncclStream);
     work->ncclComms_[i] = ncclComms[i];
     work->blockingWait_ = blockingWait_;
@@ -868,23 +878,52 @@ template <typename Fn>
 std::shared_ptr<ProcessGroup::Work> ProcessGroupNCCL::collective(
     std::vector<at::Tensor>& inputs,
     std::vector<at::Tensor>& outputs,
+    std::vector<at::cuda::CUDAStream> cudaStreams,
     Fn fn) {
   return collective(
       inputs,
       outputs,
+      cudaStreams,
       fn,
       [](std::vector<at::cuda::CUDAStream>&) {},
       [](std::vector<at::cuda::CUDAStream>&) {});
 }
 
+template <typename Fn>
+std::shared_ptr<ProcessGroup::Work> ProcessGroupNCCL::collective(
+    std::vector<at::Tensor>& inputs,
+    std::vector<at::Tensor>& outputs,
+    Fn fn) {
+  return collective(
+      inputs,
+      outputs,
+      std::vector<at::cuda::CUDAStream>(),
+      fn,
+      [](std::vector<at::cuda::CUDAStream>&) {},
+      [](std::vector<at::cuda::CUDAStream>&) {});
+}
+
+template <typename Fn, typename PreProcess, typename PostProcess>
+std::shared_ptr<ProcessGroup::Work> ProcessGroupNCCL::collective(
+    std::vector<at::Tensor>& inputs,
+    std::vector<at::Tensor>& outputs,
+    Fn fn,
+    PreProcess pre,
+    PostProcess post) {
+  return collective(
+      inputs, outputs, std::vector<at::cuda::CUDAStream>(), fn, pre, post);
+}
 std::shared_ptr<ProcessGroup::Work> ProcessGroupNCCL::allreduce(
     std::vector<at::Tensor>& tensors,
     const AllreduceOptions& opts) {
   check_gpu_tensors(tensors);
 
+  const NCCLAllreduceOptions& nopts = dynamic_cast<const NCCLAllreduceOptions&>(opts);
+
   return collective(
       tensors,
       tensors,
+      nopts.cudaStreams,
       [&](at::Tensor& input,
           at::Tensor& output,
           ncclComm_t comm,
