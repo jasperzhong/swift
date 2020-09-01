@@ -204,11 +204,17 @@ They are used in specifying strategies for reduction collectives, e.g.,
       .def(py::init<>())
       .def_readwrite("rootRank", &::c10d::BroadcastOptions::rootRank)
       .def_readwrite("rootTensor", &::c10d::BroadcastOptions::rootTensor)
+#ifdef USE_C10D_NCCL
+      .def_readwrite("cudaStreams", &::c10d::BroadcastOptions::cudaStreams)
+#endif
       .def_readwrite("timeout", &::c10d::BroadcastOptions::timeout);
 
   py::class_<::c10d::AllreduceOptions>(module, "AllreduceOptions")
       .def(py::init<>())
       .def_readwrite("reduceOp", &::c10d::AllreduceOptions::reduceOp)
+#ifdef USE_C10D_NCCL
+      .def_readwrite("cudaStreams", &::c10d::AllreduceOptions::cudaStreams)
+#endif
       .def_readwrite("timeout", &::c10d::AllreduceOptions::timeout);
 
   py::class_<::c10d::AllreduceCoalescedOptions>(
@@ -222,10 +228,16 @@ They are used in specifying strategies for reduction collectives, e.g.,
       .def_readwrite("reduceOp", &::c10d::ReduceOptions::reduceOp)
       .def_readwrite("rootRank", &::c10d::ReduceOptions::rootRank)
       .def_readwrite("rootTensor", &::c10d::ReduceOptions::rootTensor)
+#ifdef USE_C10D_NCCL
+      .def_readwrite("cudaStreams", &::c10d::ReduceOptions::cudaStreams)
+#endif
       .def_readwrite("timeout", &::c10d::ReduceOptions::timeout);
 
   py::class_<::c10d::AllgatherOptions>(module, "AllgatherOptions")
       .def(py::init<>())
+#ifdef USE_C10D_NCCL
+      .def_readwrite("cudaStreams", &::c10d::AllgatherOptions::cudaStreams)
+#endif
       .def_readwrite("timeout", &::c10d::AllgatherOptions::timeout);
 
   py::class_<::c10d::GatherOptions>(module, "GatherOptions")
@@ -241,6 +253,9 @@ They are used in specifying strategies for reduction collectives, e.g.,
   py::class_<::c10d::ReduceScatterOptions>(module, "ReduceScatterOptions")
       .def(py::init<>())
       .def_readwrite("reduceOp", &::c10d::ReduceScatterOptions::reduceOp)
+#ifdef USE_C10D_NCCL
+      .def_readwrite("cudaStreams", &::c10d::ReduceScatterOptions::cudaStreams)
+#endif
       .def_readwrite("timeout", &::c10d::ReduceScatterOptions::timeout);
 
   py::class_<::c10d::BarrierOptions>(module, "BarrierOptions")
@@ -249,6 +264,9 @@ They are used in specifying strategies for reduction collectives, e.g.,
 
   py::class_<::c10d::AllToAllOptions>(module, "AllToAllOptions")
       .def(py::init<>())
+#ifdef USE_C10D_NCCL
+      .def_readwrite("cudaStreams", &::c10d::AllToAllOptions::cudaStreams)
+#endif
       .def_readwrite("timeout", &::c10d::AllToAllOptions::timeout);
 
   auto store =
