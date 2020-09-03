@@ -15170,6 +15170,33 @@ a")
         input = torch.ones(2, 2)
         self.assertEqual(input, parameter_script(input))
 
+    def test_hash_tuple(self):
+        def fn(t1: Tuple[int, int], t2: Tuple[int, int]) -> bool:
+            return hash(t1) == hash(t2)
+
+        self.checkScript(fn, ((1, 2), (1, 2)))
+        self.checkScript(fn, ((1, 2), (3, 4)))
+        self.checkScript(fn, ((1, 2), (2, 1)))
+
+        # Tuples may contain unhashable types like `list`, check that we error
+        # properly in that case.
+        @torch.jit.script
+        def fn_unhashable(t1: Tuple[int, List[int]]):
+            return hash(t1)
+
+        with self.assertRaisesRegex(RuntimeError, 'unhashable'):
+            fn_unhashable((1, [1]))
+
+    def test_hash_tensor(self):
+        """Tensors should hash by identity"""
+        def fn(t1, t2):
+            return hash(t1) == hash(t2)
+
+        input = torch.tensor(1)
+        input_clone = torch.tensor(1)
+        self.checkScript(fn, (input, input))
+        self.checkScript(fn, (input, input_clone))
+
 
 # known to be failing in tracer
 EXCLUDE_TRACED = {
