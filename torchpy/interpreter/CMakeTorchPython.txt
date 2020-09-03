@@ -89,54 +89,58 @@ SET(TORCH_OBJS
     ${TORCH_PYTHON_DIR}/csrc/utils.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/serialization.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/Module.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_module_api.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_lite_interpreter.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_constant_pooling.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_gpu.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_lite_trainer.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_graph_executor.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_ir.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_jit_type.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_mobile_type_parser.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_subgraph_rewriter.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_argument_spec.cpp.o
-    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_backend.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_autodiff.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_class_parser.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_code_template.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_cleanup_passes.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_peephole_optimize.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_subgraph_utils.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_subgraph_matcher.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_qualified_name.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_interpreter.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_alias_analysis.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_dce.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_inliner.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_utils.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_custom_operators.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_irparser.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_schema_matching.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_fuser.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_class_import.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_custom_class.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/torch_python_test.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_interface.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_misc.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_save_load.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_base.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_class_type.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_create_autodiff_subgraphs.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_te_fuser_pass.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_ir_printer.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_type.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_cuda.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_boundsinference.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_aten.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/padded_buffer.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_expr.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_simplify.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_reductions.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_loopnest.cpp.o
-    ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_kernel.cpp.o
+    
+    # Tests need not be included, but in fact were causing a segfault 
+    # when a static graphfunction was being destroyed at torch unload.
+    
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_module_api.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_lite_interpreter.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_constant_pooling.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_gpu.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_lite_trainer.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_graph_executor.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_ir.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_jit_type.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_mobile_type_parser.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_subgraph_rewriter.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_argument_spec.cpp.o
+    # # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_backend.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_autodiff.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_class_parser.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_code_template.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_cleanup_passes.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_peephole_optimize.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_subgraph_utils.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_subgraph_matcher.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_qualified_name.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_interpreter.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_alias_analysis.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_dce.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_inliner.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_utils.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_custom_operators.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_irparser.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_schema_matching.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_fuser.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_class_import.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_custom_class.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/torch_python_test.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_interface.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_misc.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_save_load.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_base.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_class_type.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_create_autodiff_subgraphs.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_te_fuser_pass.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_ir_printer.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_type.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_cuda.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_boundsinference.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_aten.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/padded_buffer.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_expr.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_simplify.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_reductions.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_loopnest.cpp.o
+    # ${TORCH_PYTHON_DIR}/__/test/cpp/tensorexpr/test_kernel.cpp.o
 )
