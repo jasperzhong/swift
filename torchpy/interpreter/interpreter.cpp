@@ -114,6 +114,8 @@ extern "C" __attribute__((visibility("default"))) void initialize_interface(
 #undef INITIALIZE_MEMBER
 }
 
+// We need to register a custom finder because we are registering `torch._C` as
+// a built-in module, and it will otherwise get skipped by the defauljjjkk
 const char* finder = R"RAW(
 import sys
 class F:
@@ -128,34 +130,8 @@ sys.meta_path.insert(0, F())
 
 extern "C" PyObject* initModule(void);
 
-std::map<std::thread::id, PyThreadState*> thread_states;
-PyThreadState* mainThreadState = NULL;
-PyInterpreterState* interpreterState = NULL;
-std::thread::id mainThreadId;
 static std::atomic<size_t> s_id;
 std::map<size_t, py::object> forwards;
-
-void thread_enter() {
-  std::thread::id my_tid = std::this_thread::get_id();
-  if (thread_states.find(my_tid) == thread_states.end()) {
-    if (my_tid == mainThreadId || thread_states.size() == 0) {
-      thread_states[my_tid] = mainThreadState;
-
-    } else {
-      thread_states[my_tid] = PyThreadState_New(interpreterState);
-    }
-  } else {
-  }
-  PyThreadState* myThreadState = thread_states[my_tid];
-  assert(myThreadState != nullptr);
-  PyEval_RestoreThread(myThreadState); // Acquires GIL
-}
-
-void thread_exit() {
-  std::thread::id my_tid = std::this_thread::get_id();
-  PyThreadState* myThreadState = thread_states[my_tid];
-  PyEval_ReleaseThread(myThreadState); // Releases GIL
-}
 
 __attribute__((constructor)) void init() {
   // some dependency in mkl requires this...
@@ -175,28 +151,15 @@ __attribute__((constructor)) void init() {
   Py_Initialize();
   PyRun_SimpleString(PY_PATH_STRING);
   PyRun_SimpleString(finder);
+  // Release the GIL that PyInitialize acquires
+  PyEval_SaveThread();
 }
 
 static void startup() {
-  mainThreadId = std::this_thread::get_id();
-  mainThreadState = PyThreadState_Get();
-  interpreterState = mainThreadState->interp;
-  assert(interpreterState != nullptr);
-  PyEval_ReleaseThread(mainThreadState);
 }
 
 static void teardown() {
-  std::thread::id my_tid = std::this_thread::get_id();
-  assert(my_tid == mainThreadId);
-  PyEval_RestoreThread(mainThreadState);
-
-  for (auto it = thread_states.begin(); it != thread_states.end(); it++) {
-    if (my_tid != it->first) {
-      PyThreadState_Clear(it->second);
-      PyThreadState_Delete(it->second);
-    }
-  }
-  thread_states.clear();
+  PyGILState_Ensure();
 
   if (Py_FinalizeEx() < 0) {
     std::cout << "IT BROKE SO WE ARE EXITING\n";
@@ -208,17 +171,16 @@ static void teardown() {
 __attribute__((destructor)) void deinit() {}
 
 static void run_some_python(const char* code) {
-  thread_enter();
+  PyGILState_STATE gstate = PyGILState_Ensure();
 
   if (PyRun_SimpleString(code) == -1) {
     throw std::runtime_error("python eval failed\n");
   }
-
-  thread_exit();
+  PyGILState_Release(gstate);
 }
 
 static void run_python_file(const char* code) {
-  thread_enter();
+  PyGILState_STATE gstate = PyGILState_Ensure();
 
   FILE* f = fopen(code, "r");
   if (PyRun_SimpleFile(f, code) == -1) {
@@ -226,14 +188,13 @@ static void run_python_file(const char* code) {
   }
   fclose(f);
 
-  thread_exit();
+  PyGILState_Release(gstate);
 }
 
 
 static size_t load_model(const char* filename) {
-  thread_enter();
+  PyGILState_STATE gstate = PyGILState_Ensure();
   assert(PyGILState_Check() == 1);
-  std::thread::id my_tid = std::this_thread::get_id();
 
   std::string code = std::string("model = torch.jit.load('") +
       std::string(filename) + std::string("')");
@@ -241,15 +202,14 @@ static size_t load_model(const char* filename) {
 
   auto id = ++s_id;
 
-  thread_exit();
+  PyGILState_Release(gstate);
   return id;
 }
 
 static at::Tensor forward_model(size_t model_id, at::Tensor input) {
   at::Tensor output;
-  thread_enter();
+  PyGILState_STATE gstate = PyGILState_Ensure();
   {
-    std::thread::id my_tid = std::this_thread::get_id();
     assert(PyGILState_Check() == 1);
     auto forward = py::globals()["model"].attr("forward");
 
@@ -260,7 +220,8 @@ static at::Tensor forward_model(size_t model_id, at::Tensor input) {
     py_output.inc_ref();
     output = py::cast<at::Tensor>(py_output);
   }
-  thread_exit();
+
+  PyGILState_Release(gstate);
 
   return output;
   // return input;

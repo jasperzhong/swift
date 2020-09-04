@@ -12,3 +12,4 @@ This library is mainly an implementation detail and not intended for direct use.
 Currently only the cmake build system is supported.
 
 CPython is built in-source-tree as a cmake custom command.  CPython was added as a git submodule rather than downloaded as part of cmake, to be consistent with other submodules.  custom-command was preferred over custom-target as it allows specifying output files which makes cmake automatically configure dependencies.  CMake external project was not used as I couldn't figure out how to set up this dependency on .o files rather than final libs/execs.
+****

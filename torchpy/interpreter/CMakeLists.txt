@@ -30,7 +30,7 @@ add_custom_command(
 # TODO install pip packages needed by torch in this python
 # typing_extensions
 
-# Generate a header that lets interpreter init set up python sys path 
+# Generate a header that lets interpreter init set up python sys path
 # to point to the cpython built above
 SET(PYTORCH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../")
 SET(PY_PATH_STRING "import sys; sys.path = ['', '${PYTHON_LIB_DIR}/python37.zip', '${PYTHON_LIB_DIR}/python3.7', '${PYTHON_LIB_DIR}/python3.7/lib-dynload', '${PYTHON_LIB_DIR}/python3.7/site-packages', '${PYTORCH_ROOT}']")
@@ -52,7 +52,7 @@ set(INTERPRETER_LIB_SOURCES
 add_library(interpreter
   ${INTERPRETER_LIB_SOURCES})
 target_compile_options(
-    interpreter PRIVATE 
+    interpreter PRIVATE
     -fvisibility=hidden
 )
 target_include_directories(interpreter PRIVATE ${INTERPRETER_DIR})

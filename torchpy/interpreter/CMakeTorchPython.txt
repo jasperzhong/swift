@@ -61,17 +61,6 @@ SET(TORCH_OBJS
     ${TORCH_PYTHON_DIR}/csrc/utils/tensor_numpy.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/utils/python_arg_parser.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/utils/throughput_benchmark.cpp.o
-    ${TORCH_PYTHON_DIR}/csrc/cuda/shared/nvtx.cpp.o
-    ${TORCH_PYTHON_DIR}/csrc/cuda/shared/cudart.cpp.o
-    ${TORCH_PYTHON_DIR}/csrc/cuda/Event.cpp.o
-    ${TORCH_PYTHON_DIR}/csrc/cuda/serialization.cpp.o
-    ${TORCH_PYTHON_DIR}/csrc/cuda/utils.cpp.o
-    ${TORCH_PYTHON_DIR}/csrc/cuda/Stream.cpp.o
-    ${TORCH_PYTHON_DIR}/csrc/cuda/python_comm.cpp.o
-    ${TORCH_PYTHON_DIR}/csrc/cuda/python_nccl.cpp.o
-    ${TORCH_PYTHON_DIR}/csrc/cuda/Module.cpp.o
-    ${TORCH_PYTHON_DIR}/csrc/cuda/Storage.cpp.o
-    # ${TORCH_PYTHON_DIR}/csrc/CudaIPCTypes.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/MemoryFormat.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/Layout.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/PtrWrapper.cpp.o
@@ -89,10 +78,10 @@ SET(TORCH_OBJS
     ${TORCH_PYTHON_DIR}/csrc/utils.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/serialization.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/Module.cpp.o
-    
-    # Tests need not be included, but in fact were causing a segfault 
+
+    # Tests need not be included, but in fact were causing a segfault
     # when a static graphfunction was being destroyed at torch unload.
-    
+
     # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_module_api.cpp.o
     # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_lite_interpreter.cpp.o
     # ${TORCH_PYTHON_DIR}/__/test/cpp/jit/test_constant_pooling.cpp.o

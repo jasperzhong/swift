@@ -27,12 +27,17 @@ add_executable(torchpy_app ${TORCHPY_APP_SOURCES})
 target_include_directories(torchpy_app  PRIVATE ${TORCHPY_DIR})
 target_link_libraries(torchpy_app PRIVATE dl)
 
+add_library(ctype ${TORCHPY_DIR}/libctype.c)
+target_compile_options(ctype PRIVATE -fPIC)
+
 if(USE_CUDA)
   target_link_libraries(torchpy_test PRIVATE
     ${CUDA_LIBRARIES}
     ${CUDA_NVRTC_LIB}
     ${CUDA_CUDA_LIB}
-    ${TORCH_CUDA_LIBRARIES})
+    ${TORCH_CUDA_LIBRARIES}
+    ctype
+    )
 
   target_link_libraries(torchpy_app PRIVATE
     ${CUDA_LIBRARIES}
