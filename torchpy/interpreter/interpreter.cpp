@@ -114,6 +114,36 @@ extern "C" __attribute__((visibility("default"))) void initialize_interface(
 #undef INITIALIZE_MEMBER
 }
 
+// We need to preserve the existing FrozenModules list, since it includes
+// important importlib machinery. This code is adapted from the similar
+// `PyImport_ExtendInittab`.
+int extendFrozenModules(struct _frozen *newfrozen) {
+    struct _frozen *p = NULL;
+    size_t i, n;
+    int res = 0;
+
+    /* Count the number of entries in both tables */
+    for (n = 0; newfrozen[n].name != NULL; n++)
+        ;
+    for (i = 0; PyImport_FrozenModules[i].name != NULL; i++)
+        ;
+
+    /* Allocate new memory for the combined table */
+    if (i + n <= SIZE_MAX / sizeof(struct _frozen) - 1) {
+        size_t size = sizeof(struct _frozen) * (i + n + 1);
+        p = (_frozen*)PyMem_Realloc(p, size);
+    }
+    if (p == NULL) {
+      return -1;
+    }
+
+    /* Copy the tables into the new memory */
+    memcpy(p, PyImport_FrozenModules, (i+1) * sizeof(struct _frozen));
+    memcpy(p + i, newfrozen, (n + 1) * sizeof(struct _frozen));
+    PyImport_FrozenModules = p;
+    return res;
+}
+
 // We need to register a custom finder because we are registering `torch._C` as
 // a built-in module, and it will otherwise get skipped by the defauljjjkk
 const char* finder = R"RAW(
@@ -129,6 +159,7 @@ sys.meta_path.insert(0, F())
 )RAW";
 
 extern "C" PyObject* initModule(void);
+extern struct _frozen _PyImport_FrozenModules[];
 
 static std::atomic<size_t> s_id;
 std::map<size_t, py::object> forwards;
@@ -148,6 +179,8 @@ __attribute__((constructor)) void init() {
   FOREACH_LIBRARY(APPEND_INIT)
 #undef APPEND_INIT
   PyImport_AppendInittab("torch._C", initModule);
+  int ret = extendFrozenModules(_PyImport_FrozenModules);
+  TORCH_INTERNAL_ASSERT(ret == 0);
   Py_Initialize();
   PyRun_SimpleString(PY_PATH_STRING);
   PyRun_SimpleString(finder);

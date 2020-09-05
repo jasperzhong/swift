@@ -18,12 +18,31 @@ SET_SOURCE_FILES_PROPERTIES(
 # Build cpython
 SET(PYTHON_LIB_DIR "${PYTHON_SOURCE_DIR}/lib")
 SET(PYTHON_LIB "${PYTHON_LIB_DIR}/libpython3.7m.a")
+SET(PYTHON_BIN "${PYTHON_SOURCE_DIR}/python")
 add_custom_command(
-   OUTPUT ${PYTHON_MODULES} ${PYTHON_LIB}
+   OUTPUT ${PYTHON_MODULES} ${PYTHON_LIB} ${PYTHON_BIN}
    COMMAND CFLAGS=-fPIC CPPFLAGS=-fPIC ./configure --prefix ${PYTHON_SOURCE_DIR}
    COMMAND CFLAGS=-fPIC CPPFLAGS=-fPIC make -j8
    COMMAND make install
    WORKING_DIRECTORY ${PYTHON_SOURCE_DIR}
+   VERBATIM
+)
+
+# Freeze the Python standard library modules
+set(FROZEN_FILES
+  ${INTERPRETER_DIR}/frozen/main.c
+  ${INTERPRETER_DIR}/frozen/bytecode_0.c
+  ${INTERPRETER_DIR}/frozen/bytecode_1.c
+  ${INTERPRETER_DIR}/frozen/bytecode_2.c
+  ${INTERPRETER_DIR}/frozen/bytecode_3.c
+  ${INTERPRETER_DIR}/frozen/bytecode_4.c
+)
+
+add_custom_command(
+   OUTPUT ${FROZEN_FILES}
+   WORKING_DIRECTORY ${INTERPRETER_DIR}
+   COMMAND ${PYTHON_BIN} freeze_stdlib.py ${PYTHON_SOURCE_DIR}/Lib
+   DEPENDS ${PYTHON_BIN}
    VERBATIM
 )
 
@@ -33,7 +52,7 @@ add_custom_command(
 # Generate a header that lets interpreter init set up python sys path
 # to point to the cpython built above
 SET(PYTORCH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../")
-SET(PY_PATH_STRING "import sys; sys.path = ['', '${PYTHON_LIB_DIR}/python37.zip', '${PYTHON_LIB_DIR}/python3.7', '${PYTHON_LIB_DIR}/python3.7/lib-dynload', '${PYTHON_LIB_DIR}/python3.7/site-packages', '${PYTORCH_ROOT}']")
+SET(PY_PATH_STRING "import sys; sys.path = ['', '${PYTORCH_ROOT}']")
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/python_path.h
     COMMAND echo "#define PY_PATH_STRING \"${PY_PATH_STRING}\"" > ${CMAKE_CURRENT_SOURCE_DIR}/python_path.h
@@ -45,6 +64,7 @@ add_custom_command(
 set(INTERPRETER_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/python_path.h
   ${INTERPRETER_DIR}/interpreter.cpp
+  ${FROZEN_FILES}
   ${PYTHON_MODULES}
   ${TORCH_OBJS}
   # ${CMAKE_CURRENT_BINARY_DIR}/../../c10/CMakeFiles/c10.dir/core/TensorImpl.cpp.o
