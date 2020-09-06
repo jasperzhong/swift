@@ -145,7 +145,7 @@ int extendFrozenModules(struct _frozen *newfrozen) {
 }
 
 // We need to register a custom finder because we are registering `torch._C` as
-// a built-in module, and it will otherwise get skipped by the defauljjjkk
+// a built-in module, and it will otherwise get skipped by the default importer.
 const char* finder = R"RAW(
 import sys
 class F:

@@ -3,7 +3,7 @@ SET(INTERPRETER_DIR "${TORCHPY_DIR}/interpreter" PARENT_SCOPE)
 
 # Define verbose lists of objects to be baked into interpreter
 SET(PYTHON_SOURCE_DIR "${INTERPRETER_DIR}/cpython")
-SET(PYTHON_MODULE_DIR "${PYTHON_SOURCE_DIR}/build/temp.linux-x86_64-3.7/${PYTHON_SOURCE_DIR}/Modules")
+SET(PYTHON_MODULE_DIR "${PYTHON_SOURCE_DIR}/build/temp.linux-x86_64-3.8/${PYTHON_SOURCE_DIR}/Modules")
 include("CMakePythonModules.txt")
 SET(TORCH_PYTHON_DIR "${CMAKE_CURRENT_BINARY_DIR}/../../caffe2/torch/CMakeFiles/torch_python.dir")
 include("CMakeTorchPython.txt")
@@ -17,7 +17,7 @@ SET_SOURCE_FILES_PROPERTIES(
 
 # Build cpython
 SET(PYTHON_LIB_DIR "${PYTHON_SOURCE_DIR}/lib")
-SET(PYTHON_LIB "${PYTHON_LIB_DIR}/libpython3.7m.a")
+SET(PYTHON_LIB "${PYTHON_LIB_DIR}/libpython3.8.a")
 SET(PYTHON_BIN "${PYTHON_SOURCE_DIR}/python")
 add_custom_command(
    OUTPUT ${PYTHON_MODULES} ${PYTHON_LIB} ${PYTHON_BIN}
@@ -76,7 +76,7 @@ target_compile_options(
     -fvisibility=hidden
 )
 target_include_directories(interpreter PRIVATE ${INTERPRETER_DIR})
-target_link_libraries(interpreter PRIVATE -L${PYTHON_LIB_DIR} libpython3.7m.a)
+target_link_libraries(interpreter PRIVATE -L${PYTHON_LIB_DIR} libpython3.8.a)
 target_link_libraries(interpreter PRIVATE crypt crypto ssl pthread dl util m ffi lzma readline nsl ncursesw panelw) # for python builtins
 # target_link_libraries(interpreter PRIVATE -Wl,--static c10d)
 
