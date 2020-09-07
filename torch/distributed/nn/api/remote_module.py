@@ -26,7 +26,7 @@ def _instantiate_template(module_interface_cls):
     instantiator.instantiate_scriptable_remote_module_template(module_interface_cls)
 
 
-def _create_module(module_cls, args, kwargs, module_interface_cls=None):
+def _create_module(module_cls, args, kwargs, device=None, module_interface_cls=None):
     module = module_cls(*args, **kwargs)
     if not isinstance(module, nn.Module):
         raise ValueError(
@@ -35,6 +35,8 @@ def _create_module(module_cls, args, kwargs, module_interface_cls=None):
         )
     if module_interface_cls is not None:
         module = torch.jit.script(module)
+    if device:
+        module.to(device)
     return rpc.RRef(module, module_interface_cls)
 
 
@@ -56,6 +58,7 @@ class _RemoteModule(nn.Module):
         module_cls: nn.Module,
         args: Tuple = None,
         kwargs: Dict[str, Any] = None,
+        device: torch.device = None,
         _module_interface_cls: Any = None,
     ):
         """
@@ -96,6 +99,7 @@ class _RemoteModule(nn.Module):
                 >>> module_cls = MyModule
             args (Sequence, optional): args to be passed to ``module_cls``.
             kwargs (Dict, optional): kwargs to be passed to ``module_cls``.
+            device (torch.device): Device where the remote node runs the user-provided module.
             _module_interface_cls (type, optional): The TorchScript interface type for the module
                 to be created. The type object should be decorated by @torch.jit.interface.
                 If not provided, the generated RemoteModule is not torchscript-able.
@@ -164,7 +168,7 @@ class _RemoteModule(nn.Module):
 
         # Create the module on the remote side.
         self.module_rref = rpc.rpc_sync(
-            on, _create_module, (module_cls, args, kwargs, _module_interface_cls)
+            on, _create_module, (module_cls, args, kwargs, device, _module_interface_cls)
         )
 
         # Install generated methods.
@@ -322,6 +326,7 @@ class RemoteModule(_RemoteModule):
             >>> module_cls = MyModule
         args (Sequence, optional): args to be passed to ``module_cls``.
         kwargs (Dict, optional): kwargs to be passed to ``module_cls``.
+        device (torch.device): Device where the remote node runs the user-provided module.
 
     Returns:
         A remote module instance which wraps the :class:`~nn.Module` created by the
@@ -361,5 +366,6 @@ class RemoteModule(_RemoteModule):
         module_cls: nn.Module,
         args: Tuple = None,
         kwargs: Dict[str, Any] = None,
+        device: torch.device = None,
     ):
-        super().__init__(on, module_cls, args, kwargs)
+        super().__init__(on, module_cls, args, kwargs, device)

@@ -70,7 +70,7 @@ class RemoteModuleTest(RpcAgentTestFixture):
         return 2
 
     @staticmethod
-    def _create_remote_module_iter(dst_worker_name, modes=None):
+    def _create_remote_module_iter(dst_worker_name, modes=None, device=None):
         if modes is None:
             modes = ModuleCreationMode.__members__.values()
 
@@ -78,7 +78,9 @@ class RemoteModuleTest(RpcAgentTestFixture):
         kwargs = dict(first_kwarg=2)
 
         if ModuleCreationMode.MODULE_CTOR in modes:
-            remote_module = RemoteModule(dst_worker_name, MyModule, args, kwargs)
+            remote_module = RemoteModule(
+                dst_worker_name, MyModule, args, kwargs, device
+            )
             yield remote_module
 
         if ModuleCreationMode.MODULE_CTOR_WITH_INTERFACE in modes:
@@ -87,6 +89,7 @@ class RemoteModuleTest(RpcAgentTestFixture):
                 create_scripted_module,
                 args,
                 kwargs,
+                device,
                 _module_interface_cls=MyModuleInterface,
             )
             scripted_remote_module = torch.jit.script(remote_module)
@@ -207,6 +210,25 @@ class RemoteModuleTest(RpcAgentTestFixture):
             param_rrefs = remote_module.remote_parameters()
             self.assertEqual(len(param_rrefs), 1)
             self.assertTrue(torch.equal(param_rrefs[0].to_here(), _PARAM_VAL))
+
+    @dist_utils.dist_init
+    def test_device(self):
+        if self.rank != 0:
+            return
+        dst_worker_name = dist_utils.worker_name((self.rank + 1) % self.world_size)
+
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        for remote_module in self._create_remote_module_iter(
+            dst_worker_name, modes=[ModuleCreationMode.MODULE_CTOR], device=device
+        ):
+            for param_rref in remote_module.remote_parameters():
+                param = param_rref.to_here()
+                if torch.cuda.is_available():
+                    self.assertEqual(param.device.type, "cuda")
+                    self.assertEqual(param.device.index, 0)
+                else:
+                    self.assertEqual(param.device.type, "cpu")
+                    self.assertFalse(param.device.index)
 
     @dist_utils.dist_init
     def test_unsupported_methods(self):
