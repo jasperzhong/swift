@@ -158,6 +158,18 @@ sys.meta_path.insert(0, F())
 # make loader importable
 )RAW";
 
+const char* sysprint = R"RAW(
+import sys
+print("exec_prefix:", sys.base_exec_prefix)
+print("_base_executable:", sys._base_executable)
+print("base_prefix:", sys.base_prefix)
+print("exec_prefix:", sys.exec_prefix)
+print("executable:", sys.executable)
+print("path:", sys.path)
+print("prefix:", sys.prefix)
+
+)RAW";
+
 extern "C" PyObject* initModule(void);
 extern struct _frozen _PyImport_FrozenModules[];
 
@@ -169,19 +181,43 @@ __attribute__((constructor)) void init() {
   void* result = dlopen("libz.so", RTLD_GLOBAL | RTLD_LAZY);
   assert(result);
 
-  program = Py_DecodeLocale("main", NULL);
-  if (program == NULL) {
-    fprintf(stderr, "Fatal error: cannot decode argv[0]\n");
-    exit(1);
-  }
-  Py_SetProgramName(program);
 #define APPEND_INIT(name) PyImport_AppendInittab(#name, PyInit_##name);
   FOREACH_LIBRARY(APPEND_INIT)
 #undef APPEND_INIT
   PyImport_AppendInittab("torch._C", initModule);
+
   int ret = extendFrozenModules(_PyImport_FrozenModules);
   TORCH_INTERNAL_ASSERT(ret == 0);
-  Py_Initialize();
+
+  PyPreConfig preconfig;
+  PyPreConfig_InitIsolatedConfig(&preconfig);
+  PyStatus status = Py_PreInitialize(&preconfig);
+  TORCH_INTERNAL_ASSERT(!PyStatus_Exception(status))
+
+  PyConfig config;
+  PyConfig_InitIsolatedConfig(&config);
+
+  // Completely blank out the path configuration. This ensures we have complete
+  // control of how our embedded Python searches for modules, and we will never
+  // consult the external filesystem. See:
+  // https://docs.python.org/3/c-api/init_config.html#path-configuration
+  config.site_import = 0;
+  status = PyConfig_SetString(&config, &config.base_exec_prefix, L"");
+  status = PyConfig_SetString(&config, &config.base_executable, L"");
+  status = PyConfig_SetString(&config, &config.base_prefix, L"");
+  status = PyConfig_SetString(&config, &config.exec_prefix, L"");
+  status = PyConfig_SetString(&config, &config.executable, L"");
+  status = PyConfig_SetString(&config, &config.prefix, L"");
+  config.module_search_paths_set = 1;
+  wchar_t* module_search_paths[0] = {};
+  status = PyConfig_SetWideStringList(
+      &config, &config.module_search_paths, 0, module_search_paths);
+
+  status = Py_InitializeFromConfig(&config);
+  PyConfig_Clear(&config);
+  TORCH_INTERNAL_ASSERT(!PyStatus_Exception(status))
+
+  // PyRun_SimpleString(sysprint);
   PyRun_SimpleString(PY_PATH_STRING);
   PyRun_SimpleString(finder);
   // Release the GIL that PyInitialize acquires
