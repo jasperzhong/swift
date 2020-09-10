@@ -7,6 +7,7 @@ from .delegate import DefaultDelegate, DelegateBase, ModuleHierarchyCtxMgr
 from .graph import Graph
 from .graph_module import GraphModule
 from .proxy import Proxy, _create_proxy
+from .split import fully_outline_module
 
 HAS_VARSTUFF = inspect.CO_VARARGS | inspect.CO_VARKEYWORDS
 
@@ -88,4 +89,5 @@ def symbolic_trace(root : torch.nn.Module, delegate_class=DefaultDelegate) -> Gr
         graph.output(delegate.create_arg(fn(*args)))
     finally:
         torch.nn.Module.__call__ = orig_call
-    return GraphModule(root, graph)
+    orig = GraphModule(root, graph)
+    return fully_outline_module(orig)
