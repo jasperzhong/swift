@@ -282,7 +282,7 @@ inline at::Scalar PythonArgs::scalar(int i) {
 }
 
 inline std::vector<at::Scalar> PythonArgs::scalarlist(int i) {
-  std::cout << "hello from scalarList" << std::endl;
+  std::cout << "hello from scalarList!!!!!!!!!!!!!!!!!!" << std::endl;
   if (!args[i]) return std::vector<at::Scalar>();
   //THPObjectPtr arg = six::maybeAsTuple(args[i]);
   //auto size = PyList_GET_SIZE(arg.get());

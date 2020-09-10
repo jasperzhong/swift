@@ -113,13 +113,22 @@ FunctionParameter::FunctionParameter(const std::string& fmt, bool keyword_only)
   }
 
   auto name_str = fmt.substr(space + 1);
-  std::cout << "\n\n" << std::endl;
-  std::cout << "type_str: " << type_str << std::endl;
   auto it = type_map.find(type_str);
   if (it == type_map.end()) {
     throw std::runtime_error("FunctionParameter(): invalid type string: " + type_str);
   }
   type_ = it->second;
+  switch (type_) {
+    case ParameterType::SCALAR: {
+      std::cout << "type_str: " << type_str << "   type_: ParameterType::SCALAR" << std::endl;
+    }
+    case ParameterType::SCALAR_LIST: {
+      std::cout << "type_str: " << type_str << "   type_: ParameterType::SCALAR_LIST" << std::endl;
+    }
+    default: {
+      //std::cout << "type_str: " << type_str << "   type_: something else" << std::endl;
+    }
+  }
 
   auto eq = name_str.find('=');
   if (eq != std::string::npos) {
@@ -360,7 +369,6 @@ bool is_scalar_list_and_append_overloaded(PyObject* obj, int argnum, bool throw_
     PyObject* iobj = tuple ? PyTuple_GET_ITEM(obj, idx) : PyList_GET_ITEM(obj, idx);
     if (!THPUtils_checkScalar(iobj)) {
       if (throw_error) {
-        throw 20;
         throw TypeError("expected Scalar as element %d in argument %d, but got %s",
             static_cast<int>(idx), argnum, Py_TYPE(iobj)->tp_name);
       }
@@ -401,18 +409,24 @@ auto FunctionParameter::check(PyObject* obj, std::vector<py::handle> &overloaded
     }
     case ParameterType::SCALAR:
     case ParameterType::COMPLEX:
+      std::cout << "\n\n hello from scalar switch" << std::endl;
       if (PyComplex_Check(obj)) {
+        std::cout << "return true1" << std::endl;
         return true;
       }
+      std::cout << "fallthrough" << std::endl;
       // fallthrough
     case ParameterType::DOUBLE: {
       if (THPUtils_checkDouble(obj)) {
+        std::cout << "return true2" << std::endl;
         return true;
       }
       if (THPVariable_Check(obj)) {
         auto& var = ((THPVariable*)obj)->cdata;
+        std::cout << "return 2" << std::endl;
         return !var.requires_grad() && var.dim() == 0;
       }
+      std::cout << "return false" << std::endl;
       return false;
     }
     case ParameterType::INT64: {
@@ -456,6 +470,7 @@ auto FunctionParameter::check(PyObject* obj, std::vector<py::handle> &overloaded
       return THPUtils_checkLong(obj) || THPUtils_checkString(obj) || THPDevice_Check(obj);
     case ParameterType::STRING: return THPUtils_checkString(obj);
     case ParameterType::SCALAR_LIST: {
+      std::cout << "hello scalar_list switch" << std::endl;
       return is_scalar_list_and_append_overloaded(obj, argnum, true /* throw_error */);
     }
     default: throw std::runtime_error("unknown parameter type");
