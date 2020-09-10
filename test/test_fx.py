@@ -6,6 +6,7 @@ import pickle
 import copy
 from torch.fx import symbolic_trace, Proxy, Node, GraphModule, DefaultDelegate
 from torch.fx.proxy import TraceError
+from torch.fx.split import extract_module, fully_outline_module
 
 from fx.quantization import Quantizer
 
@@ -110,11 +111,12 @@ class TestFX(JitTestCase):
         # Custom delegate to disallow in-place tensor operations
         class NoMutableCallDelegate(DefaultDelegate):
             def create_node(self, kind : str, target : Union[str, Callable],
-                            args : Tuple[Any], kwargs : Dict[str, Any], name : Optional[str] = None) -> Node:
+                            args : Tuple[Any], kwargs : Dict[str, Any], name : Optional[str] = None,
+                            module_qualname : Optional[str] = None) -> Node:
                 name = target if isinstance(target, str) else torch.typename(target)
                 if name[-1] == '_':
                     raise RuntimeError('In-place operations are not supported')
-                return super().create_node(kind, target, args, kwargs, name)
+                return super().create_node(kind, target, args, kwargs, name, module_qualname)
 
         # Test method
         class MyInplaceMod(torch.nn.Module):
@@ -376,8 +378,9 @@ class TestFX(JitTestCase):
     def test_node_tagging(self):
         class TaggingDelegate(DefaultDelegate):
             def create_node(self, kind : str, target : Union[str, Callable],
-                            args : Tuple[Any], kwargs : Dict[str, Any], name : Optional[str] = None) -> Node:
-                n = super().create_node(kind, target, args, kwargs, name)
+                            args : Tuple[Any], kwargs : Dict[str, Any], name : Optional[str] = None,
+                            module_qualname : Optional[str] = None) -> Node:
+                n = super().create_node(kind, target, args, kwargs, name, module_qualname)
                 n.tag = 'foo'
                 return n
 
@@ -511,6 +514,71 @@ class TestFX(JitTestCase):
         stringed = str(traced.graph)
         for s in ['args', 'kwargs', 'uses']:
             assert s in stringed
+
+
+    @skipIfNoTorchVision
+    def test_module_qualname(self):
+        class Bar(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.rn = resnet18()
+
+            def forward(self, x):
+                return torch.neg(self.rn(x))
+
+
+        class Foo(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.bar = Bar()
+
+            def forward(self, x):
+                return 3.0 + self.bar(x)
+
+
+        f = Foo()
+        traced = symbolic_trace(f)
+
+        # print_nodes(traced.graph)
+
+        # Test extracting a single submodule from the GraphModule
+        with_extracted_module : torch.fx.GraphModule = extract_module(traced, 'bar.rn')
+
+        test_input = torch.randn(1, 3, 224, 224)
+        self.assertEqual(with_extracted_module(test_input), traced(test_input))
+
+        # Run the Module through ser/de, then try the same thing again
+        # Should run just fine if our serialization worked properly
+        pickled = pickle.dumps(traced)
+        loaded = pickle.loads(pickled)
+
+        loaded_with_extracted_module : torch.fx.GraphModule = extract_module(loaded, 'bar.rn')
+        # print(loaded_with_extracted_module)
+        self.assertEqual(loaded_with_extracted_module(test_input), traced(test_input))
+
+        # Now try to fully un-inline the Graph.
+        uninlined = fully_outline_module(traced)
+
+        # print(uninlined)
+
+        self.assertEqual(uninlined(test_input), traced(test_input))
+
+    def test_extract_stateless_mod(self):
+        class Stateless(torch.nn.Module):
+            def forward(self, x):
+                return torch.neg(x)
+
+        class Baz(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.sl = Stateless()
+
+            def forward(self, x):
+                return self.sl(x) + 3.0
+
+        b : torch.nn.Module = Baz()
+        traced : torch.fx.GraphModule = symbolic_trace(b)
+        extracted : torch.fx.GraphModule = extract_module(traced, 'sl')
 
 
 if __name__ == '__main__':
