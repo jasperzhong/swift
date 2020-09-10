@@ -254,7 +254,7 @@
   self: grad * (-self * self + 1).rsqrt()
 
 - name: atan(Tensor self) -> Tensor
-  self: grad / (self * self + 1)
+  self: grad / (self.conj() * self.conj() + 1)
 
 - name: atan2(Tensor self, Tensor other) -> Tensor
   self, other: atan2_backward(grad, self, other, grad_input_mask)
@@ -401,7 +401,7 @@
   other: div_tensor_other_backward(grad, self, other)
 
 - name: div.Scalar(Tensor self, Scalar other) -> Tensor
-  self: div_tensor_self_backward(grad, at::scalar_to_tensor(other), self.scalar_type())
+  self: div_scalar_backward(grad, other, self.scalar_type())
 
 - name: dot(Tensor self, Tensor tensor) -> Tensor
   self: handle_r_to_c(self.scalar_type(), grad * tensor.conj())
