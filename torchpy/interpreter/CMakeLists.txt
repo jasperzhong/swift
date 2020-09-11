@@ -5,15 +5,7 @@ SET(INTERPRETER_DIR "${TORCHPY_DIR}/interpreter" PARENT_SCOPE)
 SET(PYTHON_SOURCE_DIR "${INTERPRETER_DIR}/cpython")
 SET(PYTHON_MODULE_DIR "${PYTHON_SOURCE_DIR}/build/temp.linux-x86_64-3.7/${PYTHON_SOURCE_DIR}/Modules")
 include("CMakePythonModules.txt")
-SET(TORCH_PYTHON_DIR "${CMAKE_CURRENT_BINARY_DIR}/../../caffe2/torch/CMakeFiles/torch_python.dir")
-include("CMakeTorchPython.txt")
-SET_SOURCE_FILES_PROPERTIES(
-  ${TORCH_OBJS}
-  # ${CMAKE_CURRENT_BINARY_DIR}/../../c10/CMakeFiles/c10.dir/core/TensorImpl.cpp.o
-  PROPERTIES
-  EXTERNAL_OBJECT true
-  GENERATED true
-)
+
 
 # Build cpython
 SET(PYTHON_LIB_DIR "${PYTHON_SOURCE_DIR}/lib")
@@ -46,7 +38,7 @@ set(INTERPRETER_LIB_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/python_path.h
   ${INTERPRETER_DIR}/interpreter.cpp
   ${PYTHON_MODULES}
-  ${TORCH_OBJS}
+  $<TARGET_OBJECTS:torch_python_objs>
   # ${CMAKE_CURRENT_BINARY_DIR}/../../c10/CMakeFiles/c10.dir/core/TensorImpl.cpp.o
 )
 add_library(interpreter

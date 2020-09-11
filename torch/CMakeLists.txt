@@ -231,7 +231,8 @@ add_custom_command(
     "${TORCH_ROOT}"
 )
 
-add_library(torch_python SHARED ${TORCH_PYTHON_SRCS})
+add_library(torch_python_objs OBJECT ${TORCH_PYTHON_SRCS})
+add_library(torch_python SHARED $<TARGET_OBJECTS:torch_python_objs>)
 if(HAVE_SOVERSION)
   set_target_properties(torch_python PROPERTIES
       VERSION ${TORCH_VERSION} SOVERSION ${TORCH_SOVERSION})
@@ -240,7 +241,7 @@ add_dependencies(torch_python torch_python_stubs)
 
 # Required workaround for generated sources
 # See https://samthursfield.wordpress.com/2015/11/21/cmake-dependencies-between-targets-and-files-and-custom-commands/#custom-commands-in-different-directories
-add_dependencies(torch_python generate-torch-sources)
+add_dependencies(torch_python_objs generate-torch-sources)
 set_source_files_properties(
     ${GENERATED_THNN_SOURCES}
     ${GENERATED_CXX_PYTHON}
@@ -259,15 +260,16 @@ if(USE_CUDA)
   set_source_files_properties(${TORCH_SRC_DIR}/csrc/cuda/Module.cpp PROPERTIES COMPILE_FLAGS "-DCUDA_ARCH_FLAGS=\"${_ARCH_FLAGS_readable}\"")
 endif()
 
-target_compile_definitions(torch_python PRIVATE "-DTHP_BUILD_MAIN_LIB")
+target_compile_definitions(torch_python_objs PRIVATE "-DTHP_BUILD_MAIN_LIB")
 
 target_link_libraries(torch_python ${TORCH_PYTHON_LINK_LIBRARIES})
 
-target_compile_definitions(torch_python PRIVATE ${TORCH_PYTHON_COMPILE_DEFINITIONS})
+target_compile_definitions(torch_python_objs PRIVATE ${TORCH_PYTHON_COMPILE_DEFINITIONS})
 
-target_compile_options(torch_python PRIVATE ${TORCH_PYTHON_COMPILE_OPTIONS})
+target_compile_options(torch_python_objs PRIVATE ${TORCH_PYTHON_COMPILE_OPTIONS})
 
-target_include_directories(torch_python PUBLIC ${TORCH_PYTHON_INCLUDE_DIRECTORIES})
+target_include_directories(torch_python_objs PUBLIC ${TORCH_PYTHON_INCLUDE_DIRECTORIES})
+target_include_directories(torch_python_objs SYSTEM PUBLIC /data/users/whc/pytorch/third_party/fmt/include)
 
 
 if(NOT TORCH_PYTHON_LINK_FLAGS STREQUAL "")
