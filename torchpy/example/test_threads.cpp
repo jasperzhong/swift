@@ -65,3 +65,15 @@ TEST(TorchpyTest, ThreadedSimpleModel) {
     ASSERT_TRUE(ref_output.equal(outputs[i]));
   }
 }
+
+TEST(TorchpyTest, Hermetic) {
+  auto model_filename = "torchpy/example/resnet.zip";
+  unsigned long model_id;
+
+  model_id = torchpy::load(model_filename, true);
+  auto input =
+      torch::ones(at::IntArrayRef({1, 3, 224, 224}));
+      // TODO errors will segfault due to races
+  // auto input = torch::ones(at::IntArrayRef({10, 20}));
+    auto result = torchpy::forward(model_id, input);
+}

@@ -24,7 +24,7 @@ TEST(Interpreter, Hello) {
 void compare_torchpy_jit(const char* model_filename, at::Tensor input) {
   Interpreter interp;
   // Test
-  auto model_id = interp.load_model(model_filename);
+  auto model_id = interp.load_model(model_filename, false);
   at::Tensor output = interp.forward_model(model_id, input);
 
   // Reference

@@ -14,6 +14,8 @@
 #include <map>
 #include <thread>
 
+#include <fmt/format.h>
+
 namespace py = pybind11;
 using namespace py::literals;
 
@@ -242,9 +244,11 @@ __attribute__((destructor)) void deinit() {}
 static void run_some_python(const char* code) {
   PyGILState_STATE gstate = PyGILState_Ensure();
 
+  std::cout << "BEGIN\n";
   if (PyRun_SimpleString(code) == -1) {
     throw std::runtime_error("python eval failed\n");
   }
+  std::cout << "END\n";
   PyGILState_Release(gstate);
 }
 
@@ -261,13 +265,23 @@ static void run_python_file(const char* code) {
 }
 
 
-static size_t load_model(const char* filename) {
+static size_t load_model(const char* filename, bool hermetic) {
   PyGILState_STATE gstate = PyGILState_Ensure();
   assert(PyGILState_Check() == 1);
+  std::string code;
 
-  std::string code = std::string("model = torch.jit.load('") +
-      std::string(filename) + std::string("')");
-  py::exec(code);
+  if (hermetic) {
+    code = fmt::format(R"(
+from torch.hermetic import HermeticImporter
+
+i = HermeticImporter('{}')
+model = i.load_pickle('model', 'model.pkl')
+)", filename);
+  } else {
+    code = std::string("model = torch.jit.load('") +
+        std::string(filename) + std::string("')");
+  }
+    py::exec(code);
 
   auto id = ++s_id;
 

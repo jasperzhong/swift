@@ -1,7 +1,7 @@
 #pragma once
 #include <ATen/ATen.h>
 
-static size_t load_model(const char* model_file);
+static size_t load_model(const char* model_file, bool hermetic=false);
 static at::Tensor forward_model(size_t model_id, at::Tensor input);
 static void run_some_python(const char* code);
 static void startup();

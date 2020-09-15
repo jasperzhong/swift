@@ -26,12 +26,12 @@ void finalize() {
   interpreters.clear();
 }
 
-size_t load(const char* filename) {
+size_t load(const char* filename, bool hermetic) {
   // for now just load all models into all interpreters
   // eventually, we'll share/dedup tensor data
   size_t model_id;
   for (auto interp : interpreters) {
-    model_id = interp->load_model(filename);
+    model_id = interp->load_model(filename, hermetic);
   }
   return model_id;
 }
