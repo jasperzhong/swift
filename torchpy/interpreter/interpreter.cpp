@@ -147,7 +147,9 @@ int extendFrozenModules(struct _frozen *newfrozen) {
 // a built-in module, and it will otherwise get skipped by the default importer.
 const char* finder = R"RAW(
 import sys
+# Remove the path-based importer, as we don't want our isolated interpreter to read the file system
 sys.meta_path = sys.meta_path[:-1]
+
 class F:
     def find_spec(self, fullname, path, target=None):
         if fullname == 'torch._C':
