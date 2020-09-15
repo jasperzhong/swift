@@ -45,15 +45,6 @@ add_custom_command(
 # TODO install pip packages needed by torch in this python
 # typing_extensions
 
-# Generate a header that lets interpreter init set up python sys path
-# to point to the cpython built above
-SET(PY_PATH_STRING "import sys; sys.path = ['', '${PYTORCH_ROOT}']")
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/python_path.h
-    COMMAND echo "#define PY_PATH_STRING \"${PY_PATH_STRING}\"" > ${CMAKE_CURRENT_SOURCE_DIR}/python_path.h
-    VERBATIM
-)
-
 # Build the interpreter lib, designed to be standalone and dlopened
 # We bake the python and torch_python binding objs into libinterpreter
 set(INTERPRETER_LIB_SOURCES
