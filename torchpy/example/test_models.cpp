@@ -23,11 +23,11 @@ void compare_torchpy_jit(const char* model_filename, at::Tensor input) {
 
 TEST(TorchpyTest, SimpleModel) {
   compare_torchpy_jit(
-      "torchpy/example/simple.pt", torch::ones(at::IntArrayRef({10, 20})));
+      "torchpy/example/generated/simple.pt", torch::ones(at::IntArrayRef({10, 20})));
 }
 
 TEST(TorchpyTest, ResNet) {
   compare_torchpy_jit(
-      "torchpy/example/resnet.pt",
+      "torchpy/example/generated/resnet.pt",
       torch::ones(at::IntArrayRef({1, 3, 224, 224})));
 }

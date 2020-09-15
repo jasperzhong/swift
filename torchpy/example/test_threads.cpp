@@ -6,7 +6,7 @@
 #include <future>
 
 TEST(TorchpyTest, MultiSerialSimpleModel) {
-  auto model_filename = "torchpy/example/simple.pt";
+  auto model_filename = "torchpy/example/generated/simple.pt";
   auto input = torch::ones(at::IntArrayRef({10, 20}));
   size_t ninterp = 3;
   std::vector<at::Tensor> outputs;
@@ -33,7 +33,7 @@ TEST(TorchpyTest, MultiSerialSimpleModel) {
 }
 
 TEST(TorchpyTest, ThreadedSimpleModel) {
-  auto model_filename = "torchpy/example/simple.pt";
+  auto model_filename = "torchpy/example/generated/simple.pt";
   size_t nthreads = 2;
   std::vector<at::Tensor> outputs;
   auto input = torch::ones(at::IntArrayRef({10, 20}));
@@ -67,7 +67,7 @@ TEST(TorchpyTest, ThreadedSimpleModel) {
 }
 
 TEST(TorchpyTest, Hermetic) {
-  auto model_filename = "torchpy/example/resnet.zip";
+  auto model_filename = "torchpy/example/generated/resnet.zip";
   unsigned long model_id;
 
   model_id = torchpy::load(model_filename, true);
