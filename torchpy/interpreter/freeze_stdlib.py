@@ -30,8 +30,8 @@ from pathlib import Path
 from typing import List
 
 
-MAIN_INCLUDES = """
-#include "Python.h"
+MAIN_INCLUDES = """#include "Python.h"
+
 """
 
 MAIN_PREFIX = """
@@ -60,8 +60,6 @@ DENY_LIST = [
     "tests",
     "idle_test",
     "__phello__.foo.py",
-    # Packaging and distributing your own Python modules
-    "distutils",
     # importlib frozen modules. These are already baked into CPython.
     "_bootstrap.py",
     "_bootstrap_external.py",
@@ -94,25 +92,10 @@ class FrozenModule:
 
 
 class Freezer:
-    def __init__(self, root: Path, verbose: bool):
-        """
-        Args:
-            root: Path to CPython standard library (most of the time 'cpython/Lib/').
-            verbose: Whether to print debug info.
-        """
-        assert root.name == "Lib"
-        assert root.is_dir()
+    def __init__(self, verbose: bool):
         self.frozen_modules: List[FrozenModule] = []
-        self.root: Path = root
         self.indent: int = 0
         self.verbose: bool = verbose
-
-    def run(self):
-        for child in self.root.iterdir():
-            self.compile_path(child)
-
-        self.write_bytecode()
-        self.write_main()
 
     def msg(self, path: Path, code: str):
         if not self.verbose:
@@ -122,7 +105,6 @@ class Freezer:
         # S: skipped (not a package dir)
         # X: skipped (deny-listed)
         # N: skipped (not a python file)
-        path = path.relative_to(self.root)
         for i in range(self.indent):
             print("    ", end="")
         print(f"{code} {path}")
@@ -169,15 +151,15 @@ class Freezer:
                 outfp.write("%d," % c)
         outfp.write("\n};\n")
 
-    def compile_path(self, path: Path):
+    def compile_path(self, path: Path, top_package_path: Path):
         """Generic entry point for compiling a Path object."""
         if path.is_dir():
-            self.compile_package(path)
+            self.compile_package(path, top_package_path)
         else:
-            self.compile_file(path)
+            self.compile_file(path, top_package_path)
 
     @indent_msg
-    def compile_package(self, path: Path):
+    def compile_package(self, path: Path, top_package_path: Path):
         """Compile all the files within a Python package dir."""
         assert path.is_dir()
         if path.name in DENY_LIST:
@@ -193,10 +175,30 @@ class Freezer:
         self.msg(path, "P")
         # Recursively compile all children in this dir
         for child in path.iterdir():
-            self.compile_path(child)
+            self.compile_path(child, top_package_path)
+
+    def get_module_qualname(self, file_path: Path, top_package_path: Path) -> List[str]:
+        # `path` looks like 'Lib/foo/bar/baz.py'
+
+        # chop off 'Lib/' to get something that represents a Python module hierarchy.
+        # e.g. 'foo/bar/baz.py', which maps to 'foo.bar.baz'
+        normalized_path = file_path.relative_to(top_package_path.parent)
+
+        if normalized_path.name == "__init__.py":
+            # Special handling for `__init__.py`. In this case, this file
+            # specifies that the containing directory should be treated as a package.
+            # For 'foo/bar/baz/__init__.py':
+            # - The module name is 'baz'
+            module_basename = normalized_path.parent.name
+            # - The parent is foo.bar (need to shave off the 'baz')
+            module_parent = normalized_path.parent.parent.parts
+        else:
+            module_basename = normalized_path.stem
+            module_parent = normalized_path.parent.parts
+        return list(module_parent) + [module_basename]
 
     @indent_msg
-    def compile_file(self, path: Path):
+    def compile_file(self, path: Path, top_package_path: Path):
         """
         Compile a Python source file to frozen bytecode. Append the result to
         `self.frozen_modules`.
@@ -210,29 +212,8 @@ class Freezer:
             self.msg(path, "X")
             return
 
-        # `path` looks like 'Lib/foo/bar/baz.py'
-
-        # chop off 'Lib/' to get something that represents a Python module hierarchy.
-        # e.g. 'foo/bar/baz.py', which maps to 'foo.bar.baz'
-        normalized_path = path.relative_to(self.root)
-
-        if normalized_path.name == "__init__.py":
-            # Special handling for `__init__.py`. In this case, this file
-            # specifies that the containing directory should be treated as a package.
-            is_package = True
-            # For 'foo/bar/baz/__init__.py':
-            # - The module name is 'baz'
-            module_basename = normalized_path.parent.name
-            # - The parent is foo.bar (need to shave off the 'baz')
-            module_parent = normalized_path.parent.parent.parts
-        else:
-            is_package = False
-            module_basename = normalized_path.stem
-            module_parent = normalized_path.parent.parts
-
         self.msg(path, "F")
-
-        module_qualname = module_parent + (module_basename,)
+        module_qualname = self.get_module_qualname(path, top_package_path)
         module_mangled_name = "__".join(module_qualname)
         c_name = "M_" + module_mangled_name
 
@@ -241,7 +222,8 @@ class Freezer:
 
         bytecode = marshal.dumps(co)
         size = len(bytecode)
-        if is_package:
+        if path.name == '__init__.py':
+            # Python packages are signified by negative size.
             size = -size
         self.frozen_modules.append(
             FrozenModule(".".join(module_qualname), c_name, size, bytecode)
@@ -249,10 +231,21 @@ class Freezer:
 
 
 parser = argparse.ArgumentParser(description="Compile py source")
-parser.add_argument("path", type=str, help="Path to Lib/ in CPython source tree.")
+parser.add_argument("--stdlib_path", type=str, help="Path to Lib/ in CPython source tree.")
+parser.add_argument("--torch_path", type=str, help="Path to torch/ for PyTorch")
 parser.add_argument("--verbose", action="store_true", help="Print debug logs")
 
 args = parser.parse_args()
 Path("./frozen").mkdir(exist_ok=True)
 
-Freezer(Path(args.path), args.verbose).run()
+f = Freezer(args.verbose)
+
+stdlib_path = Path(args.stdlib_path)
+for child in stdlib_path.iterdir():
+    f.compile_path(child, child)
+
+torch_path = Path(args.torch_path)
+f.compile_path(torch_path, torch_path)
+
+f.write_bytecode()
+f.write_main()

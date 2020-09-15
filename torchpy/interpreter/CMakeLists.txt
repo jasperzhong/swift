@@ -4,6 +4,7 @@ SET(INTERPRETER_DIR "${TORCHPY_DIR}/interpreter" PARENT_SCOPE)
 # Define verbose lists of objects to be baked into interpreter
 SET(PYTHON_SOURCE_DIR "${INTERPRETER_DIR}/cpython")
 SET(PYTHON_MODULE_DIR "${PYTHON_SOURCE_DIR}/build/temp.linux-x86_64-3.8/${PYTHON_SOURCE_DIR}/Modules")
+SET(PYTORCH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../")
 include("CMakePythonModules.txt")
 SET(TORCH_PYTHON_DIR "${CMAKE_CURRENT_BINARY_DIR}/../../caffe2/torch/CMakeFiles/torch_python.dir")
 include("CMakeTorchPython.txt")
@@ -41,7 +42,7 @@ set(FROZEN_FILES
 add_custom_command(
    OUTPUT ${FROZEN_FILES}
    WORKING_DIRECTORY ${INTERPRETER_DIR}
-   COMMAND ${PYTHON_BIN} freeze_stdlib.py ${PYTHON_SOURCE_DIR}/Lib
+   COMMAND ${PYTHON_BIN} freeze_stdlib.py --stdlib_path=${PYTHON_SOURCE_DIR}/Lib --torch_path=${PYTORCH_ROOT}/torch --verbose
    DEPENDS ${PYTHON_BIN}
    VERBATIM
 )
@@ -51,7 +52,6 @@ add_custom_command(
 
 # Generate a header that lets interpreter init set up python sys path
 # to point to the cpython built above
-SET(PYTORCH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../")
 SET(PY_PATH_STRING "import sys; sys.path = ['', '${PYTORCH_ROOT}']")
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/python_path.h
@@ -79,6 +79,7 @@ target_include_directories(interpreter PRIVATE ${INTERPRETER_DIR})
 target_link_libraries(interpreter PRIVATE -L${PYTHON_LIB_DIR} libpython3.8.a)
 target_link_libraries(interpreter PRIVATE crypt crypto ssl pthread dl util m ffi lzma readline nsl ncursesw panelw) # for python builtins
 # target_link_libraries(interpreter PRIVATE -Wl,--static c10d)
+target_link_libraries(interpreter PRIVATE fmt::fmt-header-only)
 
 # handy to have a standalone app to verify linkage and usage of interpreter before embedding it in another lib
 set(INTERPRETER_TEST_SOURCES

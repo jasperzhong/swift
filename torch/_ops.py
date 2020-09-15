@@ -67,7 +67,9 @@ class _OpNamespace(types.ModuleType):
         return op
 
 class _Ops(types.ModuleType):
-    __file__ = os.path.join(os.path.dirname(__file__), '_ops.py')
+    # TODO(torchpy): we use `__file__` here, which is incompatible with libinterpreter's
+    # freezing scheme. Figure out a real alternative.
+    # __file__ = os.path.join(os.path.dirname(__file__), '_ops.py')
 
     def __init__(self):
         super(_Ops, self).__init__('torch.ops')

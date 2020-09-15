@@ -92,6 +92,8 @@ torch/include/
 torch/share/
 torch/test/
 torch/version.py
+torchpy/interpreter/frozen
+torchpy/interpreter/python_path.h
 # Root level file used in CI to specify certain env configs.
 # E.g., see .circleci/config.yaml
 env

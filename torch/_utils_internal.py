@@ -2,16 +2,21 @@
 import os
 import inspect
 import tempfile
+import sys
 
 # this arbitrary-looking assortment of functionality is provided here
 # to have a central place for overrideable behavior. The motivating
 # use is the FB build environment, where this source file is replaced
 # by an equivalent.
 
-if os.path.basename(os.path.dirname(__file__)) == 'shared':
-    torch_parent = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-else:
-    torch_parent = os.path.dirname(os.path.dirname(__file__))
+<<<<<<< HEAD
+# TODO(torchpy): we use `__file__` here, which is incompatible with libinterpreter's
+# freezing scheme. Figure out a real alternative.
+if not sys.executable == 'i_am_torchpy':
+    if os.path.basename(os.path.dirname(__file__)) == 'shared':
+        torch_parent = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    else:
+        torch_parent = os.path.dirname(os.path.dirname(__file__))
 
 
 def get_file_path(*path_components):
@@ -60,7 +65,7 @@ def get_source_lines_and_file(obj, error_msg=None):
 
 TEST_MASTER_ADDR = '127.0.0.1'
 TEST_MASTER_PORT = 29500
-# USE_GLOBAL_DEPS controls whether __init__.py tries to load 
+# USE_GLOBAL_DEPS controls whether __init__.py tries to load
 # libtorch_global_deps, see Note [Global dependencies]
 USE_GLOBAL_DEPS = True
 # USE_RTLD_GLOBAL_WITH_LIBTORCH controls whether __init__.py tries to load

@@ -1,6 +1,7 @@
 SET(TORCH_OBJS
     ${TORCH_PYTHON_DIR}/csrc/autograd/generated/python_functions.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/autograd/generated/python_fft_functions.cpp.o
+    ${TORCH_PYTHON_DIR}/csrc/autograd/generated/python_linalg_functions.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/autograd/generated/python_nn_functions.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/autograd/generated/python_variable_methods.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/autograd/generated/python_torch_functions.cpp.o
@@ -35,10 +36,12 @@ SET(TORCH_OBJS
     ${TORCH_PYTHON_DIR}/csrc/jit/passes/onnx/function_substitution.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/jit/passes/onnx/peephole.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/jit/passes/onnx/unpack_quantized_weights.cpp.o
-    ${TORCH_PYTHON_DIR}/csrc/jit/passes/onnx/prepare_inplace_ops_for_onnx.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/jit/passes/onnx/scalar_type_analysis.cpp.o
+    ${TORCH_PYTHON_DIR}/csrc/jit/passes/onnx/shape_type_inference.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/jit/passes/onnx/eval_peephole.cpp.o
+    ${TORCH_PYTHON_DIR}/csrc/jit/passes/onnx/remove_inplace_ops_for_onnx.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/jit/passes/onnx.cpp.o
+    ${TORCH_PYTHON_DIR}/csrc/jit/runtime/static/init.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/jit/frontend/concrete_module_type.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/multiprocessing/init.cpp.o
     ${TORCH_PYTHON_DIR}/csrc/onnx/init.cpp.o

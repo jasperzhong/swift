@@ -148,6 +148,7 @@ int extendFrozenModules(struct _frozen *newfrozen) {
 // a built-in module, and it will otherwise get skipped by the default importer.
 const char* finder = R"RAW(
 import sys
+sys.meta_path = sys.meta_path[:-1]
 class F:
     def find_spec(self, fullname, path, target=None):
         if fullname == 'torch._C':
@@ -203,10 +204,10 @@ __attribute__((constructor)) void init() {
   // https://docs.python.org/3/c-api/init_config.html#path-configuration
   config.site_import = 0;
   status = PyConfig_SetString(&config, &config.base_exec_prefix, L"");
-  status = PyConfig_SetString(&config, &config.base_executable, L"");
+  status = PyConfig_SetString(&config, &config.base_executable, L"i_am_torchpy");
   status = PyConfig_SetString(&config, &config.base_prefix, L"");
   status = PyConfig_SetString(&config, &config.exec_prefix, L"");
-  status = PyConfig_SetString(&config, &config.executable, L"");
+  status = PyConfig_SetString(&config, &config.executable, L"i_am_torchpy");
   status = PyConfig_SetString(&config, &config.prefix, L"");
   config.module_search_paths_set = 1;
   wchar_t* module_search_paths[0] = {};
@@ -217,8 +218,7 @@ __attribute__((constructor)) void init() {
   PyConfig_Clear(&config);
   TORCH_INTERNAL_ASSERT(!PyStatus_Exception(status))
 
-  // PyRun_SimpleString(sysprint);
-  PyRun_SimpleString(PY_PATH_STRING);
+  PyRun_SimpleString(sysprint);
   PyRun_SimpleString(finder);
   // Release the GIL that PyInitialize acquires
   PyEval_SaveThread();
