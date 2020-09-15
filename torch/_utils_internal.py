@@ -9,7 +9,6 @@ import sys
 # use is the FB build environment, where this source file is replaced
 # by an equivalent.
 
-<<<<<<< HEAD
 # TODO(torchpy): we use `__file__` here, which is incompatible with libinterpreter's
 # freezing scheme. Figure out a real alternative.
 if not sys.executable == 'i_am_torchpy':

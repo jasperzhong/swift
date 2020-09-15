@@ -5,16 +5,11 @@ SET(INTERPRETER_DIR "${TORCHPY_DIR}/interpreter" PARENT_SCOPE)
 SET(PYTHON_SOURCE_DIR "${INTERPRETER_DIR}/cpython")
 SET(PYTHON_MODULE_DIR "${PYTHON_SOURCE_DIR}/build/temp.linux-x86_64-3.8/${PYTHON_SOURCE_DIR}/Modules")
 SET(PYTORCH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../")
+
 include("CMakePythonModules.txt")
 SET(TORCH_PYTHON_DIR "${CMAKE_CURRENT_BINARY_DIR}/../../caffe2/torch/CMakeFiles/torch_python.dir")
-include("CMakeTorchPython.txt")
-SET_SOURCE_FILES_PROPERTIES(
-  ${TORCH_OBJS}
-  # ${CMAKE_CURRENT_BINARY_DIR}/../../c10/CMakeFiles/c10.dir/core/TensorImpl.cpp.o
-  PROPERTIES
-  EXTERNAL_OBJECT true
-  GENERATED true
-)
+
+add_library(torch_python_static STATIC $<TARGET_OBJECTS:torch_python_obj>)
 
 # Build cpython
 SET(PYTHON_LIB_DIR "${PYTHON_SOURCE_DIR}/lib")
@@ -66,7 +61,6 @@ set(INTERPRETER_LIB_SOURCES
   ${INTERPRETER_DIR}/interpreter.cpp
   ${FROZEN_FILES}
   ${PYTHON_MODULES}
-  ${TORCH_OBJS}
   # ${CMAKE_CURRENT_BINARY_DIR}/../../c10/CMakeFiles/c10.dir/core/TensorImpl.cpp.o
 )
 add_library(interpreter
@@ -80,6 +74,7 @@ target_link_libraries(interpreter PRIVATE -L${PYTHON_LIB_DIR} libpython3.8.a)
 target_link_libraries(interpreter PRIVATE crypt crypto ssl pthread dl util m ffi lzma readline nsl ncursesw panelw) # for python builtins
 # target_link_libraries(interpreter PRIVATE -Wl,--static c10d)
 target_link_libraries(interpreter PRIVATE fmt::fmt-header-only)
+target_link_libraries(interpreter PRIVATE torch_python_static)
 
 # handy to have a standalone app to verify linkage and usage of interpreter before embedding it in another lib
 set(INTERPRETER_TEST_SOURCES
