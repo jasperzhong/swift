@@ -6,7 +6,7 @@ import torch
 from .node import Argument
 from .graph import Graph
 from .graph_module import GraphModule
-from .proxy import Proxy, _create_proxy, TracerBase
+from .proxy import Proxy, TracerBase
 
 HAS_VARSTUFF = inspect.CO_VARARGS | inspect.CO_VARKEYWORDS
 
@@ -46,6 +46,24 @@ def _patch_function(fn: FunctionType, nargs: int) -> FunctionType:
 class Tracer(TracerBase):
     def __init__(self):
         super().__init__()
+
+    def call_module(self, m : torch.nn.Module, target : str, args, kwargs):
+        """
+        Method to override behavior when calling a module. By default, this
+        method checks `self.is_leaf_module()`. If `m` is not a leaf module,
+        trace through the original call using the `orig_call` method, preserved
+        from nn.Module.__call__. If it is a leaf module, emit a `call_module`
+        node.
+
+        You can override this method to get more sophisticated behavior.
+        For example, you might trace an entirely new GraphModule for the
+        submodule call, then emit a `call_module` node. This can be a way to
+        preserve the original module hierarchy.
+        """
+        if not self.is_leaf_module(m):
+            return m(*args, **kwargs)
+        else:
+            return torch.fx.proxy._create_proxy(self, 'call_module', target, args, kwargs)
 
     def create_arg(self, a: Any) -> Argument:
         # The base tracer is used to construct Graphs when there is no associated
@@ -135,11 +153,25 @@ class Tracer(TracerBase):
         orig_call = torch.nn.Module.__call__
 
         def module_call_wrapper(mod, *args, **kwargs):
-            if not self.is_leaf_module(mod):
-                return orig_call(mod, *args, **kwargs)
-            else:
-                target = _find_module(root, mod)
-                return _create_proxy(self, 'call_module', target, args, kwargs)
+            target = _find_module(root, mod)
+
+            # Snoop up to the next `module_call_wrapper` instance in the callstack, if it exists.
+            # If that call wrapper is processing this module, and the local flag `disable_intercept`
+            # is set to True, we have already dispatched this Module invocation through `call_module`.
+            # If this is the case, `call_module` wants to invoke the module directly and not recurse
+            # through module_call_wrapper again.
+            stack = inspect.stack()
+            for frame in stack[1:]:
+                if frame.function == 'module_call_wrapper':
+                    if 'mod' in frame.frame.f_locals and frame.frame.f_locals['mod'] is mod and\
+                            frame.frame.f_locals.get('disable_intercept', False):
+                        return orig_call(mod, *args, **kwargs)
+                    else:
+                        break
+
+            disable_intercept = True
+            return self.call_module(mod, target, args, kwargs)
+
         try:
             torch.nn.Module.__call__ = module_call_wrapper
             self.graph.output(self.create_arg(fn(*args)))
