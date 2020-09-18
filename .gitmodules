@@ -133,5 +133,9 @@
 [submodule "torchpy/interpreter/cpython"]
 	path = torchpy/interpreter/cpython
 	url = https://github.com/python/cpython.git
-	branch = 3.7
+	branch = 3.8
     ignore = dirty
+[submodule "torchpy/interpreter/third_party/typing"]
+	path = torchpy/interpreter/third_party/typing
+	url = https://github.com/python/typing.git
+  branch = 3.7.4.3

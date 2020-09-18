@@ -1,5 +1,5 @@
 """
-Freeze the Python standard library.
+Freeze Python packages.
 
 Freezing makes it possible to ship arbitrary Python modules as part of a C++
 library. The Python source of the module is compiled to bytecode and written
@@ -231,8 +231,7 @@ class Freezer:
 
 
 parser = argparse.ArgumentParser(description="Compile py source")
-parser.add_argument("--stdlib_path", type=str, help="Path to Lib/ in CPython source tree.")
-parser.add_argument("--torch_path", type=str, help="Path to torch/ for PyTorch")
+parser.add_argument("paths", nargs="*", help="Paths to freeze.")
 parser.add_argument("--verbose", action="store_true", help="Print debug logs")
 
 args = parser.parse_args()
@@ -240,12 +239,9 @@ Path("./frozen").mkdir(exist_ok=True)
 
 f = Freezer(args.verbose)
 
-stdlib_path = Path(args.stdlib_path)
-for child in stdlib_path.iterdir():
-    f.compile_path(child, child)
-
-torch_path = Path(args.torch_path)
-f.compile_path(torch_path, torch_path)
+for p in args.paths:
+    path = Path(p)
+    f.compile_path(path, path)
 
 f.write_bytecode()
 f.write_main()

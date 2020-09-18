@@ -24,7 +24,7 @@ add_custom_command(
    VERBATIM
 )
 
-# Freeze the Python standard library modules
+# Freeze the Python source code so we can bundle it with libinterpreter.
 set(FROZEN_FILES
   ${INTERPRETER_DIR}/frozen/main.c
   ${INTERPRETER_DIR}/frozen/bytecode_0.c
@@ -34,21 +34,24 @@ set(FROZEN_FILES
   ${INTERPRETER_DIR}/frozen/bytecode_4.c
 )
 
+# Python standard library
+file(GLOB PACKAGES_TO_FREEZE ${PYTHON_SOURCE_DIR}/Lib/*)
+# torch
+list(APPEND PACKAGES_TO_FREEZE ${PYTORCH_ROOT}/torch)
+# typing_extensions (needed by torch)
+list(APPEND PACKAGES_TO_FREEZE ${INTERPRETER_DIR}/third_party/typing/typing_extensions/src_py3/typing_extensions.py)
+
 add_custom_command(
    OUTPUT ${FROZEN_FILES}
    WORKING_DIRECTORY ${INTERPRETER_DIR}
-   COMMAND ${PYTHON_BIN} freeze_stdlib.py --stdlib_path=${PYTHON_SOURCE_DIR}/Lib --torch_path=${PYTORCH_ROOT}/torch --verbose
+   COMMAND ${PYTHON_BIN} freeze.py ${PACKAGES_TO_FREEZE} --verbose
    DEPENDS ${PYTHON_BIN}
    VERBATIM
 )
 
-# TODO install pip packages needed by torch in this python
-# typing_extensions
-
 # Build the interpreter lib, designed to be standalone and dlopened
 # We bake the python and torch_python binding objs into libinterpreter
 set(INTERPRETER_LIB_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/python_path.h
   ${INTERPRETER_DIR}/interpreter.cpp
   ${FROZEN_FILES}
   ${PYTHON_MODULES}

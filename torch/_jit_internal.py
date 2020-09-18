@@ -21,11 +21,10 @@ from torch._utils_internal import get_source_lines_and_file
 from torch.futures import Future
 from typing import Tuple, List, Dict, Optional, Union, Any, TypeVar, Generic, Callable  # noqa: F401
 
-# TODO fix this
-# if sys.version_info[:2] > (3, 7):
-#     from typing import Final
-# else:
-#     from typing_extensions import Final
+if sys.version_info[:2] > (3, 7):
+    from typing import Final
+else:
+    from typing_extensions import Final
 
 # Wrapper functions that can call either of 2 functions depending on a boolean
 # argument
@@ -724,10 +723,8 @@ if torch.distributed.rpc.is_available():
         return getattr(ann, "__origin__", None) is RRef
 
 def is_final(ann):
-    # TODO fixme
-    return ann.__module__ == 'typing_extensions'
-    # return ann.__module__ in {'typing', 'typing_extensions'} and \
-    #     (getattr(ann, '__origin__', None) is Final)
+    return ann.__module__ in {'typing', 'typing_extensions'} and \
+        (getattr(ann, '__origin__', None) is Final)
 
 # allows BroadcastingList instance to be subscriptable
 class BroadcastingListCls(object):
