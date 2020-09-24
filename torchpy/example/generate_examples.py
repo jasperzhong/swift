@@ -5,7 +5,7 @@ from pathlib import Path
 import torch
 import torchvision
 
-from torch.hermetic import HermeticExporter
+from torch.package import PackageExporter
 
 
 def traced_resnet():
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     sm.save(str(p / "simple.pt"))
 
     resnet = torchvision.models.resnet18()
-    with HermeticExporter(str(p / "resnet.zip")) as e:
+    with PackageExporter(str(p / "resnet.zip")) as e:
         # put the pickled resnet in the package, by default
         # this will also save all the code files references by
         # the objects in the pickle

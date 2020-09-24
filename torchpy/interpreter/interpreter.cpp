@@ -271,9 +271,9 @@ static size_t load_model(const char* filename, bool hermetic) {
 
   if (hermetic) {
     code = fmt::format(R"(
-from torch.hermetic import HermeticImporter
+from torch.package import PackageImporter
 
-i = HermeticImporter('{}')
+i = PackageImporter('{}')
 model = i.load_pickle('model', 'model.pkl')
 )", filename);
   } else {
