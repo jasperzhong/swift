@@ -35,6 +35,7 @@ if is_available():
         _server_process_global_profile,
     )
     import torch.distributed.autograd as dist_autograd
+    from torch._rref import RRef, is_rref
 
     import numbers
 
