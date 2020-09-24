@@ -1937,6 +1937,20 @@ std::vector<Value*> unpackOutputs(const std::vector<Value*>& outputs) {
   return new_outputs;
 }
 
+value_list sortReverseTopological(ArrayRef<Value*> inputs, Block* b) {
+  value_list result;
+  for (auto i : inputs) {
+    if (i->node()->owningBlock() == b) {
+      result.push_back(i);
+    }
+  }
+  // Sort in reverse topological order
+  std::sort(result.begin(), result.end(), [&](Value* a, Value* b) {
+    return a->node()->isAfter(b->node());
+  });
+  return result;
+}
+
 std::vector<Value*> insertGraph(
     Graph& g,
     Graph& callee,
