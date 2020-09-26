@@ -407,6 +407,7 @@ void broadcast(
 
   AutoNcclGroup nccl_group_guard;
   at::cuda::OptionalCUDAGuard device_guard;
+  ncclGroupStart();
   for (size_t i = 0, num_tensors = tensors.size(); i < num_tensors; i++) {
     int device = tensors[i].get_device();
     device_guard.set_index(device);
@@ -427,6 +428,7 @@ void broadcast(
     NCCL_CHECK(from_nccl_result(ncclBcast(
         tensors[i].data_ptr(), numel, data_type, 0, *(to_nccl_comm(&comm)), stream)));
   }
+  ncclGroupEnd();
 #else
   AT_ERROR("PyTorch built without NCCL support");
 #endif
