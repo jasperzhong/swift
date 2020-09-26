@@ -24,11 +24,13 @@ struct AutoNcclGroup {
     (c10::cuda::CUDACachingAllocator::getFreeMutex())->lock();
 #if defined(NCCL_MAJOR) && (NCCL_MAJOR >= 2)
     C10D_NCCL_CHECK(ncclGroupStart());
+    std::cout << "AutoNcclGroup start" << std::endl;
 #endif
   }
   ~AutoNcclGroup() noexcept(false) {
 #if defined(NCCL_MAJOR) && (NCCL_MAJOR >= 2)
     C10D_NCCL_CHECK(ncclGroupEnd());
+    std::cout << "AutoNcclGroup end" << std::endl;
 #endif
     (c10::cuda::CUDACachingAllocator::getFreeMutex())->unlock();
   }
@@ -173,6 +175,7 @@ ncclResult_t ncclAlltoall(
     ncclDataType_t type,
     ncclComm_t comm,
     cudaStream_t stream) {
+  std::cout << "ncclAlltoall?" << std::endl;
   int numranks;
   size_t rankdiff = count * size;
   C10D_NCCL_CHECK(ncclCommCount(comm, &numranks));
@@ -1027,6 +1030,7 @@ std::shared_ptr<ProcessGroup::Work> ProcessGroupNCCL::collective(
     for (size_t i = 0; i < inputs.size(); ++i) {
       gpuGuard.set_index(devices[i].index());
       at::cuda::CUDAStream& ncclStream = ncclStreams_[key][i];
+      std::cout << "schedule input" << i << std::endl;
       C10D_NCCL_CHECK(
           fn(inputs[i], outputs[i], ncclComms[i]->getNcclComm(), ncclStream));
     }
