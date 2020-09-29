@@ -53,7 +53,7 @@ from torch.testing._internal.distributed.rpc.rpc_test import (
 # the agent, which then gets mixed-in with each test suite and each mp method.
 
 
-class RpcMultiProcessTestCase(MultiProcessTestCase):
+class RpcMultiProcessTestCase(MultiProcessTestCase, RpcAgentTestFixture):
     def setUp(self):
         super().setUp()
         self.output_dir = tempfile.TemporaryDirectory()
@@ -71,6 +71,10 @@ class RpcMultiProcessTestCase(MultiProcessTestCase):
         ) as f:
             os.dup2(f.fileno(), 2)
         sys.stderr = os.fdopen(2, "wt")
+
+    def subprocess_env_vars(self):
+        env_vars = self.get_env_vars()
+        return env_vars
 
     def on_test_failure(self):
         for rank in range(self.world_size):
