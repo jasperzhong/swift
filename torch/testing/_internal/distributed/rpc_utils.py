@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+import os
+import shutil
+import sys
+import tempfile
 import unittest
 from enum import Flag, auto
 from typing import Dict, List, Type
@@ -49,8 +53,47 @@ from torch.testing._internal.distributed.rpc.rpc_test import (
 # the agent, which then gets mixed-in with each test suite and each mp method.
 
 
+class RpcMultiProcessTestCase(MultiProcessTestCase):
+    def setUp(self):
+        super().setUp()
+        self.output_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.output_dir.cleanup)
+        self.subprocess_init_data["output_dir"] = self.output_dir.name
+
+    def subprocess_init(self, data):
+        with open(
+            os.path.join(data["output_dir"], f"rank_{self.rank}_stdout"), "wt"
+        ) as f:
+            os.dup2(f.fileno(), 1)
+        sys.stdout = os.fdopen(1, "wt")
+        with open(
+            os.path.join(data["output_dir"], f"rank_{self.rank}_stderr"), "wt"
+        ) as f:
+            os.dup2(f.fileno(), 2)
+        sys.stderr = os.fdopen(2, "wt")
+
+    def on_test_failure(self):
+        for rank in range(self.world_size):
+            try:
+                with open(
+                    os.path.join(self.output_dir.name, f"rank_{rank}_stdout"), "rt"
+                ) as f:
+                    print(f"Process {rank} stdout:")
+                    print(f.read())
+            except Exception as err:
+                print(f"Process {rank} didn't produce stdout ({err})")
+            try:
+                with open(
+                    os.path.join(self.output_dir.name, f"rank_{rank}_stderr"), "rt"
+                ) as f:
+                    print(f"Process {rank} stderr:")
+                    print(f.read())
+            except Exception as err:
+                print(f"Process {rank} didn't produce stderr ({err})")
+
+
 @unittest.skipIf(TEST_WITH_TSAN, "TSAN and fork() is broken")
-class ForkHelper(MultiProcessTestCase):
+class ForkHelper(RpcMultiProcessTestCase):
     def setUp(self):
         super().setUp()
         self._fork_processes()
@@ -59,7 +102,7 @@ class ForkHelper(MultiProcessTestCase):
 @unittest.skipIf(
     TEST_WITH_ASAN, "Skip ASAN as torch + multiprocessing spawn have known issues"
 )
-class SpawnHelper(MultiProcessTestCase):
+class SpawnHelper(RpcMultiProcessTestCase):
     def setUp(self):
         super().setUp()
         self._spawn_processes()
