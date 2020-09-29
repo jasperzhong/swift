@@ -357,6 +357,9 @@ class MultiProcessTestCase(TestCase):
     def on_test_failure(self):
         pass
 
+    def on_test_timeout(self):
+        pass
+
     def _join_processes(self, fn):
         timeout = get_timeout(self.id())
         start_time = time.time()
@@ -387,6 +390,7 @@ class MultiProcessTestCase(TestCase):
                             timeout
                         )
                     )
+                    self.on_test_timeout()
                     for p in self.processes:
                         p.terminate()
                     break
