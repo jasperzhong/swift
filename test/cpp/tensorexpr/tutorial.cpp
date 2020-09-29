@@ -115,11 +115,21 @@ int main(int argc, char* argv[]) {
     std::cout << "Tensor computation: " << *Z << std::endl;
     // Prints: Tensor computation: Tensor Z(i[64], j[32]) = i / j
 
+    BufHandle ttt("A", {64, 32}, kFloat);
+    Placeholder a_buf(ttt);
     // TODO: Show how reductions are represented and constructed
+    Tensor* R = Compute(
+        "Z",
+        {{64, "i"}, {32, "j"}},
+        [&](const VarHandle& i, const VarHandle& j) {
+          return Z->call(i, j) * Load::make(ttt, {i, j}, 1);
+        });
+    std::cout << "Tensor computation: " << *R << std::endl;
   }
-  // TODO: Show how TorchScript IR is translated to TE
   // TODO: Describe statements
-  // TODO: Describe codegen
   // TODO: Describe Loop Nests and loop transformations
+  // TODO: Describe codegen
+  //
+  // TODO: Show how TorchScript IR is translated to TE
   return 0;
 }
