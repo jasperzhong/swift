@@ -16,6 +16,10 @@
 #include <type_traits>
 #include <unordered_map>
 
+#include <unistd.h>
+#include <sys/syscall.h>
+#define gettid() syscall(SYS_gettid)
+
 
 ncclComm_t* to_nccl_comm(torch::cuda::nccl::ncclComm_t* var) {
   return reinterpret_cast<ncclComm_t*>(var);
@@ -99,6 +103,31 @@ ncclRedOp_t to_nccl_red_op(int var) {
   return (ncclRedOp_t)(var);
 }
 
+#define NCCL_GROUP_START()                               \
+  do {                                                   \
+    NCCL_CHECK(from_nccl_result(ncclGroupStart()));      \
+      fprintf(                                           \
+          stdout,                                        \
+          "[%d:%ld] NCCL group start in: %s:%d\n",        \
+          getpid(),                                      \
+          gettid(),                                      \
+          __FILE__,                                      \
+          __LINE__);                                     \
+  } while (0)
+
+
+#define NCCL_GROUP_END()                                 \
+  do {                                                   \
+    NCCL_CHECK(from_nccl_result(ncclGroupEnd()));        \
+      fprintf(                                           \
+          stdout,                                        \
+          "[%d:%ld] NCCL group end in: %s:%d\n",          \
+          getpid(),                                      \
+          gettid(),                                      \
+          __FILE__,                                      \
+          __LINE__);                                     \
+  } while (0)
+
 namespace torch {
 namespace cuda {
 namespace nccl {
@@ -111,12 +140,12 @@ struct AutoNcclGroup {
   AutoNcclGroup() {
     (c10::cuda::CUDACachingAllocator::getFreeMutex())->lock();
 #if defined(NCCL_MAJOR) && (NCCL_MAJOR >= 2)
-    NCCL_CHECK(from_nccl_result(ncclGroupStart()));
+    NCCL_GROUP_START();
 #endif
   }
   ~AutoNcclGroup() {
 #if defined(NCCL_MAJOR) && (NCCL_MAJOR >= 2)
-    NCCL_CHECK(from_nccl_result(ncclGroupEnd()));
+    NCCL_GROUP_END();
 #endif
     (c10::cuda::CUDACachingAllocator::getFreeMutex())->unlock();
   }
@@ -420,6 +449,7 @@ void broadcast(
         count_max,
         ")");
     ncclComm_t comm = comms[i];
+    std::cout << "[" << getpid() << ":"<< gettid() << "]issue input: " << i << "num_tensors:" << num_tensors <<  std::endl;
     NCCL_CHECK(from_nccl_result(ncclBcast(
         tensors[i].data_ptr(), numel, data_type, 0, *(to_nccl_comm(&comm)), stream)));
   }
