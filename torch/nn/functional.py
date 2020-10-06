@@ -1170,6 +1170,34 @@ def glu(input: Tensor, dim: int = -1) -> Tensor:
     return torch._C._nn.glu(input, dim)
 
 
+def hardglu(input, dim: int = -1):
+    r"""hardglu(input, dim=-1) -> Tensor
+
+    The piece-wise linear implementation of the gated linear unit. Computes:
+
+    .. math::
+        \text{HardGLU}(x) = \begin{cases}
+            0 & \text{if~} b \le -3, \\
+            a & \text{if~} b \ge +3, \\
+            a * b / 6 + 1 / 2 & \text{otherwise}
+        \end{cases}
+
+    where `input` is split in half along `dim` to form `a` and `b`.
+
+    Args:
+        input (Tensor): input tensor
+        dim (int): dimension on which to split the input. Default: -1
+
+    See :class:`~torch.nn.functional.glu` for more details.
+    """
+    if not torch.jit.is_scripting():
+        if type(input) is not Tensor and has_torch_function((input,)):
+            return handle_torch_function(hardglu, (input,), input, dim=dim)
+    if input.dim() == 0:
+        raise RuntimeError("hardglu does not support scalars because halving size must be even")
+    return torch._C._nn.hardglu(input, dim)
+
+
 def hardtanh(input: Tensor, min_val: float = -1., max_val: float = 1., inplace: bool = False) -> Tensor:
     r"""
     hardtanh(input, min_val=-1., max_val=1., inplace=False) -> Tensor
