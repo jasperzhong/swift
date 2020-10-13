@@ -44,19 +44,11 @@ def iter_tensors(x: Union[torch.Tensor, Iterable[torch.Tensor]], only_requiring_
             for result in iter_tensors(elem, only_requiring_grad):
                 yield result
 
-<<<<<<< HEAD
 def get_numerical_jacobian(fn, input, target=None, eps=1e-3, grad_out=1.0):
     """
     input: input to `fn`
     target: the Tensors wrt whom Jacobians are calculated (default=`input`)
     grad_out: grad output value used to calculate gradients.
-=======
-def get_numerical_jacobian(fn, input, target=None, eps=1e-3, v=1.0):
-    """
-    input: input to `fn`
-    target: the Tensors wrt whom Jacobians are calculated (default=`input`)
-    v: grad output value used to calculate gradients in case of complex functions.
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
 
     Note that `target` may not even be part of `input` to `fn`, so please be
     **very careful** in this to not clone `target`.
@@ -74,16 +66,12 @@ def get_numerical_jacobian(fn, input, target=None, eps=1e-3, v=1.0):
 
     def update_jacobians(x, idx, d, d_idx, is_mkldnn=False):
 
-<<<<<<< HEAD
         # compute_jacobian only works for pure real
         # or pure imaginary delta
         def compute_gradient(delta):
             # we currently assume that the norm of delta equals eps
             assert(delta == eps or delta == (eps * 1j))
 
-=======
-        def compute_gradient(delta):
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
             def fn_out():
                 if not is_mkldnn:
                     # x is a view into input and so this works
@@ -101,23 +89,17 @@ def get_numerical_jacobian(fn, input, target=None, eps=1e-3, v=1.0):
             r = (outb - outa) / (2 * eps)
             return r.detach().reshape(-1)
 
-<<<<<<< HEAD
         # for details on the algorithm used here, refer:
         # Section 3.5.3 https://arxiv.org/pdf/1701.00392.pdf
         # s = fn(z) where z = x for real valued input
         # and z = x + yj for complex valued input
         ds_dx = compute_gradient(eps)
         if x.is_complex():  # C -> C, C -> R
-=======
-        ds_dx = compute_gradient(eps)
-        if x.is_complex():
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
             ds_dy = compute_gradient(eps * 1j)
             # conjugate wirtinger derivative
             conj_w_d = 0.5 * (ds_dx + ds_dy * 1j)
             # wirtinger derivative
             w_d = 0.5 * (ds_dx - ds_dy * 1j)
-<<<<<<< HEAD
             d[d_idx] = grad_out.conjugate() * conj_w_d + grad_out * w_d.conj()
         elif ds_dx.is_complex():  # R -> C
             # w_d = conj_w_d = 0.5 * ds_dx
@@ -128,20 +110,6 @@ def get_numerical_jacobian(fn, input, target=None, eps=1e-3, v=1.0):
             d[d_idx] = torch.real(grad_out.conjugate() * ds_dx)
         else:   # R -> R
             d[d_idx] = ds_dx * grad_out
-=======
-            d[d_idx] = v.conjugate() * conj_w_d + v * w_d.conj()
-        elif ds_dx.is_complex():  # R -> C
-            # w_d = conj_w_d = 0.5 * ds_dx
-            dL_dz_conj = 0.5 * (v.conjugate() * ds_dx + v * ds_dx.conj())
-            # The above formula is derived for a C -> C function that's a part of
-            # bigger function with real valued output. From separate calculations,
-            # it can be verified that the gradient for R -> C function
-            # equals to real value of the result obtained from the generic formula for
-            # C -> C functions used above.
-            d[d_idx] = torch.real(dL_dz_conj)
-        else:
-            d[d_idx] = ds_dx * v
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
 
     # TODO: compare structure
     for x_tensor, d_tensor in zip(x_tensors, j_tensors):
@@ -170,11 +138,7 @@ def get_numerical_jacobian(fn, input, target=None, eps=1e-3, v=1.0):
                     indices = x_indices[i].tolist() + list(x_idx)
                     d_idx = sum(indices[k] * x_stride[k] for k in range(len(x_size)))
                     update_jacobians(x_value, x_idx, d_tensor, d_idx)
-<<<<<<< HEAD
         elif x_tensor.layout == torch._mkldnn:  # type: ignore
-=======
-        elif x_tensor.layout == torch._mkldnn:
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
             # Use .data here to get around the version check
             x_tensor = x_tensor.data
             if len(input) != 1:
@@ -214,11 +178,7 @@ def get_analytical_jacobian(input, output, nondet_tol=0.0, grad_out=1.0):
 
     for i in range(flat_grad_output.numel()):
         flat_grad_output.zero_()
-<<<<<<< HEAD
         flat_grad_output[i] = grad_out
-=======
-        flat_grad_output[i] = v
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
         for jacobian_c in (jacobian, jacobian_reentrant):
             grads_input = torch.autograd.grad(output, diff_input_list, grad_output,
                                               retain_graph=True, allow_unused=True)
@@ -282,19 +242,12 @@ def gradcheck(
 
     The check between numerical and analytical gradients uses :func:`~torch.allclose`.
 
-<<<<<<< HEAD
     For complex functions, no notion of Jacobian exists. Gradcheck verifies if the numerical and
     analytical values of Wirtinger and Conjugate Wirtinger derivative are consistent. The gradient
     computation is done under the assumption that the overall function has a real valued output.
     For functions with complex output, gradcheck compares the numerical and analytical gradients
     for two values of :attr:`grad_output`: 1 and 1j. For more details, check out
     :ref:`complex_autograd-doc`.
-=======
-    For complex functions, no notion of Jacobian exists, and the gradients computation is done under
-    the assumption that the overall function has a real valued output. For more details, check out
-    :ref:`complex_autograd-doc`. For functions with complex output, gradcheck compares the numerical and
-    analytical gradients for two values of :attr:`grad_output`: 1 and 1j.
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
 
     .. note::
         The default values are designed for :attr:`input` of double precision.
@@ -393,38 +346,22 @@ def gradcheck(
         out_is_complex = o.is_complex()
 
         if out_is_complex:
-<<<<<<< HEAD
             # analytical vjp with grad_out = 1.0j
             analytical_with_imag_grad_out, reentrant_with_imag_grad_out, \
                 correct_grad_sizes_with_imag_grad_out, correct_grad_types_with_imag_grad_out \
                 = get_analytical_jacobian(tupled_inputs, o, nondet_tol=nondet_tol, grad_out=1j)
             numerical_with_imag_grad_out = get_numerical_jacobian(fn, tupled_inputs, eps=eps, grad_out=1j)
-=======
-            # analytical vjp with v = 1.0j
-            analytical_with_imag_v, reentrant_with_imag_v, \
-                correct_grad_sizes_with_imag_v, correct_grad_types_with_imag_v \
-                = get_analytical_jacobian(tupled_inputs, o, nondet_tol=nondet_tol, v=1j)
-            numerical_with_imag_v = get_numerical_jacobian(fn, tupled_inputs, eps=eps, v=1j)
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
 
         if not correct_grad_types and check_grad_dtypes:
             return fail_test('Gradient has dtype mismatch')
 
-<<<<<<< HEAD
         if out_is_complex and not correct_grad_types_with_imag_grad_out and check_grad_dtypes:
-=======
-        if out_is_complex and not correct_grad_types_with_imag_v and check_grad_dtypes:
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
             return fail_test('Gradient (calculated using complex valued grad output) has dtype mismatch')
 
         if not correct_grad_sizes:
             return fail_test('Analytical gradient has incorrect size')
 
-<<<<<<< HEAD
         if out_is_complex and not correct_grad_sizes_with_imag_grad_out:
-=======
-        if out_is_complex and not correct_grad_sizes_with_imag_v:
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
             return fail_test('Analytical gradient (calculated using complex valued grad output) has incorrect size')
 
         def checkIfNumericalAnalyticAreClose(a, n, j, error_str=''):
@@ -438,15 +375,9 @@ def gradcheck(
             if a.numel() != 0 or n.numel() != 0:
                 if o.is_complex():
                     # C -> C, R -> C
-<<<<<<< HEAD
                     a_with_imag_grad_out = analytical_with_imag_grad_out[j]
                     n_with_imag_grad_out = numerical_with_imag_grad_out[j]
                     checkIfNumericalAnalyticAreClose(a_with_imag_grad_out, n_with_imag_grad_out, j,
-=======
-                    a_with_imag_v = analytical_with_imag_v[j]
-                    n_with_imag_v = numerical_with_imag_v[j]
-                    checkIfNumericalAnalyticAreClose(a_with_imag_v, n_with_imag_v, j,
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
                                                      "Gradients failed to compare equal for grad output = 1j. ")
                 if inp.is_complex():
                     # C -> R, C -> C
@@ -467,11 +398,7 @@ def gradcheck(
         if not reentrant:
             return not_reentrant_error()
 
-<<<<<<< HEAD
         if out_is_complex and not reentrant_with_imag_grad_out:
-=======
-        if out_is_complex and not reentrant_with_imag_v:
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
             return not_reentrant_error(' (calculated using complex valued grad output)')
 
     # check if the backward multiplies by grad_output
