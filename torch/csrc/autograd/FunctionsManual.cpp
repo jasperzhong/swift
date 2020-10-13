@@ -255,7 +255,7 @@ Tensor mul_tensor_backward(Tensor grad, Tensor other, ScalarType self_st) {
 
 Tensor div_tensor_self_backward(Tensor grad, Tensor other, ScalarType self_st) {
   auto result = grad / other.conj();
-  return correct_dtype_gradients(self_st, out);
+  return correct_dtype_gradients(self_st, result);
 }
 
 Tensor div_tensor_other_backward(Tensor grad, Tensor self, Tensor other) {
