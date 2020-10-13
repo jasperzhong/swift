@@ -87,7 +87,7 @@ static Tensor wrapped_scalar_tensor(Scalar scalar) {
   return tensor;
 }
 
-Tensor correct_dtype_gradients(Tensor self, Tensor gradient_result) {
+Tensor handle_r_to_c(Tensor self, Tensor gradient_result) {
   if (!self.is_complex() && gradient_result.is_complex()) {
     // R -> C
     return at::real(gradient_result);
@@ -95,7 +95,7 @@ Tensor correct_dtype_gradients(Tensor self, Tensor gradient_result) {
   return gradient_result;
 }
 
-Tensor correct_dtype_gradients(ScalarType self_st, Tensor gradient_result) {
+Tensor handle_r_to_c(ScalarType self_st, Tensor gradient_result) {
   if (!at::isComplexType(self_st) && gradient_result.is_complex()) {
     // R -> C
     return at::real(gradient_result);
@@ -190,13 +190,13 @@ Tensor pow_backward(Tensor grad, const Tensor & self, const Scalar & exponent_) 
     return at::zeros_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   } else {
     auto out = grad * (exponent * self.pow(exponent - 1)).conj();
-    return correct_dtype_gradients(self, out);
+    return handle_r_to_c(self, out);
   }
 }
 
 Tensor pow_backward_self(Tensor grad, const Tensor & self, const Tensor & exponent) {
   auto out = at::where(exponent == 0.0, at::zeros({}, grad.options()), grad * (exponent * self.pow(exponent - 1)).conj());
-  return correct_dtype_gradients(self, out);
+  return handle_r_to_c(self, out);
 }
 
 // Caveats:
@@ -208,17 +208,18 @@ Tensor pow_backward_self(Tensor grad, const Tensor & self, const Tensor & expone
 // d(a^b)/db = 0 for a > 0 and b -> +0.
 // Currently, tensorflow agrees with us.
 Tensor pow_backward_exponent(Tensor grad, const Tensor& self, const Tensor& exponent, Tensor result) {
-  auto cond = [](auto exp) {
+  auto cond = [](auto self, auto exp) {
       if (exp.is_complex()) {
-        return at::logical_and(at::imag(exp) == 0, at::real(exp) >= 0);
+        auto is_real_exp = at::logical_and(at::imag(exp) == 0, at::real(exp) >= 0);
+        return at::logical_and(self == 0, is_real_exp);
       } else {
-        return exp >=0;
+        return at::logical_and(self == 0, exp >= 0);
       }
     };
-  auto out = grad * at::where(cond(exponent),
+  auto out = grad * at::where(cond(self, exponent),
                           at::zeros({}, grad.options()),
                           (result * self.log()).conj());
-  return correct_dtype_gradients(exponent, out);
+  return handle_r_to_c(exponent, out);
 }
 
 Tensor pow_backward_exponent(Tensor grad, const Scalar & base, const Tensor& exponent, Tensor result) {
@@ -235,11 +236,19 @@ Tensor pow_backward_exponent(Tensor grad, const Scalar & base, const Tensor& exp
     auto out = grad * at::where(cond(exponent),
                             at::zeros({}, grad.options()),
                             grad_lambda(result, base_));
-    return correct_dtype_gradients(exponent, out);
+    return handle_r_to_c(exponent, out);
   } else {
-    auto out = grad_lambda(result, base_);
-    return correct_dtype_gradients(exponent, out);
+    auto out = grad * grad_lambda(result, base_);
+    return handle_r_to_c(exponent, out);
   }
+}
+
+Tensor angle_backward(Tensor grad, const Tensor& self) {
+  auto out = grad * self / self.abs().pow(2);
+  if (self.is_complex()) {
+    return out * Scalar(c10::complex<double>{0.0, 1.0});
+  }
+  return out;
 }
 
 Tensor mvlgamma_backward(Tensor grad, const Tensor & self, int64_t p) {
@@ -250,17 +259,17 @@ Tensor mvlgamma_backward(Tensor grad, const Tensor & self, int64_t p) {
 
 Tensor mul_tensor_backward(Tensor grad, Tensor other, ScalarType self_st) {
   auto out = grad * other.conj();
-  return correct_dtype_gradients(self_st, out);
+  return handle_r_to_c(self_st, out);
 }
 
 Tensor div_tensor_self_backward(Tensor grad, Tensor other, ScalarType self_st) {
   auto result = grad / other.conj();
-  return correct_dtype_gradients(self_st, result);
+  return handle_r_to_c(self_st, result);
 }
 
 Tensor div_tensor_other_backward(Tensor grad, Tensor self, Tensor other) {
   auto result = -grad * ((self / other) / other).conj();
-  return correct_dtype_gradients(other, result);
+  return handle_r_to_c(other, result);
 }
 
 Tensor permute_backwards(const Tensor & grad, IntArrayRef fwd_dims) {
