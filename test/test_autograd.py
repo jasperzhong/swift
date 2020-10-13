@@ -4822,7 +4822,8 @@ def run_functional_checks(test_case, test_name, name, apply_fn, run_grad_checks,
 # and only run for floating point
 
 # TODO(@anjali411): add the commented tests back after updating the formula based on tensorflow definition
-separate_complex_tests = ['view_as_real', 'real', 'imag', 'asin', 'acos', 'div']  # ['log', 'log10', 'log1p', 'log2', 'reciprocal', 'tan']
+separate_complex_tests = ['view_as_real', 'real', 'imag', 'asin', 'acos', 'div', 'log',
+                          'log10', 'log1p', 'log2', 'pow'] #, 'reciprocal', 'tan']
 
 # NOTE: Some non-holomorphic are separately tested in TestAutogradComplex until gradcheck works properly
 # for non-holomorphic functions
@@ -4833,7 +4834,7 @@ complex_list = ['t', 'view', 'reshape', 'reshape_as', 'view_as', 'roll', 'clone'
                 'permute', 'squeeze', 'unsqueeze', 'resize', 'resize_as', 'tril', 'triu',
                 'chunk', 'split', 'split_with_sizes', 'repeat', 'expand', 'zero_',
                 'eq_', 'ne_', 'add', '__radd__', 'sum', 'conj', 'sin', 'cos', 'mul', 'sinh',
-                'cosh', '__rmul__', 'sgn', 'abs', 'dot', 'vdot', 'tensor_split'] + separate_complex_tests
+                'cosh', '__rmul__', 'sgn', 'abs', 'dot', 'vdot', 'tensor_split', 'atan'] + separate_complex_tests
 
 # TODO(@anjali411): add tests for 'sub', 'div
 # TODO(@anjali411): add the commented tests back after updating the formula based on tensorflow definition - @anjali411

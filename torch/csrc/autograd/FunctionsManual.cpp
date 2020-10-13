@@ -177,16 +177,24 @@ Tensor norm_backward(Tensor grad, const Tensor & self, const optional<Scalar> & 
 }
 
 Tensor pow_backward(Tensor grad, const Tensor & self, const Scalar & exponent_) {
-  double exponent = exponent_.toDouble();
+  auto exponent = (exponent_.isComplex()) ? exponent_.toComplexDouble() : exponent_.toDouble();
   if (exponent == 0.0) {
     return at::zeros_like(self, LEGACY_CONTIGUOUS_MEMORY_FORMAT);
   } else {
-    return grad * exponent * self.pow(exponent - 1);
+    auto result = grad * (exponent * self.pow(exponent - 1)).conj();
+    if (!self.is_complex() && grad.is_complex()) {
+      return at::real(result);
+    }
+    return result;
   }
 }
 
 Tensor pow_backward_self(Tensor grad, const Tensor & self, const Tensor & exponent) {
-  return at::where(exponent == 0.0, at::zeros({}, grad.options()), grad * exponent * self.pow(exponent - 1));
+  if (!self.is_complex() && grad.is_complex()) {
+    return at::where(exponent == 0.0, at::zeros({}, grad.options()), at::real(grad * (exponent * self.pow(exponent - 1)).conj()));
+  } else {
+    return at::where(exponent == 0.0, at::zeros({}, grad.options()), grad * (exponent * self.pow(exponent - 1)).conj());
+  }
 }
 
 // Caveats:
@@ -198,18 +206,35 @@ Tensor pow_backward_self(Tensor grad, const Tensor & self, const Tensor & expone
 // d(a^b)/db = 0 for a > 0 and b -> +0.
 // Currently, tensorflow agrees with us.
 Tensor pow_backward_exponent(Tensor grad, const Tensor& self, const Tensor& exponent, Tensor result) {
-  return grad * at::where(at::logical_and(self == 0, exponent >= 0),
+  if (!exponent.is_complex()) {
+    auto out = grad * at::where(at::logical_and(self == 0, exponent >= 0),
                           at::zeros({}, grad.options()),
-                          result * self.log());
+                          (result * self.log()).conj());
+    if (grad.is_complex()) {
+      return at::real(out)
+    }
+    return out;
+  } else {
+    // verify if the condition for logical_and is correct for C->C case.
+    return grad * at::where(at::logical_and(self == 0, exponent == 0),
+                          at::zeros({}, grad.options()),
+                          (result * self.log()).conj());
+  }
 }
 
 Tensor pow_backward_exponent(Tensor grad, const Scalar & base, const Tensor& exponent, Tensor result) {
-  if (base.toDouble() == 0) {
+  auto base_ = (base.isComplex()) ? base.toComplexDouble() : base.toDouble();
+  if (base_ == 0) {
+    // if (exponent.is_complex())
     return grad * at::where(exponent >= 0,
                             at::zeros({}, grad.options()),
                             result * std::log(base.toDouble()));
   } else {
-    return grad * result * std::log(base.toDouble());
+    auto out = grad * (result * std::log(base_)).conj();
+    if (!base.isComplex() && grad.is_complex()) {
+      return at::real(out);
+    }
+    return out;
   }
 }
 
@@ -219,7 +244,6 @@ Tensor mvlgamma_backward(Tensor grad, const Tensor & self, int64_t p) {
   return grad * args.digamma_().sum(-1);
 }
 
-<<<<<<< HEAD
 Tensor sgn_backward(Tensor result, Tensor grad, Tensor self) {
   if (self.is_complex()) {
     auto abs = at::abs(self);
@@ -227,52 +251,23 @@ Tensor sgn_backward(Tensor result, Tensor grad, Tensor self) {
     // https://arxiv.org/pdf/1701.00392.pdf Section 4.20
     return at::where(abs == 0.0, at::zeros({}, grad.options()), (grad/abs - (at::real(grad/self) * result)));
   } else {
-    return at::zeros_like(grad, at::MemoryFormat::Preserve);
+    return at::zeros_like(self, at::MemoryFormat::Preserve);
   }
 }
 
 Tensor mul_tensor_backward(Tensor grad, Tensor other, ScalarType self_st) {
-  auto result = grad * other.conj();
-=======
-Tensor mul_scalar_backward(Tensor grad, Scalar other, ScalarType self_st) {
-  auto scalar_as_tensor = at::scalar_to_tensor(other);
-  auto result = grad * scalar_as_tensor.conj();
-  // only real valued gradient should be propagated for real tensors
->>>>>>> bc776a316bf20a0704ec5d19c9d4740dd1dfb6e7
-  if (!at::isComplexType(self_st) && result.is_complex()) {
-    // R -> C
-    result = at::real(result);
-  }
-
-  return result;
-}
-
-Tensor mul_tensor_backward(Tensor grad, Tensor other, ScalarType self_st) {
-  auto result = grad * other.conj();
-  if (!at::isComplexType(self_st) && result.is_complex()) {
-    // R -> C
-    result = at::real(result);
-  }
-  return result;
+  auto out = grad * other.conj();
+  return handle_r_to_c(self_st, out);
 }
 
 Tensor div_tensor_self_backward(Tensor grad, Tensor other, ScalarType self_st) {
   auto result = grad / other.conj();
-  if (!at::isComplexType(self_st) && result.is_complex()) {
-    // R -> C
-    result = at::real(result);
-  }
-  return result;
+  return handle_r_to_c(self_st, result);
 }
 
 Tensor div_tensor_other_backward(Tensor grad, Tensor self, Tensor other) {
-  auto other_conj = other.conj();
-  auto result = -grad * (self.conj() / other_conj) / other_conj;
-  if (!other.is_complex() && result.is_complex()) {
-    // R -> C
-    result = at::real(result);
-  }
-  return result;
+  auto result = -grad * ((self / other) / other).conj();
+  return handle_r_to_c(other, result);
 }
 
 Tensor div_scalar_backward(Tensor grad, Scalar other, ScalarType self_st) {
@@ -2648,7 +2643,7 @@ Tensor log1p_backward(const Tensor& grad, const Tensor& self) {
       "Use a different mathematical operation which preserves sparsity of gradients, ",
       "or report a bug if you think this is an error.");
   }
-  return grad / (self + 1);
+  return grad / (self + 1).conj();
 }
 
 Tensor sparse_constructor_values_backward(const Tensor& sparse_grad_out, const Tensor& indices, IntArrayRef values_shape) {
