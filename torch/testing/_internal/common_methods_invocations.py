@@ -694,6 +694,8 @@ def method_tests():
         # ('tan', (S, S, S), NO_ARGS, 'complex', (True,)),
         ('asin', torch.randn(S, S, S).clamp(-0.9, 0.9), NO_ARGS, '', (True,)),
         ('acos', torch.randn(S, S, S).clamp(-0.9, 0.9), NO_ARGS, '', (True,)),
+        ('asin', torch.randn(S, S, S, dtype=torch.cdouble), NO_ARGS, 'complex', (True,)),
+        ('acos', torch.randn(S, S, S, dtype=torch.cdouble), NO_ARGS, 'complex', (True,)),
         ('atan', (S, S, S), NO_ARGS, '', (True,)),
         ('atan', (), NO_ARGS, 'scalar', (True,)),
         ('atan2', (S, S, S), ((S, S, S),)),
@@ -1663,7 +1665,6 @@ EXCLUDE_GRADGRADCHECK_BY_TEST_NAME = {
     'test_slogdet_batched_symmetric',
     'test_cdist',
 }
-
 
 def exclude_tensor_method(name, test_name):
     # there are no tensor equivalents for these (inplace or out)
