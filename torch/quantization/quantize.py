@@ -196,8 +196,9 @@ def prepare(model, inplace=False, allow_list=None,
         prepare_custom_config_dict = {
           "float_to_observed_custom_module_class": {
              CustomModule: ObservedCustomModule
-           }
+          }
         }
+
     """
     torch._C._log_api_usage_once("quantization_api.quantize.prepare")
     if prepare_custom_config_dict is None:
@@ -413,6 +414,7 @@ def convert(
              ObservedCustomModule: QuantizedCustomModule
           }
         }
+
     """
     torch._C._log_api_usage_once("quantization_api.quantize.convert")
     if not inplace:
