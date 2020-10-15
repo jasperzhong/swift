@@ -53,6 +53,18 @@ class _BatchNorm(torch.nn.modules.batchnorm._BatchNorm):
         new_mod.zero_point = int(zero_point)
         return new_mod
 
+class BatchNorm1d(_BatchNorm):
+    r"""This is the quantized version of :class:`~torch.nn.BatchNorm1d`."""
+    _INTRINSIC_BN_RELU = None  # There is no intrinsic for 1d (yet!)
+
+    def __init__(self, *args, **kwargs):
+        super(BatchNorm1d, self).__init__(*args, **kwargs)
+        self.scale = 1.0
+        self.zero_point = 0
+        self._name = 'QuantizedBatchNorm1d'
+        self._quantized_fn = torch.ops.quantized.batch_norm1d
+
+
 class BatchNorm2d(_BatchNorm):
     r"""This is the quantized version of :class:`~torch.nn.BatchNorm2d`."""
     _INTRINSIC_BN_RELU = nni.BNReLU2d

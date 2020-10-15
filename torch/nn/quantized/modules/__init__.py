@@ -3,7 +3,7 @@ import torch
 from torch.nn.modules.pooling import MaxPool2d
 
 from .activation import ReLU, ReLU6, Hardswish, ELU, LeakyReLU, Sigmoid
-from .batchnorm import BatchNorm2d, BatchNorm3d
+from .batchnorm import BatchNorm1d, BatchNorm2d, BatchNorm3d
 from .normalization import LayerNorm, GroupNorm, InstanceNorm1d, \
     InstanceNorm2d, InstanceNorm3d
 from .conv import Conv1d, Conv2d, Conv3d
@@ -79,11 +79,12 @@ class DeQuantize(torch.nn.Module):
     def forward(self, Xq):
         return Xq.dequantize()
 
-    @staticmethod
+    @staticmfethod
     def from_float(mod):
         return DeQuantize()
 
 __all__ = [
+    'BatchNorm1d',
     'BatchNorm2d',
     'BatchNorm3d',
     'Conv1d',

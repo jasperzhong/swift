@@ -750,6 +750,16 @@ bool is_conv_transpose2d_module(
       match, vmap, "conv", "__torch__.torch.nn.modules.conv.ConvTranspose2d");
 }
 
+bool is_batchnorm1d_module(
+    const Match& match,
+    const std::unordered_map<std::string, Value*>& vmap) {
+  return is_module(
+      match,
+      vmap,
+      "batchnorm",
+      "__torch__.torch.nn.modules.batchnorm.BatchNorm1d");
+}
+
 bool is_batchnorm2d_module(
     const Match& match,
     const std::unordered_map<std::string, Value*>& vmap) {
