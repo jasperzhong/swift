@@ -17,6 +17,10 @@ from typing import (
     Optional, Tuple, Union, TYPE_CHECKING)
 
 import torch
+
+# This is to support back-testing. Once that is no longer needed, we should
+# just use `torch.jit.ScriptFunction/Module`
+from torch._C import ScriptFunction, ScriptModule
 from torch.utils.benchmark.utils import common
 
 
@@ -267,7 +271,7 @@ class Serialization(enum.Enum):
 
 _GLOBALS_ALLOWED_TYPES: Dict[Serialization, Tuple[Any, ...]] = {
     Serialization.PICKLE: (str, bytes, bool, int, float, complex),
-    Serialization.TORCH_JIT: (torch.jit.ScriptFunction, torch.jit.ScriptModule),
+    Serialization.TORCH_JIT: (ScriptFunction, ScriptModule),
     Serialization.TORCH: (torch.nn.Module,),
 }
 
