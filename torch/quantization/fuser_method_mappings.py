@@ -83,6 +83,7 @@ OP_LIST_TO_FUSER_METHOD : Dict[Tuple, Union[nn.Sequential, Callable]] = {
     (nn.Conv2d, nn.ReLU): nni.ConvReLU2d,
     (nn.Conv3d, nn.ReLU): nni.ConvReLU3d,
     (nn.Linear, nn.ReLU): nni.LinearReLU,
+    (nn.BatchNorm1d, nn.ReLU): nni.BNReLU1d,
     (nn.BatchNorm2d, nn.ReLU): nni.BNReLU2d,
     (nn.BatchNorm3d, nn.ReLU): nni.BNReLU3d,
 }
