@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 from types import ModuleType
 from typing import (
     cast, Any, Callable, DefaultDict, Dict, Generator, List, NamedTuple,
@@ -494,7 +495,8 @@ class _ValgrindWrapper(object):
         task_spec: common.TaskSpec,
         globals: Dict[str, Any],
         number: int,
-        collect_baseline: bool
+        collect_baseline: bool,
+        timeout: Optional[float] = None,
     ) -> CallgrindStats:
         """Collect stats, and attach a reference run which can be used to filter interpreter overhead."""
         self._validate()
@@ -511,11 +513,13 @@ class _ValgrindWrapper(object):
                     ),
                     globals={},
                     number=number,
+                    timeout=timeout,
                 )
             baseline_inclusive_stats, baseline_exclusive_stats = \
                 self._baseline_cache[cache_key]
 
-        stmt_inclusive_stats, stmt_exclusive_stats = self._invoke(task_spec, globals, number)
+        stmt_inclusive_stats, stmt_exclusive_stats = self._invoke(
+            task_spec, globals, number, timeout)
         return CallgrindStats(
             task_spec=task_spec,
             number_per_run=number,
@@ -531,6 +535,7 @@ class _ValgrindWrapper(object):
         task_spec: common.TaskSpec,
         globals: Dict[str, Any],
         number: int,
+        timeout: Optional[float] = None,
     ) -> Tuple[FunctionCounts, FunctionCounts]:
         """Core invocation method for Callgrind collection.
 
@@ -552,6 +557,7 @@ class _ValgrindWrapper(object):
         3) Parse the run results.
         4) Cleanup the scratch directory.
         """
+        start_time = time.time()
         working_dir = tempfile.mkdtemp()
         data_dir = os.path.join(working_dir, "data")
         script_file = os.path.join(working_dir, "timer_callgrind.py")
@@ -568,7 +574,10 @@ class _ValgrindWrapper(object):
                     args,
                     stdout=f_stdout_stderr,
                     stderr=subprocess.STDOUT,
-                    **kwargs,
+                    timeout=(
+                        None if timeout is None
+                        else max(timeout - (time.time() - start_time), 0.01)
+                    ), **kwargs,
                 )
                 with open(stdout_stderr_log, "rt") as f:
                     return invocation, f.read()

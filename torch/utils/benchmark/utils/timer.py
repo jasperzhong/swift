@@ -324,7 +324,8 @@ class Timer(object):
     def collect_callgrind(
         self,
         number: int = 100,
-        collect_baseline: bool = True
+        collect_baseline: bool = True,
+        timeout: Optional[float] = None,
     ) -> valgrind_timer_interface.CallgrindStats:
         """Collect instruction counts using Callgrind.
 
@@ -368,4 +369,5 @@ class Timer(object):
             task_spec=self._task_spec,
             globals=self._globals,
             number=number,
-            collect_baseline=collect_baseline)
+            collect_baseline=collect_baseline,
+            timeout=timeout)
