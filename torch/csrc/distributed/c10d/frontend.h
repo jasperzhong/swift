@@ -13,6 +13,22 @@
 
 namespace c10d {
 
+#ifdef USE_C10D_GLOO
+constexpr char* GLOO_SOCKET_IFNAME_ENV = "GLOO_SOCKET_IFNAME";
+#endif
+
+inline std::vector<std::string> split(
+    char separator,
+    const std::string& string) {
+  std::vector<std::string> pieces;
+  std::stringstream ss(string);
+  std::string item;
+  while (std::getline(ss, item, separator)) {
+    pieces.push_back(std::move(item));
+  }
+  return pieces;
+}
+
 class Backend {
  public:
   // Maps to Backend.__new__ in Python.
@@ -212,6 +228,15 @@ class DistributedC10d {
   void checkDefaultPg() const;
   int64_t getGroupSize(const std::shared_ptr<ProcessGroup>& group) const;
   std::string getBackend(const std::shared_ptr<ProcessGroup>& group);
+
+  std::shared_ptr<ProcessGroup> newProcessGroupHelper(
+      const int64_t world_size,
+      const int64_t rank,
+      const std::vector<int64_t>& group_ranks,
+      const std::string& backend_str,
+      const std::shared_ptr<Store>& store,
+      c10::optional<std::string> group_name,
+      std::chrono::milliseconds timeout);
 
   std::string backend_;
   // TODO: Ask Alex what kind of equality we need. It determine whether we
