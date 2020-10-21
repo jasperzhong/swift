@@ -42,6 +42,22 @@ class DistributedC10d {
   int64_t getRank(const std::shared_ptr<ProcessGroup>& group) const;
   int64_t getWorldSize(const std::shared_ptr<ProcessGroup>& group) const;
 
+  // getters/setters for the global states
+  const std::string& backend() const;
+  void set_backend(std::string const& backend_name);
+
+  const std::unordered_map<
+      std::shared_ptr<ProcessGroup>,
+      std::unordered_map<int64_t, int64_t>>&
+  pg_group_ranks();
+  void set_pg_group_ranks(
+      std::unordered_map<
+          std::shared_ptr<ProcessGroup>,
+          std::unordered_map<int64_t, int64_t>> const& new_ranks);
+
+  const std::string& default_pg_init_method() const;
+  void set_default_pg_init_method(std::string const& init_method);
+
   std::shared_ptr<ProcessGroup::Work> isend(
       at::Tensor tensor,
       int64_t dst,
