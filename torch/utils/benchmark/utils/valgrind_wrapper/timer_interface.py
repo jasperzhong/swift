@@ -11,10 +11,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
-<<<<<<< HEAD
 import time
-=======
->>>>>>> fbcode/warm
 from types import ModuleType
 from typing import (
     cast, Any, Callable, DefaultDict, Dict, Generator, List, NamedTuple,
@@ -289,11 +286,7 @@ class Serialization(enum.Enum):
 
 _GLOBALS_ALLOWED_TYPES: Dict[Serialization, Tuple[Any, ...]] = {
     Serialization.PICKLE: (str, bytes, bool, int, float, complex),
-<<<<<<< HEAD
     Serialization.TORCH_JIT: (ScriptFunction, torch.jit.ScriptModule),
-=======
-    Serialization.TORCH_JIT: (torch.jit.ScriptFunction, torch.jit.ScriptModule),
->>>>>>> fbcode/warm
     Serialization.TORCH: (torch.nn.Module,),
 }
 
@@ -434,15 +427,9 @@ class GlobalsBridge:
                     "`collect_callgrind` requires that globals be wrapped in "
                     "`CopyIfCallgrind` so that serialization is explicit."
                 )
-<<<<<<< HEAD
 
             self._globals[name] = value
 
-=======
-
-            self._globals[name] = value
-
->>>>>>> fbcode/warm
     def construct(self) -> str:
         load_lines = []
         for name, wrapped_value in self._globals.items():
@@ -477,13 +464,8 @@ class GlobalsBridge:
 class _ValgrindWrapper(object):
     def __init__(self) -> None:
         self._bindings_module: Optional[ModuleType] = None
-<<<<<<< HEAD
-        if hasattr(torch._C, "valgrind_supported_platform"):
-            self._supported_platform: bool = torch._C.valgrind_supported_platform()
-=======
         if hasattr(torch._C, "_valgrind_supported_platform"):
             self._supported_platform: bool = torch._C._valgrind_supported_platform()
->>>>>>> fbcode/warm
 
         else:
             print("Callgrind bindings are not present in `torch._C`. JIT-ing bindings.")
@@ -491,11 +473,7 @@ class _ValgrindWrapper(object):
             # invoke unless we know we'll need it.
             from torch.utils.benchmark.utils.valgrind_wrapper.compat_bindings import bindings
             self._bindings_module = bindings
-<<<<<<< HEAD
-            self._supported_platform = bindings.valgrind_supported_platform()
-=======
             self._supported_platform = bindings._valgrind_supported_platform()
->>>>>>> fbcode/warm
 
         self._commands_available: Dict[str, bool] = {}
         if self._supported_platform:
@@ -527,12 +505,8 @@ class _ValgrindWrapper(object):
         task_spec: common.TaskSpec,
         globals: Dict[str, Any],
         number: int,
-<<<<<<< HEAD
         collect_baseline: bool,
         timeout: Optional[float] = None,
-=======
-        collect_baseline: bool
->>>>>>> fbcode/warm
     ) -> CallgrindStats:
         """Collect stats, and attach a reference run which can be used to filter interpreter overhead."""
         self._validate()
@@ -549,20 +523,13 @@ class _ValgrindWrapper(object):
                     ),
                     globals={},
                     number=number,
-<<<<<<< HEAD
                     timeout=timeout,
-=======
->>>>>>> fbcode/warm
                 )
             baseline_inclusive_stats, baseline_exclusive_stats = \
                 self._baseline_cache[cache_key]
 
-<<<<<<< HEAD
         stmt_inclusive_stats, stmt_exclusive_stats = self._invoke(
             task_spec, globals, number, timeout)
-=======
-        stmt_inclusive_stats, stmt_exclusive_stats = self._invoke(task_spec, globals, number)
->>>>>>> fbcode/warm
         return CallgrindStats(
             task_spec=task_spec,
             number_per_run=number,
@@ -578,10 +545,7 @@ class _ValgrindWrapper(object):
         task_spec: common.TaskSpec,
         globals: Dict[str, Any],
         number: int,
-<<<<<<< HEAD
         timeout: Optional[float] = None,
-=======
->>>>>>> fbcode/warm
     ) -> Tuple[FunctionCounts, FunctionCounts]:
         """Core invocation method for Callgrind collection.
 
@@ -806,21 +770,13 @@ class _ValgrindWrapper(object):
             # =============================================================================
             # == User code block ==========================================================
             # =============================================================================
-<<<<<<< HEAD
-            callgrind_bindings.valgrind_toggle()
-=======
             callgrind_bindings._valgrind_toggle()
->>>>>>> fbcode/warm
             {blocked_stmt}
 
             # Sleep is to allow the interpreter to catch up before we stop collecting in
             # order to reduce jitter.
             time.sleep(0.01)
-<<<<<<< HEAD
-            callgrind_bindings.valgrind_toggle()
-=======
             callgrind_bindings._valgrind_toggle()
->>>>>>> fbcode/warm
         """).strip().format(
             indented_stmt=textwrap.indent(task_spec.stmt, " " * 4),
             blocked_stmt=blocked_stmt,
