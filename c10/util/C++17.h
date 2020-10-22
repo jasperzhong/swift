@@ -100,64 +100,6 @@ template<typename... Ts> using void_t = typename make_void<Ts...>::type;
 #define CUDA_HOST_DEVICE C10_HOST_DEVICE
 #endif
 
-#ifdef __cpp_lib_apply
-
-template <class F, class Tuple>
-CUDA_HOST_DEVICE inline constexpr decltype(auto) apply(F&& f, Tuple&& t) {
-  return std::apply(std::forward<F>(f), std::forward<Tuple>(t));
-}
-
-#else
-
-// Implementation from http://en.cppreference.com/w/cpp/utility/apply (but modified)
-// TODO This is an incomplete implementation of std::apply, not working for member functions.
-namespace detail {
-template <class F, class Tuple, std::size_t... INDEX>
-#if defined(_MSC_VER)
-// MSVC has a problem with the decltype() return type, but it also doesn't need it
-C10_HOST_DEVICE constexpr auto apply_impl(F&& f, Tuple&& t, std::index_sequence<INDEX...>)
-#else
-// GCC/Clang need the decltype() return type
-CUDA_HOST_DEVICE constexpr decltype(auto) apply_impl(F&& f, Tuple&& t, std::index_sequence<INDEX...>)
-#endif
-{
-    return std::forward<F>(f)(std::get<INDEX>(std::forward<Tuple>(t))...);
-}
-}  // namespace detail
-
-template <class F, class Tuple>
-CUDA_HOST_DEVICE constexpr decltype(auto) apply(F&& f, Tuple&& t) {
-    return detail::apply_impl(
-        std::forward<F>(f), std::forward<Tuple>(t),
-        std::make_index_sequence<std::tuple_size<std::remove_reference_t<Tuple>>::value>{});
-}
-
-#endif
-
-#undef CUDA_HOST_DEVICE
-
-
-template <typename Functor, typename... Args>
-typename std::enable_if<
-    std::is_member_pointer<typename std::decay<Functor>::type>::value,
-    typename std::result_of<Functor && (Args && ...)>::type>::type
-invoke(Functor&& f, Args&&... args) {
-  return std::mem_fn(std::forward<Functor>(f))(std::forward<Args>(args)...);
-}
-
-template <typename Functor, typename... Args>
-typename std::enable_if<
-    !std::is_member_pointer<typename std::decay<Functor>::type>::value,
-    typename std::result_of<Functor && (Args && ...)>::type>::type
-invoke(Functor&& f, Args&&... args) {
-  return std::forward<Functor>(f)(std::forward<Args>(args)...);
-}
-
-
-
-
-
-
 namespace detail {
 struct _identity final {
   template<class T>
@@ -301,6 +243,118 @@ decltype(auto) if_constexpr(ThenCallback&& thenCallback) {
   return if_constexpr<Condition>(std::forward<ThenCallback>(thenCallback), [] (auto) {});
 #endif
 }
+
+
+
+
+#ifdef __cpp_lib_apply
+
+template <class F, class... ArgTypes>
+using invoke_result = std::invoke_result<F, ArgTypes...>;
+template<typename F, typename...Args>
+using invoke_result_t = std::invoke_result_t<F, Args...>;
+
+template <class F, class Tuple>
+inline constexpr decltype(auto) apply(F&& f, Tuple&& t) {
+  return std::apply(std::forward<F>(f), std::forward<Tuple>(t));
+}
+
+template< class F, class... Args>
+inline constexpr decltype(auto) invoke(F&& f, Args&&... args)
+  noexcept(std::is_nothrow_invocable_v<F, Args...>) {
+    return std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+}
+
+#else
+
+// Implementation from http://en.cppreference.com/w/cpp/utility/apply
+// and https://en.cppreference.com/w/cpp/utility/functional/invoke
+// and https://en.cppreference.com/w/cpp/types/result_of
+// Modifications:
+//  - use c10::if_constexpr instead of C++17 `if constexpr`.
+//  - replace std::***_v type traits with std::***::value (e.g. std::is_base_of_v<T> -> std::is_base_of<T>::value)
+//  - Remove noexcept-handling of invoke() because std::is_nothrow_invocable_v is not available on C++14.
+namespace detail {
+template <class T>
+struct is_reference_wrapper : std::false_type {};
+template <class U>
+struct is_reference_wrapper<std::reference_wrapper<U>> : std::true_type {};
+template <class T>
+constexpr bool is_reference_wrapper_v = is_reference_wrapper<T>::value;
+
+template <class T, class Type, class T1, class... Args>
+constexpr decltype(auto) INVOKE(Type T::* f, T1&& t1, Args&&... args)
+{
+    return if_constexpr<std::is_member_function_pointer<decltype(f)>::value>([&] (auto _) {
+        return if_constexpr<std::is_base_of<T, std::decay_t<T1>>::value>([&] (auto __) {
+            using _T1 = typename decltype(__)::template type_identity<typename decltype(_)::template type_identity<T1>>;
+            return (std::forward<_T1>(t1).*__(_(f)))(std::forward<Args>(args)...);
+        }, /* else if */ [&] { return if_constexpr<is_reference_wrapper<std::decay_t<T1>>::value>([&] (auto __) {
+            return (__(_(t1)).get().*f)(std::forward<Args>(args)...);
+        }, /* else */ [&] (auto __){
+            using _T1 = typename decltype(__)::template type_identity<typename decltype(_)::template type_identity<T1>>;
+            return (std::forward<_T1>(__(_(t1))).*f)(std::forward<Args>(args)...);
+        });});
+    }, /* else */ [&] (auto _) {
+        static_assert(std::is_member_object_pointer<decltype(_(f))>::value, "");
+        static_assert(sizeof...(args) == _(0), "");
+        return if_constexpr<std::is_base_of<T, std::decay_t<T1>>::value>([&] (auto __) {
+            using _T1 = typename decltype(__)::template type_identity<typename decltype(_)::template type_identity<T1>>;
+            return std::forward<_T1>(t1).*f;
+        }, /* else if */ [&] {return if_constexpr<is_reference_wrapper<std::decay_t<T1>>::value>([&] (auto __) {
+            return __(_(t1)).get().*f;
+        }, /* else */ [&] (auto __) {
+            using _T1 = typename decltype(__)::template type_identity<typename decltype(_)::template type_identity<T1>>;
+            return std::forward<_T1>(__(_(t1))).*f;
+        });});
+    });
+}
+
+template <class F, class... Args>
+constexpr decltype(auto) INVOKE(F&& f, Args&&... args)
+{
+      return std::forward<F>(f)(std::forward<Args>(args)...);
+}
+
+template <typename AlwaysVoid, typename, typename...>
+struct invoke_result { };
+template <typename F, typename...Args>
+struct invoke_result<decltype(void(detail::INVOKE(std::declval<F>(), std::declval<Args>()...))),
+                 F, Args...> {
+    using type = decltype(detail::INVOKE(std::declval<F>(), std::declval<Args>()...));
+};
+} // namespace detail
+
+template <class F, class... ArgTypes>
+struct invoke_result : detail::invoke_result<void, F, ArgTypes...> {};
+template<typename F, typename...Args>
+using invoke_result_t = typename invoke_result<F, Args...>::type;
+
+template< class F, class... Args>
+constexpr invoke_result_t<F, Args...> invoke(F&& f, Args&&... args) {
+    return detail::INVOKE(std::forward<F>(f), std::forward<Args>(args)...);
+}
+
+namespace detail {
+template <class F, class Tuple, std::size_t... I>
+constexpr decltype(auto) apply_impl(F&& f, Tuple&& t, std::index_sequence<I...>)
+{
+    return invoke(std::forward<F>(f), std::get<I>(std::forward<Tuple>(t))...);
+}
+}  // namespace detail
+
+template <class F, class Tuple>
+constexpr decltype(auto) apply(F&& f, Tuple&& t)
+{
+    return detail::apply_impl(
+        std::forward<F>(f), std::forward<Tuple>(t),
+        std::make_index_sequence<std::tuple_size<std::remove_reference_t<Tuple>>::value>{});
+}
+
+#endif
+
+
+
 
 
 
