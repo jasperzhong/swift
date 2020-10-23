@@ -469,11 +469,21 @@ class _ValgrindWrapper(object):
 
         else:
             print("Callgrind bindings are not present in `torch._C`. JIT-ing bindings.")
-            # This import will JIT the Callgrind control bindings, so don't
-            # invoke unless we know we'll need it.
-            from torch.utils.benchmark.utils.valgrind_wrapper.compat_bindings import bindings
-            self._bindings_module = bindings
-            self._supported_platform = bindings._valgrind_supported_platform()
+
+            try:
+                import cppimport
+            except ImportError:
+                raise ImportError("`cppimport` is required for compat Callgrind bindings.")
+
+            cppimport.force_rebuild()
+            self._bindings_module = cppimport.imp_from_filepath(
+                os.path.join(
+                    os.path.split(os.path.abspath(__file__))[0],
+                    "bindings.cpp"
+                )
+            )
+            assert "_valgrind_toggle" in dir(self._bindings_module)
+            self._supported_platform = self._bindings_module._valgrind_supported_platform()
 
         self._commands_available: Dict[str, bool] = {}
         if self._supported_platform:
