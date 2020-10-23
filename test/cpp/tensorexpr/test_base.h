@@ -82,6 +82,7 @@ static void assertAllEqual(const std::vector<T>& v1, const std::vector<T>& v2) {
     ASSERT_EQ(v1[i], v2[i]);
   }
 }
+
 } // namespace tensorexpr
 } // namespace jit
 } // namespace torch
