@@ -480,7 +480,8 @@ class _ValgrindWrapper(object):
                 os.path.join(
                     os.path.split(os.path.abspath(__file__))[0],
                     "bindings.cpp"
-                )
+                ),
+                "torch.utils.benchmark.utils.valgrind_wrapper.bindings",
             )
             assert "_valgrind_toggle" in dir(self._bindings_module)
             self._supported_platform = self._bindings_module._valgrind_supported_platform()
