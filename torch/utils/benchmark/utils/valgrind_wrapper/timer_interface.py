@@ -596,7 +596,7 @@ class _ValgrindWrapper(object):
                     stdout=f_stdout_stderr,
                     stderr=subprocess.STDOUT,
                     timeout=(
-                        None if timeout is None
+                        None if timeout is None or args[0] == "callgrind_annotate"
                         else max(timeout - (time.time() - start_time), 0.01)
                     ), **kwargs,
                 )
