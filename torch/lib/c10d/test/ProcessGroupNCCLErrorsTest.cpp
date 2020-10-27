@@ -56,11 +56,11 @@ class ProcessGroupNCCLSimulateErrors : public c10d::ProcessGroupNCCL {
         ProcessGroupNCCLSimulateErrors::kWatchdogThreadSleepMillis);
   }
 
-  std::shared_ptr<ProcessGroupNCCL::WorkNCCL> initWork(
+  c10::intrusive_ptr<ProcessGroupNCCL::WorkNCCL> initWork(
       std::vector<at::Device> devices,
       int rank,
       c10d::OpType opType) override {
-    return std::make_shared<WorkNCCLSimulateErrors>(
+    return c10::make_intrusive<WorkNCCLSimulateErrors>(
         devices, simulate_error_, rank, opType);
   }
 
@@ -112,11 +112,11 @@ class ProcessGroupNCCLTimedOutErrors : public ProcessGroupNCCLSimulateErrors {
       : ProcessGroupNCCLSimulateErrors(store, rank, size, opts),
         set_timedout_error_(false) {}
 
-  std::shared_ptr<ProcessGroupNCCL::WorkNCCL> initWork(
+  c10::intrusive_ptr<ProcessGroupNCCL::WorkNCCL> initWork(
       std::vector<at::Device> devices,
       int rank,
       c10d::OpType opType) override {
-    return std::make_shared<WorkNCCLTimedoutErrors>(
+    return c10::make_intrusive<WorkNCCLTimedoutErrors>(
         devices, set_timedout_error_, rank, opType);
   }
 
