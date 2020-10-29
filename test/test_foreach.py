@@ -157,6 +157,42 @@ class TestForeach(TestCase):
     def test_exp(self, device, dtype):
         self._test_unary_op(device, dtype, torch._foreach_exp, torch._foreach_exp_, torch.exp)
 
+    @dtypes(*[torch.float, torch.double])
+    def test_abs(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_abs, torch._foreach_abs_, torch.abs)
+
+    @dtypes(*[torch.float, torch.double, torch.complex64, torch.complex128])
+    def test_acos(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_acos, torch._foreach_acos_, torch.acos)
+
+    @dtypes(*[torch.float, torch.double, torch.complex64, torch.complex128])
+    def test_asin(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_asin, torch._foreach_asin_, torch.asin)
+
+    @dtypes(*[torch.float, torch.double, torch.complex64, torch.complex128])
+    def test_atan(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_atan, torch._foreach_atan_, torch.atan)
+
+    @dtypes(*[torch.float, torch.double])
+    def test_ceil(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_ceil, torch._foreach_ceil_, torch.ceil)
+
+    @dtypes(*[torch.float, torch.double, torch.complex64, torch.complex128])
+    def test_cos(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_cos, torch._foreach_cos_, torch.cos)
+
+    @dtypes(*[torch.float, torch.double, torch.complex64, torch.complex128])
+    def test_cosh(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_cosh, torch._foreach_cosh_, torch.cosh)
+
+    @dtypes(*[torch.float, torch.double])
+    def test_erf(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_erf, torch._foreach_erf_, torch.erf)
+
+    @dtypes(*[torch.float, torch.double])
+    def test_erfс(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_erfc, torch._foreach_erfc_, torch.erfc)
+
     #
     # Pointwise ops
     #
