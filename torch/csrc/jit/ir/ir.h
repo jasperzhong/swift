@@ -1156,10 +1156,12 @@ struct Graph {
 
   TORCH_API Value* insertFunctionCall(
       Function* callee,
-      const MatchedSchema& matched);
+      const MatchedSchema& matched,
+      bool isAsync = false);
   TORCH_API Value* insertMethodCall(
       std::string method_name,
-      const MatchedSchema& matched);
+      const MatchedSchema& matched,
+      bool isAsync = false);
 
   // Note: defined in python_ir.cpp and can be used only in python extension
   Node* createPythonOp(

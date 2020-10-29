@@ -877,6 +877,12 @@ struct CodeImpl {
     insertInstruction(TUPLE_SLICE, beg_ind, end_ind - beg_ind);
   }
 
+  void emitCallAsync(Function* func, at::ArrayRef<Value*> inputs) {
+    emitLoadInputs(inputs);
+    insertInstruction(FORK, function_table_.size(), inputs.size());
+    function_table_.emplace_back(std::move(func));
+  }
+
   void emitFork(Node* node) {
     emitLoadInputs(node->inputs());
     std::unique_ptr<GraphFunction> forked_fn(new GraphFunction(
@@ -932,6 +938,11 @@ struct CodeImpl {
             node->inputs().at(0)->type()->expect<FunctionType>()->function(),
             node->inputs().slice(1));
         break;
+      case prim::CallFunctionAsync:
+        emitCallAsync(
+            node->inputs().at(0)->type()->expect<FunctionType>()->function(),
+            node->inputs().slice(1));
+        break;
       case prim::CallMethod:
         if (auto class_type = node->inputs().at(0)->type()->cast<ClassType>()) {
           emitCall(&class_type->getMethod(node->s(attr::name)), node->inputs());
@@ -939,6 +950,11 @@ struct CodeImpl {
           emitInterfaceCall(node->s(attr::name), node->inputs());
         }
         break;
+      case prim::CallMethodAsync: {
+        auto class_type = node->inputs().at(0)->type()->expect<ClassType>();
+        emitCallAsync(
+            &class_type->getMethod(node->s(attr::name)), node->inputs());
+      } break;
       case prim::TypeCheck:
         emitTypeCheck(node);
         break;
