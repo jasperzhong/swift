@@ -5,7 +5,7 @@ add_library(toggle_callgrind SHARED
 
 target_include_directories(
     toggle_callgrind PUBLIC
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../third_party/valgrind-headers
+    ${TORCH_ROOT}/third_party
 )
 
 install(TARGETS toggle_callgrind DESTINATION lib)
