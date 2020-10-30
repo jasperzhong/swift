@@ -1,0 +1,28 @@
+cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
+
+project(measure_loop)
+set(CMAKE_CXX_STANDARD 14)
+
+find_package(Torch REQUIRED)
+find_package(Threads REQUIRED)
+find_library(
+    LIB_TOGGLE_CALLGRIND REQUIRED
+    NAMES libtoggle_callgrind.so
+    PATHS $ENV{TOGGLE_CALLGRIND_PATH}/lib
+)
+
+add_executable(measure_loop measure_loop.cpp)
+target_include_directories(
+    measure_loop PUBLIC
+    ${TORCH_INCLUDE_DIRS}
+    .
+)
+
+target_link_libraries(measure_loop
+  -Wl,--gc-sections
+  -Wl,--whole-archive
+  ${TORCH_LIBRARIES}
+  -Wl,--no-whole-archive
+  Threads::Threads
+  ${LIB_TOGGLE_CALLGRIND}
+)

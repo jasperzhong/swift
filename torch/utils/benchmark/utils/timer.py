@@ -21,6 +21,18 @@ else:
     timer = timeit.default_timer
 
 
+PYTHON = "Python"
+CPP = "C++"
+
+
+class _CPPTimer:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def timeit(self, number):
+        raise NotImplementedError("lang='C++' does not currently support timing measurements.")
+
+
 class Timer(object):
     """Helper class for measuring execution time of PyTorch statements.
 
@@ -127,9 +139,18 @@ class Timer(object):
         description: Optional[str] = None,
         env: Optional[str] = None,
         num_threads: int = 1,
+        lang: str = PYTHON,
     ):
         if not isinstance(stmt, str):
             raise ValueError("Currently only a `str` stmt is supported.")
+
+        self._lang = lang
+        if lang not in (PYTHON, CPP):
+            raise ValueError(f"Invalid lang `{lang}`. (Choices: {PYTHON}, {CPP})")
+
+        if lang == CPP:
+            assert not globals, "lang='C++' does not support globals."
+            self._timer_cls = _CPPTimer
 
         # We copy `globals` to prevent mutations from leaking, (for instance,
         # `eval` adds the `__builtins__` key) and include `torch` if not
@@ -364,10 +385,14 @@ class Timer(object):
         # Check that the statement is valid. It doesn't guarantee success, but it's much
         # simpler and quicker to raise an exception for a faulty `stmt` or `setup` in
         # the parent process rather than the valgrind subprocess.
-        self._timer.timeit(1)
+        if self._lang == PYTHON:
+            self._timer.timeit(1)
+
         return valgrind_timer_interface.wrapper_singleton().collect_callgrind(
             task_spec=self._task_spec,
             globals=self._globals,
             number=number,
             collect_baseline=collect_baseline,
-            timeout=timeout)
+            timeout=timeout,
+            python=(self._lang == PYTHON)
+        )

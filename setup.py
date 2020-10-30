@@ -866,7 +866,9 @@ if __name__ == '__main__':
                 'share/cmake/Gloo/*.cmake',
                 'share/cmake/Tensorpipe/*.cmake',
                 'share/cmake/Torch/*.cmake',
-                'utils/benchmark/utils/valgrind_wrapper/*.cpp'
+                'utils/benchmark/utils/valgrind_wrapper/*.cpp',
+                'utils/benchmark/utils/valgrind_wrapper/*.h',
+                'utils/benchmark/utils/valgrind_wrapper/gen_CMakeLists.txt',
             ],
             'caffe2': [
                 'python/serialized_test/data/operator_test/*.zip',

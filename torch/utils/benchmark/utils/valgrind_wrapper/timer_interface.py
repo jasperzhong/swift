@@ -518,9 +518,12 @@ class _ValgrindWrapper(object):
         number: int,
         collect_baseline: bool,
         timeout: Optional[float] = None,
+        python: bool = True,  # TODO: move to TaskSpec
     ) -> CallgrindStats:
         """Collect stats, and attach a reference run which can be used to filter interpreter overhead."""
         self._validate()
+        collect_baseline = collect_baseline and python
+
         baseline_inclusive_stats = FunctionCounts((), inclusive=True)
         baseline_exclusive_stats = FunctionCounts((), inclusive=False)
         if collect_baseline:
@@ -535,12 +538,13 @@ class _ValgrindWrapper(object):
                     globals={},
                     number=number,
                     timeout=timeout,
+                    python=python,
                 )
             baseline_inclusive_stats, baseline_exclusive_stats = \
                 self._baseline_cache[cache_key]
 
         stmt_inclusive_stats, stmt_exclusive_stats = self._invoke(
-            task_spec, globals, number, timeout)
+            task_spec, globals, number, timeout, python)
         return CallgrindStats(
             task_spec=task_spec,
             number_per_run=number,
@@ -556,7 +560,8 @@ class _ValgrindWrapper(object):
         task_spec: common.TaskSpec,
         globals: Dict[str, Any],
         number: int,
-        timeout: Optional[float] = None,
+        timeout: Optional[float],
+        python: bool,
     ) -> Tuple[FunctionCounts, FunctionCounts]:
         """Core invocation method for Callgrind collection.
 
@@ -581,7 +586,6 @@ class _ValgrindWrapper(object):
         start_time = time.time()
         working_dir = tempfile.mkdtemp()
         data_dir = os.path.join(working_dir, "data")
-        script_file = os.path.join(working_dir, "timer_callgrind.py")
         callgrind_out = os.path.join(working_dir, "callgrind.out")
         error_log = os.path.join(working_dir, "error.txt")
         stat_log = os.path.join(working_dir, "callgrind_stat.txt")
@@ -606,20 +610,31 @@ class _ValgrindWrapper(object):
                 f_stdout_stderr.close()
 
         try:
-            if self._bindings_module is not None:
-                shutil.copy(
-                    self._bindings_module.__file__,
-                    os.path.join(working_dir, os.path.split(self._bindings_module.__file__)[1])
-                )
+            if python:
+                script_file = os.path.join(working_dir, "timer_callgrind.py")
+                if self._bindings_module is not None:
+                    shutil.copy(
+                        self._bindings_module.__file__,
+                        os.path.join(working_dir, os.path.split(self._bindings_module.__file__)[1])
+                    )
 
-            with open(script_file, "wt") as f:
-                f.write(self._construct_script(
+                with open(script_file, "wt") as f:
+                    f.write(self._construct_script(
+                        task_spec,
+                        globals=GlobalsBridge(globals, data_dir),
+                        number=number,
+                        error_log=error_log,
+                        stat_log=stat_log,
+                        bindings=self._bindings_module))
+
+                script_cmd = ["python", script_file]
+            else:
+                script_cmd = self._construct_executable(
                     task_spec,
-                    globals=GlobalsBridge(globals, data_dir),
                     number=number,
-                    error_log=error_log,
-                    stat_log=stat_log,
-                    bindings=self._bindings_module))
+                    working_dir=working_dir,
+                    stdout_stderr_log=stdout_stderr_log,
+                )
 
             valgrind_invocation, valgrind_invocation_output = run([
                 "valgrind",
@@ -629,9 +644,7 @@ class _ValgrindWrapper(object):
                 "--dump-instr=yes",
                 "--instr-atstart=yes",
                 "--collect-atstart=no",
-                "python",
-                script_file,
-            ])
+            ] + script_cmd)
 
             if valgrind_invocation.returncode:
                 error_report = ""
@@ -804,6 +817,83 @@ class _ValgrindWrapper(object):
                 "import torch._C as callgrind_bindings" if bindings is None
                 else f"import {bindings.__name__} as callgrind_bindings"),
         )
+
+    @staticmethod
+    def _construct_executable(
+        task_spec: common.TaskSpec,
+        number: int,
+        working_dir: str,
+        stdout_stderr_log: str,
+    ):
+        cwd = os.path.split(os.path.abspath(__file__))[0]
+        shutil.copy(
+            os.path.join(cwd, "gen_CMakeLists.txt"),
+            os.path.join(working_dir, "CMakeLists.txt")
+        )
+
+        shutil.copy(
+            os.path.join(cwd, "toggle_callgrind.h"),
+            os.path.join(working_dir, "toggle_callgrind.h")
+        )
+
+        measure_loop_src = textwrap.dedent("""\
+        #include <toggle_callgrind.h>
+        #include <torch/torch.h>
+
+        int main() {{
+        torch::set_num_threads({num_threads});
+        {setup}
+            for (int i = 0; i < {warmup_number}; i++){{
+        {stmt}
+            }}
+            callgrind_toggle();
+            for (int i = 0; i < {number}; i++){{
+        {stmt}
+            }}
+            callgrind_toggle();
+
+        }}
+        """).format(
+            num_threads=task_spec.num_threads,
+            setup=textwrap.indent(task_spec.setup, " " * 4),
+            stmt=textwrap.indent(task_spec.stmt, " " * 8),
+            number=number,
+            warmup_number=min(number, 10),
+        )
+
+        with open(os.path.join(working_dir, "measure_loop.cpp"), "wt") as f:
+            f.write(measure_loop_src)
+
+        build_dir = os.path.join(working_dir, "build")
+        os.makedirs(build_dir)
+
+        # TOGGLE_CALLGRIND_PATH allows one to point to a different libtorch
+        # for callgrind bindings, while still linking against the correct
+        # libtorch for actual PyTorch.
+        torch_path = os.path.abspath(os.path.join(cwd, "../../../.."))
+        toggle_callgrind_path = os.getenv("TOGGLE_CALLGRIND_PATH") or torch_path
+
+        with open(stdout_stderr_log, "wb") as f:
+            build_result = subprocess.run(
+                # passing `env=` messes with PATH related things,
+                # so this is a workaround.
+                f"TOGGLE_CALLGRIND_PATH='{torch_path}' CMAKE_PREFIX_PATH='{torch_path}' "
+                "CXXFLAGS='-O1 -g' "
+                "cmake .. && "
+                "cmake --build . --config Release",
+                shell=True,
+                cwd=build_dir,
+                stdout=f,
+                stderr=f,
+            )
+        if build_result.returncode:
+            with open(stdout_stderr_log, "rt") as f:
+                raise ValueError(
+                    f"Failed to build C++ run loop: (retcode = {build_result.returncode})\n"
+                    f"{f.read()}"
+                )
+
+        return [os.path.join(build_dir, "measure_loop")]
 
 
 CALLGRIND_SINGLETON: Optional[_ValgrindWrapper] = None

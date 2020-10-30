@@ -1,0 +1,1 @@
+void callgrind_toggle();
