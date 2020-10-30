@@ -33,7 +33,7 @@ endif()
 set(LIBSHM_SRCDIR ${TORCH_SRC_DIR}/lib/${LIBSHM_SUBDIR})
 add_subdirectory(${LIBSHM_SRCDIR})
 
-add_subdirectory(utils/benchmark/utils/valgrind_wrapper)
+# add_subdirectory(utils/benchmark/utils/valgrind_wrapper)
 
 # Generate files
 set(TOOLS_PATH "${TORCH_ROOT}/tools")
