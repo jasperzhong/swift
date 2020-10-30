@@ -836,6 +836,8 @@ class _ValgrindWrapper(object):
             os.path.join(working_dir, "toggle_callgrind.h")
         )
 
+        setup = "" if task_spec.setup == "pass" else task_spec.setup
+
         measure_loop_src = textwrap.dedent("""\
         #include <toggle_callgrind.h>
         #include <torch/torch.h>
@@ -855,7 +857,7 @@ class _ValgrindWrapper(object):
         }}
         """).format(
             num_threads=task_spec.num_threads,
-            setup=textwrap.indent(task_spec.setup, " " * 4),
+            setup=textwrap.indent(setup, " " * 4),
             stmt=textwrap.indent(task_spec.stmt, " " * 8),
             number=number,
             warmup_number=min(number, 10),
