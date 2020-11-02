@@ -37,17 +37,6 @@ try:
 except ImportError:
     from torch._C import Function as ScriptFunction
 
-from torch.utils.benchmark.utils import common
-
-
-__all__ = ["FunctionCount", "FunctionCounts", "CallgrindStats", "CopyIfCallgrind"]
-
-
-if TYPE_CHECKING:
-    CompletedProcessType = subprocess.CompletedProcess[str]
-else:
-    CompletedProcessType = subprocess.CompletedProcess
-
 
 FunctionCount = NamedTuple("FunctionCount", [("count", int), ("function", str)])
 

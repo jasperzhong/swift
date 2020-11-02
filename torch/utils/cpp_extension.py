@@ -1169,7 +1169,7 @@ def _jit_compile(name,
                  is_standalone,
                  keep_intermediates=True) -> None:
     if IS_WINDOWS and is_standalone:
-        # On linux use LD_LIBRARY_PATH
+        # FIXME: how does this work for Windows?
         raise NotImplementedError("Not sure how to handle dynamic linking for standalone.")
 
     if with_cuda is None:
@@ -1621,34 +1621,29 @@ def _write_ninja_file_to_build_library(path,
         user_includes += system_includes
         system_includes.clear()
 
-<<<<<<< HEAD
     if is_standalone:
         common_cflags = []
     else:
         common_cflags = [f'-DTORCH_EXTENSION_NAME={name}']
         common_cflags.append('-DTORCH_API_INCLUDE_EXTENSION_H')
-=======
-    common_cflags = [f'-DTORCH_EXTENSION_NAME={name}']
-    common_cflags.append('-DTORCH_API_INCLUDE_EXTENSION_H')
 
-    # Note [Pybind11 ABI constants]
-    #
-    # Pybind11 before 2.4 used to build an ABI strings using the following pattern:
-    # f"__pybind11_internals_v{PYBIND11_INTERNALS_VERSION}{PYBIND11_INTERNALS_KIND}{PYBIND11_BUILD_TYPE}__"
-    # Since 2.4 compier type, stdlib and build abi parameters are also encoded like this:
-    # f"__pybind11_internals_v{PYBIND11_INTERNALS_VERSION}{PYBIND11_INTERNALS_KIND}{PYBIND11_COMPILER_TYPE}{PYBIND11_STDLIB}{PYBIND11_BUILD_ABI}{PYBIND11_BUILD_TYPE}__"
-    #
-    # This was done in order to further narrow down the chances of compiler ABI incompatibility
-    # that can cause a hard to debug segfaults.
-    # For PyTorch extensions we want to relax those restrictions and pass compiler, stdlib and abi properties
-    # captured during PyTorch native library compilation in torch/csrc/Module.cpp
+        # Note [Pybind11 ABI constants]
+        #
+        # Pybind11 before 2.4 used to build an ABI strings using the following pattern:
+        # f"__pybind11_internals_v{PYBIND11_INTERNALS_VERSION}{PYBIND11_INTERNALS_KIND}{PYBIND11_BUILD_TYPE}__"
+        # Since 2.4 compier type, stdlib and build abi parameters are also encoded like this:
+        # f"__pybind11_internals_v{PYBIND11_INTERNALS_VERSION}{PYBIND11_INTERNALS_KIND}{PYBIND11_COMPILER_TYPE}{PYBIND11_STDLIB}{PYBIND11_BUILD_ABI}{PYBIND11_BUILD_TYPE}__"
+        #
+        # This was done in order to further narrow down the chances of compiler ABI incompatibility
+        # that can cause a hard to debug segfaults.
+        # For PyTorch extensions we want to relax those restrictions and pass compiler, stdlib and abi properties
+        # captured during PyTorch native library compilation in torch/csrc/Module.cpp
 
-    for pname in ["COMPILER_TYPE", "STDLIB", "BUILD_ABI"]:
-        pval = getattr(torch._C, f"_PYBIND11_{pname}")
-        if pval is not None and not IS_WINDOWS:
-            common_cflags.append(f'-DPYBIND11_{pname}=\\"{pval}\\"')
+        for pname in ["COMPILER_TYPE", "STDLIB", "BUILD_ABI"]:
+            pval = getattr(torch._C, f"_PYBIND11_{pname}")
+            if pval is not None and not IS_WINDOWS:
+                common_cflags.append(f'-DPYBIND11_{pname}=\\"{pval}\\"')
 
->>>>>>> fbcode/warm
     common_cflags += [f'-I{include}' for include in user_includes]
     common_cflags += [f'-isystem {include}' for include in system_includes]
 
