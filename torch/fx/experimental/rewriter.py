@@ -3,7 +3,7 @@ import inspect
 import textwrap
 import copy
 from types import FunctionType
-from typing import Union, Callable
+from typing import cast, Union, Callable
 from torch.fx.symbolic_trace import Tracer
 from torch.fx.graph import Graph
 from torch.jit.frontend import normalize_source_lines
@@ -50,7 +50,9 @@ class AST_Rewriter(ast.NodeTransformer):
         symbolically-traceable torch.Assert function
         """
         # Create the Call node
-        call_node = ast.parse('torch.Assert()', mode='eval').body
+        # `cast` is used to silence spurious type checker warnings
+        n = cast(ast.Expression, ast.parse('torch.Assert()', mode='eval'))
+        call_node = cast(ast.Call, n.body)
         msg = node.msg if node.msg else ast.Constant(value="", kind=None)
         call_node.args = [node.test, msg]
 
@@ -76,7 +78,7 @@ def _rewrite(fn : Union[torch.nn.Module, Callable]) -> Union[torch.nn.Module, Ca
                 def __init__(self, orig):
                     super().__init__()
                     self.__dict__ = copy.copy(orig.__dict__)
-            RewrittenModule.forward = AST_Rewriter().rewrite(m.forward)
+            RewrittenModule.forward = AST_Rewriter().rewrite(cast(FunctionType, m.forward))
             new_m = RewrittenModule(m)
             for name, child in new_m.named_children():
                 new_m[name] = rewrite_module(child)
@@ -84,4 +86,4 @@ def _rewrite(fn : Union[torch.nn.Module, Callable]) -> Union[torch.nn.Module, Ca
         return rewrite_module(fn)
     else:
         # Rewrite this single free function
-        return AST_Rewriter().rewrite(fn)
+        return AST_Rewriter().rewrite(cast(FunctionType, fn))
