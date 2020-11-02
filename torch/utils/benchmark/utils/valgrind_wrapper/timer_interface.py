@@ -19,7 +19,7 @@ from typing import (
 
 import torch
 from torch.utils.benchmark.utils import common
-from torch.utils.cpp_extension import load_inline
+from torch.utils import cpp_extension
 
 
 __all__ = ["FunctionCount", "FunctionCounts", "CallgrindStats", "CopyIfCallgrind"]
@@ -862,7 +862,7 @@ class _ValgrindWrapper(object):
         toggle_callgrind_path = os.getenv("TOGGLE_CALLGRIND_PATH") or torch_path
 
         try:
-            exec_path = load_inline(
+            exec_path = cpp_extension.load(
                 "measure_loop",
                 cpp_sources=measure_loop_src,
                 extra_include_paths=[working_dir],
@@ -872,12 +872,11 @@ class _ValgrindWrapper(object):
                     f"-Wl,--no-whole-archive {toggle_callgrind_path}/lib/libtoggle_callgrind.so",
                 ],
                 build_directory=build_dir,
-                is_python_module=False,
                 is_standalone=True,
             )
 
         except TypeError:
-            # Shim version. (prior to addition of `is_standalone` to `load_inline`)
+            # Shim version. (prior to addition of `is_standalone` to `load`)
             shutil.copy(
                 os.path.join(cwd, "gen_CMakeLists.txt"),
                 os.path.join(working_dir, "CMakeLists.txt")

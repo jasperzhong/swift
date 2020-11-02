@@ -1015,7 +1015,6 @@ def load_inline(name,
                 verbose=False,
                 with_cuda=None,
                 is_python_module=True,
-                is_standalone=False,
                 with_pytorch_error_handling=True,
                 keep_intermediates=True):
     r'''
@@ -1090,9 +1089,6 @@ def load_inline(name,
     '''
     build_directory = build_directory or _get_build_directory(name, verbose)
 
-    if is_standalone and functions is not None:
-        raise ValueError("`functions` must be None if is_standalone=True.")
-
     if isinstance(cpp_sources, str):
         cpp_sources = [cpp_sources]
     cuda_sources = cuda_sources or []
@@ -1152,7 +1148,7 @@ def load_inline(name,
         verbose,
         with_cuda,
         is_python_module,
-        is_standalone,
+        is_standalone=False,
         keep_intermediates=keep_intermediates)
 
 

@@ -151,6 +151,7 @@ class Timer(object):
         if lang == CPP:
             assert not globals, "lang='C++' does not support globals."
             self._timer_cls = _CPPTimer
+            setup = ("" if setup == "pass" else setup)
 
         # We copy `globals` to prevent mutations from leaking, (for instance,
         # `eval` adds the `__builtins__` key) and include `torch` if not
