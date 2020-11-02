@@ -305,6 +305,7 @@ def build_deps():
                             'asmjit', 'CMakeLists.txt'))
     check_file(os.path.join(third_party_path, 'onnx', 'third_party',
                             'benchmark', 'CMakeLists.txt'))
+    check_file(os.path.join(third_party_path, 'valgrind-headers', 'callgrind.h'))
 
     check_pydep('yaml', 'pyyaml')
     check_pydep('typing', 'typing')

@@ -19,6 +19,7 @@ from typing import (
 
 import torch
 from torch.utils.benchmark.utils import common
+from torch.utils.cpp_extension import load_inline
 
 
 __all__ = ["FunctionCount", "FunctionCounts", "CallgrindStats", "CopyIfCallgrind"]
@@ -826,10 +827,6 @@ class _ValgrindWrapper(object):
         stdout_stderr_log: str,
     ):
         cwd = os.path.split(os.path.abspath(__file__))[0]
-        shutil.copy(
-            os.path.join(cwd, "gen_CMakeLists.txt"),
-            os.path.join(working_dir, "CMakeLists.txt")
-        )
 
         shutil.copy(
             os.path.join(cwd, "toggle_callgrind.h"),
@@ -875,27 +872,51 @@ class _ValgrindWrapper(object):
         torch_path = os.path.abspath(os.path.join(cwd, "../../../.."))
         toggle_callgrind_path = os.getenv("TOGGLE_CALLGRIND_PATH") or torch_path
 
-        with open(stdout_stderr_log, "wb") as f:
-            build_result = subprocess.run(
-                # passing `env=` messes with PATH related things,
-                # so this is a workaround.
-                f"TOGGLE_CALLGRIND_PATH='{torch_path}' CMAKE_PREFIX_PATH='{torch_path}' "
-                "CXXFLAGS='-O1 -g' "
-                "cmake .. && "
-                "cmake --build . --config Release",
-                shell=True,
-                cwd=build_dir,
-                stdout=f,
-                stderr=f,
+        try:
+            exec_path = load_inline(
+                "measure_loop",
+                cpp_sources=measure_loop_src,
+                extra_include_paths=[working_dir],
+                extra_cflags=["-O1", "-g"],
+                extra_ldflags=[
+                    f"-Wl,-rpath,{toggle_callgrind_path}/lib",
+                    f"-Wl,--no-whole-archive {toggle_callgrind_path}/lib/libtoggle_callgrind.so",
+                ],
+                build_directory=build_dir,
+                is_python_module=False,
+                is_standalone=True,
             )
-        if build_result.returncode:
-            with open(stdout_stderr_log, "rt") as f:
-                raise ValueError(
-                    f"Failed to build C++ run loop: (retcode = {build_result.returncode})\n"
-                    f"{f.read()}"
-                )
 
-        return [os.path.join(build_dir, "measure_loop")]
+        except TypeError:
+            # Shim version. (prior to addition of `is_standalone` to `load_inline`)
+            shutil.copy(
+                os.path.join(cwd, "gen_CMakeLists.txt"),
+                os.path.join(working_dir, "CMakeLists.txt")
+            )
+
+            with open(stdout_stderr_log, "wb") as f:
+                build_result = subprocess.run(
+                    # passing `env=` messes with PATH related things,
+                    # so this is a workaround.
+                    f"TOGGLE_CALLGRIND_PATH='{toggle_callgrind_path}' "
+                    f"CMAKE_PREFIX_PATH='{torch_path}' "
+                    "CXXFLAGS='-O1 -g' "
+                    "cmake .. && "
+                    "cmake --build . --config Release",
+                    shell=True,
+                    cwd=build_dir,
+                    stdout=f,
+                    stderr=f,
+                )
+            if build_result.returncode:
+                with open(stdout_stderr_log, "rt") as f:
+                    raise ValueError(
+                        f"Failed to build C++ run loop: (retcode = {build_result.returncode})\n"
+                        f"{f.read()}"
+                    )
+            exec_path = os.path.join(build_dir, "measure_loop")
+
+        return [exec_path]
 
 
 CALLGRIND_SINGLETON: Optional[_ValgrindWrapper] = None

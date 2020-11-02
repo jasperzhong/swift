@@ -1,3 +1,4 @@
+# Fallback for back-testing earlier versions of PyTorch.
 cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 
 project(measure_loop)

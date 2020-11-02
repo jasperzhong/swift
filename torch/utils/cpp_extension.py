@@ -911,6 +911,7 @@ def load(name,
          verbose=False,
          with_cuda: Optional[bool] = None,
          is_python_module=True,
+         is_standalone=False,
          keep_intermediates=True):
     r'''
     Loads a PyTorch C++ extension just-in-time (JIT).
@@ -993,6 +994,7 @@ def load(name,
         verbose,
         with_cuda,
         is_python_module,
+        is_standalone,
         keep_intermediates=keep_intermediates)
 
 
@@ -1008,6 +1010,7 @@ def load_inline(name,
                 verbose=False,
                 with_cuda=None,
                 is_python_module=True,
+                is_standalone=False,
                 with_pytorch_error_handling=True,
                 keep_intermediates=True):
     r'''
@@ -1082,6 +1085,9 @@ def load_inline(name,
     '''
     build_directory = build_directory or _get_build_directory(name, verbose)
 
+    if is_standalone and functions is not None:
+        raise ValueError("`functions` must be None if is_standalone=True.")
+
     if isinstance(cpp_sources, str):
         cpp_sources = [cpp_sources]
     cuda_sources = cuda_sources or []
@@ -1141,6 +1147,7 @@ def load_inline(name,
         verbose,
         with_cuda,
         is_python_module,
+        is_standalone,
         keep_intermediates=keep_intermediates)
 
 
@@ -1154,7 +1161,12 @@ def _jit_compile(name,
                  verbose: bool,
                  with_cuda: Optional[bool],
                  is_python_module,
+                 is_standalone,
                  keep_intermediates=True) -> None:
+    if IS_WINDOWS and is_standalone:
+        # On linux use LD_LIBRARY_PATH
+        raise NotImplementedError("Not sure how to handle dynamic linking for standalone.")
+
     if with_cuda is None:
         with_cuda = any(map(_is_cuda_file, sources))
     with_cudnn = any(['cudnn' in f for f in extra_ldflags or []])
@@ -1195,6 +1207,7 @@ def _jit_compile(name,
                         extra_ldflags=extra_ldflags or [],
                         extra_include_paths=extra_include_paths or [],
                         build_directory=build_directory,
+                        is_standalone=is_standalone,
                         verbose=verbose,
                         with_cuda=with_cuda)
             finally:
@@ -1207,7 +1220,9 @@ def _jit_compile(name,
 
     if verbose:
         print(f'Loading extension module {name}...')
-    return _import_module_from_library(name, build_directory, is_python_module)
+
+    return _import_module_from_library(
+        name, build_directory, is_python_module, is_standalone)
 
 
 def _write_ninja_file_and_compile_objects(
@@ -1260,6 +1275,7 @@ def _write_ninja_file_and_build_library(
         extra_ldflags,
         extra_include_paths,
         build_directory: str,
+        is_standalone: bool,
         verbose: bool,
         with_cuda: Optional[bool]) -> None:
     verify_ninja_availability()
@@ -1273,7 +1289,8 @@ def _write_ninja_file_and_build_library(
     extra_ldflags = _prepare_ldflags(
         extra_ldflags or [],
         with_cuda,
-        verbose)
+        verbose,
+        is_standalone)
     build_file_path = os.path.join(build_directory, 'build.ninja')
     if verbose:
         print(f'Emitting ninja build file {build_file_path}...')
@@ -1287,7 +1304,8 @@ def _write_ninja_file_and_build_library(
         extra_cuda_cflags=extra_cuda_cflags or [],
         extra_ldflags=extra_ldflags or [],
         extra_include_paths=extra_include_paths or [],
-        with_cuda=with_cuda)
+        with_cuda=with_cuda,
+        is_standalone=is_standalone)
 
     if verbose:
         print(f'Building extension module {name}...')
@@ -1320,7 +1338,7 @@ def verify_ninja_availability():
         raise RuntimeError("Ninja is required to load C++ extensions")
 
 
-def _prepare_ldflags(extra_ldflags, with_cuda, verbose):
+def _prepare_ldflags(extra_ldflags, with_cuda, verbose, is_standalone):
     here = os.path.abspath(__file__)
     torch_path = os.path.dirname(os.path.dirname(here))
     lib_path = os.path.join(torch_path, 'lib')
@@ -1339,8 +1357,9 @@ def _prepare_ldflags(extra_ldflags, with_cuda, verbose):
             # Related issue: https://github.com/pytorch/pytorch/issues/31611
             extra_ldflags.append('-INCLUDE:?warp_size@cuda@at@@YAHXZ')
         extra_ldflags.append('torch.lib')
-        extra_ldflags.append('torch_python.lib')
-        extra_ldflags.append(f'/LIBPATH:{python_lib_path}')
+        if not is_standalone:
+            extra_ldflags.append('torch_python.lib')
+            extra_ldflags.append(f'/LIBPATH:{python_lib_path}')
         extra_ldflags.append(f'/LIBPATH:{lib_path}')
     else:
         extra_ldflags.append(f'-L{lib_path}')
@@ -1351,7 +1370,11 @@ def _prepare_ldflags(extra_ldflags, with_cuda, verbose):
         if with_cuda:
             extra_ldflags.append('-ltorch_hip' if IS_HIP_EXTENSION else '-ltorch_cuda')
         extra_ldflags.append('-ltorch')
-        extra_ldflags.append('-ltorch_python')
+        if is_standalone:
+            extra_ldflags.append(f"-Wl,-rpath,{lib_path}")
+
+        if not is_standalone:
+            extra_ldflags.append('-ltorch_python')
 
     if with_cuda:
         if verbose:
@@ -1550,7 +1573,11 @@ def _run_ninja_build(build_directory: str, verbose: bool, error_prefix: str) -> 
         raise RuntimeError(message) from e
 
 
-def _import_module_from_library(module_name, path, is_python_module):
+def _import_module_from_library(module_name, path, is_python_module, is_standalone):
+    if is_standalone:
+        assert not IS_WINDOWS
+        return os.path.join(path, module_name + ".o")
+
     # https://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path
     file, path, description = imp.find_module(module_name, [path])
     # Close the .so file after load.
@@ -1568,7 +1595,8 @@ def _write_ninja_file_to_build_library(path,
                                        extra_cuda_cflags,
                                        extra_ldflags,
                                        extra_include_paths,
-                                       with_cuda) -> None:
+                                       with_cuda,
+                                       is_standalone) -> None:
     extra_cflags = [flag.strip() for flag in extra_cflags]
     extra_cuda_cflags = [flag.strip() for flag in extra_cuda_cflags]
     extra_ldflags = [flag.strip() for flag in extra_ldflags]
@@ -1588,8 +1616,11 @@ def _write_ninja_file_to_build_library(path,
         user_includes += system_includes
         system_includes.clear()
 
-    common_cflags = [f'-DTORCH_EXTENSION_NAME={name}']
-    common_cflags.append('-DTORCH_API_INCLUDE_EXTENSION_H')
+    if is_standalone:
+        common_cflags = []
+    else:
+        common_cflags = [f'-DTORCH_EXTENSION_NAME={name}']
+        common_cflags.append('-DTORCH_API_INCLUDE_EXTENSION_H')
     common_cflags += [f'-I{include}' for include in user_includes]
     common_cflags += [f'-isystem {include}' for include in system_includes]
 
@@ -1632,6 +1663,8 @@ def _write_ninja_file_to_build_library(path,
     def object_file_path(source_file: str) -> str:
         # '/path/to/file.cpp' -> 'file'
         file_name = os.path.splitext(os.path.basename(source_file))[0]
+        if is_standalone and file_name == 'main':
+            file_name = name
         if _is_cuda_file(source_file) and with_cuda:
             # Use a different object filename in case a C++ and CUDA file have
             # the same filename but different extension (.cpp vs. .cu).
@@ -1643,9 +1676,9 @@ def _write_ninja_file_to_build_library(path,
     objects = [object_file_path(src) for src in sources]
 
     if IS_WINDOWS:
-        ldflags = ['/DLL'] + extra_ldflags
+        ldflags = ([] if is_standalone else ['/DLL']) + extra_ldflags
     else:
-        ldflags = ['-shared'] + extra_ldflags
+        ldflags = ([] if is_standalone else ['-shared']) + extra_ldflags
     # The darwin linker needs explicit consent to ignore unresolved symbols.
     if sys.platform.startswith('darwin'):
         ldflags.append('-undefined dynamic_lookup')
@@ -1653,7 +1686,7 @@ def _write_ninja_file_to_build_library(path,
         ldflags = _nt_quote_args(ldflags)
 
     ext = 'pyd' if IS_WINDOWS else 'so'
-    library_target = f'{name}.{ext}'
+    library_target = None if is_standalone else f'{name}.{ext}'
 
     _write_ninja_file(
         path=path,
@@ -1665,7 +1698,8 @@ def _write_ninja_file_to_build_library(path,
         objects=objects,
         ldflags=ldflags,
         library_target=library_target,
-        with_cuda=with_cuda)
+        with_cuda=with_cuda,
+        is_standalone=is_standalone)
 
 
 def _write_ninja_file(path,
@@ -1677,7 +1711,8 @@ def _write_ninja_file(path,
                       objects,
                       ldflags,
                       library_target,
-                      with_cuda) -> None:
+                      with_cuda,
+                      is_standalone) -> None:
     r"""Write a ninja file that does the desired compiling and linking.
 
     `path`: Where to write this file
@@ -1736,13 +1771,14 @@ def _write_ninja_file(path,
 
     # See https://ninja-build.org/build.ninja.html for reference.
     compile_rule = ['rule compile']
+    c_or_ldflags = "$ldflags" if is_standalone else "-c"
     if IS_WINDOWS:
         compile_rule.append(
-            '  command = cl /showIncludes $cflags -c $in /Fo$out $post_cflags')
+            f'  command = cl /showIncludes $cflags {c_or_ldflags} $in /Fo$out $post_cflags')
         compile_rule.append('  deps = msvc')
     else:
         compile_rule.append(
-            '  command = $cxx -MMD -MF $out.d $cflags -c $in -o $out $post_cflags')
+            f'  command = $cxx -MMD -MF $out.d $cflags {c_or_ldflags} $in -o $out $post_cflags')
         compile_rule.append('  depfile = $out.d')
         compile_rule.append('  deps = gcc')
 
@@ -1763,7 +1799,7 @@ def _write_ninja_file(path,
         object_file = object_file.replace(" ", "$ ")
         build.append(f'build {object_file}: {rule} {source_file}')
 
-    if library_target is not None:
+    if library_target is not None and not is_standalone:
         link_rule = ['rule link']
         if IS_WINDOWS:
             cl_paths = subprocess.check_output(['where',
