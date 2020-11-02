@@ -193,6 +193,30 @@ class TestForeach(TestCase):
     def test_erfс(self, device, dtype):
         self._test_unary_op(device, dtype, torch._foreach_erfc, torch._foreach_erfc_, torch.erfc)
 
+    @dtypes(*[torch.float, torch.double])
+    def test_expm1(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_expm1, torch._foreach_expm1_, torch.expm1)
+
+    @dtypes(*[torch.float, torch.double])
+    def test_floor(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_floor, torch._foreach_floor_, torch.floor)
+
+    @dtypes(*[torch.float, torch.double, torch.complex64, torch.complex128])
+    def test_log(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_log, torch._foreach_log_, torch.log)
+
+    @dtypes(*[torch.float, torch.double, torch.complex64, torch.complex128])
+    def test_log10(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_log10, torch._foreach_log10_, torch.log10)
+
+    @dtypes(*[torch.float, torch.double])
+    def test_log1p(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_log1p, torch._foreach_log1p_, torch.log1p)
+
+    @dtypes(*[torch.float, torch.double, torch.complex64, torch.complex128])
+    def test_log2(self, device, dtype):
+        self._test_unary_op(device, dtype, torch._foreach_log2, torch._foreach_log2_, torch.log2)
+
     #
     # Pointwise ops
     #

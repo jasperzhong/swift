@@ -7191,6 +7191,54 @@
     CPU: foreach_tensor_erfc_slow_
     CUDA: foreach_tensor_erfc_cuda_
 
+- func: _foreach_expm1_(Tensor(a!)[] self) -> ()
+  use_c10_dispatcher: full
+  device_guard: False
+  variants: function
+  dispatch:
+    CPU: foreach_tensor_expm1_slow_
+    CUDA: foreach_tensor_expm1_cuda_
+
+- func: _foreach_floor_(Tensor(a!)[] self) -> ()
+  use_c10_dispatcher: full
+  device_guard: False
+  variants: function
+  dispatch:
+    CPU: foreach_tensor_floor_slow_
+    CUDA: foreach_tensor_floor_cuda_
+
+- func: _foreach_log_(Tensor(a!)[] self) -> ()
+  use_c10_dispatcher: full
+  device_guard: False
+  variants: function
+  dispatch:
+    CPU: foreach_tensor_log_slow_
+    CUDA: foreach_tensor_log_cuda_
+
+- func: _foreach_log10_(Tensor(a!)[] self) -> ()
+  use_c10_dispatcher: full
+  device_guard: False
+  variants: function
+  dispatch:
+    CPU: foreach_tensor_log10_slow_
+    CUDA: foreach_tensor_log10_cuda_
+
+- func: _foreach_log1p_(Tensor(a!)[] self) -> ()
+  use_c10_dispatcher: full
+  device_guard: False
+  variants: function
+  dispatch:
+    CPU: foreach_tensor_log1p_slow_
+    CUDA: foreach_tensor_log1p_cuda_
+
+- func: _foreach_log2_(Tensor(a!)[] self) -> ()
+  use_c10_dispatcher: full
+  device_guard: False
+  variants: function
+  dispatch:
+    CPU: foreach_tensor_log2_slow_
+    CUDA: foreach_tensor_log2_cuda_
+
 - func: _foreach_addcdiv_.Scalar(Tensor(a!)[] self, Tensor[] tensor1, Tensor[] tensor2, Scalar value=1) -> ()
   use_c10_dispatcher: full
   device_guard: False

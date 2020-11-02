@@ -118,6 +118,10 @@ FOREACH_UNARY_OP(asin, Asin);
 FOREACH_UNARY_OP(atan, Atan);
 FOREACH_UNARY_OP(cos, Cos);
 FOREACH_UNARY_OP(cosh, Cosh);
+FOREACH_UNARY_OP(log, Log);
+FOREACH_UNARY_OP(log10, Log10);
+FOREACH_UNARY_OP(log2, Log2);
+
 
 #define FOREACH_UNARY_OP_NO_COMPLEX(NAME, NAME1)                        \
 template<typename T>                                                    \
@@ -149,5 +153,8 @@ FOREACH_UNARY_OP_NO_COMPLEX(abs, Abs);
 FOREACH_UNARY_OP_NO_COMPLEX(ceil, Ceil);
 FOREACH_UNARY_OP_NO_COMPLEX(erf, Erf);
 FOREACH_UNARY_OP_NO_COMPLEX(erfc, Erfc);
+FOREACH_UNARY_OP_NO_COMPLEX(log1p, Log1p);
+FOREACH_UNARY_OP_NO_COMPLEX(expm1, Expm1);
+FOREACH_UNARY_OP_NO_COMPLEX(floor, Floor);
 
 }} // namespace at::native
