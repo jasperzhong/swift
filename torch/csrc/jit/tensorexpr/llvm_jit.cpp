@@ -18,6 +18,8 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 
+#include <c10/util/Half.h>
+
 #include <sleef.h>
 #include <algorithm>
 #include <memory>
@@ -99,6 +101,14 @@ class TORCH_API PytorchLLVMJITImpl {
            {llvm::pointerToJITTargetAddress(&fmodf), JITSymbolFlags::None}},
           {Mangle("remainderf"),
            {llvm::pointerToJITTargetAddress(&remainderf),
+            JITSymbolFlags::None}},
+
+          // float -> half & half -> float conversions
+          {Mangle("__gnu_h2f_ieee"),
+           {llvm::pointerToJITTargetAddress(&c10::detail::fp16_ieee_to_fp32_value),
+            JITSymbolFlags::None}},
+          {Mangle("__gnu_f2h_ieee"),
+           {llvm::pointerToJITTargetAddress(&c10::detail::fp16_ieee_from_fp32_value),
             JITSymbolFlags::None}},
 
           // FP32 Sleef functions -- SSE
