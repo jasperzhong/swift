@@ -289,6 +289,9 @@ class TestDistBackend(MultiProcessTestCase):
         self = cls(test_name)
         self.rank = rank
         self.file_name = file_name
+
+        if torch.cuda.device_count() < int(self.world_size):
+            sys.exit(TEST_SKIPS['multi-gpu'].exit_code)
         try:
             dist.init_process_group(
                 init_method=self.init_method,
@@ -4017,6 +4020,7 @@ class DistributedTest:
                     else:
                         return F.relu(self.lin1(x))
 
+            world_size = dist.get_world_size()
             torch.cuda.set_device(self.rank)
             model = torch.nn.parallel.DistributedDataParallel(
                 ToyModel().cuda(self.rank),
@@ -4036,9 +4040,9 @@ class DistributedTest:
                 # it is used.
                 local_used_maps = model.reducer._get_local_used_maps()
                 if i % 2 == 0:
-                    expected = torch.tensor([2, 0], device=self.rank, dtype=torch.int32)
+                    expected = torch.tensor([world_size, 0], device=self.rank, dtype=torch.int32)
                 else:
-                    expected = torch.tensor([2, 2], device=self.rank, dtype=torch.int32)
+                    expected = torch.tensor([world_size, world_size], device=self.rank, dtype=torch.int32)
 
                 # Validate parameter usage.
                 variable_usage_tensor = local_used_maps[0]
@@ -4088,6 +4092,7 @@ class DistributedTest:
                     else:
                         return F.relu(self.lin1(x))
 
+            world_size = dist.get_world_size()
             torch.cuda.set_device(self.rank)
             model = torch.nn.parallel.DistributedDataParallel(
                 ToyModel(self.rank).cuda(self.rank),
@@ -4108,9 +4113,9 @@ class DistributedTest:
                 local_used_maps = model.reducer._get_local_used_maps()
 
                 if i % 2 == 0:
-                    expected = torch.tensor([2, 0], device=self.rank, dtype=torch.int32)
+                    expected = torch.tensor([world_size, 0], device=self.rank, dtype=torch.int32)
                 else:
-                    expected = torch.tensor([2, 1], device=self.rank, dtype=torch.int32)
+                    expected = torch.tensor([world_size, 1], device=self.rank, dtype=torch.int32)
 
                 variable_usage_tensor = local_used_maps[0]
                 # Validate parameter usage. On odd iterations, 2nd param is only
