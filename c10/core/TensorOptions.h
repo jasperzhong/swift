@@ -20,11 +20,11 @@
 namespace c10 {
 
 inline ScalarType dtype_or_default(const c10::optional<ScalarType>& dtype) {
-  return dtype.value_or_else([] {return get_default_dtype_as_scalartype();});
+  return value_or_else(dtype, [] {return get_default_dtype_as_scalartype();});
 }
 
 inline caffe2::TypeMeta dtype_or_default(const c10::optional<caffe2::TypeMeta>& dtype) {
-  return dtype.value_or_else([] {return get_default_dtype();});
+  return value_or_else(dtype, [] {return get_default_dtype();});
 }
 
 inline Layout layout_or_default(const c10::optional<Layout>& layout) {
@@ -32,11 +32,11 @@ inline Layout layout_or_default(const c10::optional<Layout>& layout) {
 }
 
 inline Device device_or_default(const c10::optional<Device>& device) {
-  return device.value_or_else([] {return Device(kCPU);});
+  return value_or_else(device, [] {return Device(kCPU);});
 }
 
 inline bool pinned_memory_or_default(const c10::optional<bool>& pinned_memory) {
-  return pinned_memory.has_value() ? *pinned_memory : false;
+  return pinned_memory.value_or(false);
 }
 
 /// A class to encapsulate construction axes of an Tensor.  TensorOptions was
