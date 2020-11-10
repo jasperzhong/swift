@@ -12,8 +12,8 @@ namespace detail {
 // but we also want to skip compute_types which in not avoidable
 // in TensorIterator for now.
 Tensor& scalar_fill(Tensor& self, Scalar value);
-TORCH_API Tensor scalar_tensor_static(Scalar s, c10::optional<ScalarType> dtype_opt, c10::optional<Layout> layout_opt,
-                                      c10::optional<Device> device_opt, c10::optional<bool> pin_memory_opt,
+TORCH_API Tensor scalar_tensor_static(Scalar s, const c10::optional<ScalarType>& dtype_opt, const c10::optional<Layout>& layout_opt,
+                                      const c10::optional<Device>& device_opt, const c10::optional<bool>& pin_memory_opt,
                                       c10::optional<c10::MemoryFormat> memory_format_opt);
 } // namespace detail
 } // namespace at

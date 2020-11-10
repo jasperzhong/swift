@@ -1426,7 +1426,7 @@ static Tensor _norm_min_max(Tensor& self, double ord, int64_t dim, bool keepdim)
 
 // Performs matrix norm
 static Tensor& _linalg_norm_matrix_out(Tensor& result, const Tensor &self, optional<Scalar> opt_ord,
-                               IntArrayRef dim, bool keepdim, optional<ScalarType> opt_dtype) {
+                               IntArrayRef dim, bool keepdim, const optional<ScalarType>& opt_dtype) {
   Tensor result_;
   auto ord = opt_ord.value_or(2.0).toDouble();
   TORCH_CHECK(self.device().type() == DeviceType::CPU || self.device().type() == DeviceType::CUDA,
@@ -1497,7 +1497,7 @@ static Tensor& _linalg_norm_matrix_out(Tensor& result, const Tensor &self, optio
 // This function mostly serves as a wrapper for at::norm, but it overrides a few cases
 // for numpy compatibility. These cases are corrected within this wrapper, rather than
 // in at::norm itself, to avoid breaking backward compatibility.
-static Tensor& _linalg_norm_vector_out(Tensor& result, const Tensor& self, optional<Scalar> opt_ord, std::vector<int64_t> dim, bool keepdim, optional<ScalarType> opt_dtype) {
+static Tensor& _linalg_norm_vector_out(Tensor& result, const Tensor& self, optional<Scalar> opt_ord, std::vector<int64_t> dim, bool keepdim, const optional<ScalarType>& opt_dtype) {
   Tensor result_;
   bool case_was_overridden = false;
   if (opt_ord.has_value()) {
@@ -1538,7 +1538,7 @@ static Tensor& _linalg_norm_vector_out(Tensor& result, const Tensor& self, optio
   return result;
 }
 
-static Tensor& linalg_norm_out_impl(Tensor& result, const Tensor& self, optional<Scalar> opt_num_ord, optional<std::string> opt_str_ord, optional<IntArrayRef> opt_dim, bool keepdim, optional<ScalarType> opt_dtype) {
+static Tensor& linalg_norm_out_impl(Tensor& result, const Tensor& self, optional<Scalar> opt_num_ord, optional<std::string> opt_str_ord, optional<IntArrayRef> opt_dim, bool keepdim, const optional<ScalarType>& opt_dtype) {
   // Callers must give the ord argument as either a number, a string, or neither.
   // Since the user-facing API has no direct control over how this function is called, this is an internal assert.
   TORCH_INTERNAL_ASSERT(!(opt_num_ord.has_value() && opt_str_ord.has_value()));
@@ -1578,26 +1578,26 @@ static Tensor& linalg_norm_out_impl(Tensor& result, const Tensor& self, optional
 }
 
 // Numerical or None norms
-Tensor linalg_norm(const Tensor& self, optional<Scalar> opt_ord, optional<IntArrayRef> opt_dim, bool keepdim, optional<ScalarType> opt_dtype) {
+Tensor linalg_norm(const Tensor& self, optional<Scalar> opt_ord, optional<IntArrayRef> opt_dim, bool keepdim, const optional<ScalarType>& opt_dtype) {
   auto options = TensorOptions().dtype(opt_dtype.has_value() ? opt_dtype.value() : self.scalar_type()).device(self.device());
   Tensor result = at::empty({0}, options);
   return at::native::linalg_norm_out(result, self, opt_ord, opt_dim, keepdim, opt_dtype);
 }
 
 // Frobenius and nuclear norms
-Tensor linalg_norm(const Tensor& self, std::string ord, optional<IntArrayRef> opt_dim, bool keepdim, optional<ScalarType> opt_dtype) {
+Tensor linalg_norm(const Tensor& self, std::string ord, optional<IntArrayRef> opt_dim, bool keepdim, const optional<ScalarType>& opt_dtype) {
   auto options = TensorOptions().dtype(opt_dtype.has_value() ? opt_dtype.value() : self.scalar_type()).device(self.device());
   Tensor result = at::empty({0}, options);
   return at::native::linalg_norm_out(result, self, ord, opt_dim, keepdim, opt_dtype);
 }
 
 // Numerical or None norms
-Tensor& linalg_norm_out(Tensor& result, const Tensor& self, optional<Scalar> opt_ord, optional<IntArrayRef> opt_dim, bool keepdim, optional<ScalarType> opt_dtype) {
+Tensor& linalg_norm_out(Tensor& result, const Tensor& self, optional<Scalar> opt_ord, optional<IntArrayRef> opt_dim, bool keepdim, const optional<ScalarType>& opt_dtype) {
   return linalg_norm_out_impl(result, self, opt_ord, c10::nullopt, opt_dim, keepdim, opt_dtype);
 }
 
 // Frobenius and nuclear norms
-Tensor& linalg_norm_out(Tensor& result, const Tensor& self, std::string ord, optional<IntArrayRef> opt_dim, bool keepdim, optional<ScalarType> opt_dtype) {
+Tensor& linalg_norm_out(Tensor& result, const Tensor& self, std::string ord, optional<IntArrayRef> opt_dim, bool keepdim, const optional<ScalarType>& opt_dtype) {
   return linalg_norm_out_impl(result, self, c10::nullopt, ord, opt_dim, keepdim, opt_dtype);
 }
 

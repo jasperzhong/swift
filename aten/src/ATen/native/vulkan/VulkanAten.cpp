@@ -55,10 +55,10 @@ VulkanTensor& vtensor_from_vulkan(Tensor& tensor) {
 
 Tensor empty(
     IntArrayRef size,
-    optional<ScalarType> dtype,
-    optional<Layout> layout,
-    optional<Device> device,
-    optional<bool> pin_memory,
+    const optional<ScalarType>& dtype,
+    const optional<Layout>& layout,
+    const optional<Device>& device,
+    const optional<bool>& pin_memory,
     const optional<MemoryFormat> memory_format) {
   TORCH_CHECK(
       !pin_memory.has_value(),
@@ -74,10 +74,10 @@ Tensor empty(
 Tensor empty_strided(
     IntArrayRef size,
     IntArrayRef stride,
-    optional<ScalarType> dtype,
-    optional<Layout> layout,
-    optional<Device> device,
-    optional<bool> pin_memory) {
+    const optional<ScalarType>& dtype,
+    const optional<Layout>& layout,
+    const optional<Device>& device,
+    const optional<bool>& pin_memory) {
   return vulkan::aten::empty(
       size, dtype, layout, device, pin_memory, c10::nullopt);
 }
@@ -521,7 +521,7 @@ Tensor mean(
     const Tensor& self,
     const IntArrayRef dim,
     const bool keepdim,
-    const optional<ScalarType> dtype) {
+    const optional<ScalarType>& dtype) {
   TORCH_INTERNAL_ASSERT(self.is_vulkan(), "mean expects Vulkan tensor input");
 
   // Mean is implemented only for HW dimensions of 4-d tensor

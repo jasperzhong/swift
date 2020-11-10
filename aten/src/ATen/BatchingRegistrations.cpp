@@ -49,7 +49,7 @@ namespace at {
 // if not use the same mechanism. In order to accomplish that we might have to
 // do some refactoring.
 
-Tensor sum_batching_rule(const Tensor& self, IntArrayRef dims, bool keepdim, optional<ScalarType> dtype) {
+Tensor sum_batching_rule(const Tensor& self, IntArrayRef dims, bool keepdim, const optional<ScalarType>& dtype) {
   // PyTorch has a special case where sum(scalar_tensor, dim=0) does not fail
   // and instead returns a new scalar tensor. If the following happens:
   // >>> x = torch.randn(B0)  # the per-examples are all scalars
@@ -786,10 +786,10 @@ Tensor stack_batching_rule(TensorList tensors, int64_t dim) {
 // unwrap_and_call<..., at::to> because at::to takes TensorOptions& (!!)
 Tensor to_dtype_layout_batching_rule(
     const Tensor& self,
-    optional<ScalarType> dtype,
-    optional<Layout> layout,
-    optional<Device> device,
-    optional<bool> pin_memory,
+    const optional<ScalarType>& dtype,
+    const optional<Layout>& layout,
+    const optional<Device>& device,
+    const optional<bool>& pin_memory,
     bool non_blocking, bool copy,
     optional<MemoryFormat> memory_format) {
   auto options = TensorOptions()
@@ -806,10 +806,10 @@ Tensor to_dtype_layout_batching_rule(
 Tensor new_zeros_batching_rule(
     const Tensor& self,
     IntArrayRef size,
-    optional<ScalarType> dtype,
-    optional<Layout> layout,
-    optional<Device> device,
-    optional<bool> pin_memory) {
+    const optional<ScalarType>& dtype,
+    const optional<Layout>& layout,
+    const optional<Device>& device,
+    const optional<bool>& pin_memory) {
   auto physical_view = MultiBatchVmapTransform::logicalToPhysical(self);
   auto physical_size = physical_view.getPhysicalShape(size);
   auto options = TensorOptions()
@@ -824,10 +824,10 @@ Tensor new_zeros_batching_rule(
 Tensor new_empty_batching_rule(
     const Tensor& self,
     IntArrayRef size,
-    c10::optional<ScalarType> dtype,
-    c10::optional<Layout> layout,
-    c10::optional<Device> device,
-    c10::optional<bool> pin_memory) {
+    const c10::optional<ScalarType>& dtype,
+    const c10::optional<Layout>& layout,
+    const c10::optional<Device>& device,
+    const c10::optional<bool>& pin_memory) {
   auto physical_view = MultiBatchVmapTransform::logicalToPhysical(self);
   auto physical_size = physical_view.getPhysicalShape(size);
   auto result = physical_view.tensor().new_empty(physical_size, TensorOptions().dtype(dtype).layout(layout).device(device).pinned_memory(pin_memory));
