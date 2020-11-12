@@ -18,6 +18,8 @@ from .quantization_mappings import (
     _get_special_act_post_process,
 )
 
+from .utils import get_quant_type
+
 from .stubs import DeQuantStub, QuantWrapper
 from .qconfig import default_dynamic_qconfig, float16_dynamic_qconfig, float_qparams_dynamic_qconfig
 from .quant_type import quant_type_to_str
@@ -143,7 +145,7 @@ def add_observer_(module,
             m._forward_hooks.move_to_end(handle.id, last=False)
 
     for name, child in module.named_children():
-        quant_type = getattr(getattr(child, 'qconfig', None), 'quant_type', None)
+        quant_type = get_quant_type(child.qconfig)
         quant_type_str = quant_type_to_str(quant_type)
         quant_type_custom_module_class_mapping = custom_module_class_mapping.get(quant_type_str, {})
         if type(child) == nnq.FloatFunctional or type(child) == nnq.QFunctional:
@@ -157,7 +159,7 @@ def add_observer_(module,
         elif needs_observation(child) and type(child) in quant_type_custom_module_class_mapping:
             observed_child = quant_type_custom_module_class_mapping[type(child)].from_float(child)
             setattr(module, name, observed_child)
-            insert_activation_post_process(observed_child)
+            # insert_activation_post_process(observed_child)
         else:
             add_observer_(child, qconfig_propagation_list, non_leaf_module_list,
                           device, custom_module_class_mapping)

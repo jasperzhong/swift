@@ -1,3 +1,5 @@
+import torch
+
 from .quantize import *
 from .observer import *
 from .qconfig import *
