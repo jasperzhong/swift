@@ -1,4 +1,5 @@
 #include <ATen/ATen.h>
+#include <ATen/quantized/Quantizer.h>
 #include <ATen/core/op_registration/op_registration.h>
 #include <ATen/native/metal/MetalPrepackOpContext.h>
 
@@ -95,8 +96,31 @@ c10::intrusive_ptr<Conv2dOpContext> conv2d_prepack(
     c10::optional<Scalar> output_min,
     c10::optional<Scalar> output_max) {
   TORCH_CHECK(weight.dim() == 4);
+  Tensor serialized_weight = weight;
+  if(weight.sizes()[1] >= 12 && weight.sizes()[0] >= 12){
+    std::cout<<"conv2d_prepacking: "<<weight.sizes()<<std::endl;
+    auto min = weight.min().item<float>();
+    auto max = weight.max().item<float>();
+    constexpr size_t kBins = 255;
+    double scale = (max - min) / kBins;
+    auto quantizer = at::make_per_tensor_affine_quantizer(scale, -min, at::kQUInt8);
+    serialized_weight = quantizer->quantize(weight);
+    auto quantized_data =
+      reinterpret_cast<uint8_t*>(serialized_weight.template data_ptr<c10::quint8>());
+      auto data = weight.data_ptr<float>();
+      for (size_t i = 0; i < serialized_weight.numel(); ++i) {
+        int64_t temp = std::nearbyint((data[i] - min) / scale);
+        temp = std::max<int64_t>(temp, 0);
+        temp = std::min<int64_t>(temp, 255);
+        quantized_data[i] = static_cast<uint8_t>(temp);
+      }
+      // Multiplye by 1000000.f so as to store min value as zero point
+      // Since min value is pretty small scale it up. And then down in setstate.
+      quantizer = at::make_per_tensor_affine_quantizer(scale, static_cast<int64_t>(min * kMinScaleFactor), at::kQUInt8);
+      serialized_weight.set_quantizer_(quantizer);
+  }
   return c10::make_intrusive<Conv2dOpContext>(
-      std::move(weight),
+      std::move(serialized_weight),
       std::move(bias),
       stride,
       padding,
