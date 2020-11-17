@@ -394,7 +394,7 @@ TEST(OperatorRegistrationTest, whenRegisteringMismatchingKernelsInSameOpCall_the
     auto registrar1 = c10::RegisterOperators().op("_test::dummy", c10::RegisterOperators::options()
       .kernel<DummyKernelWithIntParam>(c10::DispatchKey::CPU)
       .kernel<MockKernel>(c10::DispatchKey::CUDA, &called_kernel));
-  }, "mismatched with a previous kernel");
+  }, "Mismatch in kernel C++ signatures");
 }
 
 void backend_fallback_kernel(const c10::OperatorHandle& op, c10::Stack* stack) {
@@ -640,7 +640,7 @@ TEST(OperatorRegistrationTest, givenLambdaKernel_whenRegisteringWithMismatchingC
     auto registrar = c10::RegisterOperators().op("_test::dummy", c10::RegisterOperators::options()
       .kernel(DispatchKey::CPU, [] (const int64_t&) {})
       .kernel(DispatchKey::CUDA, [] (int64_t&) {}));
-  }, "mismatched with a previous kernel");
+  }, "Mismatch in kernel C++ signatures");
 }
 
 TEST(OperatorRegistrationTest, givenLambdaKernel_whenRegisteringCatchAllAndBackendWithMismatchingCppSignatures_thenFails) {
@@ -648,7 +648,7 @@ TEST(OperatorRegistrationTest, givenLambdaKernel_whenRegisteringCatchAllAndBacke
     auto registrar = c10::RegisterOperators().op("_test::dummy", c10::RegisterOperators::options()
       .kernel(DispatchKey::CPU, [] (const int64_t&) {})
       .catchAllKernel([] (int64_t) {}));
-  }, "mismatched with a previous kernel");
+  }, "Mismatch in kernel C++ signatures");
 }
 
 TEST(OperatorRegistrationTest, givenLambdaKernel_whenRegisteringBackendAndCatchAllWithMismatchingCppSignatures_thenFails) {
@@ -656,7 +656,7 @@ TEST(OperatorRegistrationTest, givenLambdaKernel_whenRegisteringBackendAndCatchA
     auto registrar = c10::RegisterOperators().op("_test::dummy", c10::RegisterOperators::options()
       .catchAllKernel([] (const int64_t&) {})
       .kernel(DispatchKey::CPU, [] (int64_t) {}));
-  }, "mismatched with a previous kernel");
+  }, "Mismatch in kernel C++ signatures");
 }
 
 TEST(OperatorRegistrationTest, givenLambdaKernel_whenAccessingWithMismatchingCppSignatures_thenFails) {
@@ -665,7 +665,7 @@ TEST(OperatorRegistrationTest, givenLambdaKernel_whenAccessingWithMismatchingCpp
   expectThrows<c10::Error>([] {
     c10::Dispatcher::singleton().findSchemaOrThrow("_test::dummy", "")
       .typed<void(const int64_t&)>();
-  }, "Tried to access operator _test::dummy with a wrong signature");
+  }, "Tried to access or call an operator with a wrong signature.\n  operator: _test::dummy(int _0) -> ()");
 }
 
 TEST(OperatorRegistrationTest, givenLambdaKernel_whenAccessingCatchAllWithMismatchingCppSignatures_thenFails) {
@@ -674,7 +674,7 @@ TEST(OperatorRegistrationTest, givenLambdaKernel_whenAccessingCatchAllWithMismat
   expectThrows<c10::Error>([] {
     c10::Dispatcher::singleton().findSchemaOrThrow("_test::dummy", "")
       .typed<void(const int64_t&)>();
-  }, "Tried to access operator _test::dummy with a wrong signature");
+  }, "Tried to access or call an operator with a wrong signature.\n  operator: _test::dummy(int _0) -> ()");
 }
 
 TEST(OperatorRegistrationTest, givenTorchLibrary_whenRegisteringWithMismatchingCppSignatures_thenFails) {
@@ -683,7 +683,7 @@ TEST(OperatorRegistrationTest, givenTorchLibrary_whenRegisteringWithMismatchingC
   m.impl("dummy", DispatchKey::CPU, [] (int64_t) {});
   expectThrows<c10::Error>([&] {
     m.impl("dummy", DispatchKey::CUDA, [] (const int64_t&) {});
-  }, "mismatched with a previous kernel");
+  }, "Mismatch in kernel C++ signatures");
 }
 
 TEST(OperatorRegistrationTest, givenTorchLibrary_whenAccessingWithMismatchingCppSignatures_thenFails) {
@@ -693,7 +693,7 @@ TEST(OperatorRegistrationTest, givenTorchLibrary_whenAccessingWithMismatchingCpp
   expectThrows<c10::Error>([] {
     c10::Dispatcher::singleton().findSchemaOrThrow("_test::dummy", "")
       .typed<void(const int64_t&)>();
-  }, "Tried to access operator _test::dummy with a wrong signature");
+  }, "Tried to access or call an operator with a wrong signature.\n  operator: _test::dummy(int a) -> ()");
 }
 
 TEST(OperatorRegistrationTest, givenTorchLibrary_whenAccessingCatchAllWithMismatchingCppSignatures_thenFails) {
@@ -702,7 +702,7 @@ TEST(OperatorRegistrationTest, givenTorchLibrary_whenAccessingCatchAllWithMismat
   expectThrows<c10::Error>([] {
     c10::Dispatcher::singleton().findSchemaOrThrow("_test::dummy", "")
       .typed<void(const int64_t&)>();
-  }, "Tried to access operator _test::dummy with a wrong signature");
+  }, "Tried to access or call an operator with a wrong signature.\n  operator: _test::dummy(int a) -> ()");
 }
 
 /**
