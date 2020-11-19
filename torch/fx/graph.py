@@ -8,7 +8,12 @@ import keyword
 import re
 
 def _shadows_builtin_name(name: str) -> bool:
-    return name in builtins.__dict__ or name in keyword.kwlist or name in {'inf', 'nan'}
+    return hasattr(torch, name) or \
+           hasattr(torch.nn.functional, name) or \
+           hasattr(torch.nn, name) or \
+           name in builtins.__dict__ or \
+           name in keyword.kwlist or \
+           name in {'inf', 'nan'}
 
 def _is_magic(x: str) -> bool:
     return x.startswith('__') and x.endswith('__')
@@ -36,9 +41,9 @@ def _find_module_of_method(orig_method: Callable[..., Any]) -> str:
             return guess.__name__
     raise RuntimeError(f'cannot find module for {orig_method}')
 
-def _format_args(args: Tuple[Argument, ...], kwargs: Dict[str, Argument]) -> str:
-    args_s = ', '.join(repr(a) for a in args)
-    kwargs_s = ', '.join(f'{k} = {repr(v)}' for k, v in kwargs.items())
+def _format_args(args: Tuple[Argument, ...], kwargs: Dict[str, Argument], repr_fn : Callable[[Any], str]) -> str:
+    args_s = ', '.join(repr_fn(a) for a in args)
+    kwargs_s = ', '.join(f'{k} = {repr_fn(v)}' for k, v in kwargs.items())
     if args_s and kwargs_s:
         return f'{args_s}, {kwargs_s}'
     return args_s or kwargs_s
@@ -443,13 +448,7 @@ class Graph:
         if candidate[0].isdigit():
             candidate = f'_{candidate}'
 
-        def illegal_shadowing_name(name : str) -> bool:
-            return hasattr(torch, name) or \
-                hasattr(torch.nn.functional, name) or \
-                hasattr(torch.nn, name) or \
-                _shadows_builtin_name(name)
-
-        while candidate in self._used_names or illegal_shadowing_name(candidate):
+        while candidate in self._used_names:
             match = re.match(r"(.*)_(\d+)", candidate)
             if match is None:
                 candidate = candidate + '_1'
@@ -465,79 +464,136 @@ class Graph:
         Turn this `Graph` into valid Python code.
         """
         free_vars: List[str] = []
-        modules_used : Set[str] = set()
         body: List[str] = []
         maybe_return_annotation : str = ''
+        used_names = set()
+        unique_name_remap : Dict[Node, str] = {}
 
-        def register_modules_used(qualified_name : str):
+        def unique_str(base_name : str) -> str:
+            name = base_name
+            idx = 1
+            while name in used_names or _shadows_builtin_name(name):
+                name = f'{base_name}_{idx}'
+                idx = idx + 1
+            used_names.add(name)
+            return name
+
+        def unique_name(n : Node) -> str:
+            if n in unique_name_remap:
+                return unique_name_remap[n]
+
+            name = unique_str(n.name)
+
+            unique_name_remap[n] = name
+            return unique_name_remap[n]
+
+        def remapped_repr(a : Argument) -> str:
+            class ReprStr:
+                """Stupid class to get a string object with a repr without quotes"""
+                def __init__(self, s):
+                    self.s = s
+
+                def __repr__(self):
+                    return self.s
+
+            return repr(map_arg(a, lambda n: ReprStr(unique_name_remap.get(n) or n.name)))
+
+        module_names_used : Dict[str, Dict[str, Optional[str]]] = {}
+
+        def register_modules_used(qualified_name : str) -> str:
             if '.' in qualified_name:
-                module_name = qualified_name.split('.', maxsplit=1)[0]
-                modules_used.add(module_name)
+                if qualified_name.startswith('torch.ops'):
+                    _, _, tail = qualified_name.split('.', maxsplit=2)
+                    module_names_used.setdefault('torch', dict())
+                    if 'ops' not in module_names_used['torch']:
+                        module_names_used['torch']['ops'] = unique_str('ops')
+                    entry = module_names_used['torch']['ops']
+                    uniqued = entry if entry else 'ops'
+                    return f'{uniqued}.{tail}'
+
+                module_path, name = qualified_name.rsplit('.', maxsplit=1)
+                module_names_used.setdefault(module_path, dict())
+                if name not in module_names_used[module_path]:
+                    module_names_used[module_path][name] = unique_str(name)
+                entry = module_names_used[module_path][name]
+                return entry if entry else name
+            else:
+                return qualified_name
 
         def type_repr(o : Any):
             typename = _type_repr(o)
             if all(x.isidentifier() for x in typename.split('.')):
-                register_modules_used(typename)
+                typename = register_modules_used(typename)
             else:
                 # this is a constructor type, e.g. typing.List[torch.Tensor]
-                modules_used.add(o.__module__)
                 for sub_type in o.__args__:
                     # make sure we have torch.Tensor
-                    type_repr(sub_type)
+                    sub_type_repr = type_repr(sub_type)
+                    if sub_type is torch.Tensor:
+                        typename = typename.replace('torch.Tensor', sub_type_repr)
             return typename
 
         for node in self.nodes:
             if node.op == 'placeholder':
                 assert isinstance(node.target, str)
                 maybe_type_annotation = '' if node.type is None else f' : {type_repr(node.type)}'
-                maybe_default_arg = '' if not node.args else f' = {repr(node.args[0])}'
+                maybe_default_arg = '' if not node.args else f' = {remapped_repr(node.args[0])}'
                 free_vars.append(f'{node.target}{maybe_type_annotation}{maybe_default_arg}')
                 raw_name = node.target.replace('*', '')
-                if raw_name != node.name:
-                    body.append(f'{node.name} = {raw_name}\n')
+                node_unique_name = unique_name(node)
+                if raw_name != node_unique_name:
+                    body.append(f'{node_unique_name} = {raw_name}\n')
                 continue
             elif node.op == 'call_method':
                 assert isinstance(node.target, str)
                 body.append(
-                    f'{node.name} = {_format_target(repr(node.args[0]), node.target)}'
-                    f'({_format_args(node.args[1:], node.kwargs)})\n')
+                    f'{unique_name(node)} = {_format_target(remapped_repr(node.args[0]), node.target)}'
+                    f'({_format_args(node.args[1:], node.kwargs, remapped_repr)})\n')
                 continue
             elif node.op == 'call_function':
                 assert callable(node.target)
                 # pretty print operators
                 if node.target.__module__ == '_operator' and node.target.__name__ in magic_methods:
                     assert isinstance(node.args, tuple)
-                    body.append(f'{node.name} = {magic_methods[node.target.__name__].format(*(repr(a) for a in node.args))}\n')
+                    body.append(f'{unique_name(node)} = {magic_methods[node.target.__name__].format(*(remapped_repr(a) for a in node.args))}\n')
                     continue
                 qualified_name = get_qualified_name(node.target)
-                register_modules_used(qualified_name)
-                if qualified_name == 'getattr' and \
+                unique_qualified_name = register_modules_used(qualified_name)
+                if unique_qualified_name == 'getattr' and \
                    isinstance(node.args, tuple) and \
                    isinstance(node.args[1], str) and \
                    node.args[1].isidentifier():
                     # pretty print attribute access
-                    body.append(f'{node.name} = {_format_target(repr(node.args[0]), node.args[1])}\n')
+                    body.append(f'{unique_name(node)} = {_format_target(remapped_repr(node.args[0]), node.args[1])}\n')
                     continue
-                body.append(f'{node.name} = {qualified_name}({_format_args(node.args, node.kwargs)})\n')
+                body.append(f'{unique_name(node)} = {unique_qualified_name}({_format_args(node.args, node.kwargs, remapped_repr)})\n')
                 continue
             elif node.op == 'call_module':
                 assert isinstance(node.target, str)
-                body.append(f'{node.name} = {_format_target(root_module, node.target)}({_format_args(node.args, node.kwargs)})\n')
+                body.append(f'{unique_name(node)} = {_format_target(root_module, node.target)}({_format_args(node.args, node.kwargs, remapped_repr)})\n')
                 continue
             elif node.op == 'get_attr':
                 assert isinstance(node.target, str)
-                body.append(f'{node.name} = {_format_target(root_module, node.target)}\n')
+                body.append(f'{unique_name(node)} = {_format_target(root_module, node.target)}\n')
                 continue
             elif node.op == 'output':
                 if node.type is not None:
                     maybe_return_annotation = f" -> {type_repr(node.type)}"
-                body.append(f'return {repr(node.args[0])}')
+                body.append(f'return {remapped_repr(node.args[0])}')
                 continue
             raise NotImplementedError(f'node: {node.op} {node.target}')
 
-        # repr() for inf and nan floating point values aren't parseable by
-        # python as literals. Explicitly import the names from the `math` module.
-        import_strs = [f'import {name}' for name in sorted(modules_used)]
+
+        # TODO: hacked around torch.quint8 by doing import torch
+        import_strs : List[str] = ['import typing', 'import torch']
+        for module, import_set in module_names_used.items():
+            name_import_strs : List[str] = []
+            for name, uniqued in import_set.items():
+                if uniqued:
+                    name_import_strs.append(f'{name} as {uniqued}')
+                else:
+                    name_import_strs.append(name)
+            import_strs.append(f'from {module} import {", ".join(name_import_strs)}')
         import_block = '\n'.join(import_strs)
 
         code = ''.join(body)
