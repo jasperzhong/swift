@@ -1,8 +1,8 @@
-
 from typing import Optional
 import multiprocessing
 import multiprocessing.connection
 import signal
+import time
 import sys
 import warnings
 
@@ -23,11 +23,12 @@ class ProcessRaisedException(ProcessException):
     Exception is thrown when the process failed due to exception
     raised by the code.
     """
+
     def __init__(
-        self,
-        msg: str,
-        error_index: int,
-        error_pid: int,
+            self,
+            msg: str,
+            error_index: int,
+            error_pid: int,
     ):
         super().__init__(msg, error_index, error_pid)
 
@@ -90,9 +91,38 @@ class ProcessContext:
             process.sentinel: index
             for index, process in enumerate(processes)
         }
+        self.process_errors = {}
 
     def pids(self):
         return [int(process.pid) for process in self.processes]
+
+    def _try_populate_process_errors(self):
+        for idx, queue in enumerate(self.error_queues):
+            if not queue.empty():
+                self.process_errors[idx] = queue.get()
+
+    def _get_deadline(self, timeout):
+        if timeout is not None:
+            return time.monotonic() + timeout
+        else:
+            return sys.maxsize
+
+    def _busy_join(self, process, timeout=None):
+        """
+        Python multiprocessing.queues use pipes to communicate between processes.
+        If the writer process writes long message, the pipe can hang forever if the
+        reader process does not start reading it. In order to prevent this, the
+        method follows: check_data(), join(period) pattern in comparison to:
+        join(timeout), check_data().  The second pattern will deadlock the
+        writer thread.
+        """
+        deadline = self._get_deadline(timeout)
+        period = 1  # one second
+        while True:
+            self._try_populate_process_errors()
+            process.join(period)
+            if not process.is_alive() or deadline - time.monotonic() < 0:
+                break
 
     def join(self, timeout=None):
         r"""
@@ -111,17 +141,34 @@ class ProcessContext:
         if len(self.sentinels) == 0:
             return True
 
-        # Wait for any process to fail or all of them to succeed.
-        ready = multiprocessing.connection.wait(
-            self.sentinels.keys(),
-            timeout=timeout,
-        )
+        deadline = self._get_deadline(timeout)
+        period = 1  # one second
+        ready = set()
+        while True:
+            self._try_populate_process_errors()
+            # Wait for any process to fail or all of them to succeed.
+            period_ready = multiprocessing.connection.wait(
+                self.sentinels.keys(),
+                timeout=period,
+            )
+            for sentinel in period_ready:
+                ready.add(sentinel)
+            if len(ready) == len(self.processes):
+                # All processes finished
+                break
+            for process in self.processes:
+                # At least one process got error
+                if process.exitcode != 0:
+                    break
+            if deadline - time.monotonic() < 0:
+                # timeout finished
+                break
 
         error_index = None
         for sentinel in ready:
             index = self.sentinels.pop(sentinel)
             process = self.processes[index]
-            process.join()
+            self._busy_join(process)
             if process.exitcode != 0:
                 error_index = index
                 break
@@ -135,11 +182,12 @@ class ProcessContext:
         for process in self.processes:
             if process.is_alive():
                 process.terminate()
-            process.join()
+            self._busy_join(process)
 
-        # There won't be an error on the queue if the process crashed.
+        self._try_populate_process_errors()
         failed_process = self.processes[error_index]
-        if self.error_queues[error_index].empty():
+        # There won't be an error on the queue if the process crashed.
+        if error_index not in self.process_errors:
             exitcode = self.processes[error_index].exitcode
             if exitcode < 0:
                 name = signal.Signals(-exitcode).name
@@ -160,7 +208,7 @@ class ProcessContext:
                     exit_code=exitcode
                 )
 
-        original_trace = self.error_queues[error_index].get()
+        original_trace = self.process_errors[error_index]
         msg = "\n\n-- Process %d terminated with the following error:\n" % error_index
         msg += original_trace
         raise ProcessRaisedException(msg, error_index, failed_process.pid)
@@ -170,7 +218,6 @@ class SpawnContext(ProcessContext):
     def __init__(self, processes, error_queues):
         warnings.warn('SpawnContext is renamed to ProcessContext since 1.4 release.')
         super(SpawnContext, self).__init__(processes, error_queues)
-    pass
 
 
 # Note: [start_processes]

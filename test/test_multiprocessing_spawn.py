@@ -63,6 +63,11 @@ def test_process_exit(idx):
     sys.exit(12)
 
 
+def raise_exception(rank, char_size: int = 1):
+    msg = "x" * char_size
+    raise RuntimeError(f"Raising exception with message: {msg}")
+
+
 def test_nested(i, pids_queue, nested_child_sleep, start_method):
     context = mp.get_context(start_method)
     nested_child_ready_queue = context.Queue()
@@ -136,6 +141,15 @@ class _TestMultiProcessing(object):
         with self.assertRaisesRegex(Exception, message):
             mp.start_processes(test_terminate_signal_func, nprocs=2, start_method=self.start_method)
 
+    def test_raise_long_exception(self):
+        # The test checks that both reader and writes processes do not get stuck
+        # when writer process has huge stacktrace
+        size = 250000
+        with self.assertRaisesRegex(mp.ProcessRaisedException, "Raising exception with message"):
+            mp.start_processes(
+                raise_exception, args=(size,), nprocs=2, start_method=self.start_method
+            )
+
     def test_terminate_exit(self):
         exitcode = 123
         with self.assertRaisesRegex(
@@ -194,8 +208,8 @@ class SpawnTest(TestCase, _TestMultiProcessing):
     start_method = 'spawn'
 
     def test_exception_raises(self):
-        with self.assertRaises(mp.ProcessRaisedException):
-            mp.spawn(test_success_first_then_exception_func, args=(), nprocs=1)
+        with self.assertRaisesRegex(mp.ProcessRaisedException, "Raising exception with message"):
+            mp.spawn(raise_exception, args=(), nprocs=1)
 
     def test_signal_raises(self):
         context = mp.spawn(test_infinite_task, args=(), nprocs=1, join=False)
