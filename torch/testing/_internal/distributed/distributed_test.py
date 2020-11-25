@@ -1361,24 +1361,26 @@ class DistributedTest:
             )
 
         @unittest.skipIf(
-            BACKEND != "gloo",
-            "Only Gloo backend will have CUDA allReduce tested",
+            BACKEND != "gloo" and BACKEND != "nccl",
+            "Only Gloo and NCCL backends will have CUDA allReduce tested",
         )
         @skip_if_no_gpu
         def test_all_reduce_sum_cuda(self):
-            group, group_id, rank = self._init_global_test()
-            rank_to_GPU = self._init_multigpu_helper()
-            self._test_all_reduce_helper(
-                group,
-                group_id,
-                rank,
-                dist.ReduceOp.SUM,
-                2,
-                10,
-                2 + (10 * (len(group) - 1)),
-                True,
-                rank_to_GPU,
-            )
+            for i in range(100):
+                print(f"iteration {i}")
+                group, group_id, rank = self._init_global_test()
+                rank_to_GPU = self._init_multigpu_helper()
+                self._test_all_reduce_helper(
+                    group,
+                    group_id,
+                    rank,
+                    dist.ReduceOp.SUM,
+                    2,
+                    10,
+                    2 + (10 * (len(group) - 1)),
+                    True,
+                    rank_to_GPU,
+                )
 
         @unittest.skipIf(
             BACKEND != "gloo" and BACKEND != "nccl",
@@ -1387,20 +1389,22 @@ class DistributedTest:
         @skip_if_no_gpu
         @skip_if_rocm
         def test_all_reduce_sum_cuda_async(self):
-            group, group_id, rank = self._init_global_test()
-            rank_to_GPU = self._init_multigpu_helper()
-            self._test_all_reduce_helper(
-                group,
-                group_id,
-                rank,
-                dist.ReduceOp.SUM,
-                2,
-                10,
-                2 + (10 * (len(group) - 1)),
-                True,
-                rank_to_GPU,
-                async_op=True
-            )
+            for i in range(100):
+                print(f"iteration {i}")
+                group, group_id, rank = self._init_global_test()
+                rank_to_GPU = self._init_multigpu_helper()
+                self._test_all_reduce_helper(
+                    group,
+                    group_id,
+                    rank,
+                    dist.ReduceOp.SUM,
+                    2,
+                    10,
+                    2 + (10 * (len(group) - 1)),
+                    True,
+                    rank_to_GPU,
+                    async_op=True
+                )
 
         @unittest.skipIf(BACKEND == "nccl", "Nccl does not support CPU tensors")
         def test_all_reduce_sum_complex(self):
@@ -1426,8 +1430,8 @@ class DistributedTest:
                     dist.all_reduce(_build_tensor(1, dtype=torch.cfloat), unsupported_op, group_id)
 
         @unittest.skipIf(
-            BACKEND != "gloo",
-            "Only Gloo backend will have CUDA allReduce tested",
+            BACKEND != "gloo" and BACKEND != "nccl",
+            "Only Gloo and NCCL backends will have CUDA allReduce tested",
         )
         @skip_if_no_gpu
         def test_all_reduce_sum_cuda_complex(self):
@@ -2500,18 +2504,20 @@ class DistributedTest:
         @skip_if_no_gpu
         @skip_if_rocm
         def test_reduce_multigpu(self):
-            group, group_id, rank = self._init_global_test()
-            rank_to_GPU = self._init_multigpu_helper()
-            self._test_reduce_multigpu_helper(
-                group,
-                group_id,
-                rank,
-                rank_to_GPU,
-                dist.ReduceOp.SUM,
-                2,
-                10,
-                (2 + 10 * (len(group) - 1)) * len(rank_to_GPU[0]),
-            )
+            for i in range(100):
+                print(f"iteration {i}")
+                group, group_id, rank = self._init_global_test()
+                rank_to_GPU = self._init_multigpu_helper()
+                self._test_reduce_multigpu_helper(
+                    group,
+                    group_id,
+                    rank,
+                    rank_to_GPU,
+                    dist.ReduceOp.SUM,
+                    2,
+                    10,
+                    (2 + 10 * (len(group) - 1)) * len(rank_to_GPU[0]),
+                )
 
         def _test_all_gather_multigpu_helper(self, group, group_id, rank, rank_to_GPU, dtype=torch.float):
             for dest in group:
