@@ -93,6 +93,78 @@ extern "C" void zgetrs_(char *trans, int *n, int *nrhs, std::complex<double> *a,
 extern "C" void cgetrs_(char *trans, int *n, int *nrhs, std::complex<float> *a, int *lda, int *ipiv, std::complex<float> *b, int *ldb, int *info);
 extern "C" void dgetrs_(char *trans, int *n, int *nrhs, double *a, int *lda, int *ipiv, double *b, int *ldb, int *info);
 extern "C" void sgetrs_(char *trans, int *n, int *nrhs, float *a, int *lda, int *ipiv, float *b, int *ldb, int *info);
+
+// gels
+extern "C" void zgels_(char *trans, int *m, int *n, int *nrhs,
+    std::complex<double> *a, int *lda, std::complex<double> *b, int *ldb,
+    std::complex<double> *work, int *lwork, int *info);
+extern "C" void cgels_(char *trans, int *m, int *n, int *nrhs,
+    std::complex<float> *a, int *lda, std::complex<float> *b, int *ldb,
+    std::complex<float> *work, int *lwork, int *info);
+extern "C" void dgels_(char *trans, int *m, int *n, int *nrhs,
+    double *a, int *lda, double *b, int *ldb,
+    double *work, int *lwork, int *info);
+extern "C" void sgels_(char *trans, int *m, int *n, int *nrhs,
+    float *a, int *lda, float *b, int *ldb,
+    float *work, int *lwork, int *info);
+
+// gelsd
+extern "C" void zgelsd_(int *m, int *n, int *nrhs,
+    std::complex<double> *a, int *lda, std::complex<double> *b, int *ldb,
+    double *s, double *rcond, int *rank,
+    std::complex<double> *work, int *lwork, double *rwork, int *iwork, int *info);
+extern "C" void cgelsd_(int *m, int *n, int *nrhs,
+    std::complex<float> *a, int *lda, std::complex<float> *b, int *ldb,
+    float *s, float *rcond, int *rank,
+    std::complex<float> *work, int *lwork, float *rwork, int *iwork, int *info);
+extern "C" void dgelsd_(int *m, int *n, int *nrhs,
+    double *a, int *lda, double *b, int *ldb,
+    double *s, double *rcond, int *rank,
+    double *work, int *lwork, int *iwork, int *info);
+extern "C" void sgelsd_(int *m, int *n, int *nrhs,
+    float *a, int *lda, float *b, int *ldb,
+    float *s, float *rcond, int *rank,
+    float *work, int *lwork, int *iwork, int *info);
+
+// gelsy
+extern "C" void zgelsy_(int *m, int *n, int *nrhs,
+    std::complex<double> *a, int *lda, std::complex<double> *b, int *ldb,
+    int *jpvt, double *rcond, int *rank,
+    std::complex<double> *work, int *lwork,
+    double *rwork, int *info);
+extern "C" void cgelsy_(int *m, int *n, int *nrhs,
+    std::complex<float> * a, int *lda, std::complex<float> *b, int *ldb,
+    int *jpvt, float *rcond, int *rank,
+    std::complex<float> *work, int *lwork,
+    float *rwork, int *info);
+extern "C" void dgelsy_(int *m, int *n, int *nrhs,
+    double *a, int *lda, double *b, int *ldb,
+    int *jpvt, double *rcond, int *rank,
+    double *work, int *lwork, int *info);
+extern "C" void sgelsy_(int *m, int *n, int *nrhs,
+    float *a, int *lda, float *b, int *ldb,
+    int *jpvt, float *rcond, int *rank,
+    float *work, int *lwork, int *info);
+
+// gelss
+extern "C" void zgelss_(int *m, int *n, int *nrhs,
+    std::complex<double> *a, int *lda, std::complex<double> *b, int *ldb,
+    double *s, double *rcond, int *rank,
+    std::complex<double> *work, int *lwork,
+    double *rwork, int *info);
+extern "C" void cgelss_(int *m, int *n, int *nrhs,
+    std::complex<float> *a, int *lda, std::complex<float> *b, int *ldb,
+    float *s, float *rcond, int *rank,
+    std::complex<float> *work, int *lwork,
+    float *rwork, int *info);
+extern "C" void dgelss_(int *m, int *n, int *nrhs,
+    double *a, int *lda, double *b, int *ldb,
+    double *s, double *rcond, int *rank,
+    double *work, int *lwork, int *info);
+extern "C" void sgelss_(int *m, int *n, int *nrhs,
+    float *a, int *lda, float *b, int *ldb,
+    float *s, float *rcond, int *rank,
+    float *work, int *lwork, int *info);
 #endif
 
 namespace at {
@@ -138,6 +210,126 @@ void lapackSvd(char jobz, int m, int n, scalar_t *a, int lda,
 template<class scalar_t>
 void lapackLuSolve(char trans, int n, int nrhs, scalar_t *a, int lda, int *ipiv, scalar_t *b, int ldb, int *info);
 
+template<class scalar_t>
+void lapackGels(char trans, int m, int n, int nrhs,
+    scalar_t *a, int lda, scalar_t *b, int ldb,
+    scalar_t *work, int lwork, int *info);
+
+template<class scalar_t, class value_t = scalar_t>
+void lapackGelsd(int m, int n, int nrhs,
+    scalar_t *a, int lda, scalar_t *b, int ldb,
+    value_t *s, value_t rcond, int *rank,
+    scalar_t* work, int lwork,
+    value_t *rwork, int* iwork, int *info);
+
+template<class scalar_t, class value_t = scalar_t>
+void lapackGelsy(int m, int n, int nrhs,
+    scalar_t *a, int lda, scalar_t *b, int ldb,
+    int *jpvt, value_t rcond, int *rank,
+    scalar_t *work, int lwork, value_t* rwork, int *info);
+
+template<class scalar_t, class value_t = scalar_t>
+void lapackGelss(int m, int n, int nrhs,
+    scalar_t *a, int lda, scalar_t *b, int ldb,
+    value_t *s, value_t rcond, int *rank,
+    scalar_t *work, int lwork,
+    value_t *rwork, int *info);
+
+enum class LapackLstsqDriver : int64_t { Gels, Gelsd, Gelsy, Gelss};
+
+template<LapackLstsqDriver, class scalar_t, class value_t = scalar_t>
+struct lapackLstsq_impl;
+
+template<class scalar_t, class value_t>
+struct lapackLstsq_impl<LapackLstsqDriver::Gels, scalar_t, value_t> {
+  static void call(
+      char trans, int m, int n, int nrhs,
+      scalar_t *a, int lda, scalar_t *b, int ldb,
+      scalar_t *work, int lwork, int *info, // Gels flavor
+      int *jpvt, value_t rcond, int *rank, value_t* rwork, // Gelsy flavor
+      value_t *s, // Gelss flavor
+      int *iwork // Gelsd flavor
+      ) {
+    lapackGels<scalar_t>(
+        trans, m, n, nrhs,
+        a, lda, b, ldb,
+        work, lwork, info);
+  }
+};
+
+template<class scalar_t, class value_t>
+struct lapackLstsq_impl<LapackLstsqDriver::Gelsy, scalar_t, value_t> {
+  static void call(
+      char trans, int m, int n, int nrhs,
+      scalar_t *a, int lda, scalar_t *b, int ldb,
+      scalar_t *work, int lwork, int *info, // Gels flavor
+      int *jpvt, value_t rcond, int *rank, value_t* rwork, // Gelsy flavor
+      value_t *s, // Gelss flavor
+      int *iwork // Gelsd flavor
+      ) {
+    lapackGelsy<scalar_t, value_t>(
+        m, n, nrhs,
+        a, lda, b, ldb,
+        jpvt, rcond, rank,
+        work, lwork, rwork, info);
+  }
+};
+
+template<class scalar_t, class value_t>
+struct lapackLstsq_impl<LapackLstsqDriver::Gelsd, scalar_t, value_t> {
+  static void call(
+      char trans, int m, int n, int nrhs,
+      scalar_t *a, int lda, scalar_t *b, int ldb,
+      scalar_t *work, int lwork, int *info, // Gels flavor
+      int *jpvt, value_t rcond, int *rank, value_t* rwork, // Gelsy flavor
+      value_t *s, // Gelss flavor
+      int *iwork // Gelsd flavor
+      ) {
+    lapackGelsd<scalar_t, value_t>(
+        m, n, nrhs,
+        a, lda, b, ldb,
+        s, rcond, rank,
+        work, lwork,
+        rwork, iwork, info);
+  }
+};
+
+template<class scalar_t, class value_t>
+struct lapackLstsq_impl<LapackLstsqDriver::Gelss, scalar_t, value_t> {
+  static void call(
+      char trans, int m, int n, int nrhs,
+      scalar_t *a, int lda, scalar_t *b, int ldb,
+      scalar_t *work, int lwork, int *info, // Gels flavor
+      int *jpvt, value_t rcond, int *rank, value_t* rwork, // Gelsy flavor
+      value_t *s, // Gelss flavor
+      int *iwork // Gelsd flavor
+      ) {
+    lapackGelss<scalar_t, value_t>(
+        m, n, nrhs,
+        a, lda, b, ldb,
+        s, rcond, rank,
+        work, lwork,
+        rwork, info);
+  }
+};
+
+template<LapackLstsqDriver driver, class scalar_t, class value_t = scalar_t>
+void lapackLstsq(
+    char trans, int m, int n, int nrhs,
+    scalar_t *a, int lda, scalar_t *b, int ldb,
+    scalar_t *work, int lwork, int *info, // Gels flavor
+    int *jpvt, value_t rcond, int *rank, value_t* rwork, // Gelsy flavor
+    value_t *s, // Gelss flavor
+    int *iwork // Gelsd flavor
+    ) {
+  lapackLstsq_impl<driver, scalar_t, value_t>::call(
+      trans, m, n, nrhs,
+      a, lda, b, ldb,
+      work, lwork, info,
+      jpvt, rcond, rank, rwork,
+      s,
+      iwork);
+}
 
 template<> void lapackSolve<c10::complex<double>>(int n, int nrhs, c10::complex<double> *a, int lda, int *ipiv, c10::complex<double> *b, int ldb, int *info) {
   zgesv_(&n, &nrhs, reinterpret_cast<std::complex<double>*>(a), &lda, ipiv, reinterpret_cast<std::complex<double>*>(b), &ldb, info);
@@ -341,6 +533,196 @@ template<> void lapackLuSolve<double>(char trans, int n, int nrhs, double *a, in
 
 template<> void lapackLuSolve<float>(char trans, int n, int nrhs, float *a, int lda, int *ipiv, float *b, int ldb, int *info) {
   sgetrs_(&trans, &n, &nrhs, a, &lda, ipiv, b, &ldb, info);
+}
+
+template<> void lapackGels<c10::complex<double>>(
+    char trans, int m, int n, int nrhs,
+    c10::complex<double> *a, int lda, c10::complex<double> *b, int ldb,
+    c10::complex<double> *work, int lwork, int *info) {
+  zgels_(&trans, &m, &n, &nrhs,
+      reinterpret_cast<std::complex<double>*>(a), &lda,
+      reinterpret_cast<std::complex<double>*>(b), &ldb,
+      reinterpret_cast<std::complex<double>*>(work), &lwork, info);
+}
+
+template<> void lapackGels<c10::complex<float>>(
+    char trans, int m, int n, int nrhs,
+    c10::complex<float> *a, int lda, c10::complex<float> *b, int ldb,
+    c10::complex<float> *work, int lwork, int *info) {
+  cgels_(&trans, &m, &n, &nrhs,
+      reinterpret_cast<std::complex<float>*>(a), &lda,
+      reinterpret_cast<std::complex<float>*>(b), &ldb,
+      reinterpret_cast<std::complex<float>*>(work), &lwork, info);
+}
+
+template<> void lapackGels<double>(
+    char trans, int m, int n, int nrhs,
+    double *a, int lda, double *b, int ldb,
+    double *work, int lwork, int *info) {
+  dgels_(&trans, &m, &n, &nrhs,
+      a, &lda, b, &ldb, work, &lwork, info);
+}
+
+template<> void lapackGels<float>(
+    char trans, int m, int n, int nrhs,
+    float *a, int lda, float *b, int ldb,
+    float *work, int lwork, int *info) {
+  sgels_(&trans, &m, &n, &nrhs,
+      a, &lda, b, &ldb, work, &lwork, info);
+}
+
+template<> void lapackGelsd<c10::complex<double>, double>(
+    int m, int n, int nrhs,
+    c10::complex<double> *a, int lda, c10::complex<double> *b, int ldb,
+    double *s, double rcond, int *rank,
+    c10::complex<double> *work, int lwork,
+    double *rwork, int *iwork, int *info) {
+  zgelsd_(&m, &n, &nrhs,
+      reinterpret_cast<std::complex<double>*>(a), &lda,
+      reinterpret_cast<std::complex<double>*>(b), &ldb,
+      s, &rcond, rank,
+      reinterpret_cast<std::complex<double>*>(work), &lwork,
+      rwork, iwork, info);
+}
+
+template<> void lapackGelsd<c10::complex<float>, float>(
+    int m, int n, int nrhs,
+    c10::complex<float> *a, int lda, c10::complex<float> *b, int ldb,
+    float *s, float rcond, int *rank,
+    c10::complex<float> *work, int lwork,
+    float *rwork, int *iwork, int *info) {
+  cgelsd_(&m, &n, &nrhs,
+      reinterpret_cast<std::complex<float>*>(a), &lda,
+      reinterpret_cast<std::complex<float>*>(b), &ldb,
+      s, &rcond, rank,
+      reinterpret_cast<std::complex<float>*>(work), &lwork,
+      rwork, iwork, info);
+}
+
+template<> void lapackGelsd<double>(
+    int m, int n, int nrhs,
+    double *a, int lda, double *b, int ldb,
+    double *s, double rcond, int *rank,
+    double *work, int lwork,
+    double *rwork, int *iwork, int *info) {
+  dgelsd_(&m, &n, &nrhs,
+      a, &lda, b, &ldb,
+      s, &rcond, rank,
+      work, &lwork, iwork, info);
+}
+
+template<> void lapackGelsd<float>(
+    int m, int n, int nrhs,
+    float *a, int lda, float *b, int ldb,
+    float *s, float rcond, int *rank,
+    float *work, int lwork,
+    float *rwork, int *iwork, int *info) {
+  sgelsd_(&m, &n, &nrhs,
+      a, &lda, b, &ldb,
+      s, &rcond, rank,
+      work, &lwork, iwork, info);
+}
+
+template<> void lapackGelsy<c10::complex<double>, double>(
+    int m, int n, int nrhs,
+    c10::complex<double> *a, int lda, c10::complex<double> *b, int ldb,
+    int *jpvt, double rcond, int *rank,
+    c10::complex<double> *work, int lwork, double *rwork, int *info) {
+  zgelsy_(&m, &n, &nrhs,
+      reinterpret_cast<std::complex<double>*>(a), &lda,
+      reinterpret_cast<std::complex<double>*>(b), &ldb,
+      jpvt, &rcond, rank,
+      reinterpret_cast<std::complex<double>*>(work), &lwork,
+      rwork, info);
+}
+
+template<> void lapackGelsy<c10::complex<float>, float>(
+    int m, int n, int nrhs,
+    c10::complex<float> *a, int lda, c10::complex<float> *b, int ldb,
+    int *jpvt, float rcond, int *rank,
+    c10::complex<float> *work, int lwork, float *rwork, int *info) {
+  cgelsy_(&m, &n, &nrhs,
+      reinterpret_cast<std::complex<float>*>(a), &lda,
+      reinterpret_cast<std::complex<float>*>(b), &ldb,
+      jpvt, &rcond, rank,
+      reinterpret_cast<std::complex<float>*>(work), &lwork,
+      rwork, info);
+}
+
+template<> void lapackGelsy<double>(
+    int m, int n, int nrhs,
+    double *a, int lda, double *b, int ldb,
+    int *jpvt, double rcond, int *rank,
+    double *work, int lwork, double *rwork, int *info) {
+  dgelsy_(&m, &n, &nrhs,
+      a, &lda, b, &ldb,
+      jpvt, &rcond, rank,
+      work, &lwork, info);
+}
+
+template<> void lapackGelsy<float>(
+    int m, int n, int nrhs,
+    float *a, int lda, float *b, int ldb,
+    int *jpvt, float rcond, int *rank,
+    float *work, int lwork, float *rwork, int *info) {
+  sgelsy_(&m, &n, &nrhs,
+      a, &lda, b, &ldb,
+      jpvt, &rcond, rank,
+      work, &lwork, info);
+}
+
+template<> void lapackGelss<c10::complex<double>, double>(
+    int m, int n, int nrhs,
+    c10::complex<double> *a, int lda, c10::complex<double> *b, int ldb,
+    double *s, double rcond, int *rank,
+    c10::complex<double> *work, int lwork,
+    double *rwork, int *info
+    ) {
+  zgelss_(&m, &n, &nrhs,
+      reinterpret_cast<std::complex<double>*>(a), &lda,
+      reinterpret_cast<std::complex<double>*>(b), &ldb,
+      s, &rcond, rank,
+      reinterpret_cast<std::complex<double>*>(work), &lwork,
+      rwork, info);
+}
+
+template<> void lapackGelss<c10::complex<float>, float>(
+    int m, int n, int nrhs,
+    c10::complex<float> *a, int lda, c10::complex<float> *b, int ldb,
+    float *s, float rcond, int *rank,
+    c10::complex<float> *work, int lwork,
+    float *rwork, int *info
+    ) {
+  cgelss_(&m, &n, &nrhs,
+      reinterpret_cast<std::complex<float>*>(a), &lda,
+      reinterpret_cast<std::complex<float>*>(b), &ldb,
+      s, &rcond, rank,
+      reinterpret_cast<std::complex<float>*>(work), &lwork,
+      rwork, info);
+}
+
+template<> void lapackGelss<double>(
+    int m, int n, int nrhs,
+    double *a, int lda, double *b, int ldb,
+    double *s, double rcond, int *rank,
+    double *work, int lwork,
+    double *rwork, int *info) {
+  dgelss_(&m, &n, &nrhs,
+      a, &lda, b, &ldb,
+      s, &rcond, rank,
+      work, &lwork, info);
+}
+
+template<> void lapackGelss<float>(
+    int m, int n, int nrhs,
+    float *a, int lda, float *b, int ldb,
+    float *s, float rcond, int *rank,
+    float *work, int lwork,
+    float *rwork, int *info) {
+  sgelss_(&m, &n, &nrhs,
+      a, &lda, b, &ldb,
+      s, &rcond, rank,
+      work, &lwork, info);
 }
 #endif
 
@@ -1271,6 +1653,332 @@ std::tuple<Tensor&, Tensor&, Tensor&> svd_out(Tensor& U, Tensor& S, Tensor& VT,
   S.resize_as_(S_tmp).copy_(S_tmp);
   VT.resize_as_(VT_tmp).copy_(VT_tmp);
   return std::tuple<Tensor&, Tensor&, Tensor&>(U, S, VT);
+}
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ lstsq ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#ifdef USE_LAPACK
+template<class scalar_t, class value_t, class func_t>
+struct LapackLstsqHelper {
+  using self_type = LapackLstsqHelper;
+
+  // we use `driver_type` to decide how to initialize
+  // relevant to specific drivers parameters
+  LapackLstsqDriver driver_type;
+  func_t driver;
+
+  bool is_complex;
+  at::ScalarType scalar_type;
+  IntArrayRef batch_shape;
+  // the strides below store the offsets to different lstsq problems in a batch
+  int64_t a_stride;
+  int64_t b_stride;
+  int64_t s_stride;
+
+  // variables below correspond to LAPACK inputs.
+  // for more information check the LAPACK documentation on
+  // `?gels`, `?gelsy`, `?gelsd`, `?gelss`
+  char trans;
+  int m;
+  int n;
+  int nrhs;
+  scalar_t* a_working_ptr = nullptr;
+  int lda;
+  scalar_t* b_working_ptr = nullptr;
+  int ldb;
+  Tensor work;
+  scalar_t work_opt; // used to decide the opt `work` size with lwork=-1
+  scalar_t* work_ptr = &work_opt;
+  int lwork = -1; // default value to decide the opt size for workspace arrays
+  int info = 0;
+  Tensor jpvt;
+  int* jpvt_ptr = nullptr;
+  value_t rcond;
+  Tensor rank;
+  int rank_opt;
+  int64_t* rank_working_ptr = nullptr;
+  Tensor rwork;
+  value_t rwork_opt; // used to decide the opt `rwork` size with lwork=-1
+  value_t* rwork_ptr = &rwork_opt;
+  Tensor s;
+  value_t* s_working_ptr = nullptr;
+  Tensor iwork;
+  int iwork_opt; // used to decide the opt `iwork` size with lwork=-1
+  int* iwork_ptr = &iwork_opt;
+
+  LapackLstsqHelper(LapackLstsqDriver driver_type, func_t driver)
+    : driver_type{driver_type}, driver{driver}
+  {}
+
+  self_type& set_trans(char trans) { this->trans = trans; return *this; }
+  self_type& set_m(int m) { this->m = m; return *this; }
+  self_type& set_n(int n) { this->n = n; return *this; }
+  self_type& set_nrhs(int nrhs) { this->nrhs = nrhs; return *this; }
+  self_type& set_a(const Tensor& a) {
+    this->a_working_ptr = a.data_ptr<scalar_t>();
+    this->scalar_type = a.scalar_type();
+    this->is_complex = a.is_complex();
+    // `a` is persistent, should be safe to store its properties in references.
+    this->batch_shape = IntArrayRef(a.sizes().data(), a.dim() - 2);
+    this->a_stride = matrixStride(a);
+    return *this;
+  }
+  self_type& set_lda(int lda) { this->lda = lda; return *this; }
+  self_type& set_b(const Tensor& b) {
+    this->b_working_ptr = b.data_ptr<scalar_t>();
+    this->b_stride = matrixStride(b);
+    return *this;
+  }
+  self_type& set_ldb(int ldb) { this->ldb = ldb; return *this; }
+  self_type& set_work() {
+    lwork = static_cast<int>(real_impl<scalar_t, value_t>(work_opt));
+    work = at::empty({lwork}, scalar_type);
+    work_ptr = work.data_ptr<scalar_t>();
+    return *this;
+  }
+  self_type& set_jpvt() {
+    // handle `jpvt` workspace array (relevant for `?gelsy` which uses
+    // a QR factorization with column pivoting).
+    if (LapackLstsqDriver::Gelsy == driver_type) {
+      jpvt = at::empty({std::max<int64_t>(1, n)}, at::kInt);
+      jpvt_ptr = jpvt.data_ptr<int>();
+    }
+    return *this;
+  }
+  self_type& set_rcond(double cond) { this->rcond = static_cast<value_t>(cond); return *this; }
+  self_type& set_rank() {
+    // only `?gels` is not rank-revealing
+    if (LapackLstsqDriver::Gels != driver_type) {
+      if (!batch_shape.size()) {
+        rank = at::empty({1}, at::kLong);
+      }
+      else {
+        rank = at::empty(batch_shape, at::kLong);
+      }
+      rank_working_ptr = rank.data_ptr<int64_t>();
+    }
+    return *this;
+  }
+  self_type& set_rwork() {
+    // `rwork` only makes sense for complex flavors and
+    // `?gelsy`, `?gelsd` and `?gelss` drivers
+    if (!this->is_complex || LapackLstsqDriver::Gels == driver_type) {
+      return *this;
+    }
+
+    int64_t rwork_len;
+    switch (this->driver_type) {
+      case LapackLstsqDriver::Gelsy:
+        rwork_len = std::max<int64_t>(1, 2 * n);
+        break;
+      case LapackLstsqDriver::Gelss:
+        rwork_len = std::max<int64_t>(1, 5 * std::min(m, n));
+        break;
+      // case LapackLstsqDriver::Gelsd:
+      default:
+        rwork_len = static_cast<int>(rwork_opt);
+    }
+    rwork = at::empty({rwork_len}, c10::toValueType(scalar_type));
+    rwork_ptr = rwork.data_ptr<value_t>();
+    return *this;
+  }
+  self_type& set_s() {
+    // `?gelsd` and `?gelss` are SVD-based
+    // and we can extract singular values from them.
+    if (LapackLstsqDriver::Gelsd == driver_type
+      || LapackLstsqDriver::Gelss == driver_type) {
+      auto s_shape = batch_shape.vec();
+      s_shape.push_back(std::min(m, n));
+      s = at::empty(s_shape, c10::toValueType(scalar_type));
+      s_working_ptr = s.data_ptr<value_t>();
+      s_stride = s.size(-1);
+    }
+    return *this;
+  }
+  self_type& set_iwork() {
+    // handle `iwork` workspace array (relevant only for `?gelsd`)
+    if (LapackLstsqDriver::Gelsd == driver_type) {
+      iwork = at::empty({iwork_opt}, at::kInt);
+      iwork_ptr = iwork.data_ptr<int>();
+    }
+    return *this;
+  }
+
+  self_type& call_driver() {
+    driver(trans, m, n, nrhs,
+      a_working_ptr, lda,
+      b_working_ptr, ldb,
+      work_ptr, lwork,
+      &info,
+      jpvt_ptr,
+      rcond,
+      &rank_opt,
+      rwork_ptr,
+      s_working_ptr,
+      iwork_ptr);
+    // we want the output `rank` Tensor to be of type int64_t,
+    // however LAPACK accepts int. That is why we use an integer
+    // variable that then gets promoted and written into `rank`.
+    // We use this approach over a tensor cast for better performance.
+    if (rank_working_ptr) {
+      *rank_working_ptr = static_cast<int64_t>(rank_opt);
+    }
+    return *this;
+  }
+
+  self_type& next() {
+    // advance to the next problem in a batch
+    a_working_ptr += a_stride;
+    b_working_ptr += b_stride;
+    rank_working_ptr = rank_working_ptr ? rank_working_ptr + 1 : nullptr;
+    s_working_ptr = s_working_ptr ? s_working_ptr + s_stride : nullptr;
+    return *this;
+  }
+};
+#endif
+
+std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
+    const Tensor& a, const Tensor& b, double cond, std::string driver_name) {
+#ifndef USE_LAPACK
+  AT_ERROR("linalg.lstsq: LAPACK library not found in compilation");
+#else
+  std::vector<int64_t> infos(batchCount(a), 0);
+
+  static auto driver_string_to_enum = std::unordered_map<std::string, LapackLstsqDriver>({
+    {"gels", LapackLstsqDriver::Gels},
+    {"gelsy", LapackLstsqDriver::Gelsy},
+    {"gelsd", LapackLstsqDriver::Gelsd},
+    {"gelss", LapackLstsqDriver::Gelss}
+  });
+  auto driver_enum = driver_string_to_enum[driver_name];
+
+  Tensor rank;
+  Tensor singular_values;
+
+  AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(a.scalar_type(), "linalg.lstsq_cpu", [&] {
+    using value_t = typename c10::scalar_value_type<scalar_t>::type;
+
+    auto driver = lapackLstsq<LapackLstsqDriver::Gelsd, scalar_t, value_t>;
+    static auto driver_enum_to_func = std::unordered_map<LapackLstsqDriver, decltype(driver)>({
+      {LapackLstsqDriver::Gels, lapackLstsq<LapackLstsqDriver::Gels, scalar_t, value_t>},
+      {LapackLstsqDriver::Gelsy, lapackLstsq<LapackLstsqDriver::Gelsy, scalar_t, value_t>},
+      {LapackLstsqDriver::Gelsd, lapackLstsq<LapackLstsqDriver::Gelsd, scalar_t, value_t>},
+      {LapackLstsqDriver::Gelss, lapackLstsq<LapackLstsqDriver::Gelss, scalar_t, value_t>}
+    });
+    driver = driver_enum_to_func[driver_enum];
+
+    auto m = a.size(-2);
+    auto n = a.size(-1);
+    auto nrhs = b.size(-1);
+    auto driver_helper = LapackLstsqHelper<scalar_t, value_t, decltype(driver)>(driver_enum, driver)
+      .set_trans('N')
+      .set_m(m)
+      .set_n(n)
+      .set_nrhs(nrhs)
+      .set_a(a)
+      .set_lda(std::max<int64_t>(1, m))
+      .set_b(b)
+      .set_ldb(std::max<int64_t>(1, std::max(m, n)))
+      .set_jpvt()
+      .set_rcond(cond)
+      .set_rank()
+      .set_s()
+      .call_driver() // initial call to deduce optimal sizes for workspace arrays
+      .set_work()
+      .set_rwork()
+      .set_iwork();
+
+    // solve each problem in a batch separately
+    for (int64_t i = 0; i < batchCount(a); ++i) {
+      driver_helper.call_driver().next();
+      infos[i] = driver_helper.info;
+      if (driver_helper.info) {
+        break;
+      }
+    }
+
+    rank = driver_helper.rank;
+    singular_values = driver_helper.s;
+  });
+
+  // Check infos for potential errors
+  if (a.dim() > 2) {
+    batchCheckErrors(infos, "torch.linalg.lstsq_cpu");
+  }
+  else {
+    singleCheckErrors(infos[0], "torch.linalg.lstsq_cpu");
+  }
+
+  return std::make_tuple(b, rank, singular_values);
+#endif
+}
+
+std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
+    const Tensor& self, const Tensor& b,
+    c10::optional<double> cond,
+    c10::optional<std::string> driver_name) {
+  TORCH_CHECK(
+    self.dim() >= 2,
+    "input `self` Tensor should be at least 2D"
+  );
+  TORCH_CHECK(
+    b.dim() >= 1,
+    "input 'b' Tensor should be at least 1D"
+  );
+  auto dim_diff = self.dim() - b.dim();
+  TORCH_CHECK(
+    0 <= dim_diff && dim_diff <= 1,
+    "self.dim() must be greater or equal to b.dim() and "
+    "(self.dim() - b.dim()) <= 1"
+  );
+  Tensor b2d = dim_diff ? b.unsqueeze(-1) : b;
+  TORCH_CHECK(
+    self.size(-2) == b2d.size(-2),
+    dim_diff ? "self.size(-2) should match b.size(-1)" :
+      "self.size(-2) should match b.size(-2)"
+  );
+
+  auto driver_str = driver_name.has_value() ? driver_name.value() : "gelsd";
+  // convert `driver_str` to lower case inplace.
+  std::transform(driver_str.begin(), driver_str.end(), driver_str.begin(),
+    [](unsigned char c) { return std::tolower(c); });
+  static std::unordered_set<std::string> allowed_drivers = {
+    "gels", "gelsy", "gelsd", "gelss"
+  };
+  TORCH_CHECK(
+    allowed_drivers.find(driver_str) != allowed_drivers.end(),
+    "torch.linalg.lstsq: parameter 'driver_str' should be one of "
+    "(gels, gelsy, gelsd, gelss)"
+  );
+
+  auto self_working_copy = cloneBatchedColumnMajor(self);
+
+  // Tensor b must be of size (..., max(m, n), nrhs)
+  // plus in column-major order
+  auto m = self.size(-2);
+  auto n = self.size(-1);
+  auto b_working_copy_sizes = b2d.sizes().vec();
+  b_working_copy_sizes[b2d.dim() - 2] = std::max(m, n);
+  auto b_working_copy_strides = at::detail::defaultStrides(b2d.sizes());
+  b_working_copy_strides[b2d.dim() - 2] = 1;
+  b_working_copy_strides[b2d.dim() - 1] = std::max(m, n);
+  Tensor b_working_copy;
+  b_working_copy = at::empty_strided(
+    b_working_copy_sizes, b_working_copy_strides, b.options());
+  b_working_copy.narrow(-2, 0, m).copy_(b2d);
+
+  double rcond;
+  if (cond.has_value()) {
+    rcond = cond.value();
+  }
+  else {
+    auto value_type = c10::toValueType(self.scalar_type());
+    rcond = _get_epsilon(value_type);
+  }
+
+  Tensor x, rank, singular_values;
+  std::tie(x, rank, singular_values) =
+    at::_lstsq_helper(self_working_copy, b_working_copy, rcond, driver_str);
+  return std::make_tuple(x, rank, singular_values);
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ lu_solve ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

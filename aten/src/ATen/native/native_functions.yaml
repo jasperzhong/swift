@@ -9466,6 +9466,19 @@
   dispatch:
     DefaultBackend: det
 
+- func: linalg_lstsq(Tensor self, Tensor b, float? cond=None, str? driver_name=None) -> (Tensor x, Tensor rank, Tensor s)
+  python_module: linalg
+  use_c10_dispatcher: full
+  variants: function
+  dispatch:
+    DefaultBackend: linalg_lstsq
+
+- func: _lstsq_helper(Tensor a, Tensor b, float cond, str driver_name) -> (Tensor x, Tensor rank, Tensor s)
+  use_c10_dispatcher: full
+  variants: function
+  dispatch:
+    CPU: _lstsq_helper_cpu
+
 - func: _syevd_helper(Tensor self, bool compute_eigenvectors, str uplo) -> (Tensor, Tensor)
   use_c10_dispatcher: full
   variants: function

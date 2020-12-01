@@ -996,6 +996,7 @@ def get_testing_overrides() -> Dict[Callable, Callable]:
         Tensor.view: lambda self, shape: -1,
         Tensor.view_as: lambda self, other: -1,
         Tensor.zero_: lambda self: -1,
+        torch.linalg.lstsq: lambda self, b, cond=None, driver_name=None: -1,
         torch.linalg.norm: lambda self: -1
     }
 

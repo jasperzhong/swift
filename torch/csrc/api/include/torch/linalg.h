@@ -36,6 +36,10 @@ inline Tensor& eigvalsh_out(Tensor& result, const Tensor& self, std::string uplo
   return torch::linalg_eigvalsh_out(result, self, uplo);
 }
 
+inline std::tuple<Tensor, Tensor, Tensor> lstsq(const Tensor& self, const Tensor& b, c10::optional<double> cond, c10::optional<std::string> driver_name) {
+  return torch::linalg_lstsq(self, b, cond, driver_name);
+}
+
 inline Tensor norm(const Tensor& self, optional<Scalar> opt_ord, optional<IntArrayRef> opt_dim, bool keepdim, optional<ScalarType> opt_dtype) {
   return torch::linalg_norm(self, opt_ord, opt_dim, keepdim, opt_dtype);
 }
@@ -123,6 +127,10 @@ inline Tensor eigvalsh(const Tensor& self, std::string uplo) {
 
 inline Tensor& eigvalsh_out(Tensor& result, const Tensor& self, std::string uplo) {
   return detail::eigvalsh_out(result, self, uplo);
+}
+
+inline std::tuple<Tensor, Tensor, Tensor> lstsq(const Tensor& self, const Tensor& b, c10::optional<double> cond, c10::optional<std::string> driver_name) {
+  return detail::lstsq(self, b, cond, driver_name);
 }
 
 inline Tensor linalg_norm(const Tensor& self, optional<Scalar> opt_ord, optional<IntArrayRef> opt_dim, bool keepdim, optional<ScalarType> opt_dtype) {
