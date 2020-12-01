@@ -2,26 +2,60 @@
 
 #include <ATen/DimVector.h>
 #include <c10/core/TensorOptions.h>
+#include <ATen/core/Dimname.h>
 
 namespace at {
 
-class Tensor;
+namespace impl {
 
-struct TensorMeta {
-  DimVector sizes;
-  // TODO: DimVector strides;
-  TensorOptions options;
+// From https://stackoverflow.com/questions/11761703/overloading-macro-on-number-of-arguments
+#define TORCH_META_FUNC1(name) void name::meta
+#define TORCH_META_FUNC2(name, overload) void name::meta ## _ ## overload
+#define GET_MACRO(_1,_2,NAME,...) NAME
 
-  TensorMeta() {}  // blegh default construction
-  TensorMeta(IntArrayRef _sizes, TensorOptions _options)
-    : sizes(_sizes), options(_options) {}
+// Use this to define the prototype for a meta function.  This takes one
+// argument (just the operator name), or two arguments (operator name and
+// overload name).
+//
+// Example usage:
+//
+//    TORCH_META_FUNC(add, Tensor) (
+//      const Tensor& self, const Tensor& other
+//    ) {
+//      ... compute sizes and options ...
+//      set_output(sizes, options);
+//    }
+//
+#define TORCH_META_FUNC(...) GET_MACRO(__VA_ARGS__, TORCH_META_FUNC2, TORCH_META_FUNC1)(__VA_ARGS__)
+
+// Use this to define the prototype for an implementation.  This takes only
+// one argument, which is the name of the dispatch key entry you're
+// implementing.
+//
+// Example usage:
+//
+//    TORCH_META_FUNC(add_cpu) (
+//      Tensor& result, const Tensor& self, const Tensor& other
+//    ) {
+//      ... do the actual implementation ...
+//    }
+//
+#define TORCH_IMPL_FUNC(name) void name::impl
+
+// Base class for all structured kernel classes.  The set_output virtual
+// method is varied depending whether or not the operator is
+// functional/out/inplace, and could also be specialized for CPU/CUDA/etc
+// (although presently it isn't).
+//
+// A notable subclass of this interface is TensorIterator(Base).
+struct CAFFE2_API MetaBase {
+  virtual void set_output(int64_t output_idx, IntArrayRef sizes, IntArrayRef strides, TensorOptions options, DimnameList names) = 0;
+  void set_output(IntArrayRef sizes, TensorOptions options) {
+    set_output(0, sizes, {}, options, {});
+  }
+  virtual ~MetaBase() {}
 };
 
-CAFFE2_API Tensor meta_tensor_from_meta(const TensorMeta& meta);
-
-CAFFE2_API Tensor tensor_from_meta(const TensorMeta& meta);
-
-// Analogous to self.new_empty(sizes)
-CAFFE2_API TensorMeta new_meta(const Tensor& self, IntArrayRef sizes);
+} // namespace impl
 
 } // namespace at

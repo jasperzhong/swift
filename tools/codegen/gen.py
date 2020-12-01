@@ -275,36 +275,72 @@ class RegisterDispatchKey:
             sig = NativeSignature.from_schema(f.func)
 
             if self.target is Target.DEFINITION:
-                # TODO: work a little harder to generate fresh names for 'result'
-                # TODO: less praying that I picked the right argument name for 'self'
-
+                if self.dispatch_key == 'Meta':
+                    class_name = f"{meta.name(g)}_meta_{k.name}"
+                    parent_class_name = f"at::meta::{meta.name(g)}"
+                else:
+                    class_name = f"{g.out.dispatch[self.dispatch_key]}_{k.name}"
+                    parent_class_name = f"at::native::{g.out.dispatch[self.dispatch_key]}"
                 if k is SchemaKind.functional:
-                    out_expr = "result"
+                    # TODO: devirtualize these calls
                     if self.dispatch_key == "Meta":
-                        prologue = "auto result = meta_tensor_from_meta(op.ret_);"
+                        # TODO: Might be good to just stick meta in options,
+                        # then don't need special case here
+                        set_output_impl = """
+if (strides.empty()) {
+    outputs_[output_idx] = at::empty_meta(sizes, options);
+} else {
+    TORCH_INTERNAL_ASSERT(0, "not implemented yet");
+}
+if (!names.empty()) namedinference::propagate_names(outputs_[output_idx], names);
+"""
                     else:
-                        prologue = "auto result = tensor_from_meta(op.ret_);"
+                        set_output_impl = """
+if (strides.empty()) {
+    outputs_[output_idx] = at::empty(sizes, options);
+} else {
+    outputs_[output_idx] = at::empty_strided(sizes, strides, options);
+}
+if (!names.empty()) namedinference::propagate_names(outputs_[output_idx], names);
+"""
+                    assert len(f.func.returns) == 1, "multi-return not supported yet"
+                    out_expr = "op.outputs_[0]"
+                    ret_expr = "std::move(op.outputs_[0])"  # small optimization
+                    output_type = "Tensor"
+                    ctor = ""
+                    ctor_exprs = ""
                 elif k is SchemaKind.inplace:
+                    set_output_impl = """
+// TODO: consistency check
+// TODO: striding???
+if (!names.empty()) namedinference::propagate_names(outputs_[output_idx], names);
+"""
                     out_expr = "self"
-                    prologue = "// TODO: consistency check assert"
+                    ret_expr = "self"
+                    output_type = "std::reference_wrapper<Tensor>"
+                    ctor = f"{class_name}(Tensor& self) : outputs_{{std::ref(self)}} {{}}"
+                    ctor_exprs = "(self)"
                 elif k is SchemaKind.out:
-                    # TODO: generalize this for multi-out
-                    assert len(f.func.arguments.out) == 1, "multi-out structured not supported yet"
                     # TODO: properly get the expression as it was brought into
                     # scope by sig
-                    out_expr = f.func.arguments.out[0].name
-                    prologue = f"""
+                    # TODO: devirtualize
+                    set_output_impl = f"""
 // TODO: add a consistency check for op.ret_
-{out_expr}.resize_(op.ret_.sizes);
+outputs_[output_idx].get().resize_(sizes);
+// TODO: striding
 """
+                    # TODO: generalize this for multi-out
+                    assert len(f.func.arguments.out) == 1, "multi-out structured not supported yet"
+                    out_expr = f.func.arguments.out[0].name
+                    ret_expr = out_expr
+                    output_type = "std::reference_wrapper<Tensor>"
+                    ctor = f"{class_name}(Tensor& out) : outputs_{{std::ref(out)}} {{}}"
+                    ctor_exprs = f"({out_expr})"  # TODO: probably wrong
 
-                if self.dispatch_key == "Meta":
-                    meta_name = meta.name(g)
-                    out_impl_name = f"at::meta::{meta_name}"
-                    out_impl_call = "// meta function does nothing"
+                if self.dispatch_key == 'Meta':
+                    impl_call = ""
                 else:
-                    out_impl_name = f"at::native::{g.out.dispatch[self.dispatch_key]}"
-                    out_impl_call = f"op.impl({out_expr}, {functional_exprs});"
+                    impl_call = f"op.impl({out_expr}, {functional_exprs});"
 
                 device_guard = ""
 
@@ -325,12 +361,20 @@ class RegisterDispatchKey:
                 # For an overview of what this template code looks like, see
                 # https://github.com/pytorch/rfcs/pull/9
                 return f"""\
+struct {class_name} final : public {parent_class_name} {{
+    {ctor}
+    void set_output(int64_t output_idx, IntArrayRef sizes, IntArrayRef strides, TensorOptions options, DimnameList names) override {{
+        {set_output_impl}
+    }}
+    std::array<{output_type}, {len(f.func.returns)}> outputs_;
+}};
+
 {sig.defn()} {{
     {device_guard}
-    {out_impl_name} op({functional_exprs});
-    {prologue}
-    {out_impl_call}
-    return {out_expr};
+    {class_name} op{ctor_exprs};
+    op.meta({functional_exprs});
+    {impl_call}
+    return {ret_expr};
 }}
 """
 
@@ -561,8 +605,7 @@ def compute_native_function_declaration(g: Union[StructuredNativeFunctions, Nati
             args = native.arguments(f.func)
             rs.append(f"""\
 struct CAFFE2_API {n} : public at::meta::{meta_name} {{
-    using meta::{meta_name}::{meta_name};
-    {returns_type} impl({', '.join(a.str_with_default() for a in args)});
+    void impl({', '.join(a.str_with_default() for a in args)});
 }};
 """)
         return rs
@@ -591,16 +634,11 @@ def compute_meta_function_declaration(g: StructuredNativeFunctions) -> str:
     with native_function_manager(g.out):
         sig = g.signature()
         name = meta.name(g)
-        returns_type = meta.returns_type(sig.returns)
         args = meta.arguments(sig)
         args_str = ', '.join(map(str, args))
-        # TODO: maybe return should be done as individual fields
-        # rather than tuple; but that makes the return field convention
-        # more complex
         return f"""\
-struct CAFFE2_API {name} {{
-    {name}({args_str});
-    {returns_type} ret_;
+struct CAFFE2_API {name} : public at::impl::MetaBase {{
+    void meta({args_str});
 }};
 """
 
