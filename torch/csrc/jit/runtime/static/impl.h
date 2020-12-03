@@ -262,7 +262,7 @@ class ProcessedNode {
   }
 
   bool has_out_variant() const {
-    return fn_.has_value();
+    return static_cast<bool>(fn_);
   }
 
   const std::vector<size_t>& input_regs() const {
@@ -281,9 +281,9 @@ class ProcessedNode {
  private:
   Node* node_;
   c10::optional<Operation> op_;
-  c10::optional<std::function<void(const ProcessedNode*, std::vector<IValue>&)>>
+  std::function<void(const ProcessedNode*, std::vector<IValue>&)>
       fn_;
-  c10::optional<std::function<void(const ProcessedNode*, std::vector<IValue>&)>>
+  std::function<void(const ProcessedNode*, std::vector<IValue>&)>
       native_fn_;
 
   std::vector<size_t> input_regs_;
