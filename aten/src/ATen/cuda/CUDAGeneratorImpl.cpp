@@ -83,8 +83,8 @@ Generator createCUDAGenerator(DeviceIndex device_index) {
  * CUDAGeneratorImpl class implementation
  */
 CUDAGeneratorImpl::CUDAGeneratorImpl(DeviceIndex device_index)
-  : c10::GeneratorImpl{Device(DeviceType::CUDA, device_index),
-              DispatchKeySet(c10::DispatchKey::CUDA)} { 
+  : c10::GeneratorImpl{Device(Device::Unchecked::UNCHECKED, kCUDA, device_index),
+              DispatchKeySet(c10::DispatchKey::CUDA)} {
   at::cuda::assertNotCapturing("Cannot construct a new CUDAGeneratorImpl");
 }
 
@@ -201,7 +201,7 @@ PhiloxCudaState CUDAGeneratorImpl::philox_cuda_state(uint64_t increment) {
                 CAPTURE_DEFAULT_GENS_MSG);
     uint32_t offset = this->offset_intragraph_;
     TORCH_INTERNAL_ASSERT(this->offset_intragraph_ <=
-                          std::numeric_limits<uint32_t>::max() - increment); 
+                          std::numeric_limits<uint32_t>::max() - increment);
     this->offset_intragraph_ += increment;
     return PhiloxCudaState(this->seed_,
                            this->offset_extragraph_,

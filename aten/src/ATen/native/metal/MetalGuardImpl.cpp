@@ -16,10 +16,10 @@ struct MetalGuardImpl final : public c10::impl::DeviceGuardImplInterface {
   }
   Device exchangeDevice(Device) const override {
     // no-op
-    return Device(DeviceType::Metal, -1);
+    return kMetal;
   }
   Device getDevice() const override {
-    return Device(DeviceType::Metal, -1);
+    return kMetal;
   }
   void setDevice(Device) const override {
     // no-op
@@ -29,12 +29,12 @@ struct MetalGuardImpl final : public c10::impl::DeviceGuardImplInterface {
   }
   Stream getStream(Device d) const noexcept override {
     // no-op
-    return Stream(Stream::DEFAULT, Device(DeviceType::Metal, -1));
+    return Stream(Stream::DEFAULT, kMetal);
   }
   // NB: These do NOT set the current device
   Stream exchangeStream(Stream s) const noexcept override {
     // no-op
-    return Stream(Stream::DEFAULT, Device(DeviceType::Metal, -1));
+    return Stream(Stream::DEFAULT, kMetal);
   }
   DeviceIndex deviceCount() const noexcept override {
     return 1;

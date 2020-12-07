@@ -30,11 +30,27 @@ using DeviceIndex = int8_t;
 struct C10_API Device final {
   using Type = DeviceType;
 
-  /// Constructs a new `Device` from a `DeviceType` and an optional device
+  enum Unchecked { UNCHECKED };
+
+  /// Constructs a new `Device` from a `DeviceType` and a device
   /// index.
-  /* implicit */ Device(DeviceType type, DeviceIndex index = -1)
+  /// Also performs validation
+  /* implicit */ Device(DeviceType type, DeviceIndex index)
       : type_(type), index_(index) {
     validate();
+  }
+
+  /// Does not perform validation
+  /// This is useful because the Device constructor is called very frequently
+  /// and we usually know beforehand that the device is already valid
+  /* implicit */ Device(Unchecked, DeviceType type, DeviceIndex index)
+      : type_(type), index_(index) {
+  }
+
+  /// Does not perform validation
+  /// This is useful for Devices that do not use a DeviceIndex (e.g. cpu)
+  /* implicit */ Device(DeviceType type)
+      : type_(type), index_(-1) {
   }
 
   /// Constructs a `Device` from a string description, for convenience.
@@ -91,7 +107,7 @@ struct C10_API Device final {
 
  private:
   DeviceType type_;
-  DeviceIndex index_ = -1;
+  DeviceIndex index_;
   void validate() {
     TORCH_CHECK(index_ == -1 || index_ >= 0,
         "Device index must be -1 or non-negative, got ", (int)index_);
