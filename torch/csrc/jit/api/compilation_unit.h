@@ -112,6 +112,7 @@ struct TORCH_API CompilationUnit {
       const c10::QualifiedName& qualifiedName,
       const ClassDef& classDef,
       ResolverPtr rcb,
+      InterfaceType::InterfaceIgnoredArgsType ignored_arg_names,
       bool is_module = false);
 
   Function* create_function(

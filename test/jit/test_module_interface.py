@@ -710,3 +710,33 @@ class TestModuleInterface(JitTestCase):
 
         with self.assertRaisesRegex(Exception, "Could not compile"):
             scripted_mod = torch.jit.script(TestModule())
+
+    def test_module_interface_ignore_arg_names(self):
+        global ModuleInterface
+
+        @torch.jit.interface
+        class ModuleInterface(nn.Module):
+            __ignored_argument_names__ = {"forward": ["a", "b"]}
+
+            def forward(self, a: int, b: torch.Tensor) -> torch.Tensor:
+                pass
+
+        class IfaceImpl(nn.Module):
+            def forward(self, input_a: int, input_b: torch.Tensor) -> torch.Tensor:
+                return input_b
+
+        @torch.jit.script
+        def as_module_interface(a: ModuleInterface) -> ModuleInterface:
+            a.forward(3, torch.tensor([1]))
+            return a
+
+        def uses_kwargs(a: ModuleInterface) -> ModuleInterface:
+            a.forward(b=torch.tensor([1]), a=3)
+            return a
+
+        # This should work because of __ignored_argument_names__.
+        as_module_interface(torch.jit.script(IfaceImpl()))
+
+        # This should fail because __ignored_argument_names__ disables named args.
+        with self.assertRaisesRegex(Exception, "forward cannot be called with keyword arguments"):
+            torch.jit.script(uses_kwargs)

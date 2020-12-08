@@ -1036,12 +1036,14 @@ def interface(obj):
 
     qualified_name = _qualified_name(obj)
     rcb = _jit_internal.createResolutionCallbackFromFrame(1)
+    ignored_arg_names = obj.__ignored_argument_names__ if hasattr(obj, "__ignored_argument_names__") else {}
+
     # if this type is a `nn.Module` subclass, generate an module interface type
     # instead of a class interface type, an module interface type only compile
     # the user provided methods as part of the interface
     ast = get_jit_class_def(obj, obj.__name__)
     torch._C._jit_script_interface_compile(
-        qualified_name, ast, rcb, is_module_interface
+        qualified_name, ast, rcb, is_module_interface, ignored_arg_names
     )
     obj.__torch_script_interface__ = True
     return obj

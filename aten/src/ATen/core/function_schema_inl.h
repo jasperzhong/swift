@@ -270,6 +270,7 @@ inline FunctionSchema FunctionSchema::cloneWithRemappedTypes(
 inline bool isSubtypeOfList(
     ArrayRef<Argument> child,
     ArrayRef<Argument> parent,
+    const std::set<std::string>& ignored_arg_names,
     std::ostream* why_not) {
   if (child.size() != parent.size()) {
     return false;
@@ -277,7 +278,7 @@ inline bool isSubtypeOfList(
   for (size_t i = 0; i < child.size(); ++i) {
     const Argument& c = child[i];
     const Argument& p = parent[i];
-    if (c.name() != p.name()) {
+    if ((ignored_arg_names.count(c.name()) == 0) && (c.name() != p.name())) {
       return false;
     }
     if (!c.type()->isSubtypeOfExt(p.type(), why_not)) {
@@ -290,14 +291,16 @@ inline bool isSubtypeOfList(
 inline bool FunctionSchema::isSubtypeOf(
     const FunctionSchema& rhs,
     bool as_method,
+    const std::set<std::string>& ignored_arg_names,
     std::ostream* why_not) const {
   size_t start = as_method ? 1 : 0;
   // functions are contravariant in arguments but covariant in returns
   return isSubtypeOfList(
              ArrayRef<Argument>(rhs.arguments()).slice(start),
              ArrayRef<Argument>(arguments()).slice(start),
+             ignored_arg_names,
              why_not) &&
-      isSubtypeOfList(returns(), rhs.returns(), why_not);
+      isSubtypeOfList(returns(), rhs.returns(), ignored_arg_names, why_not);
 }
 
 } // namespace c10

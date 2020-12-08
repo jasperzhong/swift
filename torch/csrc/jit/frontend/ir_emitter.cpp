@@ -4206,10 +4206,13 @@ void CompilationUnit::define_interface(
     const c10::QualifiedName& qualifiedName,
     const ClassDef& classDef,
     ResolverPtr rcb,
+    InterfaceType::InterfaceIgnoredArgsType ignored_argument_names,
     bool is_module) {
   ScriptTypeParser typeParser(std::move(rcb));
-  InterfaceTypePtr iface =
-      InterfaceType::create(c10::QualifiedName(qualifiedName), is_module);
+  InterfaceTypePtr iface = InterfaceType::create(
+      c10::QualifiedName(qualifiedName),
+      std::move(ignored_argument_names),
+      is_module);
   for (const Stmt& stmt : classDef.body()) {
     if (stmt.kind() != TK_DEF) {
       throw ErrorReport(stmt)

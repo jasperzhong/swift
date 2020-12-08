@@ -1375,11 +1375,30 @@ void initJitScriptBindings(PyObject* module) {
       [](const std::string& qualifiedName,
          const ClassDef& classDef,
          const ResolutionCallback& rcb,
-         bool is_module) {
+         bool is_module,
+         py::handle py_ignored_argument_names) {
+        // Convert ignored_argument_names from a py::dict to C++ dictionary.
+        InterfaceType::InterfaceIgnoredArgsType ignored_arg_names;
+        auto py_ignored_argument_names_dict =
+            py_ignored_argument_names.cast<py::dict>();
+        for (const auto& method : py_ignored_argument_names_dict) {
+          auto method_name = method.first.cast<py::str>();
+          auto py_args_list = method.second.cast<py::list>();
+
+          InterfaceType::InterfaceIgnoredArgsType::value_type::second_type
+              args_set;
+          for (const auto& arg : py_args_list) {
+            args_set.insert(arg.cast<py::str>());
+          }
+
+          ignored_arg_names[method_name] = args_set;
+        }
+
         get_python_cu()->define_interface(
             c10::QualifiedName(qualifiedName),
             classDef,
             pythonResolver(rcb),
+            std::move(ignored_arg_names),
             is_module);
       });
 
