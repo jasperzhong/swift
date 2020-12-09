@@ -235,13 +235,13 @@ void lapackGelss(int m, int n, int nrhs,
     scalar_t *work, int lwork,
     value_t *rwork, int *info);
 
-enum class LapackLstsqDriver : int64_t { Gels, Gelsd, Gelsy, Gelss};
+enum class LapackLstsqDriverType : int64_t { Gels, Gelsd, Gelsy, Gelss};
 
-template<LapackLstsqDriver, class scalar_t, class value_t = scalar_t>
+template<LapackLstsqDriverType, class scalar_t, class value_t = scalar_t>
 struct lapackLstsq_impl;
 
 template<class scalar_t, class value_t>
-struct lapackLstsq_impl<LapackLstsqDriver::Gels, scalar_t, value_t> {
+struct lapackLstsq_impl<LapackLstsqDriverType::Gels, scalar_t, value_t> {
   static void call(
       char trans, int m, int n, int nrhs,
       scalar_t *a, int lda, scalar_t *b, int ldb,
@@ -258,7 +258,7 @@ struct lapackLstsq_impl<LapackLstsqDriver::Gels, scalar_t, value_t> {
 };
 
 template<class scalar_t, class value_t>
-struct lapackLstsq_impl<LapackLstsqDriver::Gelsy, scalar_t, value_t> {
+struct lapackLstsq_impl<LapackLstsqDriverType::Gelsy, scalar_t, value_t> {
   static void call(
       char trans, int m, int n, int nrhs,
       scalar_t *a, int lda, scalar_t *b, int ldb,
@@ -276,7 +276,7 @@ struct lapackLstsq_impl<LapackLstsqDriver::Gelsy, scalar_t, value_t> {
 };
 
 template<class scalar_t, class value_t>
-struct lapackLstsq_impl<LapackLstsqDriver::Gelsd, scalar_t, value_t> {
+struct lapackLstsq_impl<LapackLstsqDriverType::Gelsd, scalar_t, value_t> {
   static void call(
       char trans, int m, int n, int nrhs,
       scalar_t *a, int lda, scalar_t *b, int ldb,
@@ -295,7 +295,7 @@ struct lapackLstsq_impl<LapackLstsqDriver::Gelsd, scalar_t, value_t> {
 };
 
 template<class scalar_t, class value_t>
-struct lapackLstsq_impl<LapackLstsqDriver::Gelss, scalar_t, value_t> {
+struct lapackLstsq_impl<LapackLstsqDriverType::Gelss, scalar_t, value_t> {
   static void call(
       char trans, int m, int n, int nrhs,
       scalar_t *a, int lda, scalar_t *b, int ldb,
@@ -313,7 +313,7 @@ struct lapackLstsq_impl<LapackLstsqDriver::Gelss, scalar_t, value_t> {
   }
 };
 
-template<LapackLstsqDriver driver, class scalar_t, class value_t = scalar_t>
+template<LapackLstsqDriverType driver_type, class scalar_t, class value_t = scalar_t>
 void lapackLstsq(
     char trans, int m, int n, int nrhs,
     scalar_t *a, int lda, scalar_t *b, int ldb,
@@ -322,7 +322,7 @@ void lapackLstsq(
     value_t *s, // Gelss flavor
     int *iwork // Gelsd flavor
     ) {
-  lapackLstsq_impl<driver, scalar_t, value_t>::call(
+  lapackLstsq_impl<driver_type, scalar_t, value_t>::call(
       trans, m, n, nrhs,
       a, lda, b, ldb,
       work, lwork, info,
@@ -1663,7 +1663,7 @@ struct LapackLstsqHelper {
 
   // we use `driver_type` to decide how to initialize
   // relevant to specific drivers parameters
-  LapackLstsqDriver driver_type;
+  LapackLstsqDriverType driver_type;
   func_t driver;
 
   bool is_complex;
@@ -1705,7 +1705,7 @@ struct LapackLstsqHelper {
   int iwork_opt; // used to decide the opt `iwork` size with lwork=-1
   int* iwork_ptr = &iwork_opt;
 
-  LapackLstsqHelper(LapackLstsqDriver driver_type, func_t driver)
+  LapackLstsqHelper(LapackLstsqDriverType driver_type, func_t driver)
     : driver_type{driver_type}, driver{driver}
   {}
 
@@ -1738,7 +1738,7 @@ struct LapackLstsqHelper {
   self_type& set_jpvt() {
     // handle `jpvt` workspace array (relevant for `?gelsy` which uses
     // a QR factorization with column pivoting).
-    if (LapackLstsqDriver::Gelsy == driver_type) {
+    if (LapackLstsqDriverType::Gelsy == driver_type) {
       jpvt = at::empty({std::max<int64_t>(1, n)}, at::kInt);
       jpvt_ptr = jpvt.data_ptr<int>();
     }
@@ -1747,7 +1747,7 @@ struct LapackLstsqHelper {
   self_type& set_rcond(double cond) { this->rcond = static_cast<value_t>(cond); return *this; }
   self_type& set_rank() {
     // only `?gels` is not rank-revealing
-    if (LapackLstsqDriver::Gels != driver_type) {
+    if (LapackLstsqDriverType::Gels != driver_type) {
       if (!batch_shape.size()) {
         rank = at::empty({1}, at::kLong);
       }
@@ -1761,19 +1761,19 @@ struct LapackLstsqHelper {
   self_type& set_rwork() {
     // `rwork` only makes sense for complex flavors and
     // `?gelsy`, `?gelsd` and `?gelss` drivers
-    if (!this->is_complex || LapackLstsqDriver::Gels == driver_type) {
+    if (!this->is_complex || LapackLstsqDriverType::Gels == driver_type) {
       return *this;
     }
 
     int64_t rwork_len;
     switch (this->driver_type) {
-      case LapackLstsqDriver::Gelsy:
+      case LapackLstsqDriverType::Gelsy:
         rwork_len = std::max<int64_t>(1, 2 * n);
         break;
-      case LapackLstsqDriver::Gelss:
+      case LapackLstsqDriverType::Gelss:
         rwork_len = std::max<int64_t>(1, 5 * std::min(m, n));
         break;
-      // case LapackLstsqDriver::Gelsd:
+      // case LapackLstsqDriverType::Gelsd:
       default:
         rwork_len = static_cast<int>(rwork_opt);
     }
@@ -1784,8 +1784,8 @@ struct LapackLstsqHelper {
   self_type& set_s() {
     // `?gelsd` and `?gelss` are SVD-based
     // and we can extract singular values from them.
-    if (LapackLstsqDriver::Gelsd == driver_type
-      || LapackLstsqDriver::Gelss == driver_type) {
+    if (LapackLstsqDriverType::Gelsd == driver_type
+      || LapackLstsqDriverType::Gelss == driver_type) {
       auto s_shape = batch_shape.vec();
       s_shape.push_back(std::min(m, n));
       s = at::empty(s_shape, c10::toValueType(scalar_type));
@@ -1796,7 +1796,7 @@ struct LapackLstsqHelper {
   }
   self_type& set_iwork() {
     // handle `iwork` workspace array (relevant only for `?gelsd`)
-    if (LapackLstsqDriver::Gelsd == driver_type) {
+    if (LapackLstsqDriverType::Gelsd == driver_type) {
       iwork = at::empty({iwork_opt}, at::kInt);
       iwork_ptr = iwork.data_ptr<int>();
     }
@@ -1835,12 +1835,12 @@ struct LapackLstsqHelper {
   }
 };
 
-// we use `enum class LapackLstsqDriver` as keys in an unordered_map.
+// we use `enum class LapackLstsqDriverType` as keys in an unordered_map.
 // Clang5 and Gcc5 do not support std::hash for enum classes, hence
 // we provide our own hash function.
 struct LapackLstsqDriverHash {
-  std::size_t operator()(const LapackLstsqDriver& driver) const {
-    return static_cast<std::size_t>(driver);
+  std::size_t operator()(const LapackLstsqDriverType& driver_type) const {
+    return static_cast<std::size_t>(driver_type);
   }
 };
 #endif
@@ -1852,13 +1852,13 @@ std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
 #else
   std::vector<int64_t> infos(batchCount(a), 0);
 
-  static auto driver_string_to_enum = std::unordered_map<std::string, LapackLstsqDriver>({
-    {"gels", LapackLstsqDriver::Gels},
-    {"gelsy", LapackLstsqDriver::Gelsy},
-    {"gelsd", LapackLstsqDriver::Gelsd},
-    {"gelss", LapackLstsqDriver::Gelss}
+  static auto driver_string_to_type = std::unordered_map<std::string, LapackLstsqDriverType>({
+    {"gels", LapackLstsqDriverType::Gels},
+    {"gelsy", LapackLstsqDriverType::Gelsy},
+    {"gelsd", LapackLstsqDriverType::Gelsd},
+    {"gelss", LapackLstsqDriverType::Gelss}
   });
-  auto driver_enum = driver_string_to_enum[driver_name];
+  auto driver_type = driver_string_to_type[driver_name];
 
   Tensor rank;
   Tensor singular_values;
@@ -1866,20 +1866,20 @@ std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
   AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(a.scalar_type(), "linalg.lstsq_cpu", [&] {
     using value_t = typename c10::scalar_value_type<scalar_t>::type;
 
-    auto driver = lapackLstsq<LapackLstsqDriver::Gelsd, scalar_t, value_t>;
-    static auto driver_enum_to_func
-      = std::unordered_map<LapackLstsqDriver, decltype(driver), LapackLstsqDriverHash>({
-      {LapackLstsqDriver::Gels, lapackLstsq<LapackLstsqDriver::Gels, scalar_t, value_t>},
-      {LapackLstsqDriver::Gelsy, lapackLstsq<LapackLstsqDriver::Gelsy, scalar_t, value_t>},
-      {LapackLstsqDriver::Gelsd, lapackLstsq<LapackLstsqDriver::Gelsd, scalar_t, value_t>},
-      {LapackLstsqDriver::Gelss, lapackLstsq<LapackLstsqDriver::Gelss, scalar_t, value_t>}
+    auto driver = lapackLstsq<LapackLstsqDriverType::Gelsd, scalar_t, value_t>;
+    static auto driver_type_to_func
+      = std::unordered_map<LapackLstsqDriverType, decltype(driver), LapackLstsqDriverHash>({
+      {LapackLstsqDriverType::Gels, lapackLstsq<LapackLstsqDriverType::Gels, scalar_t, value_t>},
+      {LapackLstsqDriverType::Gelsy, lapackLstsq<LapackLstsqDriverType::Gelsy, scalar_t, value_t>},
+      {LapackLstsqDriverType::Gelsd, lapackLstsq<LapackLstsqDriverType::Gelsd, scalar_t, value_t>},
+      {LapackLstsqDriverType::Gelss, lapackLstsq<LapackLstsqDriverType::Gelss, scalar_t, value_t>}
     });
-    driver = driver_enum_to_func[driver_enum];
+    driver = driver_type_to_func[driver_type];
 
     auto m = a.size(-2);
     auto n = a.size(-1);
     auto nrhs = b.size(-1);
-    auto driver_helper = LapackLstsqHelper<scalar_t, value_t, decltype(driver)>(driver_enum, driver)
+    auto driver_helper = LapackLstsqHelper<scalar_t, value_t, decltype(driver)>(driver_type, driver)
       .set_trans('N')
       .set_m(m)
       .set_n(n)
