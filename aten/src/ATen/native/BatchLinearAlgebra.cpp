@@ -1834,7 +1834,6 @@ struct LapackLstsqHelper {
     return *this;
   }
 };
-#endif
 
 // we use `enum class LapackLstsqDriver` as keys in an unordered_map.
 // Clang5 and Gcc5 do not support std::hash for enum classes, hence
@@ -1844,6 +1843,7 @@ struct LapackLstsqDriverHash {
     return static_cast<std::size_t>(driver);
   }
 };
+#endif
 
 std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
     const Tensor& a, const Tensor& b, double cond, std::string driver_name) {
