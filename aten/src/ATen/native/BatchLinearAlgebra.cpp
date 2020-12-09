@@ -1836,6 +1836,15 @@ struct LapackLstsqHelper {
 };
 #endif
 
+// we use `enum class LapackLstsqDriver` as keys in an unordered_map.
+// Clang5 and Gcc5 do not support std::hash for enum classes, hence
+// we provide our own hash function.
+struct LapackLstsqDriverHash {
+  std::size_t operator()(const LapackLstsqDriver& driver) const {
+    return static_cast<std::size_t>(driver);
+  }
+};
+
 std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
     const Tensor& a, const Tensor& b, double cond, std::string driver_name) {
 #ifndef USE_LAPACK
@@ -1858,7 +1867,8 @@ std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
     using value_t = typename c10::scalar_value_type<scalar_t>::type;
 
     auto driver = lapackLstsq<LapackLstsqDriver::Gelsd, scalar_t, value_t>;
-    static auto driver_enum_to_func = std::unordered_map<LapackLstsqDriver, decltype(driver)>({
+    static auto driver_enum_to_func
+      = std::unordered_map<LapackLstsqDriver, decltype(driver), LapackLstsqDriverHash>({
       {LapackLstsqDriver::Gels, lapackLstsq<LapackLstsqDriver::Gels, scalar_t, value_t>},
       {LapackLstsqDriver::Gelsy, lapackLstsq<LapackLstsqDriver::Gelsy, scalar_t, value_t>},
       {LapackLstsqDriver::Gelsd, lapackLstsq<LapackLstsqDriver::Gelsd, scalar_t, value_t>},
@@ -1946,7 +1956,7 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
   };
   TORCH_CHECK(
     allowed_drivers.find(driver_str) != allowed_drivers.end(),
-    "torch.linalg.lstsq: parameter 'driver_str' should be one of "
+    "torch.linalg.lstsq: parameter 'driver_name' should be one of "
     "(gels, gelsy, gelsd, gelss)"
   );
 
