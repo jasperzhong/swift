@@ -12,7 +12,7 @@ aten_native_yaml = os.path.join(path, '../aten/src/ATen/native/native_functions.
 all_operators_with_namedtuple_return = {
     'max', 'min', 'median', 'nanmedian', 'mode', 'kthvalue', 'svd', 'symeig', 'eig',
     'qr', 'geqrf', 'solve', 'slogdet', 'sort', 'topk', 'lstsq',
-    'triangular_solve', 'cummax', 'cummin', 'linalg_eigh'
+    'triangular_solve', 'cummax', 'cummin', 'linalg_eigh', 'linalg_lstsq'
 }
 
 
@@ -65,23 +65,33 @@ class TestNamedTupleAPI(unittest.TestCase):
             op(operators=['triangular_solve'], input=(a,), names=('solution', 'cloned_coefficient'), hasout=True),
             op(operators=['lstsq'], input=(a,), names=('solution', 'QR'), hasout=True),
             op(operators=['linalg_eigh'], input=("L",), names=('eigenvalues', 'eigenvectors'), hasout=True),
+            op(operators=['linalg_lstsq'], input=(a,), names=('x', 'rank', 's'), hasout=False)
         ]
+
+        def identify_linalg(f):
+            if (f.startswith('linalg_')):
+                return (f[7:], torch.linalg)
+            else:
+                return f, torch
 
         for op in operators:
             for f in op.operators:
-                if 'linalg_' in f:
-                    ret = getattr(torch.linalg, f[7:])(a, *op.input)
-                    ret1 = getattr(torch.linalg, f[7:])(a, *op.input, out=tuple(ret))
-                    for i, name in enumerate(op.names):
-                        self.assertIs(getattr(ret, name), ret[i])
-                else:
+                f, module = identify_linalg(f)
+                # test method call if present, only for torch module
+                if module == torch and hasattr(a, f):
                     ret = getattr(a, f)(*op.input)
                     for i, name in enumerate(op.names):
                         self.assertIs(getattr(ret, name), ret[i])
-                    if op.hasout:
-                        ret1 = getattr(torch, f)(a, *op.input, out=tuple(ret))
-                        for i, name in enumerate(op.names):
-                            self.assertIs(getattr(ret, name), ret[i])
+
+                # test funtional call
+                ret = getattr(module, f)(a, *op.input)
+                for i, name in enumerate(op.names):
+                    self.assertIs(getattr(ret, name), ret[i])
+
+                if op.hasout:
+                    ret1 = getattr(module, f)(a, *op.input, out=tuple(ret))
+                    for i, name in enumerate(op.names):
+                        self.assertIs(getattr(ret, name), ret[i])
 
         all_covered_operators = set([x for y in operators for x in y.operators])
 
