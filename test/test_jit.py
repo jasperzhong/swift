@@ -553,6 +553,51 @@ class TestJit(JitTestCase):
         self.run_pass('peephole', foo.graph)
         FileCheck().check("aten::__getitem__").run(foo.graph)
 
+        @torch.jit.script
+        def foo(x, y, z):
+            li = [x, y, z]
+            x1, y1, z1 = li
+            return x1, y1, z1
+
+        # optimize list unpack
+        FileCheck().check("Unpack").run(foo.graph)
+        self.run_pass('peephole', foo.graph)
+        FileCheck().check_not("Unpack").run(foo.graph)
+
+        @torch.jit.script
+        def foo(x, y, z):
+            li = [x, y, z]
+            li.append(x + z)
+            x1, y1, z1 = li
+            return x1, y1, z1
+
+        # write prevents optimization
+        self.run_pass('peephole', foo.graph)
+        FileCheck().check("Unpack").run(foo.graph)
+
+        @torch.jit.script
+        def foo(x, y, z):
+            li = [x] + [y]
+            return li
+
+        # optimize list add
+        FileCheck().check_count("ListConstruct", 2).run(foo.graph)
+        self.run_pass('peephole', foo.graph)
+        FileCheck().check_count("ListConstruct", 1, exactly=True).run(foo.graph)
+
+        @torch.jit.script
+        def foo(x, y, z):
+            li = [x] + [y]
+            li.append(z)
+            return li + li
+
+        # first list add optimized, second one cannot because of write
+        FileCheck().check_count("ListConstruct", 2, exactly=True).check_count("aten::add", 2).run(foo.graph)
+        self.run_pass('peephole', foo.graph)
+        FileCheck().check_count("ListConstruct", 1, exactly=True).check_count("aten::add", 1, exactly=True)\
+            .run(foo.graph)
+
+
     @unittest.skipIf(not RUN_CUDA, "cpp tests require CUDA")
     def test_peephole_cuda(self):
         a = torch.tensor([0.4], device='cpu')
