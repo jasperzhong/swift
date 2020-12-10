@@ -70,13 +70,13 @@ class TestNamedTupleAPI(unittest.TestCase):
 
         def identify_linalg(f):
             if (f.startswith('linalg_')):
-                return (f[7:], torch.linalg)
+                return torch.linalg, f[7:]
             else:
-                return f, torch
+                return torch, f
 
         for op in operators:
             for f in op.operators:
-                f, module = identify_linalg(f)
+                module, f = identify_linalg(f)
                 # test method call if present, only for torch module
                 if module == torch and hasattr(a, f):
                     ret = getattr(a, f)(*op.input)
