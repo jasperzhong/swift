@@ -1775,7 +1775,7 @@ struct LapackLstsqHelper {
         break;
       // case LapackLstsqDriverType::Gelsd:
       default:
-        rwork_len = static_cast<int>(rwork_opt);
+        rwork_len = static_cast<int64_t>(rwork_opt);
     }
     rwork = at::empty({rwork_len}, c10::toValueType(scalar_type));
     rwork_ptr = rwork.data_ptr<value_t>();
@@ -1838,7 +1838,7 @@ struct LapackLstsqHelper {
 // we use `enum class LapackLstsqDriverType` as keys in an unordered_map.
 // Clang5 and Gcc5 do not support std::hash for enum classes, hence
 // we provide our own hash function.
-struct LapackLstsqDriverHash {
+struct LapackLstsqDriverTypeHash {
   std::size_t operator()(const LapackLstsqDriverType& driver_type) const {
     return static_cast<std::size_t>(driver_type);
   }
@@ -1868,7 +1868,7 @@ std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
 
     auto driver = lapackLstsq<LapackLstsqDriverType::Gelsd, scalar_t, value_t>;
     static auto driver_type_to_func
-      = std::unordered_map<LapackLstsqDriverType, decltype(driver), LapackLstsqDriverHash>({
+      = std::unordered_map<LapackLstsqDriverType, decltype(driver), LapackLstsqDriverTypeHash>({
       {LapackLstsqDriverType::Gels, lapackLstsq<LapackLstsqDriverType::Gels, scalar_t, value_t>},
       {LapackLstsqDriverType::Gelsy, lapackLstsq<LapackLstsqDriverType::Gelsy, scalar_t, value_t>},
       {LapackLstsqDriverType::Gelsd, lapackLstsq<LapackLstsqDriverType::Gelsd, scalar_t, value_t>},
