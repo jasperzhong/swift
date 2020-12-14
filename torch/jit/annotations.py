@@ -335,6 +335,7 @@ def try_ann_to_type(ann, loc):
     # Maybe resolve a NamedTuple to a Tuple Type
     def fake_rcb(key):
         return None
+
     return torch._C._resolve_type_from_object(ann, loc, fake_rcb)
 
 
