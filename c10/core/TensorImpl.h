@@ -1438,6 +1438,7 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
   }
 
   bool is_non_overlapping_and_dense() const {
+    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(support_as_strided());
     return is_non_overlapping_and_dense_;
   }
 
