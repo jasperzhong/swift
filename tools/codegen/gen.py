@@ -469,6 +469,7 @@ c10::impl::hacky_wrapper_for_legacy_signatures<
             else:
                 assert_never(self.target)
                 # Silence mypy's "Missing return statement" error
+                return None
 
         return list(mapMaybe(gen_one, g.functions()))
 
