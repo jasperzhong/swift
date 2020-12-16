@@ -2,6 +2,7 @@ import collections
 import gc
 import unittest
 
+import tempfile
 import torch
 import torch.nn as nn
 import torch.optim
@@ -17,6 +18,14 @@ try:
 except ImportError:
     HAS_PSUTIL = False
 import pickle
+
+
+HAS_TORCHVISION = False
+try:
+    import torchvision
+    HAS_TORCHVISION = True
+except ImportError:
+    pass
 
 
 @unittest.skipIf(not HAS_PSUTIL, "Requires psutil to run")
@@ -49,6 +58,24 @@ class TestProfilerCUDA(TestCase):
         self.assertTrue(not (is_increasing and max_diff > 100 * 1024),
                         msg='memory usage is increasing, {}'.format(str(last_rss)))
 
+
+class DummyModule_1(nn.Module):
+    def __init__(self):
+        super(DummyModule_1, self).__init__()
+        self.conv = torch.nn.Conv2d(3, 2, kernel_size=1, stride=2, padding=3, bias=False)
+
+    def forward(self, x):
+        return self.conv(x)
+
+class DummyModule_2(nn.Module):
+    def __init__(self):
+        super(DummyModule_2, self).__init__()
+        self.dummy = DummyModule_1()
+
+    def forward(self, x):
+        return self.dummy(x)
+
+
 class TestProfiler(TestCase):
     def test_source(self):
         """Checks that source code attribution works for eager, TS and autograd mode
@@ -67,15 +94,7 @@ class TestProfiler(TestCase):
             w = ts_method_2(x, y) + a
             return w.sum()
 
-        class DummyModule(nn.Module):
-            def __init__(self):
-                super(DummyModule, self).__init__()
-                self.conv = torch.nn.Conv2d(3, 2, kernel_size=1, stride=2, padding=3, bias=False)
-
-            def forward(self, x):
-                return self.conv(x)
-
-        mod = DummyModule()
+        mod = DummyModule_1()
 
         with profile(with_stack=True, use_kineto=kineto_available()) as p:
             x = torch.randn(10, 10, requires_grad=True)
@@ -265,6 +284,21 @@ class TestProfiler(TestCase):
             self.payload()
         print(p.key_averages().table(
             sort_by="self_cuda_time_total", row_limit=-1))
+
+    def test_module_attrib_eager(self):
+        model = DummyModule_2()
+        inp = torch.randn(2, 3, 2, 2)
+        with profile(with_stack=True, use_kineto=kineto_available()) as p:
+            model(inp)
+
+        print(p.key_averages(
+            group_by_stack_n=10).table(
+            sort_by="self_cpu_time_total", row_limit=-1))
+
+        for e in p.function_events:
+            if e.name == "aten::mkldnn_convolution":
+                self.assertTrue(any(["DummyModule_1" in entry for entry in e.stack]))
+                self.assertTrue(any(["DummyModule_2" in entry for entry in e.stack]))
 
 
 if __name__ == '__main__':
