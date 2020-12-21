@@ -1264,16 +1264,17 @@ class TestFakeQuantize(TestCase):
             zero_point_curr = zero_point_base.clamp(quant_min, quant_max)
             zero_point_curr.requires_grad_()
 
+            grad_factor = 1.0
             Y_prime = torch._fake_quantize_learnable_per_channel_affine(
-                X_curr, scale_curr, zero_point_curr, axis, quant_min, quant_max).to(device)
+                    X_curr, scale_curr, zero_point_curr, axis, quant_min, quant_max).to(device)
 
             dout = torch.rand(X_curr.shape, dtype=torch.float).to(device)
             dX, dScale, dZeroPoint = _fake_quantize_learnable_per_channel_affine_grad_reference(
                 dout, X_curr, scale_curr, zero_point_curr, axis, quant_min, quant_max, device)
             Y_prime.backward(dout)
 
-            dX_expected = dX.to(device).detach()
-            dX_actual = X_curr.to(device).grad.detach()
+            dX_expected = dX.to(device).detach().cpu()
+            dX_actual = X_curr.to(device).grad.detach().cpu()
             dScale_expected = dScale.to(device).detach()
             dScale_actual = scale_curr.to(device).grad.detach()
             dZeroPoint_expected = dZeroPoint.to(device).detach()
@@ -1282,13 +1283,19 @@ class TestFakeQuantize(TestCase):
 
             self.assertTrue(
                 torch.allclose(dX_expected, dX_actual, rtol=tolerance, atol=tolerance),
-                "Expected dX to match X.grad")
+                "Expected dX={} to match X.grad={}, X={}, s={}, z={}, dout={}, n_bits={}".format(
+                    dX_expected, dX_actual, X_curr, scale_curr, zero_point_curr, dout, n_bits))
             self.assertTrue(
-                torch.allclose(dScale_expected, dScale_actual, rtol=tolerance, atol=tolerance),
-                "Expected dScale to match scale.grad")
+                torch.allclose(dScale_expected * grad_factor, dScale_actual, rtol=tolerance, atol=tolerance),
+                "Expected dScale={} to match scale.grad={}, X={}, s={}, z={}, dout={}, n_bits={}".format(dScale_expected * grad_factor, dScale_actual,
+                X_curr, scale_curr, zero_point_curr, dout, n_bits))
             self.assertTrue(
-                torch.allclose(dZeroPoint_expected, dZeroPoint_actual, rtol=tolerance, atol=tolerance),
-                "Expected dZeroPoint to match zero_point.grad")
+                torch.allclose(dZeroPoint_expected * grad_factor, dZeroPoint_actual, rtol=tolerance, atol=tolerance),
+                "Expected dZeroPoint={} to match zero_point.grad={}, X={}, s={}, z={}, dout={}, n_bits={}".format(dZeroPoint_expected * grad_factor, dZeroPoint_actual,
+                X_curr, scale_curr, zero_point_curr, dout, n_bits))
+            X_curr.grad.data.zero_()
+            scale_curr.grad.data.zero_()
+            zero_point_curr.grad.data.zero_()
 
     @given(X=hu.per_channel_tensor(shapes=hu.array_shapes(2, 5,),
                                    qparams=hu.qparams(dtypes=torch.quint8)))
@@ -1302,15 +1309,15 @@ class TestFakeQuantize(TestCase):
         self._test_learnable_backward_per_channel(
             X_base, 'cpu', scale_base, zero_point_base, axis)
 
-    @given(X=hu.per_channel_tensor(shapes=hu.array_shapes(2, 5,),
-                                   qparams=hu.qparams(dtypes=torch.quint8)))
-    @unittest.skip("temporarily disable the test")
-    def test_learnable_backward_per_channel_cuda(self, X):
+    @unittest.skipIf(not TEST_CUDA, "No gpu is not available.")
+    def test_learnable_backward_per_channel_cuda(self):
         torch.random.manual_seed(NP_RANDOM_SEED)
-        X, (scale, zero_point, axis, torch_type) = X
+        axis = 0
+        X = torch.rand(2, 5) * 2 - 1
         X_base = torch.tensor(X).to('cuda')
-        scale_base = to_tensor(scale, 'cuda')
-        zero_point_base = to_tensor(zero_point, 'cuda')
+        channel_size = X_base.size(axis)
+        scale_base = torch.normal(mean=0, std=1, size=(channel_size,)).clamp(1e-4, 100)
+        zero_point_base = torch.normal(mean=0, std=128, size=(channel_size,))
         self._test_learnable_backward_per_channel(
             X_base, 'cuda', scale_base, zero_point_base, axis)
 
