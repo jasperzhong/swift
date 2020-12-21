@@ -2013,20 +2013,29 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
     "(gels, gelsy, gelsd, gelss)"
   );
 
+  // LAPACK/MAGMA requries inputs to be in column-major-order.
   auto self_working_copy = cloneBatchedColumnMajor(self);
 
   // Tensor b must be of size (..., max(m, n), nrhs)
-  // plus in column-major order
+  // and in column-major order.
+  // We allow the batch dims of `self` to broadcast over the batch
+  // dims of `b` so that it is possible to solve multiple systems with
+  // with the same lhs (encoded by `self`) / rhs (encoded by `b`).
+  // `b_working_copy` is modified in-place and the combination of
+  // batch broadcasting plus LAPACK/MAGMA requirements impose the following
+  // restrictions on sizes/strides of `b`:
+  // 1. b.size = (broadcasted_batch_size(self, b), max(m, n), nrhs).
+  // 2. b.stride should correspond to an almost contiguous Tensor in column-major-order,
+  //   i.e. b.stride = b.transpose(-2, -1).contiguous().transpose(-2, -1).strides()
   auto m = self.size(-2);
   auto n = self.size(-1);
-  auto b_working_copy_sizes = b2d.sizes().vec();
-  b_working_copy_sizes[b2d.dim() - 2] = std::max(m, n);
-  auto b_working_copy_strides = at::detail::defaultStrides(b2d.sizes());
-  b_working_copy_strides[b2d.dim() - 2] = 1;
-  b_working_copy_strides[b2d.dim() - 1] = std::max(m, n);
-  Tensor b_working_copy;
-  b_working_copy = at::empty_strided(
-    b_working_copy_sizes, b_working_copy_strides, b.options());
+  auto nrhs = b2d.size(-1);
+  auto b_sizes = broadcast_batch_size(self, b2d, self.dim() - 2);
+  b_sizes.insert(b_sizes.end(), {std::max(m, n), nrhs});
+  auto b_strides = at::detail::defaultStrides(b_sizes);
+  b_strides[b2d.dim() - 2] = 1;
+  b_strides[b2d.dim() - 1] = std::max(m, n);
+  auto b_working_copy = at::empty_strided(b_sizes, b_strides, b.options());
   b_working_copy.narrow(-2, 0, m).copy_(b2d);
 
   double rcond;

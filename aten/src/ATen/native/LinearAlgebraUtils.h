@@ -170,6 +170,13 @@ static inline std::tuple<Tensor,Tensor> _linalg_broadcast_batch_dims(const Tenso
   return std::make_tuple(arg1_broadcasted, arg2_broadcasted);
 }
 
+static inline std::vector<int64_t> broadcast_batch_size(const Tensor& t1, const Tensor& t2, int64_t n_batch_dims) {
+  IntArrayRef t1_batch_sizes(t1.sizes().data(), n_batch_dims);
+  IntArrayRef t2_batch_sizes(t2.sizes().data(), n_batch_dims);
+  auto broadcasted_batch_sizes = infer_size(t1_batch_sizes, t2_batch_sizes);
+  return broadcasted_batch_sizes;
+}
+
 // Return a permutation with the given axes moved to the end.
 static inline Tensor _move_to_end(const Tensor& self, IntArrayRef axes) {
   const std::vector<int64_t> a = axes.vec();
