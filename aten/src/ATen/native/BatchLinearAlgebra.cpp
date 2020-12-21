@@ -1985,7 +1985,7 @@ std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
         int64_t a_linear_batch_idx) {
         driver_helper.next(a_working_ptr, b_working_ptr, a_linear_batch_idx)
           .call_driver();
-        singleCheckErrors(driver_helper.info, "troch.linalg.lstsq_cpu");
+        singleCheckErrors(driver_helper.info, "torch.linalg.lstsq_cpu");
       }
     );
 
