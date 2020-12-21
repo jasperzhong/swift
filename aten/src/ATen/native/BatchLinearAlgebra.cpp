@@ -1746,13 +1746,13 @@ struct LapackLstsqHelper {
   Tensor jpvt;
   int* jpvt_ptr = nullptr;
   value_t rcond;
-  Tensor rank;
+  Tensor rank, rank_1d;
   int rank_opt;
   int64_t* rank_working_ptr = nullptr;
   Tensor rwork;
   value_t rwork_opt; // used to decide the opt `rwork` size with lwork=-1
   value_t* rwork_ptr = &rwork_opt;
-  Tensor s;
+  Tensor s, s_2d;
   value_t* s_working_ptr = nullptr;
   Tensor iwork;
   int iwork_opt; // used to decide the opt `iwork` size with lwork=-1
@@ -1807,6 +1807,7 @@ struct LapackLstsqHelper {
       else {
         rank = at::empty(batch_shape, at::kLong);
       }
+      rank_1d = rank.view({-1});
       rank_working_ptr = rank.data_ptr<int64_t>();
     }
     return *this;
@@ -1844,6 +1845,7 @@ struct LapackLstsqHelper {
       s = at::empty(s_shape, c10::toValueType(scalar_type));
       s_working_ptr = s.data_ptr<value_t>();
       s_stride = s.size(-1);
+      s_2d = s.view({-1, std::min(m, n)});
     }
     return *this;
   }
@@ -1879,11 +1881,27 @@ struct LapackLstsqHelper {
   }
 
   self_type& next() {
-    // advance to the next problem in a batch
+    // advance to the next problem in a batch.
+    // Use only if a.shape[:-2] == b.shape[:-2]
     a_working_ptr += a_stride;
     b_working_ptr += b_stride;
     rank_working_ptr = rank_working_ptr ? rank_working_ptr + 1 : nullptr;
     s_working_ptr = s_working_ptr ? s_working_ptr + s_stride : nullptr;
+    return *this;
+  }
+
+  self_type& next(scalar_t* a_working_ptr, scalar_t* b_working_ptr,
+    int64_t a_linear_batch_idx) {
+    // advance to the next problem in a batch.
+    // Designed to be used with `batch_iterator_with_broadcasting` method.
+    this->a_working_ptr = a_working_ptr;
+    this->b_working_ptr = b_working_ptr;
+    rank_working_ptr = rank_working_ptr ?
+      rank_1d.select(0, a_linear_batch_idx).template data_ptr<int64_t>() :
+      nullptr;
+    s_working_ptr = s_working_ptr ?
+      s_2d.select(0, a_linear_batch_idx).template data_ptr<value_t>() :
+      nullptr;
     return *this;
   }
 };
@@ -1950,26 +1968,30 @@ std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
       .set_rwork()
       .set_iwork();
 
-    // solve each problem in a batch separately
-    for (int64_t i = 0; i < batchCount(a); ++i) {
-      driver_helper.call_driver().next();
-      infos[i] = driver_helper.info;
-      if (driver_helper.info) {
-        break;
+    // If batch dims for `a` and `b` are equivalent, i.e.
+    // a.shape[:-2] == b.shape[:-2], the call to `batch_iterator_with_broadcasting`
+    // is equivalent to:
+    // for (int64_t i = 0; i < batchCount(a); ++i) {
+    //   driver_helper.call_driver().next();
+    //   infos[i] = driver_helper.info;
+    //   if (driver_helper.info) {
+    //     break;
+    //   }
+    // }
+    // which does correspond to a batch-wise iteration for methods that do not
+    // broadcast over batch dimensions.
+    batch_iterator_with_broadcasting<scalar_t>(a, b,
+      [&](scalar_t* a_working_ptr, scalar_t* b_working_ptr,
+        int64_t a_linear_batch_idx) {
+        driver_helper.next(a_working_ptr, b_working_ptr, a_linear_batch_idx)
+          .call_driver();
+        singleCheckErrors(driver_helper.info, "troch.linalg.lstsq_cpu");
       }
-    }
+    );
 
     rank = driver_helper.rank;
     singular_values = driver_helper.s;
   });
-
-  // Check infos for potential errors
-  if (a.dim() > 2) {
-    batchCheckErrors(infos, "torch.linalg.lstsq_cpu");
-  }
-  else {
-    singleCheckErrors(infos[0], "torch.linalg.lstsq_cpu");
-  }
 
   return std::make_tuple(b, rank, singular_values);
 #endif

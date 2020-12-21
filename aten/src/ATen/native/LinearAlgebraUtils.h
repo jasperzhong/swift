@@ -54,7 +54,7 @@ static inline int64_t matrixStride(const Tensor& batched_matrices) {
 // a = a_c.contiguous().tranpose(-1, -2)
 // b = b_c.contiguous().tranpose(-1, -2)
 template<typename scalar_t, typename func_t>
-void batch_iterator_with_broadcasting(Tensor& a, Tensor& b, const func_t& f) {
+void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const func_t& f) {
   IntArrayRef batch_sizes(a.sizes().data(), a.dim() - 2);
   auto a_sizes = batch_sizes.vec();
   auto a_strides = IntArrayRef(a.strides().data(), a.dim() - 2).vec();
@@ -70,7 +70,8 @@ void batch_iterator_with_broadcasting(Tensor& a, Tensor& b, const func_t& f) {
 
 
   auto a_linear_batch_idx = at::arange(batchCount(a))
-    .reshape(batch_sizes).unsqueeze(-1).unsqueeze(-1);
+    .view(batch_sizes).unsqueeze(-1).unsqueeze(-1);
+
   TensorIterator iter = TensorIteratorConfig()
     .set_check_mem_overlap(false)
     .check_all_same_dtype(false)
@@ -80,7 +81,7 @@ void batch_iterator_with_broadcasting(Tensor& a, Tensor& b, const func_t& f) {
     .add_input(a_linear_batch_idx)
     .build();
 
-  auto a_broadcasts_over_b = a_sizes != b_sizes;
+  auto a_broadcasts_over_b = (a_sizes != b_sizes);
   Tensor a_buffer, a_was_accessed;
   if (a_broadcasts_over_b) {
     a_buffer = a.clone().detach();
@@ -104,8 +105,8 @@ void batch_iterator_with_broadcasting(Tensor& a, Tensor& b, const func_t& f) {
 
         f(a_working_ptr, b_working_ptr, a_curr_linear_batch_idx);
 
-        a_ptr += strides[0];
-        b_ptr += strides[1];
+        b_ptr += strides[0];
+        a_ptr += strides[1];
         a_linear_batch_idx += strides[2];
       }
     };
