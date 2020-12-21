@@ -2036,6 +2036,7 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
   b_strides[b2d.dim() - 2] = 1;
   b_strides[b2d.dim() - 1] = std::max(m, n);
   auto b_working_copy = at::empty_strided(b_sizes, b_strides, b.options());
+  // copy broadcasts here
   b_working_copy.narrow(-2, 0, m).copy_(b2d);
 
   double rcond;
