@@ -4,6 +4,7 @@
 #include <ATen/ATen.h>
 #include <ATen/ExpandUtils.h>
 #include <ATen/TensorUtils.h>
+#include <ATen/native/TensorIterator.h>
 #include <limits>
 #include <sstream>
 #include <cstring>
@@ -47,6 +48,71 @@ static inline int64_t batchCount(const Tensor& batched_matrices) {
 static inline int64_t matrixStride(const Tensor& batched_matrices) {
   return batched_matrices.size(-1) * batched_matrices.size(-2);
 }
+
+// we assume that `a` and `b` do not overlap, and moreover,
+// we expect that there exist tensors a_c and b_c such that
+// a = a_c.contiguous().tranpose(-1, -2)
+// b = b_c.contiguous().tranpose(-1, -2)
+template<typename scalar_t, typename func_t>
+void batch_iterator_with_broadcasting(Tensor& a, Tensor& b, const func_t& f) {
+  IntArrayRef batch_sizes(a.sizes().data(), a.dim() - 2);
+  auto a_sizes = batch_sizes.vec();
+  auto a_strides = IntArrayRef(a.strides().data(), a.dim() - 2).vec();
+  a_sizes.insert(a_sizes.end(), {1, 1});
+  a_strides.insert(a_strides.end(), {0, 0});
+  auto a_restrided = a.as_strided(a_sizes, a_strides);
+
+  auto b_sizes = IntArrayRef(b.sizes().data(), b.dim() - 2).vec();
+  b_sizes.insert(b_sizes.end(), {1, 1});
+  auto b_strides = IntArrayRef(b.strides().data(), b.dim() - 2).vec();
+  b_strides.insert(b_strides.end(), {0, 0});
+  auto b_restrided = b.as_strided(b_sizes, b_strides);
+
+
+  auto a_linear_batch_idx = at::arange(batchCount(a))
+    .reshape(batch_sizes).unsqueeze(-1).unsqueeze(-1);
+  TensorIterator iter = TensorIteratorConfig()
+    .set_check_mem_overlap(false)
+    .check_all_same_dtype(false)
+    .resize_outputs(false)
+    .add_output(b_restrided)
+    .add_input(a_restrided)
+    .add_input(a_linear_batch_idx)
+    .build();
+
+  auto a_broadcasts_over_b = a_sizes != b_sizes;
+  Tensor a_buffer, a_was_accessed;
+  if (a_broadcasts_over_b) {
+    a_buffer = a.clone().detach();
+    a_was_accessed = at::zeros(batch_sizes, at::kBool);
+
+    auto m = a.size(-2);
+    auto n = a.size(-1);
+    auto a_3d = a.view({-1, m, n});
+    auto a_buffer_3d = a_buffer.view({-1, m, n});
+    auto a_was_accessed_1d = a_was_accessed.view({-1});
+  }
+  else {
+    auto loop = [&](char** data, const int64_t* strides, int64_t nelems) {
+      auto* b_ptr = data[0];
+      auto* a_ptr = data[1];
+      auto* a_linear_batch_idx = data[2];
+      for (int64_t elem = 0; elem < nelems; ++elem) {
+        auto* a_working_ptr = reinterpret_cast<scalar_t*>(a_ptr);
+        auto* b_working_ptr = reinterpret_cast<scalar_t*>(b_ptr);
+        auto a_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(a_linear_batch_idx);
+
+        f(a_working_ptr, b_working_ptr, a_curr_linear_batch_idx);
+
+        a_ptr += strides[0];
+        b_ptr += strides[1];
+        a_linear_batch_idx += strides[2];
+      }
+    };
+    iter.serial_for_each(loop, {0, batchCount(b)});
+  }
+}
+
 
 // Returns the epsilon value for floating types except half
 static inline double _get_epsilon(const ScalarType& sc_type) {
