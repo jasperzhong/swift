@@ -82,25 +82,27 @@ void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const fu
     .build();
 
   auto a_broadcasts_over_b = (a_sizes != b_sizes);
+  Tensor a_buffer, a_was_accessed, a_3d, a_buffer_3d;
   if (a_broadcasts_over_b) {
-    auto a_buffer = a.clone().detach();
-    auto a_was_accessed = at::zeros(batchCount(a), at::kBool);
-
+    a_buffer = a.clone().detach();
+    a_was_accessed = at::zeros(batchCount(a), at::kBool);
     auto m = a.size(-2);
     auto n = a.size(-1);
-    auto a_3d = a.view({-1, m, n});
-    auto a_buffer_3d = a_buffer.view({-1, m, n});
+    a_3d = a.view({-1, m, n});
+    a_buffer_3d = a_buffer.view({-1, m, n});
+  }
 
-    auto loop = [&](char** data, const int64_t* strides, int64_t nelems) {
-      auto* b_ptr = data[0];
-      auto* a_ptr = data[1];
-      auto* a_batch_idx_ptr = data[2];
+  auto loop = [&](char** data, const int64_t* strides, int64_t nelems) {
+    auto* b_ptr = data[0];
+    auto* a_ptr = data[1];
+    auto* a_batch_idx_ptr = data[2];
 
-      for (int64_t elem = 0; elem < nelems; ++elem) {
-        auto* a_working_ptr = reinterpret_cast<scalar_t*>(a_ptr);
-        auto* b_working_ptr = reinterpret_cast<scalar_t*>(b_ptr);
-        auto a_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(a_batch_idx_ptr);
+    for (int64_t elem = 0; elem < nelems; ++elem) {
+      auto* a_working_ptr = reinterpret_cast<scalar_t*>(a_ptr);
+      auto* b_working_ptr = reinterpret_cast<scalar_t*>(b_ptr);
+      auto a_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(a_batch_idx_ptr);
 
+      if (a_broadcasts_over_b) {
         auto* a_was_accessed_flag = a_was_accessed
           .select(0, a_curr_linear_batch_idx)
           .data_ptr<bool>();
@@ -111,34 +113,15 @@ void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const fu
           a_3d.select(0, a_curr_linear_batch_idx)
             .copy_(a_buffer_3d.select(0, a_curr_linear_batch_idx));
         }
-        f(a_working_ptr, b_working_ptr, a_curr_linear_batch_idx);
-
-        b_ptr += strides[0];
-        a_ptr += strides[1];
-        a_batch_idx_ptr += strides[2];
       }
-    };
-    iter.serial_for_each(loop, {0, batchCount(b)});
-  }
-  else {
-    auto loop = [&](char** data, const int64_t* strides, int64_t nelems) {
-      auto* b_ptr = data[0];
-      auto* a_ptr = data[1];
-      auto* a_batch_idx_ptr = data[2];
-      for (int64_t elem = 0; elem < nelems; ++elem) {
-        auto* a_working_ptr = reinterpret_cast<scalar_t*>(a_ptr);
-        auto* b_working_ptr = reinterpret_cast<scalar_t*>(b_ptr);
-        auto a_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(a_batch_idx_ptr);
+      f(a_working_ptr, b_working_ptr, a_curr_linear_batch_idx);
 
-        f(a_working_ptr, b_working_ptr, a_curr_linear_batch_idx);
-
-        b_ptr += strides[0];
-        a_ptr += strides[1];
-        a_batch_idx_ptr += strides[2];
-      }
-    };
-    iter.serial_for_each(loop, {0, batchCount(b)});
-  }
+      b_ptr += strides[0];
+      a_ptr += strides[1];
+      a_batch_idx_ptr += strides[2];
+    }
+  };
+  iter.serial_for_each(loop, {0, batchCount(b)});
 }
 
 
