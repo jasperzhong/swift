@@ -2015,9 +2015,9 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
     "self.dim() must be greater or equal to b.dim() and "
     "(self.dim() - b.dim()) <= 1"
   );
-  Tensor b2d = dim_diff ? b.unsqueeze(-1) : b;
+  Tensor b_2d = dim_diff ? b.unsqueeze(-1) : b;
   TORCH_CHECK(
-    self.size(-2) == b2d.size(-2),
+    self.size(-2) == b_2d.size(-2),
     dim_diff ? "self.size(-2) should match b.size(-1)" :
       "self.size(-2) should match b.size(-2)"
   );
@@ -2051,15 +2051,15 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
   //   i.e. b.stride = b.transpose(-2, -1).contiguous().transpose(-2, -1).strides()
   auto m = self.size(-2);
   auto n = self.size(-1);
-  auto nrhs = b2d.size(-1);
-  auto b_sizes = broadcast_batch_size(self, b2d, self.dim() - 2);
+  auto nrhs = b_2d.size(-1);
+  auto b_sizes = broadcast_batch_size(self, b_2d, self.dim() - 2);
   b_sizes.insert(b_sizes.end(), {std::max(m, n), nrhs});
   auto b_strides = at::detail::defaultStrides(b_sizes);
-  b_strides[b2d.dim() - 2] = 1;
-  b_strides[b2d.dim() - 1] = std::max(m, n);
+  b_strides[b_2d.dim() - 2] = 1;
+  b_strides[b_2d.dim() - 1] = std::max(m, n);
   auto b_working_copy = at::empty_strided(b_sizes, b_strides, b.options());
   // copy broadcasts here
-  b_working_copy.narrow(-2, 0, m).copy_(b2d);
+  b_working_copy.narrow(-2, 0, m).copy_(b_2d);
 
   double rcond;
   if (cond.has_value()) {
