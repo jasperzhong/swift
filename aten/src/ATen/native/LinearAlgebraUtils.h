@@ -51,8 +51,8 @@ static inline int64_t matrixStride(const Tensor& batched_matrices) {
 
 // we assume that `a` and `b` do not overlap, and moreover,
 // we expect that there exist tensors a_c and b_c such that
-// a = a_c.contiguous().tranpose(-1, -2)
-// b = b_c.contiguous().tranpose(-1, -2)
+// a = a_c.contiguous().transpose(-1, -2)
+// b = b_c.contiguous().transpose(-1, -2)
 template<typename scalar_t, typename func_t>
 void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const func_t& f) {
   IntArrayRef batch_sizes(a.sizes().data(), a.dim() - 2);
@@ -82,32 +82,59 @@ void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const fu
     .build();
 
   auto a_broadcasts_over_b = (a_sizes != b_sizes);
-  Tensor a_buffer, a_was_accessed;
   if (a_broadcasts_over_b) {
-    a_buffer = a.clone().detach();
-    a_was_accessed = at::zeros(batch_sizes, at::kBool);
+    auto a_buffer = a.clone().detach();
+    auto a_was_accessed = at::zeros(batchCount(a), at::kBool);
 
     auto m = a.size(-2);
     auto n = a.size(-1);
     auto a_3d = a.view({-1, m, n});
     auto a_buffer_3d = a_buffer.view({-1, m, n});
-    auto a_was_accessed_1d = a_was_accessed.view({-1});
+
+    auto loop = [&](char** data, const int64_t* strides, int64_t nelems) {
+      auto* b_ptr = data[0];
+      auto* a_ptr = data[1];
+      auto* a_batch_idx_ptr = data[2];
+
+      for (int64_t elem = 0; elem < nelems; ++elem) {
+        auto* a_working_ptr = reinterpret_cast<scalar_t*>(a_ptr);
+        auto* b_working_ptr = reinterpret_cast<scalar_t*>(b_ptr);
+        auto a_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(a_batch_idx_ptr);
+
+        auto* a_was_accessed_flag = a_was_accessed
+          .select(0, a_curr_linear_batch_idx)
+          .data_ptr<bool>();
+        if (!(*a_was_accessed_flag)) {
+          *a_was_accessed_flag = true;
+        }
+        else {
+          a_3d.select(0, a_curr_linear_batch_idx)
+            .copy_(a_buffer_3d.select(0, a_curr_linear_batch_idx));
+        }
+        f(a_working_ptr, b_working_ptr, a_curr_linear_batch_idx);
+
+        b_ptr += strides[0];
+        a_ptr += strides[1];
+        a_batch_idx_ptr += strides[2];
+      }
+    };
+    iter.serial_for_each(loop, {0, batchCount(b)});
   }
   else {
     auto loop = [&](char** data, const int64_t* strides, int64_t nelems) {
       auto* b_ptr = data[0];
       auto* a_ptr = data[1];
-      auto* a_linear_batch_idx = data[2];
+      auto* a_batch_idx_ptr = data[2];
       for (int64_t elem = 0; elem < nelems; ++elem) {
         auto* a_working_ptr = reinterpret_cast<scalar_t*>(a_ptr);
         auto* b_working_ptr = reinterpret_cast<scalar_t*>(b_ptr);
-        auto a_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(a_linear_batch_idx);
+        auto a_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(a_batch_idx_ptr);
 
         f(a_working_ptr, b_working_ptr, a_curr_linear_batch_idx);
 
         b_ptr += strides[0];
         a_ptr += strides[1];
-        a_linear_batch_idx += strides[2];
+        a_batch_idx_ptr += strides[2];
       }
     };
     iter.serial_for_each(loop, {0, batchCount(b)});
