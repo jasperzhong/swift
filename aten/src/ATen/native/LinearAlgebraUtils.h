@@ -77,10 +77,24 @@ void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const fu
 
   auto a_broadcasts_over_b = (a_batch_sizes != b_batch_sizes);
   Tensor a_buffer, a_was_accessed, a_buffer_3d;
+  std::function<void(int64_t)> check_if_copy_needed_for_a
+    = [](int64_t a_curr_linear_batch_idx){};
   if (a_broadcasts_over_b) {
     a_buffer = a.clone().detach();
     a_was_accessed = at::zeros(batchCount(a), at::kBool);
     a_buffer_3d = a_buffer.view({-1, m, n});
+    check_if_copy_needed_for_a = [&](int64_t a_curr_linear_batch_idx) {
+      auto* a_was_accessed_flag = a_was_accessed
+        .select(0, a_curr_linear_batch_idx)
+        .data_ptr<bool>();
+      if (!(*a_was_accessed_flag)) {
+        *a_was_accessed_flag = true;
+      }
+      else {
+        a_3d.select(0, a_curr_linear_batch_idx)
+          .copy_(a_buffer_3d.select(0, a_curr_linear_batch_idx));
+      }
+    };
   }
 
   auto loop = [&](char** data, const int64_t* strides, int64_t nelems) {
@@ -91,18 +105,7 @@ void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const fu
       auto b_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(b_batch_idx_ptr);
       auto a_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(a_batch_idx_ptr);
 
-      if (a_broadcasts_over_b) {
-        auto* a_was_accessed_flag = a_was_accessed
-          .select(0, a_curr_linear_batch_idx)
-          .data_ptr<bool>();
-        if (!(*a_was_accessed_flag)) {
-          *a_was_accessed_flag = true;
-        }
-        else {
-          a_3d.select(0, a_curr_linear_batch_idx)
-            .copy_(a_buffer_3d.select(0, a_curr_linear_batch_idx));
-        }
-      }
+      check_if_copy_needed_for_a(a_curr_linear_batch_idx);
 
       auto* a_working_ptr = a_3d.select(0, a_curr_linear_batch_idx)
         .data_ptr<scalar_t>();
