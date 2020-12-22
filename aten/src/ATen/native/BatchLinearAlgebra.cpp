@@ -1837,7 +1837,7 @@ struct LapackLstsqHelper {
   }
   self_type& set_s() {
     // `?gelsd` and `?gelss` are SVD-based
-    // and we can extract singular values from them.
+    // so we can extract singular values from them.
     if (LapackLstsqDriverType::Gelsd == driver_type
       || LapackLstsqDriverType::Gelss == driver_type) {
       auto s_shape = batch_shape.vec();
@@ -1882,7 +1882,7 @@ struct LapackLstsqHelper {
 
   self_type& next() {
     // advance to the next problem in a batch.
-    // Use only if a.shape[:-2] == b.shape[:-2]
+    // Should only be used if a.shape[:-2] == b.shape[:-2]
     a_working_ptr += a_stride;
     b_working_ptr += b_stride;
     rank_working_ptr = rank_working_ptr ? rank_working_ptr + 1 : nullptr;
@@ -1893,7 +1893,7 @@ struct LapackLstsqHelper {
   self_type& next(scalar_t* a_working_ptr, scalar_t* b_working_ptr,
     int64_t a_linear_batch_idx) {
     // advance to the next problem in a batch.
-    // Designed to be used with `batch_iterator_with_broadcasting` method.
+    // Designed to be used with the `batch_iterator_with_broadcasting` method.
     this->a_working_ptr = a_working_ptr;
     this->b_working_ptr = b_working_ptr;
     rank_working_ptr = rank_working_ptr ?

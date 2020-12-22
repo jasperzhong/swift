@@ -72,15 +72,6 @@ void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const fu
   auto a_linear_batch_idx = at::arange(batchCount(a))
     .view(batch_sizes).unsqueeze(-1).unsqueeze(-1);
 
-  TensorIterator iter = TensorIteratorConfig()
-    .set_check_mem_overlap(false)
-    .check_all_same_dtype(false)
-    .resize_outputs(false)
-    .add_output(b_restrided)
-    .add_input(a_restrided)
-    .add_input(a_linear_batch_idx)
-    .build();
-
   auto a_broadcasts_over_b = (a_sizes != b_sizes);
   Tensor a_buffer, a_was_accessed;
   if (a_broadcasts_over_b) {
@@ -94,23 +85,32 @@ void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const fu
     auto a_was_accessed_1d = a_was_accessed.view({-1});
   }
   else {
-    auto loop = [&](char** data, const int64_t* strides, int64_t nelems) {
-      auto* b_ptr = data[0];
-      auto* a_ptr = data[1];
-      auto* a_linear_batch_idx = data[2];
-      for (int64_t elem = 0; elem < nelems; ++elem) {
-        auto* a_working_ptr = reinterpret_cast<scalar_t*>(a_ptr);
-        auto* b_working_ptr = reinterpret_cast<scalar_t*>(b_ptr);
-        auto a_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(a_linear_batch_idx);
+    TensorIteratorConfig()
+      .set_check_mem_overlap(false)
+      .check_all_same_dtype(false)
+      .resize_outputs(false)
+      .add_output(b_restrided)
+      .add_input(a_restrided)
+      .add_input(a_linear_batch_idx)
+      .build()
+      .serial_for_each(
+        [&](char** data, const int64_t* strides, int64_t nelems) {
+          auto* b_ptr = data[0];
+          auto* a_ptr = data[1];
+          auto* a_linear_batch_idx = data[2];
+          for (int64_t elem = 0; elem < nelems; ++elem) {
+            auto* a_working_ptr = reinterpret_cast<scalar_t*>(a_ptr);
+            auto* b_working_ptr = reinterpret_cast<scalar_t*>(b_ptr);
+            auto a_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(a_linear_batch_idx);
 
-        f(a_working_ptr, b_working_ptr, a_curr_linear_batch_idx);
+            f(a_working_ptr, b_working_ptr, a_curr_linear_batch_idx);
 
-        b_ptr += strides[0];
-        a_ptr += strides[1];
-        a_linear_batch_idx += strides[2];
-      }
-    };
-    iter.serial_for_each(loop, {0, batchCount(b)});
+            b_ptr += strides[0];
+            a_ptr += strides[1];
+            a_linear_batch_idx += strides[2];
+          }
+        }, {0, batchCount(b)}
+      );
   }
 }
 
