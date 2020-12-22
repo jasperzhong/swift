@@ -55,51 +55,40 @@ static inline int64_t matrixStride(const Tensor& batched_matrices) {
 // b = b_c.contiguous().transpose(-1, -2)
 template<typename scalar_t, typename func_t>
 void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const func_t& f) {
-  IntArrayRef batch_sizes(a.sizes().data(), a.dim() - 2);
-  auto a_sizes = batch_sizes.vec();
-  auto a_strides = IntArrayRef(a.strides().data(), a.dim() - 2).vec();
-  a_sizes.insert(a_sizes.end(), {1, 1});
-  a_strides.insert(a_strides.end(), {0, 0});
-  auto a_restrided = a.as_strided(a_sizes, a_strides);
+  IntArrayRef a_batch_sizes(a.sizes().data(), a.dim() - 2);
+  IntArrayRef b_batch_sizes(b.sizes().data(), b.dim() - 2);
 
-  auto b_sizes = IntArrayRef(b.sizes().data(), b.dim() - 2).vec();
-  b_sizes.insert(b_sizes.end(), {1, 1});
-  auto b_strides = IntArrayRef(b.strides().data(), b.dim() - 2).vec();
-  b_strides.insert(b_strides.end(), {0, 0});
-  auto b_restrided = b.as_strided(b_sizes, b_strides);
-
-
-  auto a_linear_batch_idx = at::arange(batchCount(a))
-    .view(batch_sizes).unsqueeze(-1).unsqueeze(-1);
+  auto a_linear_batch_idx = at::arange(batchCount(a)).view(a_batch_sizes);
+  auto b_linear_batch_idx = at::arange(batchCount(b)).view(b_batch_sizes);
 
   TensorIterator iter = TensorIteratorConfig()
     .set_check_mem_overlap(false)
     .check_all_same_dtype(false)
     .resize_outputs(false)
-    .add_output(b_restrided)
-    .add_input(a_restrided)
+    .add_output(b_linear_batch_idx)
     .add_input(a_linear_batch_idx)
     .build();
 
-  auto a_broadcasts_over_b = (a_sizes != b_sizes);
-  Tensor a_buffer, a_was_accessed, a_3d, a_buffer_3d;
+  auto m = a.size(-2);
+  auto n = a.size(-1);
+  auto nrhs = b.size(-1);
+  auto a_3d = a.view({-1, m, n});
+  auto b_3d = b.view({-1, m, nrhs});
+
+  auto a_broadcasts_over_b = (a_batch_sizes != b_batch_sizes);
+  Tensor a_buffer, a_was_accessed, a_buffer_3d;
   if (a_broadcasts_over_b) {
     a_buffer = a.clone().detach();
     a_was_accessed = at::zeros(batchCount(a), at::kBool);
-    auto m = a.size(-2);
-    auto n = a.size(-1);
-    a_3d = a.view({-1, m, n});
     a_buffer_3d = a_buffer.view({-1, m, n});
   }
 
   auto loop = [&](char** data, const int64_t* strides, int64_t nelems) {
-    auto* b_ptr = data[0];
-    auto* a_ptr = data[1];
-    auto* a_batch_idx_ptr = data[2];
+    auto* b_batch_idx_ptr = data[0];
+    auto* a_batch_idx_ptr = data[1];
 
     for (int64_t elem = 0; elem < nelems; ++elem) {
-      auto* a_working_ptr = reinterpret_cast<scalar_t*>(a_ptr);
-      auto* b_working_ptr = reinterpret_cast<scalar_t*>(b_ptr);
+      auto b_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(b_batch_idx_ptr);
       auto a_curr_linear_batch_idx = *reinterpret_cast<int64_t*>(a_batch_idx_ptr);
 
       if (a_broadcasts_over_b) {
@@ -114,11 +103,15 @@ void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const fu
             .copy_(a_buffer_3d.select(0, a_curr_linear_batch_idx));
         }
       }
+
+      auto* a_working_ptr = a_3d.select(0, a_curr_linear_batch_idx)
+        .data_ptr<scalar_t>();
+      auto* b_working_ptr = b_3d.select(0, b_curr_linear_batch_idx)
+        .data_ptr<scalar_t>();
       f(a_working_ptr, b_working_ptr, a_curr_linear_batch_idx);
 
-      b_ptr += strides[0];
-      a_ptr += strides[1];
-      a_batch_idx_ptr += strides[2];
+      b_batch_idx_ptr += strides[0];
+      a_batch_idx_ptr += strides[1];
     }
   };
   iter.serial_for_each(loop, {0, batchCount(b)});
