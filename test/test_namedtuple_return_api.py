@@ -12,7 +12,7 @@ aten_native_yaml = os.path.join(path, '../aten/src/ATen/native/native_functions.
 all_operators_with_namedtuple_return = {
     'max', 'min', 'median', 'nanmedian', 'mode', 'kthvalue', 'svd', 'symeig', 'eig',
     'qr', 'geqrf', 'solve', 'slogdet', 'sort', 'topk', 'lstsq',
-    'triangular_solve', 'cummax', 'cummin', 'linalg_eigh', 'linalg_lstsq'
+    'triangular_solve', 'cummax', 'cummin', 'linalg_eigh', 'linalg_lstsq', 'unpack_dual'
 }
 
 
@@ -66,6 +66,7 @@ class TestNamedTupleAPI(unittest.TestCase):
             op(operators=['lstsq'], input=(a,), names=('solution', 'QR'), hasout=True),
             op(operators=['linalg_eigh'], input=("L",), names=('eigenvalues', 'eigenvectors'), hasout=True),
             op(operators=['linalg_lstsq'], input=(a,), names=('x', 'rank', 's'), hasout=False)
+            op(operators=['unpack_dual'], input=(a, 0), names=('primal', 'tangent'), hasout=False),
         ]
 
         def identify_linalg(f):
@@ -82,7 +83,6 @@ class TestNamedTupleAPI(unittest.TestCase):
                     ret = getattr(a, f)(*op.input)
                     for i, name in enumerate(op.names):
                         self.assertIs(getattr(ret, name), ret[i])
-
                 # test funtional call
                 ret = getattr(module, f)(a, *op.input)
                 for i, name in enumerate(op.names):
