@@ -1,5 +1,6 @@
 import concurrent.futures
 import contextlib
+import copy
 import json
 import logging
 import os
@@ -23,7 +24,12 @@ from torch.distributed.rpc.internal import (
     _internal_rpc_pickler,
     _build_rpc_profiling_key,
 )
-from torch.testing._internal.common_distributed import skip_if_lt_x_gpu, captured_output
+from torch.nn.parallel import DistributedDataParallel
+from torch.testing._internal.common_distributed import (
+    skip_if_lt_x_gpu,
+    requires_nccl,
+    captured_output
+)
 from torch.testing._internal.common_utils import IS_MACOS, load_tests
 from torch.testing._internal.dist_utils import (
     dist_init,
@@ -4867,3 +4873,88 @@ class TensorPipeAgentRpcTest(RpcAgentTestFixture):
             RuntimeError, "Overloaded torch operator invoked from Python failed to many any schema"
         ):
             rpc.rpc_sync(dst, torch.add, args=())
+
+    @staticmethod
+    def _functional_linear_model(w1, w2, input):
+        return torch.nn.functional.linear(torch.nn.functional.linear(input, w1), w2)
+
+    @staticmethod
+    def _identity(input, dst):
+        return input
+
+    @requires_nccl()
+    @skip_if_lt_x_gpu(4)
+    def test_with_ddp(self):
+        # Each trainer uses a different random seed. Otherwise, they are going
+        # to have exactly the same initial model parameters, input, and
+        # therefore grads. That means the grads will be the same before and
+        # after DDP's all-reduce.
+        torch.manual_seed(self.rank)
+
+        options = self.rpc_backend_options
+        dst = worker_name((self.rank + 1) % self.world_size)
+
+        # Forward pass.
+        options.set_device_map(dst, {self.rank: (self.rank + 1) % self.world_size})
+        # Backward pass (Hack until we fix https://github.com/pytorch/pytorch/issues/44170).
+        reverse_rank = (self.rank - 1 + self.world_size) % self.world_size
+        options.set_device_map(worker_name(reverse_rank), {self.rank: reverse_rank})
+
+        rpc.init_rpc(
+            name=worker_name(self.rank),
+            backend=self.rpc_backend,
+            rank=self.rank,
+            world_size=self.world_size,
+            rpc_backend_options=options,
+        )
+
+        initialize_pg(self.init_method, self.rank, self.world_size, backend="nccl")
+
+        w1 = torch.rand((10, 20), device=self.rank, requires_grad=True)
+        w2 = torch.rand((5, 10), device=self.rank, requires_grad=True)
+
+        class LocalModel(torch.nn.Module):
+            def __init__(self, device):
+                super().__init__()
+                self.fc1 = torch.nn.Linear(5, 3).cuda(device)
+                self.fc2 = torch.nn.Linear(3, 1).cuda(device)
+
+            def forward(self, inp):
+                return self.fc2(self.fc1(inp))
+
+        class DistModel(torch.nn.Module):
+            def __init__(self, fc1, fc2, dst):
+                super().__init__()
+                self.fc1 = copy.deepcopy(fc1)
+                self.fc2 = rpc.remote(dst, TensorPipeAgentRpcTest._identity, args=(fc2, dst))
+
+            def forward(self, inp):
+                return self.fc2.rpc_sync().forward(self.fc1(inp))
+
+        # Run local model.
+        t = torch.rand((10, 20), device=self.rank, requires_grad=True)
+        local_model = LocalModel(self.rank)
+        ddp_model = DistributedDataParallel(local_model, device_ids=[self.rank])
+        out = ddp_model(TensorPipeAgentRpcTest._functional_linear_model(w1, w2, t))
+        out.sum().backward()
+
+        dist_model = DistModel(local_model.fc1, local_model.fc2, dst)
+        ddp_model = DistributedDataParallel(dist_model, device_ids=[self.rank])
+        # Need to use `_wait_all_workers` since `dist.barrier()`
+        # causes a deadlock: https://github.com/pytorch/pytorch/issues/44169
+        rpc.api._wait_all_workers()
+
+        # Run distributed model.
+        with dist_autograd.context() as context_id:
+            res = rpc.rpc_sync(dst, TensorPipeAgentRpcTest._functional_linear_model, args=(w1, w2, t))
+            out = ddp_model(res)
+            # Need to use `_wait_all_workers` since `dist.barrier()`
+            # causes a deadlock: https://github.com/pytorch/pytorch/issues/44169
+            rpc.api._wait_all_workers()
+            dist_autograd.backward(context_id, [out.sum()])
+            grads = dist_autograd.get_gradients(context_id)
+            self.assertEqual(t.grad, grads[t])
+            self.assertEqual(w1.grad, grads[w1])
+            self.assertEqual(w2.grad, grads[w2])
+
+        rpc.shutdown()
