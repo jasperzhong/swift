@@ -2021,7 +2021,6 @@ std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
 #ifndef USE_LAPACK
   AT_ERROR("linalg.lstsq: LAPACK library not found in compilation");
 #else
-  std::vector<int64_t> infos(batchCount(a), 0);
 
   static auto driver_string_to_type = std::unordered_map<std::string, LapackLstsqDriverType>({
     {"gels", LapackLstsqDriverType::Gels},
@@ -2073,7 +2072,6 @@ std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
     // is equivalent to:
     // for (int64_t i = 0; i < batchCount(a); ++i) {
     //   driver_helper.call_driver().next();
-    //   infos[i] = driver_helper.info;
     //   if (driver_helper.info) {
     //     break;
     //   }
