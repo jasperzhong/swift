@@ -2153,14 +2153,9 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
     /*nrows=*/std::max(m, n),
     /*desired_batch_sizes=*/broadcast_batch_size(self, b_2d, self.dim() - 2));
 
-  double rcond;
-  if (cond.has_value()) {
-    rcond = cond.value();
-  }
-  else {
-    auto value_type = c10::toValueType(self.scalar_type());
-    rcond = _get_epsilon(value_type);
-  }
+  double rcond = cond.has_value()
+    ? cond.value()
+    : _get_epsilon(c10::toValueType(self.scalar_type()));
 
   Tensor x, rank, singular_values;
   std::tie(x, rank, singular_values) =
