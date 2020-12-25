@@ -33,6 +33,32 @@ static inline Tensor cloneBatchedColumnMajor(const Tensor& src) {
 }
 
 /*
+ * This method is designed to be a faster alternative to
+ * `cloneBatchedColumnMajor` with some additional features,
+ * namely:
+ * 1. It uses `copy` instead of `clone` which could be much faster.
+ * 2. `nrows` parameter used to create inputs with the number of rows larger
+ *  than the original input, which is required for some LAPACK/MAGMA methods.
+ * 3. `desired_batch_size` is used to create copies with the batch size
+ *  which is either the original batch size of the input, or its larger
+ *  broadcasted shape.
+ */
+static inline Tensor copyBatchedColumnMajor(const Tensor& src, int64_t nrows = -1,
+    c10::optional<IntArrayRef> desired_batch_sizes = c10::nullopt) {
+  nrows = (nrows == -1) ? src.size(-2) : nrows;
+  auto copy_sizes = desired_batch_sizes.has_value()
+    ? desired_batch_sizes.value().vec()
+    : IntArrayRef(src.sizes().data(), src.dim() - 2).vec();
+  copy_sizes.insert(copy_sizes.end(), {nrows, src.size(-1)});
+  auto copy_strides = at::detail::defaultStrides(copy_sizes);
+  copy_strides[src.dim() - 2] = 1;
+  copy_strides[src.dim() - 1] = nrows;
+  auto copy = at::empty_strided(copy_sizes, copy_strides, src.options());
+  copy.narrow(-2, 0, src.size(-2)).copy_(src);
+  return copy;
+}
+
+/*
  * Given batches of matrices with arbitrary batch dim,
  * computes the number of batches.
  */
