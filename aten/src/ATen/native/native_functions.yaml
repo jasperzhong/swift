@@ -10021,7 +10021,7 @@
   dispatch:
     DefaultBackend: linalg_lstsq
 
-- func: _lstsq_helper(Tensor a, Tensor b, float cond, str driver_name) -> (Tensor, Tensor, Tensor)
+- func: _lstsq_helper(Tensor a, Tensor b, float cond, str? driver_name) -> (Tensor, Tensor, Tensor)
   use_c10_dispatcher: full
   variants: function
   dispatch:

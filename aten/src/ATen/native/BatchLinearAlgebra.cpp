@@ -2017,7 +2017,7 @@ struct LapackLstsqDriverTypeHash {
 #endif
 
 std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
-    const Tensor& a, const Tensor& b, double cond, std::string driver_name) {
+    const Tensor& a, const Tensor& b, double cond, c10::optional<std::string> driver_name) {
 #ifndef USE_LAPACK
   AT_ERROR("linalg.lstsq: LAPACK library not found in compilation");
 #else
@@ -2028,7 +2028,9 @@ std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
     {"gelsd", LapackLstsqDriverType::Gelsd},
     {"gelss", LapackLstsqDriverType::Gelss}
   });
-  auto driver_type = driver_string_to_type[driver_name];
+  // driver_name is never nullopt for CPU
+  auto driver_str = driver_name.value();
+  auto driver_type = driver_string_to_type[driver_str];
 
   Tensor rank;
   Tensor singular_values;
@@ -2120,18 +2122,33 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
       "self.size(-2) should match b.size(-2)"
   );
 
-  auto driver_str = driver_name.has_value() ? driver_name.value() : "gelsd";
-  // convert `driver_str` to lower case inplace.
-  std::transform(driver_str.begin(), driver_str.end(), driver_str.begin(),
-    [](unsigned char c) { return std::tolower(c); });
-  static std::unordered_set<std::string> allowed_drivers = {
-    "gels", "gelsy", "gelsd", "gelss"
-  };
-  TORCH_CHECK(
-    allowed_drivers.find(driver_str) != allowed_drivers.end(),
-    "torch.linalg.lstsq: parameter 'driver_name' should be one of "
-    "(gels, gelsy, gelsd, gelss)"
-  );
+  // if `driver_name` is empty, we use `driver_opt` to be set to
+  // c10::nullopt if working with CUDA tensors,
+  // otherwise to "gelsy" driver.
+  // CUDA tensors are treated specially because MAGMA
+  // has only 'gels' driver supported.
+  c10::optional<std::string> driver_opt = driver_name;
+  // check whether the user provided name is a valid driver name
+  if (driver_name.has_value()) {
+    auto driver_str = driver_name.value();
+    // convert `driver_str` to lower case inplace.
+    std::transform(driver_str.begin(), driver_str.end(), driver_str.begin(),
+      [](unsigned char c) { return std::tolower(c); });
+    static std::unordered_set<std::string> allowed_drivers = {
+      "gels", "gelsy", "gelsd", "gelss"
+    };
+    TORCH_CHECK(
+      allowed_drivers.find(driver_str) != allowed_drivers.end(),
+      "torch.linalg.lstsq: parameter 'driver_name' should be one of "
+      "(gels, gelsy, gelsd, gelss)"
+    );
+  }
+  // if driver name is not provided, set to default 'gelsy' if on CPU,
+  // or to an empty option if on CUDA.
+  else {
+    driver_opt = (at::kCPU == self.device().type())
+      ? c10::optional<std::string>("gelsy") : c10::nullopt;
+  }
 
   // LAPACK/MAGMA requries inputs to be in the column-major-order.
   auto self_working_copy = copyBatchedColumnMajor(self);
@@ -2159,7 +2176,7 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
 
   Tensor x, rank, singular_values;
   std::tie(x, rank, singular_values) =
-    at::_lstsq_helper(self_working_copy, b_working_copy, rcond, driver_str);
+    at::_lstsq_helper(self_working_copy, b_working_copy, rcond, driver_opt);
   return std::make_tuple(x, rank, singular_values);
 }
 
