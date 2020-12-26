@@ -2142,6 +2142,12 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
       "torch.linalg.lstsq: parameter 'driver_name' should be one of "
       "(gels, gelsy, gelsd, gelss)"
     );
+    if (at::kCUDA == self.device().type()) {
+      TORCH_CHECK(
+        driver_str == "gels",
+        "`driver_name` other than `None` or `gels` is not supported on CUDA"
+      );
+    }
   }
   // if driver name is not provided, set to default 'gelsy' if on CPU,
   // or to an empty option if on CUDA.
