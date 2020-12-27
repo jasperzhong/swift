@@ -2121,6 +2121,16 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
     dim_diff ? "self.size(-2) should match b.size(-1)" :
       "self.size(-2) should match b.size(-2)"
   );
+  TORCH_CHECK(
+    (self.size(-2) > 0) && (self.size(-1) > 0),
+    "input `self` Tensor has to be a non-empty matrix or "
+    "a batch of non-empty matrices"
+  );
+  TORCH_CHECK(
+    (b_2d.size(-2) > 0) && (b_2d.size(-1) > 0),
+    "input `b` Tensor has to be a non-empty vector/matrix or "
+    "a batch of non-empty vectors/matrices"
+  );
 
   // if `driver_name` is empty, we use `driver_opt` to be set to
   // c10::nullopt if working with CUDA tensors,
