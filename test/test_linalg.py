@@ -217,10 +217,10 @@ class TestLinalg(TestCase):
         with self.assertRaisesRegex(RuntimeError, 'input `b` Tensor should be at least 1D'):
             torch.linalg.lstsq(a, torch.tensor(1, dtype=dtype, device=device))
 
-        with self.assertRaisesRegex(RuntimeError, 'self.size\(-2\) should match b.size\(-1\)'):
+        with self.assertRaisesRegex(RuntimeError, r'self.size\(-2\) should match b.size\(-1\)'):
             torch.linalg.lstsq(a, b)
 
-        with self.assertRaisesRegex(RuntimeError, 'self.size\(-2\) should match b.size\(-2\)'):
+        with self.assertRaisesRegex(RuntimeError, r'self.size\(-2\) should match b.size\(-2\)'):
             torch.linalg.lstsq(a, b.unsqueeze(-1))
 
         a = torch.rand(2, 2, 2, 2, dtype=dtype, device=device)

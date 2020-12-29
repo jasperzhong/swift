@@ -105,7 +105,8 @@ void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const fu
   std::function<void(int64_t)> check_if_copy_needed_for_a
     = [](int64_t a_curr_linear_batch_idx){};
   if (a_broadcasts_over_b) {
-    a_buffer = a.clone().detach();
+    a_buffer = at::empty_strided(a.sizes(), a.strides(), a.options())
+      .copy_(a);
     a_was_accessed = at::zeros(batchCount(a), at::kBool);
     a_buffer_3d = a_buffer.view({-1, m, n});
     check_if_copy_needed_for_a = [&](int64_t a_curr_linear_batch_idx) {
