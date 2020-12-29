@@ -97,9 +97,8 @@ void batch_iterator_with_broadcasting(const Tensor& a, const Tensor& b, const fu
 
   auto m = a.size(-2);
   auto n = a.size(-1);
-  auto nrhs = b.size(-1);
   auto a_3d = a.view({-1, m, n});
-  auto b_3d = b.view({-1, m, nrhs});
+  auto b_3d = b.view({-1, b.size(-2), b.size(-1)});
 
   auto a_broadcasts_over_b = (a_batch_sizes != b_batch_sizes);
   Tensor a_buffer, a_was_accessed, a_buffer_3d;

@@ -120,6 +120,122 @@ class TestLinalg(TestCase):
         run_test_case(zero_strided, b)
         run_test_case(a, zero_strided)
 
+    @onlyCPU
+    @skipCPUIfNoLapack
+    @dtypes(torch.float, torch.double, torch.cfloat, torch.cdouble)
+    def test_linalg_lstsq(self, device, dtype):
+        from torch.testing._internal.common_utils import random_well_conditioned_matrix
+        drivers = ('gels', 'gelsy', 'gelsd', 'gelss') \
+            if device == 'cpu' \
+            else ('gels', None)
+
+        def check_correctness(a, b, sol):
+            sol2 = a.pinverse() @ b
+            self.assertEqual(sol, sol2, atol=1e-5, rtol=1e-5)
+
+        def check_ranks(a, ranks, cond=1e-7):
+            ranks2 = torch.matrix_rank(a, tol=cond)
+            ranks2 = ranks2.unsqueeze(0) if ranks2.dim() == 0 else ranks2
+            self.assertEqual(ranks, ranks2)
+
+        def check_singular_values(a, sv):
+            sv2 = a.svd()[1]
+            self.assertEqual(sv, sv2)
+
+        ms = [2 ** i for i in range(1, 5)]
+        m_ge_n_sizes = [(m, m // 2) for m in ms] + [(m, m) for m in ms]
+        m_l_n_sizes = [(m // 2, m) for m in ms]
+        matrix_sizes = m_ge_n_sizes + (m_l_n_sizes if device == 'cpu' else [])
+        batches = [(), (2,), (2, 2), (2, 2, 2)]
+
+        for batch, matrix_size, driver in itertools.product(batches, matrix_sizes, drivers):
+            shape = batch + matrix_size
+            a = random_well_conditioned_matrix(*shape, dtype=dtype, device=device)
+            b = torch.rand(*shape, dtype=dtype, device=device)
+
+            cond = 1e-7
+            m = a.size(-2)
+            n = a.size(-1)
+            res = torch.linalg.lstsq(a, b, cond=cond, driver_name=driver)
+            sol = res.x.narrow(-2, 0, n)
+
+            check_correctness(a, b, sol)
+            if driver != 'gels':
+                check_ranks(a, res.rank, cond)
+                if driver != 'gelsy':
+                    check_singular_values(a, res.s)
+
+    @onlyCPU
+    @skipCPUIfNoLapack
+    @dtypes(torch.float, torch.double, torch.cfloat, torch.cdouble)
+    def test_linalg_lstsq_batch_broadcasting(self, device, dtype):
+        from torch.testing._internal.common_utils import random_well_conditioned_matrix
+
+        def check_correctness(a, b):
+            sol = torch.linalg.lstsq(a, b).x
+            sol2 = a.pinverse() @ b
+            self.assertEqual(sol, sol2, rtol=1e-5, atol=1e-5)
+
+        ms = [2 ** i for i in range(1, 5)]
+        batches = [(), (2,), (2, 2), (2, 2, 2)]
+        # the case when a single matrix is batch-broadcasted over the rhs
+        for m, batch in itertools.product(ms, batches):
+            a = random_well_conditioned_matrix(m, m, dtype=dtype, device=device).view(*([1] * len(batch)), m, m)
+            b = torch.rand(*(batch + (m, m)), dtype=dtype, device=device)
+            check_correctness(a, b)
+
+        # cases with broadcastable shapes
+        for m in ms:
+            a = random_well_conditioned_matrix(1, 3, 1, 3, m, m, dtype=dtype, device=device)
+            b = torch.rand(3, 1, 3, 1, m, m // 2, dtype=dtype, device=device)
+            check_correctness(a, b)
+
+            # rhs are vectors, not matrices in this test
+            b = torch.rand(3, 1, 3, 1, m, dtype=dtype, device=device)
+            # unsqueeze for b because `check_correctness` checks against
+            # a.pinverse() @ b, which requires b to be a matrix
+            check_correctness(a, b.unsqueeze(-1))
+
+            a = random_well_conditioned_matrix(3, 1, 3, 1, m, m, dtype=dtype, device=device)
+            b = torch.rand(1, 3, 1, 3, m, m // 2, dtype=dtype, device=device)
+            check_correctness(a, b)
+
+            # rhs are vectors, not matrices in this test
+            b = torch.rand(1, 3, 1, 3, m, dtype=dtype, device=device)
+            check_correctness(a, b.unsqueeze(-1))
+
+    @skipCPUIfNoLapack
+    @skipCUDAIfNoMagma
+    @dtypes(torch.float, torch.double, torch.cfloat, torch.cdouble)
+    def test_linalg_lstsq_input_checks(self, device, dtype):
+        a = torch.rand(2, 3, dtype=dtype, device=device)
+        b = torch.rand(3, dtype=dtype, device=device)
+
+        with self.assertRaisesRegex(RuntimeError, 'input `self` Tensor should be at least 2D'):
+            torch.linalg.lstsq(b, b)
+
+        with self.assertRaisesRegex(RuntimeError, 'input `b` Tensor should be at least 1D'):
+            torch.linalg.lstsq(a, torch.tensor(1, dtype=dtype, device=device))
+
+        with self.assertRaisesRegex(RuntimeError, 'self.size\(-2\) should match b.size\(-1\)'):
+            torch.linalg.lstsq(a, b)
+
+        with self.assertRaisesRegex(RuntimeError, 'self.size\(-2\) should match b.size\(-2\)'):
+            torch.linalg.lstsq(a, b.unsqueeze(-1))
+
+        a = torch.rand(2, 2, 2, 2, dtype=dtype, device=device)
+        b = torch.rand(2, 2, 2, dtype=dtype, device=device)
+
+        with self.assertRaisesRegex(RuntimeError, 'has to be a non-empty matrix'):
+            torch.linalg.lstsq(a.as_strided((2, 2, 2, 0), a.stride()), b)
+
+        with self.assertRaisesRegex(RuntimeError, 'has to be a non-empty matrix'):
+            torch.linalg.lstsq(a.as_strided((2, 2, 0, 2), a.stride()), b.as_strided((2, 2, 0), b.stride()))
+
+        b = torch.rand(2, 2, 2, 2, dtype=dtype, device=device)
+        with self.assertRaisesRegex(RuntimeError, 'has to be a non-empty vector/matrix'):
+            torch.linalg.lstsq(a, b.as_strided((2, 2, 2, 0), b.stride()))
+
     @skipCUDAIfNoMagma
     @skipCPUIfNoLapack
     @dtypes(torch.float32, torch.float64, torch.complex64, torch.complex128)

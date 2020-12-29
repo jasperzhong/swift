@@ -2107,7 +2107,7 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
   );
   TORCH_CHECK(
     b.dim() >= 1,
-    "input 'b' Tensor should be at least 1D"
+    "input `b` Tensor should be at least 1D"
   );
   auto dim_diff = self.dim() - b.dim();
   TORCH_CHECK(
