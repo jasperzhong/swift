@@ -150,6 +150,12 @@ void magmaLuSolveBatched(
     scalar_t** dB_array, magma_int_t lddb, magma_int_t& info,
     magma_int_t batchsize, const MAGMAQueue& magma_queue);
 
+template<class scalar_t>
+void magmaGels(
+    magma_trans_t trans, magma_int_t m, magma_int_t n, magma_int_t nrhs,
+    scalar_t* dA, magma_int_t ldda, scalar_t* dB, magma_int_t lddb,
+    scalar_t* hwork, magma_int_t lwork, magma_int_t* info);
+
 template<>
 void magmaSolve<double>(
     magma_int_t n, magma_int_t nrhs, double* dA, magma_int_t ldda,
@@ -1120,6 +1126,56 @@ void magmaLuSolveBatched<c10::complex<float>>(
     magma_int_t batchsize, const MAGMAQueue& magma_queue) {
  info = magma_cgetrs_batched(MagmaNoTrans, n, nrhs, reinterpret_cast<magmaFloatComplex**>(dA_array), ldda, dipiv_array, reinterpret_cast<magmaFloatComplex**>(dB_array), lddb, batchsize, magma_queue.get_queue());
  AT_CUDA_CHECK(cudaGetLastError());
+}
+
+template<>
+void magmaGels<float>(
+    magma_trans_t trans, magma_int_t m, magma_int_t n, magma_int_t nrhs,
+    float* dA, magma_int_t ldda, float* dB, magma_int_t lddb,
+    float* hwork, magma_int_t lwork, magma_int_t* info) {
+  MagmaStreamSyncGuard guard;
+  magma_sgels_gpu(trans, m, n, nrhs,
+      dA, ldda, dB, lddb,
+      hwork, lwork, info);
+  AT_CUDA_CHECK(cudaGetLastError());
+}
+
+template<>
+void magmaGels<double>(
+    magma_trans_t trans, magma_int_t m, magma_int_t n, magma_int_t nrhs,
+    double* dA, magma_int_t ldda, double* dB, magma_int_t lddb,
+    double* hwork, magma_int_t lwork, magma_int_t* info) {
+  MagmaStreamSyncGuard guard;
+  magma_dgels_gpu(trans, m, n, nrhs,
+      dA, ldda, dB, lddb,
+      hwork, lwork, info);
+  AT_CUDA_CHECK(cudaGetLastError());
+}
+
+template<>
+void magmaGels<c10::complex<float>>(
+    magma_trans_t trans, magma_int_t m, magma_int_t n, magma_int_t nrhs,
+    c10::complex<float>* dA, magma_int_t ldda, c10::complex<float>* dB, magma_int_t lddb,
+    c10::complex<float>* hwork, magma_int_t lwork, magma_int_t* info) {
+  MagmaStreamSyncGuard guard;
+  magma_cgels_gpu(trans, m, n, nrhs,
+      reinterpret_cast<magmaFloatComplex*>(dA), ldda,
+      reinterpret_cast<magmaFloatComplex*>(dB), lddb,
+      reinterpret_cast<magmaFloatComplex*>(hwork), lwork, info);
+  AT_CUDA_CHECK(cudaGetLastError());
+}
+
+template<>
+void magmaGels<c10::complex<double>>(
+    magma_trans_t trans, magma_int_t m, magma_int_t n, magma_int_t nrhs,
+    c10::complex<double>* dA, magma_int_t ldda, c10::complex<double>* dB, magma_int_t lddb,
+    c10::complex<double>* hwork, magma_int_t lwork, magma_int_t* info) {
+  MagmaStreamSyncGuard guard;
+  magma_zgels_gpu(trans, m, n, nrhs,
+      reinterpret_cast<magmaDoubleComplex*>(dA), ldda,
+      reinterpret_cast<magmaDoubleComplex*>(dB), lddb,
+      reinterpret_cast<magmaDoubleComplex*>(hwork), lwork, info);
+  AT_CUDA_CHECK(cudaGetLastError());
 }
 #endif
 

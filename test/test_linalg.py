@@ -125,7 +125,7 @@ class TestLinalg(TestCase):
     @dtypes(torch.float, torch.double, torch.cfloat, torch.cdouble)
     def test_linalg_lstsq(self, device, dtype):
         from torch.testing._internal.common_utils import random_well_conditioned_matrix
-        drivers = ('gels', 'gelsy', 'gelsd', 'gelss') \
+        drivers = ('gels', 'gelsy', 'gelsd', 'gelss', None) \
             if device == 'cpu' \
             else ('gels', None)
 
@@ -160,10 +160,11 @@ class TestLinalg(TestCase):
             sol = res.x.narrow(-2, 0, n)
 
             check_correctness(a, b, sol)
-            if driver != 'gels':
-                check_ranks(a, res.rank, cond)
-                if driver != 'gelsy':
-                    check_singular_values(a, res.s)
+            if device == 'cpu':
+                if driver != 'gels':
+                    check_ranks(a, res.rank, cond)
+                    if (driver is not None) and driver != 'gelsy':
+                        check_singular_values(a, res.s)
 
     @onlyCPU
     @skipCPUIfNoLapack
