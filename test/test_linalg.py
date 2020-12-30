@@ -236,6 +236,14 @@ class TestLinalg(TestCase):
         with self.assertRaisesRegex(RuntimeError, 'has to be a non-empty vector/matrix'):
             torch.linalg.lstsq(a, b.as_strided((2, 2, 2, 0), b.stride()))
 
+        if device != 'cpu':
+            with self.assertRaisesRegex(RuntimeError, '`driver_name` other than `gels` is not supported on CUDA'):
+                torch.linalg.lstsq(a, b, driver_name='fictitious_driver')
+        # if on cpu
+        else:
+            with self.assertRaisesRegex(RuntimeError, r'parameter `driver_name` should be one of \(gels, gelsy, gelsd, gelss\)'):
+                torch.linalg.lstsq(a, b, driver_name='fictitious_driver')
+
     @skipCUDAIfNoMagma
     @skipCPUIfNoLapack
     @dtypes(torch.float32, torch.float64, torch.complex64, torch.complex128)

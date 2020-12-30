@@ -2119,32 +2119,32 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
     c10::optional<std::string> driver_name) {
   TORCH_CHECK(
     self.dim() >= 2,
-    "input `self` Tensor should be at least 2D"
+    "torch.linalg.lstsq: input `self` Tensor should be at least 2D"
   );
   TORCH_CHECK(
     b.dim() >= 1,
-    "input `b` Tensor should be at least 1D"
+    "torch.linalg.lstsq: input `b` Tensor should be at least 1D"
   );
   auto dim_diff = self.dim() - b.dim();
   TORCH_CHECK(
     0 <= dim_diff && dim_diff <= 1,
-    "self.dim() must be greater or equal to b.dim() and "
+    "torch.linalg.lstsq: self.dim() must be greater or equal to b.dim() and "
     "(self.dim() - b.dim()) <= 1"
   );
   Tensor b_2d = dim_diff ? b.unsqueeze(-1) : b;
   TORCH_CHECK(
     self.size(-2) == b_2d.size(-2),
-    dim_diff ? "self.size(-2) should match b.size(-1)" :
-      "self.size(-2) should match b.size(-2)"
+    dim_diff ? "torch.linalg.lstsq: self.size(-2) should match b.size(-1)" :
+      "torch.linalg.lstsq: self.size(-2) should match b.size(-2)"
   );
   TORCH_CHECK(
     (self.size(-2) > 0) && (self.size(-1) > 0),
-    "input `self` Tensor has to be a non-empty matrix or "
+    "torch.linalg.lstsq: input `self` Tensor has to be a non-empty matrix or "
     "a batch of non-empty matrices"
   );
   TORCH_CHECK(
     (b_2d.size(-2) > 0) && (b_2d.size(-1) > 0),
-    "input `b` Tensor has to be a non-empty vector/matrix or "
+    "torch.linalg.lstsq: input `b` Tensor has to be a non-empty vector/matrix or "
     "a batch of non-empty vectors/matrices"
   );
 
@@ -2163,23 +2163,27 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
     static std::unordered_set<std::string> allowed_drivers = {
       "gels", "gelsy", "gelsd", "gelss"
     };
-    TORCH_CHECK(
-      allowed_drivers.find(driver_str) != allowed_drivers.end(),
-      "torch.linalg.lstsq: parameter 'driver_name' should be one of "
-      "(gels, gelsy, gelsd, gelss)"
-    );
-    if (at::kCUDA == self.device().type()) {
+    if (at::kCPU == self.device().type()) {
+      TORCH_CHECK(
+        allowed_drivers.find(driver_str) != allowed_drivers.end(),
+        "torch.linalg.lstsq: parameter `driver_name` should be one of "
+        "(gels, gelsy, gelsd, gelss)"
+      );
+    }
+    //else if (at::kCUDA == self.device().type()) {
+    else {
       TORCH_CHECK(
         driver_str == "gels",
-        "`driver_name` other than `None` or `gels` is not supported on CUDA"
+        "torch.linalg.lstsq: `driver_name` other than `gels` is not supported on CUDA"
       );
     }
   }
   // if driver name is not provided, set to default 'gelsy' if on CPU,
-  // or to an empty option if on CUDA.
+  // or to `gels` if on CUDA.
   else {
     driver_opt = (at::kCPU == self.device().type())
-      ? c10::optional<std::string>("gelsy") : c10::nullopt;
+      ? c10::optional<std::string>("gelsy")
+      : c10::optional<std::string>("gels");
   }
 
   // LAPACK/MAGMA requries inputs to be in the column-major-order.
