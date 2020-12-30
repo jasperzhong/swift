@@ -120,7 +120,7 @@ class TestLinalg(TestCase):
         run_test_case(zero_strided, b)
         run_test_case(a, zero_strided)
 
-    @onlyCPU
+    @skipCUDAIfNoMagma
     @skipCPUIfNoLapack
     @dtypes(torch.float, torch.double, torch.cfloat, torch.cdouble)
     def test_linalg_lstsq(self, device, dtype):
@@ -166,7 +166,7 @@ class TestLinalg(TestCase):
                     if (driver is not None) and driver != 'gelsy':
                         check_singular_values(a, res.s)
 
-    @onlyCPU
+    @skipCUDAIfNoMagma
     @skipCPUIfNoLapack
     @dtypes(torch.float, torch.double, torch.cfloat, torch.cdouble)
     def test_linalg_lstsq_batch_broadcasting(self, device, dtype):
