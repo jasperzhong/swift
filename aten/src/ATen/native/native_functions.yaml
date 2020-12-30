@@ -10017,6 +10017,7 @@
   variants: function
   dispatch:
     CPU: _lstsq_helper_cpu
+    CUDA: _lstsq_helper_cuda
 
 - func: _syevd_helper(Tensor self, bool compute_eigenvectors, str uplo) -> (Tensor, Tensor)
   use_c10_dispatcher: full

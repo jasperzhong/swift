@@ -2035,7 +2035,7 @@ struct LapackLstsqDriverTypeHash {
 std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
     const Tensor& a, const Tensor& b, double cond, c10::optional<std::string> driver_name) {
 #ifndef USE_LAPACK
-  AT_ERROR("linalg.lstsq: LAPACK library not found in compilation");
+  AT_ERROR("torch.linalg.lstsq: LAPACK library not found in compilation");
 #else
 
   static auto driver_string_to_type = std::unordered_map<std::string, LapackLstsqDriverType>({
@@ -2051,7 +2051,7 @@ std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
   Tensor rank;
   Tensor singular_values;
 
-  AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(a.scalar_type(), "linalg.lstsq_cpu", [&] {
+  AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(a.scalar_type(), "torch.linalg.lstsq_cpu", [&] {
     using value_t = typename c10::scalar_value_type<scalar_t>::type;
 
     auto driver = lapackLstsq<LapackLstsqDriverType::Gelsd, scalar_t, value_t>;
@@ -2095,7 +2095,7 @@ std::tuple<Tensor, Tensor, Tensor> _lstsq_helper_cpu(
     //   }
     // }
     // which does correspond to a batch-wise iteration for methods that do not
-    // broadcast over batch dimensions.
+    // broadcast with size expansion over batch dimensions.
     batch_iterator_with_broadcasting<scalar_t>(a, b,
       [&](scalar_t* a_working_ptr, scalar_t* b_working_ptr,
         int64_t a_linear_batch_idx) {
