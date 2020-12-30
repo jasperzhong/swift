@@ -245,6 +245,12 @@ class TestLinalg(TestCase):
             with self.assertRaisesRegex(RuntimeError, r'parameter `driver_name` should be one of \(gels, gelsy, gelsd, gelss\)'):
                 torch.linalg.lstsq(a, b, driver_name='fictitious_driver')
 
+        if device != 'cpu':
+            a = torch.rand(2, 3, dtype=dtype, device=device)
+            b = torch.rand(2, 1, dtype=dtype, device=device)
+            with self.assertRaisesRegex(RuntimeError, r'only overdetermined systems \(m >= n\) are allowed on CUDA'):
+                torch.linalg.lstsq(a, b)
+
     @skipCUDAIfNoMagma
     @skipCPUIfNoLapack
     @dtypes(torch.float32, torch.float64, torch.complex64, torch.complex128)

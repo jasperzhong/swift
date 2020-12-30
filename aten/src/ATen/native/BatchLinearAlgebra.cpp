@@ -2186,6 +2186,14 @@ std::tuple<Tensor, Tensor, Tensor> linalg_lstsq(
       : c10::optional<std::string>("gels");
   }
 
+  // CUDA has only `gels` driver now which ONLY works with overdermined systems
+  if (at::kCUDA == self.device().type()) {
+    TORCH_CHECK(
+      self.size(-2) >= self.size(-1),
+      "torch.linalg.lstsq: only overdetermined systems (m >= n) are allowed on CUDA"
+    );
+  }
+
   // LAPACK/MAGMA requries inputs to be in the column-major-order.
   auto self_working_copy = copyBatchedColumnMajor(self);
 
