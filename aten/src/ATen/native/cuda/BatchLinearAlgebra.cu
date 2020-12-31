@@ -2285,9 +2285,7 @@ AT_ERROR("torch.linalg.lstsq: MAGMA library not found in "
     auto m = magma_int_cast(a.size(-2), "m");
     auto n = magma_int_cast(a.size(-1), "n");
     auto nrhs = magma_int_cast(b.size(-1), "nrhs");
-    auto* dA = a.data_ptr<scalar_t>();
     auto ldda = std::max<magma_int_t>(1, m);
-    auto* dB = b.data_ptr<scalar_t>();
     auto lddb = std::max<magma_int_t>(1, std::max(m, n));
     auto nb = magmaGeqrfOptimalBlocksize<scalar_t>(m, n);
     auto lwork = (m - n + nb) * (nrhs + nb) + nrhs * nb;
