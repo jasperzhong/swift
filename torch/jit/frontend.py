@@ -18,7 +18,7 @@ from torch._C._jit_tree_views import (
 )
 from torch._utils_internal import get_source_lines_and_file
 
-from torch._jit_internal import SourceContext, should_drop, is_static_fn
+from torch._jit_internal import SourceContext, createResolutionCallbackFromClosure, should_drop, is_static_fn
 import torch.jit.annotations
 
 # Borrowed from cPython implementation
@@ -217,6 +217,38 @@ def normalize_source_lines(sourcelines: List[str]) -> List[str]:
     return aligned_prefix + aligned_suffix
 
 
+def check_fn_decorators_supported(fn_def, ctx, rcb):
+    """
+    Check that all decorators present in fn_def are supported by JIT.
+
+    Args:
+        fn_def: The ast.FunctionDef object.
+        ctx: A SourceContext instance. Used for source highlighting
+            when an unsupported decorator is found.
+        rcb: A resolution callback used to resolve decorator instances.
+            This helps handle cases of import aliasing.
+    """
+    # Small function for converting AST subtrees representing decorators
+    # to their full names.
+    def get_decorator_name(decorator):
+        if isinstance(decorator, ast.Call):
+            return get_decorator_name(decorator.func)
+        elif isinstance(decorator, ast.Attribute):
+            return f"{get_decorator_name(decorator.value)}.{decorator.attr}"
+        elif isinstance(decorator, ast.Name):
+            return decorator.id
+        else:
+            raise RuntimeError(f"Unsupported node type: {type(decorator)}")
+
+    for decorator in fn_def.decorator_list:
+        if isinstance(decorator, ast.Call):
+            decorator_name = get_decorator_name(decorator)
+            decorator_obj = rcb(decorator_name)
+            if decorator_obj == torch.no_grad:
+                ctx_range = ctx.make_range(decorator.lineno, decorator.col_offset, decorator.col_offset + len(decorator_name))
+                raise NotSupportedError(ctx_range, "Using no_grad as a decorator is not supported")
+
+
 def get_jit_def(fn, def_name, self_name=None):
     """
     Build a JIT AST (TreeView) from the given function.
@@ -243,6 +275,9 @@ def get_jit_def(fn, def_name, self_name=None):
     type_line = torch.jit.annotations.get_type_line(source)
     ctx = SourceContext(source, filename, file_lineno, leading_whitespace_len, True)
     fn_def = py_ast.body[0]
+
+    # Check that all decorators applied to fn are supported.
+    check_fn_decorators_supported(fn_def, ctx, createResolutionCallbackFromClosure(fn))
 
     # Swap out the function signature and body if it is unused
     if should_drop(fn):

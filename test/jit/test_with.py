@@ -620,6 +620,35 @@ class TestWith(JitTestCase):
 
         self.assertFalse(w.requires_grad)
 
+    def test_no_grad_decorator_error(self):
+        """
+        Test that using torch.no_grad as a decorator in
+        TorchScript throws an error.
+        """
+        @torch.no_grad()
+        def fn(x: int) -> int:
+            x = x + 1
+            return x
+
+        no_grad = torch.no_grad
+
+        @no_grad()
+        def gn(x: int) -> int:
+            x = x + 1
+            return x
+
+        with self.assertRaisesRegex(
+            torch.jit.frontend.NotSupportedError,
+            r"Using no_grad as a decorator is not supported",
+        ):
+            torch.jit.script(fn)
+
+        with self.assertRaisesRegex(
+            torch.jit.frontend.NotSupportedError,
+            r"Using no_grad as a decorator is not supported",
+        ):
+            torch.jit.script(gn)
+
     def test_with_record_function(self):
         """
         Check that torch.autograd.profiler.record_function context manager is
