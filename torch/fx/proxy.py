@@ -38,8 +38,12 @@ class TracerBase:
         a default parameter, we use the ``args`` tuple. ``args`` is
         otherwise empty for ``placeholder`` Nodes.
         '''
-        args_ = self.create_arg(args)
-        kwargs_ = self.create_arg(kwargs)
+        try:
+            self._cached_user_frame = self.find_user_frame()
+            args_ = self.create_arg(args)
+            kwargs_ = self.create_arg(kwargs)
+        finally:
+            self._cached_user_frame = None
         assert isinstance(args_, tuple)
         assert isinstance(kwargs_, dict)
         return self.proxy(self.create_node(kind, target, args_, kwargs_, name, type_expr))
@@ -72,11 +76,66 @@ class TracerBase:
 
         if isinstance(a, Proxy):
             # base case: we unwrap the Proxy object
+            reasonable_name = self.find_reasonable_name(a)
+            if reasonable_name is not None and not a.node.name.startswith(reasonable_name):
+                a.node.name = a.tracer.graph._create_unique_name(reasonable_name)
             return a.node
         elif isinstance(a, base_types) or a is None:
             return a
 
         raise NotImplementedError(f"argument of type: {type(a)}")
+
+    def find_user_frame(self):
+        """
+        Find the Python stack frame executing the user code during
+        symbolic tracing.
+        """
+        # We have to do a little dance here. Basically, walk up the callstack and
+        # record the first frame not in the FX source. This is the frame executing
+        # the user code during tracing.
+        frame = inspect.currentframe()
+
+        fx_files = ['torch/fx/proxy.py', 'torch/fx/symbolic_trace.py']
+        while frame:
+            frame = frame.f_back
+            if frame and all(not frame.f_code.co_filename.endswith(file) for file in fx_files):
+                break
+
+        if not frame:
+            return None
+
+        return frame
+
+    def find_reasonable_name(self, obj: 'Proxy') -> Optional[str]:
+        """
+        Find a reasonable name for this proxy object. By default, this introspects
+        the Python interpreter state to find the name this Proxy was assigned to
+        in the user code
+        """
+
+        # Retrieve the cached user frame. This is a performance optimization
+        # so we don't have to do the frame lookup for every single proxy input
+        frame = getattr(self, '_cached_user_frame', None)
+        if not frame:
+            frame = self.find_user_frame()
+
+        if not frame:
+            return None
+
+        f_locals = frame.f_locals
+
+        found_name : Optional[str] = None
+        for k, v in f_locals.items():
+            if obj is v:
+                # Arbitrary tie-breaker: use the shortest name found in the
+                # frame. This will account for cases e.g. `x` and `identity`
+                # in the same frame (as in ResNet). This tie-breaker makes it
+                # so that we use a consistent name. TODO: Futher introspect
+                # into Python bytecode state to get the actual name used?
+                if not found_name or len(k) < len(found_name):  # type: ignore
+                    found_name = k
+
+        return found_name
 
     def to_bool(self, obj: 'Proxy') -> bool:
         """Called when a proxy object is being converted to a boolean, such as
@@ -111,6 +170,7 @@ class GraphAppendingTracer(TracerBase):
 
 class TraceError(ValueError):
     pass
+
 
 # Proxy objects are stand-in values for normal values in a PyTorch computation.
 # Instead of performing compute they record computation into Graph.
