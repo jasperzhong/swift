@@ -183,7 +183,12 @@ else
   ( ! get_exit_code python setup.py clean] )
   ( ! get_exit_code python setup.py clean bad_argument )
 
-  if [[ "$BUILD_ENVIRONMENT" != *libtorch* ]]; then
+  if [[ "$BUILD_ENVIRONMENT" != *libtorch* ]]; then\
+    # Install OpenSSL on linux for Gloo TCP-TLS transport
+    if [[ "${BUILD_ENVIRONMENT}" == *linux* ]]; then
+      sudo apt-get -qq update
+      sudo apt-get -qq install libssl-dev
+    fi
 
     # ppc64le build fails when WERROR=1
     # set only when building other architectures
