@@ -292,15 +292,15 @@ bool IsGraphValidForInference(std::shared_ptr<Graph> graph) {
   // Verify if every input has type(either Tensor or Sequence) and scalar type.
   // This is a requirement for ONNX graph inputs.
   for (auto in : graph->inputs()) {
-    if (auto t_type = in->type()->cast<TensorType>()) {
+    if (auto* t_type = in->type()->castRaw<TensorType>()) {
       if (!t_type->scalarType().has_value()) {
         GRAPH_UPDATE(
             "Input ", in->debugName(), " is tensor type, but miss datatype.");
         return false;
       }
-    } else if (auto s_type = in->type()->cast<ListType>()) {
+    } else if (auto* s_type = in->type()->castRaw<ListType>()) {
       auto e_type = s_type->getElementType();
-      if (auto t_type = e_type->cast<TensorType>()) {
+      if (auto* t_type = e_type->castRaw<TensorType>()) {
         if (t_type->scalarType().has_value()) {
           continue;
         }

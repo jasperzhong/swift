@@ -1298,19 +1298,19 @@ struct PythonPrintImpl {
         type_printer_(std::move(type_printer)),
         enforce_importable_(enforce_importable) {}
 
-  void printClass(const ClassTypePtr& classType) {
+  void printClass(const ClassType& classType) {
     // If any of the methods are not Graph funtions, this indicates that
     // this class is a custom-bound C++ class. Skip serialization
     // of this class, we will depend on the ClassType being defined
     // in the target process.
-    for (auto& method : classType->methods()) {
+    for (auto& method : classType.methods()) {
       if (!method->isGraphFunction()) {
         return;
       }
     }
 
-    bool is_module = classType->is_module();
-    body_ << "class " << classType->name()->name();
+    bool is_module = classType.is_module();
+    body_ << "class " << classType.name()->name();
     if (is_module) {
       body_ << "(Module)";
     }
@@ -1318,7 +1318,7 @@ struct PythonPrintImpl {
     body_ << ":\n";
     {
       const auto guard = WithIndented();
-      size_t numAttrs = classType->numAttributes();
+      size_t numAttrs = classType.numAttributes();
       // For modules, we need to print special information about the module's
       // attributes and parameters.
       if (is_module) {
@@ -1327,11 +1327,11 @@ struct PythonPrintImpl {
         // Populate the __parameters__ field. This tells the importer which
         // attributes are parameters.
         for (size_t i = 0; i < numAttrs; i++) {
-          if (classType->is_parameter(i)) {
-            params.push_back(classType->getAttributeName(i));
+          if (classType.is_parameter(i)) {
+            params.push_back(classType.getAttributeName(i));
           }
-          if (classType->is_buffer(i)) {
-            buffers.push_back(classType->getAttributeName(i));
+          if (classType.is_buffer(i)) {
+            buffers.push_back(classType.getAttributeName(i));
           }
         }
         indent();
@@ -1350,8 +1350,8 @@ struct PythonPrintImpl {
       }
 
       for (size_t i = 0; i < numAttrs; i++) {
-        const auto& name = classType->getAttributeName(i);
-        const auto& type = classType->getAttribute(i);
+        const auto& name = classType.getAttributeName(i);
+        const auto& type = classType.getAttribute(i);
         registerClassDependencies(type);
 
         indent();
@@ -1376,10 +1376,10 @@ struct PythonPrintImpl {
         }
       }
 
-      size_t numConstants = classType->numConstants();
+      size_t numConstants = classType.numConstants();
       for (size_t i = 0; i < numConstants; i++) {
-        const auto& name = classType->getConstantName(i);
-        IValue v = classType->getConstant(i);
+        const auto& name = classType.getConstantName(i);
+        IValue v = classType.getConstant(i);
 
         indent();
         body_ << name << " : "
@@ -1390,18 +1390,18 @@ struct PythonPrintImpl {
       }
 
       // TODO fields
-      for (auto& method : classType->methods()) {
+      for (auto& method : classType.methods()) {
         printFunction(*method);
       }
     }
   }
 
   void printNamedType(const c10::NamedTypePtr& type) {
-    if (auto functionType = type->cast<FunctionType>()) {
+    if (auto* functionType = type->castRaw<FunctionType>()) {
       printFunction(*functionType->function());
-    } else if (auto classType = type->cast<ClassType>()) {
-      printClass(classType);
-    } else if (auto tupleType = type->cast<TupleType>()) {
+    } else if (auto* classType = type->castRaw<ClassType>()) {
+      printClass(*classType);
+    } else if (auto* tupleType = type->castRaw<TupleType>()) {
       TORCH_INTERNAL_ASSERT(tupleType->schema());
       body_ << "class " << tupleType->name()->name();
       body_ << "(NamedTuple):\n";
@@ -1414,7 +1414,7 @@ struct PythonPrintImpl {
                 << attr.type()->annotation_str(type_printer_) << "\n";
         }
       }
-    } else if (auto interfaceType = type->cast<InterfaceType>()) {
+    } else if (auto* interfaceType = type->castRaw<InterfaceType>()) {
       body_ << "class " << interfaceType->name()->name();
       if (interfaceType->is_module()) {
         body_ << "(ModuleInterface):\n";
@@ -1444,7 +1444,7 @@ struct PythonPrintImpl {
           body_ << "  pass\n";
         }
       }
-    } else if (auto enumType = type->cast<EnumType>()) {
+    } else if (auto* enumType = type->castRaw<EnumType>()) {
       body_ << "class " << enumType->qualifiedClassName().name() << "(Enum):\n";
 
       std::string value_wrapper = "";

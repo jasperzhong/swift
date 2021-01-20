@@ -60,7 +60,7 @@ struct AutogradZeroSpecializer {
   void setStatesOnGraphInputs() {
     for (Value* input : graph_->inputs()) {
       const auto& tp = input->type();
-      if (auto tt = tp->cast<TensorType>()) {
+      if (auto* tt = tp->castRaw<TensorType>()) {
         if (tt->undefined()) {
           if (*tt->undefined()) {
             state_[input] = State::Zero;
@@ -133,7 +133,7 @@ struct AutogradZeroSpecializer {
         continue;
       }
 
-      if (inp->uses().size() == 0 || !inp->type()->cast<TensorType>()) {
+      if (inp->uses().size() == 0 || !inp->type()->castRaw<TensorType>()) {
         continue;
       }
 

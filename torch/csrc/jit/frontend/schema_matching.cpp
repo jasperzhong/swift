@@ -9,7 +9,7 @@ namespace torch {
 namespace jit {
 
 static inline TypePtr unwrapOptional(TypePtr opt_type) {
-  if (auto unwrap_list_type = opt_type->cast<OptionalType>()) {
+  if (auto* unwrap_list_type = opt_type->castRaw<OptionalType>()) {
     return unwrap_list_type->getElementType();
   }
   return opt_type;
@@ -30,14 +30,14 @@ static inline bool isIntOrFloatUsedAsList(
 /// Returns true if `type` is a Tuple in which all the elements have the
 /// same type or if it's a subtype of `list_type_`.
 inline bool convertibleToList(const TypePtr& type, const TypePtr& list_type_) {
-  auto list_type = list_type_->cast<ListType>();
+  auto* list_type = list_type_->castRaw<ListType>();
   if (!list_type) {
     return false;
   }
   if (type->isSubtypeOf(list_type_)) {
     return true;
   }
-  if (auto tuple = type->cast<TupleType>()) {
+  if (auto* tuple = type->castRaw<TupleType>()) {
     return std::all_of(
         tuple->elements().begin(),
         tuple->elements().end(),
@@ -58,7 +58,7 @@ Value* tryConvertToType(
     Value* value,
     bool allow_conversions) {
   // treat conversion to Optional[T] as conversions to T
-  if (OptionalTypePtr op = concrete_type->cast<OptionalType>()) {
+  if (auto* op = concrete_type->castRaw<OptionalType>()) {
     if (value->type()->kind() != OptionalType::Kind &&
         !value->type()->isSubtypeOf(NoneType::get())) {
       return tryConvertToType(
@@ -66,7 +66,7 @@ Value* tryConvertToType(
     }
   }
 
-  if (auto value_tuple = value->type()->cast<TupleType>()) {
+  if (auto* value_tuple = value->type()->castRaw<TupleType>()) {
     // Allow homogeneous tuples to be casted implicitly to lists of appropriate
     // types
     if (convertibleToList(value->type(), unwrapOptional(concrete_type))) {
@@ -184,7 +184,7 @@ static Value* tryMatchArgument(
       auto& ostream = err()
           << arg.formatTypeMismatchMsg(value->type()->repr_str());
 
-      if (auto pt = value->type()->cast<TensorType>()) {
+      if (auto* pt = value->type()->castRaw<TensorType>()) {
         if (pt->isInferredType()) {
           std::string inferred_type_hint;
           inferred_type_hint = c10::str(
@@ -196,7 +196,7 @@ static Value* tryMatchArgument(
         }
       }
 
-      if (auto v = value->type()->cast<ListType>()) {
+      if (auto* v = value->type()->castRaw<ListType>()) {
         if (v->getElementType()->isSubtypeOf(TensorType::get())) {
           ostream << "Empty lists default to List[Tensor]. Add a variable "
                      "annotation to the assignment to create an empty list "

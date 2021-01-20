@@ -140,13 +140,13 @@ static void ReplaceAddWithConcat(Block* b) {
     }
     if (it->kind() == aten::add) {
       if (!it->input(0)->type()->cast<ListType>() ||
-          !it->input(1)->type()->cast<ListType>()) {
+          !it->input(1)->type()->castRaw<ListType>()) {
         continue;
       }
 
       TypePtr elem =
           it->input(0)->type()->castRaw<ListType>()->getElementType();
-      if (elem->cast<IntType>()) {
+      if (elem->castRaw<IntType>()) {
         Node* concat_node = b->owningGraph()->create(onnx::Concat, 1);
         concat_node->i_(attr::axis, 0);
         concat_node->insertBefore(*it);
@@ -201,7 +201,7 @@ static void fuseListAndListUnpack(Block* b) {
                 ->type()
                 ->castRaw<ListType>()
                 ->getElementType()
-                ->cast<IntType>()) {
+                ->castRaw<IntType>()) {
           Node* gather_indices = b->owningGraph()->create(onnx::Constant, 1);
           gather_indices->insertBefore(*it);
           gather_indices->t_(
