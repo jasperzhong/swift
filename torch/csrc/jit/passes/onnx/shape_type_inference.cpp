@@ -209,7 +209,7 @@ Value* CloneValueFromListConstruct(Value* v, std::shared_ptr<Graph> n_graph) {
   // special case, and change from list type to tensor type. The scalar type
   // is preserved. If the elemtype is Int, insert a onnx::Concat node into
   // the graph.
-  TypePtr elem = v->type()->cast<ListType>()->getElementType();
+  TypePtr elem = v->type()->castRaw<ListType>()->getElementType();
   c10::optional<at::ScalarType> scalar_type = c10::nullopt;
   if (elem->cast<IntType>()) {
     scalar_type = at::kLong;
@@ -349,8 +349,8 @@ bool IsBlockReturnTypeSame(Node* n) {
     auto else_block_type = else_block->outputs()[i]->type();
     if (then_block_type->cast<TensorType>() &&
         else_block_type->cast<TensorType>()) {
-      if (then_block_type->cast<TensorType>()->scalarType() !=
-          else_block_type->cast<TensorType>()->scalarType()) {
+      if (then_block_type->castRaw<TensorType>()->scalarType() !=
+          else_block_type->castRaw<TensorType>()->scalarType()) {
         return false;
       }
     }
