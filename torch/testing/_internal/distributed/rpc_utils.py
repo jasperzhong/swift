@@ -43,6 +43,7 @@ from torch.testing._internal.distributed.rpc.rpc_test import (
     RpcTest,
     TensorPipeAgentRpcTest,
 )
+from torch.testing._internal.distributed.rpc.examples.batch_update_parameter_server_test import BatchUpdateParameterServerTest
 from torch.testing._internal.distributed.rpc.examples.parameter_server_test import ParameterServerTest
 
 def _check_and_set_tcp_init():
@@ -115,6 +116,7 @@ MP_HELPERS_AND_SUFFIXES = {
 # for each agent (except the faulty agent, which is special).
 GENERIC_TESTS = [
     RpcTest,
+    BatchUpdateParameterServerTest,
     ParameterServerTest,
     DistAutogradTest,
     DistOptimizerTest,
