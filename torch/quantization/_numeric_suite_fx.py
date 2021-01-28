@@ -1,9 +1,10 @@
-from typing import Any, Dict
+from typing import Any, Dict, Callable
 
 import torch
 from torch.fx import GraphModule  # type: ignore
 from torch.fx import map_arg  # type: ignore
 from torch.fx.graph import Graph
+from torch.fx.node import Node
 from torch.quantization import get_default_compare_output_module_list
 from torch.quantization._numeric_suite import (
     _find_match,
@@ -17,6 +18,7 @@ from torch.quantization._numeric_suite import (
 from torch.quantization.fx.quantize import _remove_qconfig, is_activation_post_process
 from torch.quantization.quantize_fx import prepare_fx
 from torch.quantization.fx.quantization_patterns import QuantizeHandler
+from torch.quantization.fx.quantization_types import QuantizerCls
 
 
 class NumericSuiteQuantizeHandler(QuantizeHandler):
