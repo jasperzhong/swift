@@ -5,8 +5,9 @@ import torch.nn as nn
 import torch.nn.intrinsic as nni
 from torch.quantization import get_default_qconfig
 from torch.quantization._numeric_suite_fx import (
-    compare_weights_fx,
     remove_qconfig_observer_fx,
+    compare_model_outputs_fx,
+    compare_weights_fx,
     compare_model_stub_fx,
 )
 from torch.quantization.fx.quantize import is_activation_post_process
@@ -210,3 +211,74 @@ class TestGraphModeNumericSuite(QuantizationTestCase):
             linear_data,
             expected_ob_dict_keys,
         )
+
+    @override_qengines
+    def test_compare_model_outputs_conv_static_fx(self):
+        r"""Compare the output of conv layer in static quantized model and corresponding
+        output of conv layer in float model
+        """
+
+        def compare_and_validate_results(float_model, q_model, data):
+            act_compare_dict = compare_model_outputs_fx(float_model, q_model, data)
+            expected_ob_dict_keys = {"x.stats", "conv.stats"}
+
+            self.assertTrue(act_compare_dict.keys() == expected_ob_dict_keys)
+            for k, v in act_compare_dict.items():
+                self.assertTrue(len(v["float"]) == 1)
+                self.assertTrue(len(v["float"]) == len(v["quantized"]))
+                for i, val in enumerate(v["quantized"]):
+                    self.assertTrue(v["float"][i].shape == v["quantized"][i].shape)
+
+        qengine = torch.backends.quantized.engine
+        qconfig = get_default_qconfig(qengine)
+        qconfig_dict = {"": qconfig}
+
+        model_list = [ConvModel(), ConvBnReLUModel()]
+
+        for float_model in model_list:
+            float_model.eval()
+            prepared_model = prepare_fx(float_model, qconfig_dict)
+            backup_prepared_model = copy.deepcopy(prepared_model)
+
+            # Run calibration
+            test_only_eval_fn(prepared_model, self.img_data_2d)
+            q_model = convert_fx(prepared_model)
+
+            compare_and_validate_results(
+                backup_prepared_model, q_model, self.img_data_2d[0][0]
+            )
+
+    @override_qengines
+    def test_compare_model_outputs_linear_static_fx(self):
+        r"""Compare the output of linear layer in static quantized model and corresponding
+        output of linear layer in float model
+        """
+
+        def compare_and_validate_results(float_model, q_model, data):
+            act_compare_dict = compare_model_outputs_fx(float_model, q_model, data)
+            expected_ob_dict_keys = {"x.stats", "fc1.stats"}
+
+            self.assertTrue(act_compare_dict.keys() == expected_ob_dict_keys)
+            for k, v in act_compare_dict.items():
+                self.assertTrue(len(v["float"]) == 1)
+                self.assertTrue(len(v["float"]) == len(v["quantized"]))
+                for i, val in enumerate(v["quantized"]):
+                    self.assertTrue(v["float"][i].shape == v["quantized"][i].shape)
+
+        float_model = SingleLayerLinearModel()
+        float_model.eval()
+
+        qengine = torch.backends.quantized.engine
+        qconfig = get_default_qconfig(qengine)
+        qconfig_dict = {"": qconfig}
+
+        prepared_model = prepare_fx(float_model, qconfig_dict)
+
+        backup_prepared_model = copy.deepcopy(prepared_model)
+
+        # Run calibration
+        test_only_eval_fn(prepared_model, self.calib_data)
+        q_model = convert_fx(prepared_model)
+
+        linear_data = self.calib_data[0][0]
+        compare_and_validate_results(backup_prepared_model, q_model, linear_data)
