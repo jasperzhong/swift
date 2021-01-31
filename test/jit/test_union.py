@@ -4,7 +4,7 @@ import sys
 
 import torch
 from enum import Enum
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 # Make the helper files in test/ importable
 pytorch_test_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -18,12 +18,8 @@ if __name__ == '__main__':
 
 class TestUnion(JitTestCase):
 
-    def _generate_formatTypeMismatchMsg_error_message(self,
-                                                      schema_str: str,
-                                                      arg_str: str,
-                                                      arg_pos: int,
-                                                      actual_type: str,
-                                                      actual_value: str) -> str:
+    def _generate_formatTypeMismatchMsg_error_message(self, schema_str: str,
+        arg_str: str, arg_pos: int, actual_type: str, actual_value: str) -> str:
         """
         Generate the verbose error message that we expect to be thrown at
         FunctionSchema::formatTypeMismatchMsg
@@ -44,11 +40,11 @@ class TestUnion(JitTestCase):
         expected_type = arg_list[arg_pos][0]
         arg_name = arg_list[arg_pos][1]
         res = "\n".join([f"{fn_name}() Expected a value of type "
-                         f"'{expected_type}' for argument '{arg_name}' but instead "
-                         f"found type '{actual_type}'.", f"Position: {arg_pos}",
-                         f"Value: {actual_value}", f"Declaration: {schema_str}", "Cast "
-                         f"error details: Expected a member of {expected_type} but "
-                         f"instead found type {actual_type}"])
+                f"'{expected_type}' for argument '{arg_name}' but instead "
+                f"found type '{actual_type}'.", f"Position: {arg_pos}",
+                f"Value: {actual_value}", f"Declaration: {schema_str}", "Cast "
+                f"error details: Expected a member of {expected_type} but "
+                f"instead found type {actual_type}"])
         return re.escape(res)
 
     # Return a list of (TYPE-NAME, ARG-NAME) tuples
@@ -93,7 +89,7 @@ class TestUnion(JitTestCase):
         def fn(x: Union[Dict[str, int], List[int]]) -> str:
             return "foo"
 
-        self.checkScript(fn, ({"foo": 1, "bar": 2, "baz": 3},))
+        self.checkScript(fn, ({"foo":1, "bar":2, "baz":3},))
         self.checkScript(fn, ([1, 2, 3],))
 
         scripted_fn = torch.jit.script(fn)
@@ -103,7 +99,7 @@ class TestUnion(JitTestCase):
             "Union[Dict[str, int], List[int]] x", 0,
             "Dict[str, str]", "{\"foo\": \"bar\", \"baz\": \"qux\"}")
         with self.assertRaisesRegex(RuntimeError, msg):
-            scripted_fn({"foo": "bar", "baz": "qux"})
+            scripted_fn({"foo":"bar", "baz":"qux"})
 
         msg = self._generate_formatTypeMismatchMsg_error_message(
             "fn(Union(Dict(str, int), int[]) x) -> (str)",
@@ -143,7 +139,7 @@ class TestUnion(JitTestCase):
     def test_union_in_class_constructor(self):
 
         @torch.jit.script
-        class A(object):    #noqa B903
+        class A(object):
             def __init__(self, x: Union[int, str]) -> None:
                 self.x = x
 
@@ -222,25 +218,30 @@ class TestUnion(JitTestCase):
             x.append("foo")
             return x
 
+        #scripted_fn = torch.jit.script(fn)
+
         with self.assertRaisesRegex(RuntimeError, "Could not match type str"):
             scripted_fn = torch.jit.script(fn)
             scripted_fn()
 
-    def test_union_does_not_replace_existing_union_annotated_type(self):
-        def fn():
-            x: List[Union[int, str]] = [1, "foo", 3]
-            x.append(2.0)
-            return x
+    #def test_union_does_not_replace_existing_union_annotated_type(self):
+    #    def fn():
+    #        x: List[Union[int, str]] = [1, "foo", 3]
+    #        x.append(2.0)
+    #        return x
 
-        with self.assertRaisesRegex(RuntimeError, "Could not match type float"):
-            scripted_fn = torch.jit.script(fn)
-            scripted_fn()
+    #    scripted_fn = torch.jit.script(fn)
+
+    #    with self.assertRaisesRegex(RuntimeError, "Could not match type str"):
+    #        scripted_fn()
 
     def test_union_does_not_replace_existing_annotated_type_with_empty_container(self):
         def fn():
             x: List[int] = []
             x.append("foo")
             return x
+
+        #scripted_fn = torch.jit.script(fn)
 
         with self.assertRaisesRegex(RuntimeError, "Could not match type str"):
             scripted_fn = torch.jit.script(fn)
@@ -256,7 +257,7 @@ class TestUnion(JitTestCase):
             return "foo"
 
         self.assertEqual(self._input_str(fn_with_union),
-                         self._input_str(fn_with_nested_union))
+                        self._input_str(fn_with_nested_union))
 
     def test_unions_of_a_single_argument_vanish(self):
         @torch.jit.script
