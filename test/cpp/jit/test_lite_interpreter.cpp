@@ -9,6 +9,9 @@
 #include <torch/csrc/jit/serialization/import.h>
 #include <torch/custom_class.h>
 #include <torch/torch.h>
+#include <torch/csrc/jit/backends/backend_detail.h>
+#include <torch/csrc/jit/backends/backend.h>
+#include <torch/csrc/jit/frontend/resolver.h>
 
 #include <unordered_set>
 
@@ -336,6 +339,121 @@ class TorchBindLiteInterpreterTestStruct
     return ss.str();
   }
 };
+
+TEST(LiteInterpreterTest, ToBackend) {
+  Module m("M");
+  m.define(R"JIT(
+    def forward(self, x):
+      return 2 * x
+  )JIT");
+
+  c10::Dict<IValue, IValue> compile_spec(StringType::get(), AnyType::get());
+  c10::Dict<IValue, IValue> fake_dict(StringType::get(), AnyType::get());
+  fake_dict.insert("", "");
+  compile_spec.insert("forward", fake_dict);
+  auto any_dict_ty = DictType::create(StringType::get(), AnyType::get());
+  // lowered module
+  auto lm = torch::jit::detail::codegen_backend_module(
+      "mul_test_backend", m, compile_spec, any_dict_ty);
+
+  std::stringstream lms;
+  lm.save(lms);
+//  auto loaded_m = load(lms);
+//  lm.save("/Users/myuan/models/backend/backend_c.pt");
+
+  auto minput = 5 * torch::ones({});
+  auto ref = m.run_method("forward", minput).toTensor().item<float>();
+  auto res = lm.run_method("forward", minput).toTensor().item<float>();
+  AT_ASSERT(ref == res);
+
+  std::stringstream lmms;
+  lm._save_for_mobile(lmms);
+//  lm._save_for_mobile("/Users/myuan/models/backend/backend_c.ptl");
+  // lowered mobile module
+  auto lmm = _load_for_mobile(lmms);
+  auto lres = lmm.run_method("forward", minput).toTensor().item<float>();
+  AT_ASSERT(ref == lres);
+}
+
+namespace {
+struct ClassNamespaceValue : public SugaredValue {
+  explicit ClassNamespaceValue(c10::QualifiedName name)
+      : basename_(std::move(name)) {}
+
+  std::shared_ptr<SugaredValue> attr(
+      const SourceRange& loc,
+      Function& m,
+      const std::string& name) override {
+    auto fullName = c10::QualifiedName(basename_, name);
+
+    // Check to see if it is a custom class.
+    if (auto custom_class = getCustomClass(fullName.qualifiedName())) {
+      return std::make_shared<ClassValue>(custom_class);
+    }
+
+    // If it's not a custom class, assume it's another namespace
+    return std::make_shared<ClassNamespaceValue>(std::move(fullName));
+  }
+
+  std::string kind() const override {
+    return "Class Namespace";
+  }
+
+ private:
+  c10::QualifiedName basename_;
+};
+
+ struct TestModuleResolver : public Resolver {
+  std::shared_ptr<SugaredValue> resolveValue(
+      const std::string& name,
+      Function& m,
+      const SourceRange& loc) override {
+    if (name == "torch") {
+      return std::make_shared<BuiltinModule>("aten");
+    } else if (name == "__torch__") {
+      return std::make_shared<ClassNamespaceValue>(c10::QualifiedName(name));
+    }
+
+    return nullptr;
+  }
+
+  TypePtr resolveType(const std::string& name, const SourceRange& loc)
+  override {
+    return nullptr;
+  }
+};
+}
+
+TEST(LiteInterpreterTest, BuiltinClass) {
+  script::Module m("m");
+
+  auto cls = getCustomClass("__torch__.torch.classes._TorchScriptTesting._LiteInterpreterTest");
+  TORCH_INTERNAL_ASSERT(cls);
+  c10::intrusive_ptr<torch::CustomClassHolder> obj_holder;
+  m.register_attribute(
+      "my_obj", cls, IValue::make_capsule(obj_holder));
+
+  m.register_parameter("foo", torch::ones({}), false);
+  m.define(R"(
+    def __getstate__(self):
+      return 1
+    def __setstate__(self, a):
+      self.my_obj = __torch__.torch.classes._TorchScriptTesting._LiteInterpreterTest()
+
+    def forward(self, x) -> str:
+      return self.my_obj.get(x)
+  )", std::make_shared<TestModuleResolver>());
+
+  std::stringstream ss;
+  m._save_for_mobile(ss);
+  m._save_for_mobile("/Users/myuan/temp/test.ptl");
+  mobile::Module bc = _load_for_mobile(ss);
+  auto res =
+      bc.get_method("forward")(std::vector<IValue>{torch::zeros({3, 4})});
+  auto str = res.toStringRef();
+  std::string expected = "Hello! Your tensor has 12 elements!";
+  AT_ASSERT(str == expected);
+}
 
 TEST(LiteInterpreterTest, BuiltinFunction) {
   script::Module m("m");
@@ -817,6 +935,7 @@ static auto reg =
     torch::class_<TorchBindLiteInterpreterTestStruct>(
         "_TorchScriptTesting",
         "_LiteInterpreterTest")
+        .def(torch::init<>())
         .def("get", &TorchBindLiteInterpreterTestStruct::get)
         .def_pickle(
             // __getattr__
@@ -827,6 +946,60 @@ static auto reg =
               return c10::make_intrusive<TorchBindLiteInterpreterTestStruct>();
             });
 
+// This test JIT backend is intended to do the minimal amount of work
+// necessary to test that the JIT backend registration endpoints and
+// code generation are working correctly. It is not intended to
+// produce numerically correct results.
+class MulTestBackend : public PyTorchBackendInterface {
+ public:
+  // Constructor.
+  explicit MulTestBackend() {}
+  virtual ~MulTestBackend() = default;
+
+  c10::IValue preprocess(
+      c10::IValue mod,
+      c10::impl::GenericDict method_compile_spec) override {
+    return mod;
+  }
+
+  c10::impl::GenericDict compile(
+      c10::IValue processed,
+      c10::impl::GenericDict method_compile_spec) override {
+    auto spec =
+        c10::impl::toTypedDict<std::string, at::IValue>(method_compile_spec);
+
+    // Return the same string as a value for every key in method_compile_spec.
+    auto handles = c10::Dict<std::string, std::string>();
+    for (const auto& it : spec) {
+      handles.insert(it.key(), it.key());
+    }
+    return c10::impl::toGenericDict(handles);
+  }
+
+  c10::impl::GenericList execute(
+      c10::IValue handle,
+      c10::impl::GenericList inputs) override {
+    TORCH_INTERNAL_ASSERT(handle.isString());
+    TORCH_INTERNAL_ASSERT(inputs.size() > 0);
+
+    c10::List<at::Tensor> output_list;
+
+    c10::IValue value = inputs[0];
+    at::Tensor x = value.toTensor();
+    x = x.clone();
+    at::Tensor output = value.toTensor();
+    output = output.clone();
+
+    if (handle.toStringRef() == "forward") {
+      output = x * 2;
+      output_list.emplace_back(output);
+    }
+
+    return c10::impl::toList(output_list);
+  }
+};
+
+static auto cls = torch::jit::backend<MulTestBackend>("mul_test_backend");
 } // namespace
 
 } // namespace jit
