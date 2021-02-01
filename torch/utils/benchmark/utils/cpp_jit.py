@@ -75,12 +75,14 @@ def _compile_template(
     template_path: str,
     stmt: str,
     setup: str,
+    global_setup: str,
     is_standalone: bool
 ) -> Any:
     with open(template_path, "rt") as f:
         src = f.read()
 
     for before, after, indentation in (
+        ("// GLOBAL_SETUP_TEMPLATE_LOCATION", global_setup, 0),
         ("// SETUP_TEMPLATE_LOCATION", setup, 4),
         ("// STMT_TEMPLATE_LOCATION", stmt, 8)
     ):
@@ -130,15 +132,15 @@ def _compile_template(
     )
 
 
-def compile_timeit_template(stmt: str, setup: str) -> TimeitModuleType:
+def compile_timeit_template(stmt: str, setup: str, global_setup: str) -> TimeitModuleType:
     template_path: str = os.path.join(SOURCE_ROOT, "timeit_template.cpp")
-    module = _compile_template("timer_timeit", template_path, stmt, setup, is_standalone=False)
+    module = _compile_template("timer_timeit", template_path, stmt, setup, global_setup, is_standalone=False)
     assert isinstance(module, TimeitModuleType)
     return module
 
 
-def compile_callgrind_template(stmt: str, setup: str) -> str:
+def compile_callgrind_template(stmt: str, setup: str, global_setup: str) -> str:
     template_path: str = os.path.join(SOURCE_ROOT, "valgrind_wrapper", "timer_callgrind_template.cpp")
-    target = _compile_template("timer_callgrind", template_path, stmt, setup, is_standalone=True)
+    target = _compile_template("timer_callgrind", template_path, stmt, setup, global_setup, is_standalone=True)
     assert isinstance(target, str)
     return target
