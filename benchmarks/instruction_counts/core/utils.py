@@ -4,6 +4,7 @@ import tempfile
 from typing import List, Optional, Tuple
 
 from core.api import AutogradMode, AutoLabels, RuntimeMode, TimerArgs, GroupedBenchmark
+from core.jit import generate_torchscript_file
 from core.types import Definition, FlatDefinition, FlatIntermediateDefinition, Label
 
 
@@ -68,8 +69,12 @@ def unpack(definitions: FlatIntermediateDefinition) -> FlatDefinition:
         else:
             assert isinstance(args, GroupedBenchmark)
 
-            # A later PR will populate model_path.
             model_path: Optional[str] = None
+            ts_model_setup = args.ts_model_setup
+            if ts_model_setup is not None:
+                name: str = re.sub(r'[^a-z0-9_]', '_', '_'.join(label).lower())
+                name = f"{name}_{uuid.uuid4()}"
+                model_path = generate_torchscript_file(ts_model_setup, name=name, temp_dir=get_temp_dir())
 
             for auto_labels, timer_args in args.flatten(model_path):
                 results.append((label, auto_labels, timer_args))
