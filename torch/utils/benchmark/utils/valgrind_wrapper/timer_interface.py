@@ -18,6 +18,7 @@ from typing import (
 import torch
 from torch.utils.benchmark.utils import common, cpp_jit
 from torch.utils.benchmark.utils._stubs import CallgrindModuleType
+from torch.utils.benchmark.utils.historic.back_testing import IS_BACK_TESTING, ScriptFunction
 
 
 __all__ = ["FunctionCount", "FunctionCounts", "CallgrindStats", "CopyIfCallgrind"]
@@ -267,7 +268,7 @@ class Serialization(enum.Enum):
 
 _GLOBALS_ALLOWED_TYPES: Dict[Serialization, Tuple[Any, ...]] = {
     Serialization.PICKLE: (str, bytes, bool, int, float, complex),
-    Serialization.TORCH_JIT: (torch.jit.ScriptFunction, torch.jit.ScriptModule),
+    Serialization.TORCH_JIT: (ScriptFunction, torch.jit.ScriptModule),
     Serialization.TORCH: (torch.nn.Module,),
 }
 
@@ -445,13 +446,13 @@ class GlobalsBridge:
 class _ValgrindWrapper(object):
     def __init__(self) -> None:
         self._bindings_module: Optional[CallgrindModuleType] = None
-        if hasattr(torch._C, "_valgrind_supported_platform"):
-            self._supported_platform: bool = torch._C._valgrind_supported_platform()
-
-        else:
+        if IS_BACK_TESTING:
             print("Callgrind bindings are not present in `torch._C`. JIT-ing bindings.")
             self._bindings_module = cpp_jit.get_compat_bindings()
             self._supported_platform = self._bindings_module._valgrind_supported_platform()
+
+        else:
+            self._supported_platform: bool = torch._C._valgrind_supported_platform()
 
         self._commands_available: Dict[str, bool] = {}
         if self._supported_platform:
@@ -464,7 +465,11 @@ class _ValgrindWrapper(object):
                 ).returncode
 
         self._build_type: Optional[str] = None
-        build_search = re.search("BUILD_TYPE=(.+),", torch.__config__.show())
+        try:
+            torch_cfg = torch.__config__.show()
+        except AttributeError:
+            torch_cfg = ""
+        build_search = re.search("BUILD_TYPE=(.+),", torch_cfg)
         if build_search is not None:
             self._build_type = build_search.groups()[0].split(",")[0]
 
