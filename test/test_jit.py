@@ -41,6 +41,7 @@ from jit.test_isinstance import TestIsinstance  # noqa: F401
 from jit.test_cuda import TestCUDA  # noqa: F401
 from jit.test_hash import TestHash  # noqa: F401
 from jit.test_complex import TestComplex  # noqa: F401
+from jit.test_union import TestUnion  # noqa: F401
 
 # Torch
 from torch import Tensor
@@ -9646,27 +9647,6 @@ dedent """
                     if 1 == 1:
                         a = 4
 
-    def test_if_tuple_sizes(self):
-        with self.assertRaisesRegex(RuntimeError, "Type mismatch"):
-            @torch.jit.script
-            def diff_tuple_sizes(x):
-                if 1 == 2:
-                    c0 = ((x, x), (x, x, x))
-                else:
-                    c0 = ((x, x, x), (x, x))
-                return c0
-
-    def test_if_different_type(self):
-        with self.assertRaisesRegex(RuntimeError, "Type mismatch: c0 is set to type int "
-                                    "in the true branch and type float in the false branch:"):
-            @torch.jit.script
-            def diff_type_used():
-                if 1 == 2:
-                    c0 = 1
-                else:
-                    c0 = 1.0
-                return c0
-
         with self.assertRaisesRegex(RuntimeError, "Variable 'c0' previously has type float"):
             @torch.jit.script
             def diff_existing_type(x):
@@ -13163,7 +13143,7 @@ dedent """
         self.checkScript(fn, ("y"))
 
         def index_str_to_tensor(s):
-            # type: (str) -> int
+            # type: (str) -> Tensor
             return torch.tensor(ord(s))  # noqa T484
 
         s = u'\u00a3'.encode('utf8')[:1]
