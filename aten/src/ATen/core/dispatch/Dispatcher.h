@@ -137,11 +137,6 @@ public:
   template<class Return, class... Args>
   Return call(const TypedOperatorHandle<Return (Args...)>& op, Args... args) const;
 
-  // Like call, but override the default DispatchKey calculation code,
-  // instead dispatching straight to the provided DispatchKey
-  template<class Return, class... Args>
-  Return callWithDispatchKey(const TypedOperatorHandle<Return (Args...)>& op, DispatchKey dispatchKey, Args... args) const;
-
   // Like call, but intended for use in a redispatch: you are currently
   // in some currentDispatchKey, you have finished processing the key and
   // you now want to redispatch to the next dispatch key in the chain.
@@ -226,13 +221,6 @@ public:
   RegistrationHandleRAII addRegistrationListener(std::unique_ptr<OpRegistrationListener> listener);
 
   void checkInvariants() const;
-
-  /* Check if operator calls with a given dispatch key
-   * need to be observed with RecordFunction.
-   */
-  inline bool shouldRecord(DispatchKey dispatch_key) const {
-    return dispatch_key != DispatchKey::BackendSelect;
-  }
 
   //
   // ------------------------------------------------------------------------
@@ -379,10 +367,6 @@ public:
     return c10::Dispatcher::singleton().call<Return, Args...>(*this, std::forward<Args>(args)...);
   }
 
-  Return callWithDispatchKey(DispatchKey dispatchKey, Args... args) const {
-    return c10::Dispatcher::singleton().callWithDispatchKey<Return, Args...>(*this, dispatchKey, std::forward<Args>(args)...);
-  }
-
   // Note: benchmarks showed that this function wasn't getting inlined during calls to at::empty
   C10_ALWAYS_INLINE Return redispatch(DispatchKeySet currentDispatchKeySet, Args... args) const {
     return c10::Dispatcher::singleton().redispatch<Return, Args...>(*this, currentDispatchKeySet, std::forward<Args>(args)...);
@@ -396,20 +380,6 @@ private:
 
 namespace detail {
 template<class... Args> inline void unused_arg_(const Args&...) {}
-}
-
-template<class Return, class... Args>
-inline Return Dispatcher::callWithDispatchKey(const TypedOperatorHandle<Return(Args...)>& op, DispatchKey dispatchKey, Args... args) const {
-  detail::unused_arg_(args...);  // workaround for a false-positive warning about unused parameters in gcc 5
-  // No alias dispatch key is allowed at runtime.
-  TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!c10::isAliasDispatchKey(dispatchKey));
-  auto dispatchKeySet = op.operatorIterator_->op.dispatchKeyExtractor()
-    .template getDispatchKeySetUnboxed<Args...>(
-      DispatchKeySet(DispatchKeySet::FULL_AFTER, dispatchKey),
-      args...
-    );
-  const KernelFunction& kernel = op.operatorIterator_->op.lookup(dispatchKey);
-  return _callWithDispatchKeySet<Return, Args...>(op, kernel, dispatchKeySet, args...);
 }
 
 // Note: benchmarks showed that this function wasn't getting inlined during calls to at::empty
@@ -433,7 +403,7 @@ C10_ALWAYS_INLINE Return Dispatcher::_callWithDispatchKeySet(const TypedOperator
     at::RecordFunction guard(at::RecordScope::FUNCTION, pre_sampled);
     if (C10_UNLIKELY(guard.isActive())) {
       auto dispatchKey = dispatchKeySet.highestPriorityTypeId();
-      if (shouldRecord(dispatchKey) && op.operatorIterator_->op.isObserved()) {
+      if (op.operatorIterator_->op.isObserved()) {
         int64_t seq_num = -1;
         // Setting sequence number in the Autograd case to associate
         // the forward range with the coresponding Autograd's node
@@ -514,7 +484,7 @@ C10_ALWAYS_INLINE void Dispatcher::_callBoxed(const OperatorHandle& op, const im
     at::RecordFunction guard(at::RecordScope::FUNCTION, pre_sampled);
     if (C10_UNLIKELY(guard.isActive())) {
       auto dispatchKey = dispatchKeySet.highestPriorityTypeId();
-      if (shouldRecord(dispatchKey) && entry.isObserved()) {
+      if (entry.isObserved()) {
         int64_t seq_num = -1;
         if (isIncludedInAlias(dispatchKey, DispatchKey::Autograd) && at::GradMode::is_enabled()) {
           seq_num = at::sequence_number::peek();
