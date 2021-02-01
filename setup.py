@@ -917,6 +917,8 @@ if __name__ == '__main__':
                 'share/cmake/Tensorpipe/*.cmake',
                 'share/cmake/Torch/*.cmake',
                 'utils/benchmark/utils/*.cpp',
+                'utils/benchmark/utils/historic/*.cpp',
+                'utils/benchmark/utils/historic/CMakeLists.txt',
                 'utils/benchmark/utils/valgrind_wrapper/*.cpp',
                 'utils/benchmark/utils/valgrind_wrapper/*.h',
             ],
