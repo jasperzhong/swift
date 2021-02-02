@@ -865,6 +865,34 @@ class ForeachUnaryFuncInfo(OpInfo):
         self.inplace_variant = inplace
         self.ref = ref
 
+class ForeachBinaryFuncInfo(OpInfo):
+    """Early version of a specialized OpInfo for foreach binary functions"""
+    def __init__(self,
+                 name,
+                 method,
+                 inplace,
+                 ref,  # torch reference function
+                 ref_name,  # torch reference function name
+                 dtypes=all_types_and(torch.bool, torch.half, torch.bfloat16),
+                 dtypesIfCPU=all_types_and(torch.bool, torch.half, torch.bfloat16),
+                 dtypesIfCUDA=all_types_and(torch.bool, torch.half, torch.bfloat16),
+                 dtypesIfROCM=None,
+                 safe_casts_outputs=False,
+                 sample_inputs_func=sample_inputs_foreach,
+                 **kwargs):
+        super(ForeachBinaryFuncInfo, self).__init__(name,
+                                                    dtypes=dtypes,
+                                                    dtypesIfCPU=dtypesIfCPU,
+                                                    dtypesIfCUDA=dtypesIfCUDA,
+                                                    dtypesIfROCM=dtypesIfROCM,
+                                                    safe_casts_outputs=safe_casts_outputs,
+                                                    sample_inputs_func=sample_inputs_func,
+                                                    **kwargs)
+        self.method_variant = method
+        self.inplace_variant = inplace
+        self.ref = ref
+        self.ref_name = ref_name
+
 class HermitianOpInfo(OpInfo):
     """Operator information for Hermitian functions
     These are functions that take Hermitian matrices as input.
@@ -1257,6 +1285,33 @@ def sample_inputs_masked_select(op_info, device, dtype, requires_grad):
     )
 
     return samples
+
+foreach_binary_op_db: List[OpInfo] = [
+    ForeachBinaryFuncInfo('_foreach_add',
+                          method=torch._foreach_add,
+                          inplace=torch._foreach_add_,
+                          ref=torch.add,
+                          ref_name='add'),
+
+    ForeachBinaryFuncInfo('_foreach_sub',
+                          method=torch._foreach_sub,
+                          inplace=torch._foreach_sub_,
+                          ref=torch.sub,
+                          ref_name='sub'),
+
+    ForeachBinaryFuncInfo('_foreach_mul',
+                          method=torch._foreach_mul,
+                          inplace=torch._foreach_mul_,
+                          ref=torch.mul,
+                          ref_name='mul'),
+
+    ForeachBinaryFuncInfo('_foreach_div',
+                          method=torch._foreach_div,
+                          inplace=torch._foreach_div_,
+                          ref=torch.div,
+                          ref_name='div',
+                          safe_casts_outputs=True),
+]
 
 foreach_unary_op_db: List[OpInfo] = [
     ForeachUnaryFuncInfo('_foreach_neg',
