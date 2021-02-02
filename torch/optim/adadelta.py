@@ -50,41 +50,53 @@ class Adadelta(Optimizer):
                 loss = closure()
 
         for group in self.param_groups:
-            params_with_grad = []
             grads = []
+            params_with_grad = []
+            states = []
             square_avgs = []
             acc_deltas = []
 
+            rho, eps = group['rho'], group['eps']
+
             for p in group['params']:
-                if p.grad is None:
-                    continue
-                params_with_grad.append(p)
-                if p.grad.is_sparse:
-                    raise RuntimeError('Adadelta does not support sparse gradients')
-                grads.append(p.grad)
+                if p.grad is not None: 
+                    if p.grad.is_sparse:
+                        raise RuntimeError('Adadelta does not support sparse gradients')
 
-                state = self.state[p]
+                    grads.append(p.grad)
+                    params_with_grad.append(p)
 
-                # Lazy state initialization
-                if len(state) == 0:
-                    state['step'] = 0
-                    state['square_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                    state['acc_delta'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                    state = self.state[p]
 
-                square_avgs.append(state['square_avg'])
-                acc_deltas.append(state['acc_delta'])
+                    # State initialization
+                    if len(state) == 0:
+                        state['step'] = 0
+                        state['square_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                        state['acc_delta'] = torch.zeros_like(p, memory_format=torch.preserve_format)
 
-                lr, rho, eps, weight_decay = group['lr'], group['rho'], group['eps'], group['weight_decay']
+                    square_avgs.append(state['square_avg'])
+                    acc_deltas.append(state['acc_delta'])
 
-                state['step'] += 1
+                    state['step'] += 1
+                    states.append(state)
 
-            F.adadelta(params_with_grad,
-                       grads,
-                       square_avgs,
-                       acc_deltas,
-                       lr,
-                       rho,
-                       eps,
-                       weight_decay)
+            if group['weight_decay'] != 0:
+                torch._foreach_add_(grads, params_with_grad, alpha=group['weight_decay'])
+
+            torch._foreach_mul_(square_avgs, rho)
+            torch._foreach_addcmul_(square_avgs, grads, grads, value=1 - rho)
+
+            std = torch._foreach_add(square_avgs, eps)
+            torch._foreach_sqrt_(std)
+
+            deltas = torch._foreach_add(acc_deltas, eps)
+            torch._foreach_sqrt_(deltas)
+            torch._foreach_div_(deltas, std)
+            torch._foreach_mul_(deltas, grads)
+
+            torch._foreach_add_(params_with_grad, deltas, alpha=-group['lr'])
+
+            torch._foreach_mul_(acc_deltas, rho)
+            torch._foreach_addcmul_(acc_deltas, deltas, deltas, value=1 - rho)
 
         return loss

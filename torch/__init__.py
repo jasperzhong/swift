@@ -607,7 +607,6 @@ import torch.nn.intrinsic
 import torch.nn.quantizable
 import torch.nn.quantized
 import torch.optim
-import torch.optim._multi_tensor
 import torch.multiprocessing
 import torch.sparse
 import torch.utils.backcompat
