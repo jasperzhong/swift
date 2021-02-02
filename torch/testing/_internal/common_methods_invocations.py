@@ -829,6 +829,41 @@ class ShapeFuncInfo(OpInfo):
                                             **kwargs)
         self.ref = ref
 
+def sample_inputs_foreach(self, device, dtype, N):
+    if dtype in [torch.bfloat16, torch.bool, torch.float16]:
+        tensors = [torch.randn((N, N), device=device).to(dtype) for _ in range(N)]
+    elif dtype in torch.testing.get_all_int_dtypes():
+        tensors = [torch.randint(1, 100, (N, N), device=device, dtype=dtype) for _ in range(N)]
+    else:
+        tensors = [torch.randn((N, N), device=device, dtype=dtype) for _ in range(N)]
+
+    return tensors
+
+class ForeachUnaryFuncInfo(OpInfo):
+    """Early version of a specialized OpInfo for foreach unary functions"""
+    def __init__(self,
+                 name,
+                 method,
+                 inplace,
+                 ref,  # torch reference function
+                 dtypes=floating_and_complex_types(),
+                 dtypesIfCPU=all_types_and_complex(),
+                 dtypesIfCUDA=floating_and_complex_types_and(torch.half),
+                 dtypesIfROCM=None,
+                 safe_casts_outputs=True,
+                 sample_inputs_func=sample_inputs_foreach,
+                 **kwargs):
+        super(ForeachUnaryFuncInfo, self).__init__(name,
+                                                   dtypes=dtypes,
+                                                   dtypesIfCPU=dtypesIfCPU,
+                                                   dtypesIfCUDA=dtypesIfCUDA,
+                                                   dtypesIfROCM=dtypesIfROCM,
+                                                   safe_casts_outputs=safe_casts_outputs,
+                                                   sample_inputs_func=sample_inputs_func,
+                                                   **kwargs)
+        self.method_variant = method
+        self.inplace_variant = inplace
+        self.ref = ref
 
 class HermitianOpInfo(OpInfo):
     """Operator information for Hermitian functions
@@ -1222,6 +1257,187 @@ def sample_inputs_masked_select(op_info, device, dtype, requires_grad):
     )
 
     return samples
+
+foreach_unary_op_db: List[OpInfo] = [
+    ForeachUnaryFuncInfo('_foreach_neg',
+                         method=torch._foreach_neg,
+                         inplace=torch._foreach_neg_,
+                         ref=torch.neg,
+                         dtypes=all_types_and_complex(),
+                         dtypesIfCPU=all_types_and_complex(),
+                         dtypesIfCUDA=all_types_and_complex(),
+                         sample_inputs_func=sample_inputs_foreach,
+                         safe_casts_outputs=False),
+
+    ForeachUnaryFuncInfo('_foreach_sqrt',
+                         method=torch._foreach_sqrt,
+                         inplace=torch._foreach_sqrt_,
+                         ref=torch.sqrt,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_and_complex_types_and(torch.bfloat16),
+                         dtypesIfCUDA=floating_and_complex_types_and(torch.half)),
+
+    ForeachUnaryFuncInfo('_foreach_exp',
+                         method=torch._foreach_exp,
+                         inplace=torch._foreach_exp_,
+                         ref=torch.exp),
+
+    ForeachUnaryFuncInfo('_foreach_acos',
+                         method=torch._foreach_acos,
+                         inplace=torch._foreach_acos_,
+                         ref=torch.acos),
+
+    ForeachUnaryFuncInfo('_foreach_asin',
+                         method=torch._foreach_asin,
+                         inplace=torch._foreach_asin_,
+                         ref=torch.asin),
+
+    ForeachUnaryFuncInfo('_foreach_atan',
+                         method=torch._foreach_atan,
+                         inplace=torch._foreach_atan_,
+                         ref=torch.atan),
+
+    ForeachUnaryFuncInfo('_foreach_cos',
+                         method=torch._foreach_cos,
+                         inplace=torch._foreach_cos_,
+                         ref=torch.cos),
+
+    ForeachUnaryFuncInfo('_foreach_cosh',
+                         method=torch._foreach_cosh,
+                         inplace=torch._foreach_cosh_,
+                         ref=torch.cosh),
+
+    ForeachUnaryFuncInfo('_foreach_log',
+                         method=torch._foreach_log,
+                         inplace=torch._foreach_log_,
+                         ref=torch.log),
+
+    ForeachUnaryFuncInfo('_foreach_log10',
+                         method=torch._foreach_log10,
+                         inplace=torch._foreach_log10_,
+                         ref=torch.log10),
+
+    ForeachUnaryFuncInfo('_foreach_log2',
+                         method=torch._foreach_log2,
+                         inplace=torch._foreach_log2_,
+                         ref=torch.log2),
+
+    ForeachUnaryFuncInfo('_foreach_tan',
+                         method=torch._foreach_tan,
+                         inplace=torch._foreach_tan_,
+                         ref=torch.tan),
+
+    ForeachUnaryFuncInfo('_foreach_tanh',
+                         method=torch._foreach_tanh,
+                         inplace=torch._foreach_tanh_,
+                         ref=torch.tanh),
+
+    ForeachUnaryFuncInfo('_foreach_sin',
+                         method=torch._foreach_sin,
+                         inplace=torch._foreach_sin_,
+                         ref=torch.sin),
+
+    ForeachUnaryFuncInfo('_foreach_sinh',
+                         method=torch._foreach_sinh,
+                         inplace=torch._foreach_sinh_,
+                         ref=torch.sinh),
+
+    ForeachUnaryFuncInfo('_foreach_ceil',
+                         method=torch._foreach_ceil,
+                         inplace=torch._foreach_ceil_,
+                         ref=torch.ceil,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_types_and(torch.bfloat16),
+                         dtypesIfCUDA=floating_types_and(torch.half)),
+
+    ForeachUnaryFuncInfo('_foreach_erf',
+                         method=torch._foreach_erf,
+                         inplace=torch._foreach_erf_,
+                         ref=torch.erf,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_types_and(torch.bfloat16),
+                         dtypesIfCUDA=floating_types_and(torch.half)),
+
+    ForeachUnaryFuncInfo('_foreach_erfc',
+                         method=torch._foreach_erfc,
+                         inplace=torch._foreach_erfc_,
+                         ref=torch.erfc,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_types_and(torch.bfloat16),
+                         dtypesIfCUDA=floating_types_and(torch.half)),
+
+    ForeachUnaryFuncInfo('_foreach_expm1',
+                         method=torch._foreach_expm1,
+                         inplace=torch._foreach_expm1_,
+                         ref=torch.expm1,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_types_and(torch.bfloat16),
+                         dtypesIfCUDA=floating_types_and(torch.half)),
+
+    ForeachUnaryFuncInfo('_foreach_floor',
+                         method=torch._foreach_floor,
+                         inplace=torch._foreach_floor_,
+                         ref=torch.floor,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_types_and(torch.bfloat16),
+                         dtypesIfCUDA=floating_types_and(torch.half)),
+
+    ForeachUnaryFuncInfo('_foreach_log1p',
+                         method=torch._foreach_log1p,
+                         inplace=torch._foreach_log1p_,
+                         ref=torch.log1p,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_types_and(torch.bfloat16),
+                         dtypesIfCUDA=floating_types_and(torch.half)),
+
+    ForeachUnaryFuncInfo('_foreach_round',
+                         method=torch._foreach_round,
+                         inplace=torch._foreach_round_,
+                         ref=torch.round,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_types_and(torch.bfloat16),
+                         dtypesIfCUDA=floating_types_and(torch.half)),
+
+    ForeachUnaryFuncInfo('_foreach_frac',
+                         method=torch._foreach_frac,
+                         inplace=torch._foreach_frac_,
+                         ref=torch.frac,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_types_and(torch.bfloat16),
+                         dtypesIfCUDA=floating_types_and(torch.half)),
+
+    ForeachUnaryFuncInfo('_foreach_reciprocal',
+                         method=torch._foreach_reciprocal,
+                         inplace=torch._foreach_reciprocal_,
+                         ref=torch.reciprocal,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_types_and(torch.bfloat16),
+                         dtypesIfCUDA=floating_types_and(torch.half)),
+
+    ForeachUnaryFuncInfo('_foreach_sigmoid',
+                         method=torch._foreach_sigmoid,
+                         inplace=torch._foreach_sigmoid_,
+                         ref=torch.sigmoid,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_types_and(torch.bfloat16),
+                         dtypesIfCUDA=floating_types_and(torch.half)),
+
+    ForeachUnaryFuncInfo('_foreach_trunc',
+                         method=torch._foreach_trunc,
+                         inplace=torch._foreach_trunc_,
+                         ref=torch.trunc,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_types_and(torch.bfloat16),
+                         dtypesIfCUDA=floating_types_and(torch.half)),
+
+    ForeachUnaryFuncInfo('_foreach_abs',
+                         method=torch._foreach_abs,
+                         inplace=torch._foreach_abs_,
+                         ref=torch.abs,
+                         dtypes=floating_types(),
+                         dtypesIfCPU=floating_and_complex_types_and(torch.bfloat16, torch.half),
+                         dtypesIfCUDA=floating_and_complex_types_and(torch.bfloat16, torch.half)),
+]
 
 # Operator database (sorted alphabetically)
 op_db: List[OpInfo] = [
