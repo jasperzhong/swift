@@ -879,6 +879,7 @@ class ForeachBinaryFuncInfo(OpInfo):
                  dtypesIfROCM=None,
                  safe_casts_outputs=False,
                  sample_inputs_func=sample_inputs_foreach,
+                 supports_alpha_param=False,
                  **kwargs):
         super(ForeachBinaryFuncInfo, self).__init__(name,
                                                     dtypes=dtypes,
@@ -892,6 +893,7 @@ class ForeachBinaryFuncInfo(OpInfo):
         self.inplace_variant = inplace
         self.ref = ref
         self.ref_name = ref_name
+        self.supports_alpha_param = supports_alpha_param
 
 class HermitianOpInfo(OpInfo):
     """Operator information for Hermitian functions
@@ -1291,13 +1293,15 @@ foreach_binary_op_db: List[OpInfo] = [
                           method=torch._foreach_add,
                           inplace=torch._foreach_add_,
                           ref=torch.add,
-                          ref_name='add'),
+                          ref_name='add',
+                          supports_alpha_param=True),
 
     ForeachBinaryFuncInfo('_foreach_sub',
                           method=torch._foreach_sub,
                           inplace=torch._foreach_sub_,
                           ref=torch.sub,
-                          ref_name='sub'),
+                          ref_name='sub',
+                          supports_alpha_param=True),
 
     ForeachBinaryFuncInfo('_foreach_mul',
                           method=torch._foreach_mul,
