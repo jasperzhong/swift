@@ -383,13 +383,13 @@ class TestForeach(TestCase):
                 scalars = [1 for _ in range(N)]
                 expected = [torch_bin_op(t, s) for t, s in zip(tensors, scalars)]
 
-                # we dont support bool and complex types on CUDA for now
-                if dtype in torch.testing.get_all_complex_dtypes() and self.device_type == 'cuda':
-                    with self.assertRaisesRegex(RuntimeError, "not implemented for"):
-                        foreach_bin_op_(tensors, scalars)
+                # we dont support bool and complex types on CUDA for now	
+                if dtype in torch.testing.get_all_complex_dtypes() and self.device_type == 'cuda':	
+                    with self.assertRaisesRegex(RuntimeError, "not implemented for"):	
+                        foreach_bin_op_(tensors, scalars)	
 
-                    with self.assertRaisesRegex(RuntimeError, "not implemented for"):
-                        foreach_bin_op(tensors, scalars)
+                    with self.assertRaisesRegex(RuntimeError, "not implemented for"):	
+                        foreach_bin_op(tensors, scalars)	
                     return
 
                 res = foreach_bin_op(tensors, scalars)
@@ -506,13 +506,13 @@ class TestForeach(TestCase):
                 if (dtype is torch.float16 or dtype is torch.bfloat16):
                     expected = [e.to(dtype=dtype) for e in expected]
 
-                # we dont support bool and complex types on CUDA for now
-                if (dtype in torch.testing.get_all_complex_dtypes() or dtype == torch.bool) and self.device_type == 'cuda':
-                    with self.assertRaisesRegex(RuntimeError, "not implemented for"):
-                        foreach_bin_op_(tensors, scalars)
+                # we dont support bool and complex types on CUDA for now	
+                if (dtype in torch.testing.get_all_complex_dtypes() or dtype == torch.bool) and self.device_type == 'cuda':	
+                    with self.assertRaisesRegex(RuntimeError, "not implemented for"):	
+                        foreach_bin_op_(tensors, scalars)	
 
-                    with self.assertRaisesRegex(RuntimeError, "not implemented for"):
-                        foreach_bin_op(tensors, scalars)
+                    with self.assertRaisesRegex(RuntimeError, "not implemented for"):	
+                        foreach_bin_op(tensors, scalars)	
                     return
 
                 res = foreach_bin_op(tensors, scalars)
@@ -592,16 +592,8 @@ class TestForeach(TestCase):
                     continue
 
                 expected = [torch_bin_op(t, s) for t, s in zip(tensors, scalars)]
-                if dtype in [torch.complex64, torch.complex128] and self.device_type == "cuda":
-                    with self.assertRaisesRegex(RuntimeError, "not implemented for"):
-                        res = foreach_bin_op(tensors, scalars)
-
-                    with self.assertRaisesRegex(RuntimeError, "not implemented for"):
-                        foreach_bin_op_(tensors, scalars)
-                    continue
-                else:
-                    res = foreach_bin_op(tensors, scalars)
-                    self.assertEqual(res, expected)
+                res = foreach_bin_op(tensors, scalars)
+                self.assertEqual(res, expected)
 
                 if dtype not in [torch.complex64, torch.complex128]:
                     with self.assertRaisesRegex(RuntimeError, "can't be cast to the desired output type"):
