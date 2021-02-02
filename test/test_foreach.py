@@ -1,11 +1,13 @@
 import torch
 import unittest
+
 from torch.testing._internal.common_utils import TestCase, run_tests, TEST_WITH_ROCM, TEST_WITH_SLOW
 from torch.testing._internal.common_device_type import \
     (instantiate_device_type_tests, dtypes, skipCUDAIfRocm, ops)
 from torch._six import inf, nan
 from torch.testing._internal.common_methods_invocations import \
-    (foreach_unary_op_db, foreach_binary_op_db, foreach_pointwise_op_db, foreach_min_max_op_db)
+    (foreach_unary_op_db, foreach_binary_op_db, foreach_pointwise_op_db, 
+     foreach_min_max_op_db, foreach_binary_op_tensor_list_db)
 
 N_values = [20] if not TEST_WITH_SLOW else [30, 300]
 
@@ -30,24 +32,52 @@ class TestForeach(TestCase):
     @ops(foreach_unary_op_db)
     def test_unary_ops(self, device, dtype, op):
         for N in N_values:
-            tensors = op.sample_inputs(device, dtype, N)
-            ref_res = [op.ref(t) for t in tensors]
-
+            foreach_exception = False
+            torch_exception = False
             method = op.get_method()
-            inplace = op.get_inplace()
-            fe_res = method(tensors)
-            self.assertEqual(ref_res, fe_res)
+            tensors = op.sample_inputs(device, dtype, N)
 
-            if op.safe_casts_outputs and dtype in torch.testing.integral_types_and(torch.bool):
-                with self.assertRaisesRegex(RuntimeError, "can't be cast to the desired output type"):
-                    inplace(tensors)
-            elif dtype in [torch.complex64, torch.complex128] and inplace == torch._foreach_abs_:
-                # Special case for abs
-                with self.assertRaisesRegex(RuntimeError, r"In-place abs is not supported for complex tensors."):
-                    inplace(tensors)
-            else:
+            try:
+                ref_res = [op.ref(t) for t in tensors]
+            except Exception:
+                torch_exception = True
+
+            try:
+                fe_res = method(tensors)
+            except Exception:
+                foreach_exception = True
+
+            self.assertEqual(foreach_exception, torch_exception)
+
+            if not foreach_exception:
+                self.assertEqual(ref_res, fe_res)
+
+    @ops(foreach_unary_op_db)
+    def test_unary_ops_inplace(self, device, dtype, op):
+        for N in N_values:
+            foreach_exception = False
+            torch_exception = False
+            inplace = op.get_inplace()
+            tensors = op.sample_inputs(device, dtype, N)
+            tensors_copy = [t.clone() for t in tensors]
+
+            try:
                 inplace(tensors)
-                self.assertEqual(tensors, fe_res)
+            except Exception:
+                foreach_exception = True
+
+            try:
+                # get torch inplace reference function
+                inplace_name = op.ref_name + "_"
+                torch_inplace = getattr(torch.Tensor, inplace_name, None)
+                for t in tensors_copy:
+                    torch_inplace(t)
+            except Exception:
+                torch_exception = True
+
+            self.assertEqual(foreach_exception, torch_exception)
+            if not foreach_exception:
+                self.assertEqual(tensors, tensors_copy)
 
     # Test foreach binary ops with a single scalar
     # Compare results agains reference torch functions
@@ -177,17 +207,18 @@ class TestForeach(TestCase):
     # In case of an exeption, check if torch reference function throws as well.
     # In case of add/sub, also test alphas
     @skipCUDAIfRocm
-    @ops(foreach_binary_op_db)
-    def test_binary_ops_tensor_list(self, device, dtype, op):
+    @ops(foreach_binary_op_tensor_list_db)
+    def test_binary_ops_tensor_list(self, device, dtypes, op):
         # Mimics cuda kernel dtype flow.  With fp16/bf16 input, runs in fp32 and casts output back to fp16/bf16.
-        dtype = torch.float32 if (self.device_type == 'cuda' and 
-                                  (dtype is torch.float16 or dtype is torch.bfloat16)) else dtype
+        dtype1 = torch.float32 if (self.device_type == 'cuda' and 
+                                   (dtypes[0] is torch.float16 or dtypes[0] is torch.bfloat16)) else dtypes[0]
+        dtype2 = dtypes[1]
 
         for N in N_values:
             foreach_exeption = False
             torch_exeption = False
-            tensors1 = op.sample_inputs(device, dtype, N)
-            tensors2 = op.sample_inputs(device, dtype, N)
+            tensors1 = op.sample_inputs(device, dtype1, N)
+            tensors2 = op.sample_inputs(device, dtype2, N)
             method = op.get_method()
             alpha = 2
 
@@ -208,11 +239,11 @@ class TestForeach(TestCase):
             self.assertEqual(foreach_exeption, torch_exeption)
 
             if not torch_exeption:
-                if (dtype is torch.float16 or dtype is torch.bfloat16) and TEST_WITH_ROCM:
-                    self.assertEqual(ref_res, fe_res, atol=1.e-3, rtol=self.dtype_precisions[dtype][0])
+                if (dtype1 is torch.float16 or dtype1 is torch.bfloat16) and TEST_WITH_ROCM:
+                    self.assertEqual(ref_res, fe_res, atol=1.e-3, rtol=self.dtype_precisions[dtype1][0])
 
                     if op.supports_alpha_param: 
-                        self.assertEqual(ref_res_alpha, fe_res_alpha, atol=1.e-3, rtol=self.dtype_precisions[dtype][0])
+                        self.assertEqual(ref_res_alpha, fe_res_alpha, atol=1.e-3, rtol=self.dtype_precisions[dtype1][0])
                 else:
                     self.assertEqual(ref_res, fe_res)
 
@@ -220,15 +251,16 @@ class TestForeach(TestCase):
                         self.assertEqual(ref_res_alpha, fe_res_alpha)
 
     @skipCUDAIfRocm
-    @ops(foreach_binary_op_db)
-    def test_binary_ops_tensor_list_inplace(self, device, dtype, op):
+    @ops(foreach_binary_op_tensor_list_db)
+    def test_binary_ops_tensor_list_inplace(self, device, dtypes, op):
         # Mimics cuda kernel dtype flow.  With fp16/bf16 input, runs in fp32 and casts output back to fp16/bf16.
-        dtype = torch.float32 if (self.device_type == 'cuda' and 
-                                  (dtype is torch.float16 or dtype is torch.bfloat16)) else dtype
+        dtype1 = torch.float32 if (self.device_type == 'cuda' and 
+                                   (dtypes[0] is torch.float16 or dtypes[0] is torch.bfloat16)) else dtypes[0]
+        dtype2 = dtypes[1]
 
         for N in N_values:
-            tensors1 = op.sample_inputs(device, dtype, N)
-            tensors2 = op.sample_inputs(device, dtype, N)
+            tensors1 = op.sample_inputs(device, dtype1, N)
+            tensors2 = op.sample_inputs(device, dtype2, N)
             tensors1_copy = [t1.clone() for t1 in tensors1]
             tensors2_copy = [t2.clone() for t2 in tensors2]
             inplace = op.get_inplace()
@@ -268,6 +300,10 @@ class TestForeach(TestCase):
         for N in N_values:
             values = [2 + i for i in range(N)]
             for vals in [values[0], values]:
+                foreach_exception = False
+                torch_exception = False
+                method = op.get_method()
+                inplace = op.get_inplace()
                 tensors = op.sample_inputs(device, dtype, N)
                 tensors1 = op.sample_inputs(device, dtype, N)
                 tensors2 = op.sample_inputs(device, dtype, N)
@@ -276,79 +312,105 @@ class TestForeach(TestCase):
                 control_dtype = torch.float32 if (self.device_type == 'cuda' and 
                                                   (dtype is torch.float16 or dtype is torch.bfloat16)) else dtype
 
-                if not isinstance(vals, list):
-                    expected = [op.ref(tensors[i].to(dtype=control_dtype),
-                                       tensors1[i].to(dtype=control_dtype),
-                                       tensors2[i].to(dtype=control_dtype),
-                                       value=values[0]).to(dtype=dtype) for i in range(N)]
-                else:
-                    expected = [op.ref(tensors[i].to(dtype=control_dtype),
-                                       tensors1[i].to(dtype=control_dtype),
-                                       tensors2[i].to(dtype=control_dtype),
-                                       value=values[i]).to(dtype=dtype) for i in range(N)]
+                try:
+                    if not isinstance(vals, list):
+                        expected = [op.ref(tensors[i].to(dtype=control_dtype),
+                                           tensors1[i].to(dtype=control_dtype),
+                                           tensors2[i].to(dtype=control_dtype),
+                                           value=values[0]).to(dtype=dtype) for i in range(N)]
+                    else:
+                        expected = [op.ref(tensors[i].to(dtype=control_dtype),
+                                           tensors1[i].to(dtype=control_dtype),
+                                           tensors2[i].to(dtype=control_dtype),
+                                           value=values[i]).to(dtype=dtype) for i in range(N)]
+                except Exception:
+                    torch_exception = True
 
-                method = op.get_method()
-                inplace = op.get_inplace()
-                fe_res = method(tensors, tensors1, tensors2, vals)
-                inplace(tensors, tensors1, tensors2, vals)
-                self.assertEqual(fe_res, tensors)
+                try:
+                    fe_res = method(tensors, tensors1, tensors2, vals)
+                except Exception:
+                    foreach_exception = True
 
-                if (dtype is torch.float16 or dtype is torch.bfloat16) and TEST_WITH_ROCM:
-                    self.assertEqual(tensors, expected, atol=1.e-3, rtol=self.dtype_precisions[dtype][0])
-                else:
-                    self.assertEqual(tensors, expected)
+                self.assertEqual(torch_exception, foreach_exception)
+                if not torch_exception:
+                    # test inplace
+                    inplace(tensors, tensors1, tensors2, vals)
 
-                # test error cases
-                tensors = op.sample_inputs(device, dtype, N)
-                tensors1 = op.sample_inputs(device, dtype, N)
-                tensors2 = op.sample_inputs(device, dtype, N)
+                    if (dtype is torch.float16 or dtype is torch.bfloat16) and TEST_WITH_ROCM:
+                        self.assertEqual(fe_res, expected, atol=1.e-3, rtol=self.dtype_precisions[dtype][0])
+                        self.assertEqual(tensors, expected, atol=1.e-3, rtol=self.dtype_precisions[dtype][0])
+                    else:
+                        self.assertEqual(fe_res, expected)
+                        self.assertEqual(tensors, expected)
 
-                with self.assertRaisesRegex(RuntimeError, "Tensor list must have same number of elements as scalar list."):
-                    method(tensors, tensors1, tensors2, [2 for _ in range(N + 1)])
+    @ops(foreach_pointwise_op_db)
+    def test_pointwise_ops_error_cases(self, device, dtype, op):
+        # test error cases
+        for N in N_values:
+            method = op.get_method()
+            tensors = op.sample_inputs(device, dtype, N)
+            tensors1 = op.sample_inputs(device, dtype, N)
+            tensors2 = op.sample_inputs(device, dtype, N)
 
-                with self.assertRaisesRegex(RuntimeError, "Tensor list must have same number of elements as scalar list."):
-                    method(tensors, tensors1, tensors2, [2 for _ in range(N - 1)])
+            with self.assertRaisesRegex(RuntimeError, "Tensor list must have same number of elements as scalar list."):
+                method(tensors, tensors1, tensors2, [2 for _ in range(N + 1)])
 
-                tensors = op.sample_inputs(device, dtype, N + 1)
-                with self.assertRaisesRegex(RuntimeError, "Tensor lists must have the same number of tensors, got 21 and 20"):
-                    method(tensors, tensors1, tensors2, [2 for _ in range(N)])
+            with self.assertRaisesRegex(RuntimeError, "Tensor list must have same number of elements as scalar list."):
+                method(tensors, tensors1, tensors2, [2 for _ in range(N - 1)])
 
-                tensors1 = op.sample_inputs(device, dtype, N + 1)
-                with self.assertRaisesRegex(RuntimeError, "Tensor lists must have the same number of tensors, got 21 and 20"):
-                    method(tensors, tensors1, tensors2, [2 for _ in range(N)])
+            tensors = op.sample_inputs(device, dtype, N + 1)
+            with self.assertRaisesRegex(RuntimeError, "Tensor lists must have the same number of tensors, got 21 and 20"):
+                method(tensors, tensors1, tensors2, [2 for _ in range(N)])
+
+            tensors1 = op.sample_inputs(device, dtype, N + 1)
+            with self.assertRaisesRegex(RuntimeError, "Tensor lists must have the same number of tensors, got 21 and 20"):
+                method(tensors, tensors1, tensors2, [2 for _ in range(N)])
 
     @ops(foreach_min_max_op_db)
-    def test_min_max(self, device, dtype, op):
+    def test_min_max(self, device, dtypes, op):
+        dtype = dtypes[0]
         for N in N_values:
             # Mimics cuda kernel dtype flow.  With fp16/bf16 input, runs in fp32 and casts output back to fp16/bf16.
             control_dtype = torch.float32 if (self.device_type == 'cuda' and
                                               (dtype is torch.float16 or dtype is torch.bfloat16)) else dtype
             method = op.get_method()
+            foreach_exception = False
+            torch_exception = False
 
             tensors1 = op.sample_inputs(device, dtype, N)
             tensors2 = op.sample_inputs(device, dtype, N)
 
-            expected = [op.ref(tensors1[i].to(dtype=control_dtype),
-                               tensors2[i].to(dtype=control_dtype)).to(dtype=dtype) for i in range(N)]
+            try:
+                expected = [op.ref(tensors1[i].to(dtype=control_dtype),
+                                   tensors2[i].to(dtype=control_dtype)).to(dtype=dtype) for i in range(N)]
+            except Exception:
+                torch_exception = True
 
-            res = method(tensors1, tensors2)
-            self.assertEqual(res, expected)
+            try:
+                fe_res = method(tensors1, tensors2)
+            except Exception:
+                foreach_exception = True
+
+            self.assertEqual(foreach_exception, torch_exception)
+
+            if not foreach_exception:
+                self.assertEqual(expected, fe_res)
 
     @ops(foreach_min_max_op_db)
     def test_min_max_inf_nan(self, device, dtype, op):
         method = op.get_method()
         a = [
-            torch.tensor([float('inf')], device=device, dtype=dtype),
-            torch.tensor([-float('inf')], device=device, dtype=dtype),
-            torch.tensor([float('nan')], device=device, dtype=dtype),
-            torch.tensor([float('nan')], device=device, dtype=dtype),
+            torch.tensor([float('inf')], device=device, dtype=dtype[0]),
+            torch.tensor([-float('inf')], device=device, dtype=dtype[0]),
+            torch.tensor([float('nan')], device=device, dtype=dtype[0]),
+            torch.tensor([float('nan')], device=device, dtype=dtype[0]),
         ]
 
         b = [
-            torch.tensor([-float('inf')], device=device, dtype=dtype),
-            torch.tensor([float('inf')], device=device, dtype=dtype),
-            torch.tensor([float('inf')], device=device, dtype=dtype),
-            torch.tensor([float('nan')], device=device, dtype=dtype)
+            torch.tensor([-float('inf')], device=device, dtype=dtype[0]),
+            torch.tensor([float('inf')], device=device, dtype=dtype[0]),
+            torch.tensor([float('inf')], device=device, dtype=dtype[0]),
+            torch.tensor([float('nan')], device=device, dtype=dtype[0])
         ]
 
         expected = [op.ref(a1, b1) for a1, b1 in zip(a, b)]
@@ -356,17 +418,17 @@ class TestForeach(TestCase):
         self.assertEqual(res, expected)
 
         a = [
-            torch.tensor([inf], device=device, dtype=dtype),
-            torch.tensor([-inf], device=device, dtype=dtype),
-            torch.tensor([nan], device=device, dtype=dtype),
-            torch.tensor([nan], device=device, dtype=dtype)
+            torch.tensor([inf], device=device, dtype=dtype[0]),
+            torch.tensor([-inf], device=device, dtype=dtype[0]),
+            torch.tensor([nan], device=device, dtype=dtype[0]),
+            torch.tensor([nan], device=device, dtype=dtype[0])
         ]
 
         b = [
-            torch.tensor([-inf], device=device, dtype=dtype),
-            torch.tensor([inf], device=device, dtype=dtype),
-            torch.tensor([inf], device=device, dtype=dtype),
-            torch.tensor([nan], device=device, dtype=dtype)
+            torch.tensor([-inf], device=device, dtype=dtype[0]),
+            torch.tensor([inf], device=device, dtype=dtype[0]),
+            torch.tensor([inf], device=device, dtype=dtype[0]),
+            torch.tensor([nan], device=device, dtype=dtype[0])
         ]
 
         expected = [op.ref(a1, b1) for a1, b1 in zip(a, b)]
@@ -388,13 +450,18 @@ class TestForeach(TestCase):
 
     @dtypes(*torch.testing.get_all_dtypes())
     def test_add_scalar_with_empty_list_and_empty_tensor(self, device, dtype):
-        # TODO: enable empty list case
         for tensors in [[torch.randn([0])]]:
             res = torch._foreach_add(tensors, 1)
             self.assertEqual(res, tensors)
 
             torch._foreach_add_(tensors, 1)
             self.assertEqual(res, tensors)
+
+        with self.assertRaisesRegex(RuntimeError, "There were no tensor arguments to this function"):
+            torch._foreach_add([], 1)
+
+        with self.assertRaisesRegex(RuntimeError, "There were no tensor arguments to this function"):
+            torch._foreach_add_([], 1)
 
     @dtypes(*torch.testing.get_all_dtypes())
     def test_add_scalar_with_overlapping_tensors(self, device, dtype):
@@ -407,11 +474,6 @@ class TestForeach(TestCase):
 
         res = torch._foreach_add(tensors, 1)
         self.assertEqual(res, expected)
-
-    def test_bin_op_scalar_with_different_tensor_dtypes(self, device):
-        tensors = [torch.tensor([1.1], dtype=torch.float, device=device),
-                   torch.tensor([1], dtype=torch.long, device=device)]
-        self.assertRaises(RuntimeError, lambda: torch._foreach_add(tensors, 1))
 
     #
     # Ops with list
@@ -442,15 +504,6 @@ class TestForeach(TestCase):
             with self.assertRaisesRegex(RuntimeError, "Tensor lists must have the same number of tensors, got 1 and 2"):
                 bin_op_(tensors1, tensors2)
 
-            # Different dtypes
-            tensors1 = [torch.zeros(10, 10, device=device, dtype=torch.float) for _ in range(10)]
-            tensors2 = [torch.ones(10, 10, device=device, dtype=torch.int) for _ in range(10)]
-
-            with self.assertRaisesRegex(RuntimeError, "All tensors in the tensor list must have the same dtype."):
-                bin_op(tensors1, tensors2)
-            with self.assertRaisesRegex(RuntimeError, "All tensors in the tensor list must have the same dtype."):
-                bin_op_(tensors1, tensors2)
-
             # different devices
             if torch.cuda.is_available() and torch.cuda.device_count() > 1:
                 tensor1 = torch.zeros(10, 10, device="cuda:0")
@@ -472,11 +525,13 @@ class TestForeach(TestCase):
     def test_add_list_different_sizes(self, device, dtype):
         tensors1 = [torch.zeros(10 + n, 10 + n, device=device, dtype=dtype) for n in range(10)]
         tensors2 = [torch.ones(10 + n, 10 + n, device=device, dtype=dtype) for n in range(10)]
+        expected = [torch.add(a, b) for a, b in zip(tensors1, tensors2)]
 
         res = torch._foreach_add(tensors1, tensors2)
+        self.assertEqual(res, expected)
+
         torch._foreach_add_(tensors1, tensors2)
-        self.assertEqual(res, tensors1)
-        self.assertEqual(res, [torch.ones(10 + n, 10 + n, device=device, dtype=dtype) for n in range(10)])
+        self.assertEqual(expected, tensors1)
 
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA not found")
     @dtypes(*torch.testing.get_all_dtypes())
