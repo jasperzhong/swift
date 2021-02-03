@@ -59,6 +59,18 @@ def _param_rrefs(module_rref, recurse):
     return ret
 
 
+def _train(module_rref, value):
+    module_rref.local_value().train(value)
+
+
+def _training(module_rref):
+    return module_rref.local_value().training
+
+
+def _set_training(module_rref, value):
+    module_rref.local_value().training = value
+
+
 def _raise_not_supported(name):
     raise ValueError("Method ``{}`` not supported for RemoteModule".format(name))
 
@@ -280,6 +292,25 @@ class _RemoteModule(nn.Module):
             "Method ``parameters`` not supported for RemoteModule. Please use ``remote_parameters`` instead."
         )
 
+    # nn.Module defines training as a boolean
+    @property  # type: ignore[override]
+    def training(self):
+        if hasattr(self, 'on'):
+            return rpc.rpc_sync(self.on, _training, args=(self.module_rref,))
+        else:
+            return _raise_not_supported("training")
+
+    @training.setter
+    def training(self, value: bool):
+        if hasattr(self, 'on'):
+            rpc.rpc_sync(self.on, _set_training, args=(self.module_rref, value))
+        else:
+            pass
+
+    def train(self: T, value: bool = True) -> T:
+        rpc.rpc_sync(self.on, _train, args=(self.module_rref, value))
+        return self
+
     def named_parameters(  # type: ignore[return]
         self, prefix: str = "", recurse: bool = True
     ) -> Iterator[Tuple[str, Parameter]]:
@@ -304,12 +335,6 @@ class _RemoteModule(nn.Module):
 
     def named_modules(self, memo: Optional[Set[Module]] = None, prefix: str = ""):
         _raise_not_supported(self.named_modules.__name__)
-
-    def train(self: T, mode: bool = True) -> T:  # type: ignore[return]
-        _raise_not_supported(self.train.__name__)
-
-    def eval(self: T) -> T:  # type: ignore[return]
-        _raise_not_supported(self.eval.__name__)
 
     def requires_grad_(self: T, requires_grad: bool = True) -> T:  # type: ignore[return]
         _raise_not_supported(self.requires_grad_.__name__)

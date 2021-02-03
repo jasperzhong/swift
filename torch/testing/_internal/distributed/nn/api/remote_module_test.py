@@ -232,6 +232,25 @@ class RemoteModuleTest(RpcAgentTestFixture):
             for param in rref.to_here().parameters():
                 self.assertTrue(torch.equal(param, _PARAM_VAL))
 
+    @dist_utils.dist_init
+    def test_train_eval(self):
+        if self.rank != 0:
+            return
+        dst_worker_name = dist_utils.worker_name((self.rank + 1) % self.world_size)
+
+        for remote_module in self._create_remote_module_iter(
+            dst_worker_name, modes=[ModuleCreationMode.MODULE_CTOR]
+        ):
+            self.assertTrue(remote_module.training)
+            remote_module.eval()
+            self.assertFalse(remote_module.training)
+            remote_module.train()
+            self.assertTrue(remote_module.training)
+            remote_module.train(False)
+            self.assertFalse(remote_module.training)
+            remote_module.train(True)
+            self.assertTrue(remote_module.training)
+
     @skip_if_lt_x_gpu(1)
     @dist_utils.dist_init
     def test_valid_device(self):
@@ -449,14 +468,6 @@ class RemoteModuleTest(RpcAgentTestFixture):
             ):
                 remote_module.named_modules()
 
-            with self.assertRaisesRegex(
-                ValueError, r"Method ``train`` not supported for RemoteModule"
-            ):
-                remote_module.train()
-            with self.assertRaisesRegex(
-                ValueError, r"Method ``eval`` not supported for RemoteModule"
-            ):
-                remote_module.eval()
             with self.assertRaisesRegex(
                 ValueError, r"Method ``requires_grad_`` not supported for RemoteModule"
             ):
