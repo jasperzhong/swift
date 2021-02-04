@@ -20,6 +20,27 @@ if __name__ == '__main__':
                        "instead.")
 
 class TestList(JitTestCase):
+    def test_list_logical_assignment(self):
+        def and_assignment(l: List[int]):
+            a = l and [3]
+            return a
+
+        self.checkScript(and_assignment, ([1, 2, 3],))
+        self.checkScript(and_assignment, ([],))
+
+        def or_assignment(l: List[int]):
+            a = l or [3]
+            return a
+
+        self.checkScript(or_assignment, ([1, 2, 3],))
+        self.checkScript(or_assignment, ([],))
+
+        def optional_assignment(l: Optional[List[int]]):
+            a = l or [3]
+            return a
+
+        self.checkScript(optional_assignment, (None,))
+
     def test_list_bool_conversion(self):
         def if_predicate(l: List[int]):
             if l:
@@ -1203,6 +1224,27 @@ class TestDict(JitTestCase):
 
     def dict_bool(self):
         return {True: 1}
+
+    def test_dict_logical_assignment(self):
+        def and_assignment(d: Dict[int, int]):
+            a = d and {10: 11}
+            return a
+
+        self.checkScript(and_assignment, ({1:2, 3:4},))
+        self.checkScript(and_assignment, ({},))
+
+        def or_assignment(d: Dict[int, int]):
+            a = d or {10: 11}
+            return a
+
+        self.checkScript(or_assignment, ({1:2, 3:4},))
+        self.checkScript(or_assignment, ({},))
+
+        def optional_assignment(d: Optional[Dict[int, int]]):
+            a = d or {10: 11}
+            return a
+
+        self.checkScript(optional_assignment, (None,))
 
     def test_dict_bool_conversion(self):
         def if_predicate(d: Dict[int, int]):
