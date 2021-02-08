@@ -250,7 +250,7 @@ cmake_dependent_option(
 if(NOT DEFINED USE_VULKAN)
   cmake_dependent_option(
       USE_VULKAN "Use Vulkan GPU backend" ON
-      "ANDROID" OFF)
+      "ANDROID" ON)
 endif()
 
 option(USE_VULKAN_FP16_INFERENCE "Vulkan - Use fp16 inference" OFF)

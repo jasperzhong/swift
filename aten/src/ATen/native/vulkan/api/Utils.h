@@ -2,6 +2,10 @@
 
 #ifdef USE_VULKAN_API
 
+#include <type_traits>
+#include <limits>
+#include <cstdint>
+
 namespace at {
 namespace native {
 namespace vulkan {

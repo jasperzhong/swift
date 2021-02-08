@@ -6,6 +6,9 @@ namespace vulkan {
 namespace ops {
 
 Tensor& copy_(Tensor& self, const Tensor& src) {
+  std::cout << "XXX copy_ self.is_vulkan():" << self.is_vulkan() << std::endl;
+  std::cout << "XXX copy_ src.is_vulkan():" << src.is_vulkan() << std::endl;
+
   api::Context* const context = api::context();
 
   api::Command::Pool& command_pool = context->command().pool;
@@ -159,6 +162,7 @@ Tensor& copy_(Tensor& self, const Tensor& src) {
   // No queue submission here.  All queue submissions must have been handled
   // above either explicitly or as a result of calling tensor.host().
 
+  std::cout << "XXX copy_ 1 self.is_vulkan():" << self.is_vulkan() << std::endl;
   return self;
 }
 

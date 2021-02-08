@@ -254,6 +254,9 @@ uvec3 image_extents(const IntArrayRef sizes) {
           "Only Tensors with 1 <= dim <= 4 can be represented as a Vulkan Image!");
   }
 
+  if (depth == 0) {
+    depth = 1;
+  }
   return {
     width,
     height,
