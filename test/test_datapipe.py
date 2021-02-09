@@ -5,6 +5,8 @@ import tempfile
 import warnings
 import tarfile
 import zipfile
+import numpy as np
+from PIL import Image
 
 import torch
 from torch.testing._internal.common_utils import (TestCase, run_tests)
@@ -12,6 +14,11 @@ from torch.utils.data import IterDataPipe, RandomSampler
 from typing import List, Tuple, Dict, Any, Type
 
 import torch.utils.data.datapipes as dp
+
+from torch.utils.data.datapipes.utils.decoder import (
+    basichandlers as decoder_basichandlers,
+    imagehandler as decoder_imagehandler)
+
 
 def create_temp_dir_and_files():
     # The temp dir and files within it will be released and deleted in tearDown().
@@ -153,6 +160,57 @@ class TestIterableDataPipeBasic(TestCase):
             self.assertEqual(data_refs[i][1].read(), open(self.temp_files[i], 'rb').read())
 
 
+    def test_routeddecoder_iterable_datapipe(self):
+        temp_dir = self.temp_dir.name
+        temp_pngfile_pathname = os.path.join(temp_dir, "test_png.png")
+        img = Image.new('RGB', (2, 2), color='red')
+        img.save(temp_pngfile_pathname)
+        datapipe1 = dp.iter.ListDirFiles(temp_dir, ['*.png', '*.txt'])
+        datapipe2 = dp.iter.LoadFilesFromDisk(datapipe1)
+        datapipe3 = dp.iter.RoutedDecoder(datapipe2, handlers=[decoder_imagehandler('rgb')])
+        datapipe3.add_handler(decoder_basichandlers)
+
+        for rec in datapipe3:
+            ext = os.path.splitext(rec[0])[1]
+            if ext == '.png':
+                expected = np.array([[[1., 0., 0.], [1., 0., 0.]], [[1., 0., 0.], [1., 0., 0.]]], dtype=np.single)
+                self.assertTrue(np.array_equal(rec[1], expected))
+            else:
+                self.assertTrue(rec[1] == open(rec[0], 'rb').read().decode('utf-8'))
+
+
+    def test_groupbykey_iterable_datapipe(self):
+        temp_dir = self.temp_dir.name
+        temp_tarfile_pathname = os.path.join(temp_dir, "test_tar.tar")
+        file_list = [
+            "a.png", "b.png", "c.json", "a.json", "c.png", "b.json", "d.png",
+            "d.json", "e.png", "f.json", "g.png", "f.png", "g.json", "e.json",
+            "h.txt", "h.json"]
+        with tarfile.open(temp_tarfile_pathname, "w:gz") as tar:
+            for file_name in file_list:
+                file_pathname = os.path.join(temp_dir, file_name)
+                with open(file_pathname, 'w') as f:
+                    f.write('12345abcde')
+                tar.add(file_pathname)
+
+        datapipe1 = dp.iter.ListDirFiles(temp_dir, '*.tar')
+        datapipe2 = dp.iter.LoadFilesFromDisk(datapipe1)
+        datapipe3 = dp.iter.ReadFilesFromTar(datapipe2)
+        datapipe4 = dp.iter.GroupByKey(datapipe3, group_size=2)
+
+        expected_result = [("a.png", "a.json"), ("c.png", "c.json"), ("b.png", "b.json"), ("d.png", "d.json"), (
+            "f.png", "f.json"), ("g.png", "g.json"), ("e.png", "e.json"), ("h.json", "h.txt")]
+
+        count = 0
+        for rec, expected in zip(datapipe4, expected_result):
+            count = count + 1
+            self.assertEqual(os.path.basename(rec[0][0]), expected[0])
+            self.assertEqual(os.path.basename(rec[1][0]), expected[1])
+            self.assertEqual(rec[0][1].read(), b'12345abcde')
+            self.assertEqual(rec[1][1].read(), b'12345abcde')
+        self.assertEqual(count, 8)
+
+
 class IDP_NoLen(IterDataPipe):
     def __init__(self, input_dp):
         super().__init__()
@@ -187,24 +245,24 @@ class TestFunctionalIterDataPipe(TestCase):
 
     def test_picklable(self):
         arr = range(10)
-        picklable_datapipes: List[Tuple[Type[IterDataPipe], IterDataPipe, List, Dict[str, Any]]] = [
-            (dp.iter.Map, IDP(arr), [], {}),
-            (dp.iter.Map, IDP(arr), [0], {'fn': _fake_fn, 'test': True}),
-            (dp.iter.Collate, IDP(arr), [], {}),
-            (dp.iter.Collate, IDP(arr), [0], {'collate_fn': _fake_fn, 'test': True}),
-            (dp.iter.Filter, IDP(arr), [0], {'filter_fn': _fake_filter_fn, 'test': True}),
+        picklable_datapipes: List[Tuple[Type[IterDataPipe], IterDataPipe, Dict[str, Any]]] = [
+            (dp.iter.Map, IDP(arr), {}),
+            (dp.iter.Map, IDP(arr), {'fn': _fake_fn, 'fn_args': (0), 'fn_kwargs': {'test': True}}),
+            (dp.iter.Collate, IDP(arr), {}),
+            (dp.iter.Collate, IDP(arr), {'collate_fn': _fake_fn, 'fn_args': (0), 'fn_kwargs': {'test': True}}),
+            (dp.iter.Filter, IDP(arr), {'filter_fn': _fake_filter_fn, 'fn_args': (0), 'fn_kwargs': {'test': True}}),
         ]
-        for dpipe, input_dp, args, kargs in picklable_datapipes:
-            p = pickle.dumps(dpipe(input_dp, *args, **kargs))  # type: ignore
+        for dpipe, input_dp, kargs in picklable_datapipes:
+            p = pickle.dumps(dpipe(input_dp, **kargs))  # type: ignore
 
-        unpicklable_datapipes: List[Tuple[Type[IterDataPipe], IterDataPipe, List, Dict[str, Any]]] = [
-            (dp.iter.Map, IDP(arr), [], {'fn': lambda x: x}),
-            (dp.iter.Collate, IDP(arr), [], {'collate_fn': lambda x: x}),
-            (dp.iter.Filter, IDP(arr), [], {'filter_fn': lambda x: x >= 5}),
+        unpicklable_datapipes: List[Tuple[Type[IterDataPipe], IterDataPipe, Dict[str, Any]]] = [
+            (dp.iter.Map, IDP(arr), {'fn': lambda x: x}),
+            (dp.iter.Collate, IDP(arr), {'collate_fn': lambda x: x}),
+            (dp.iter.Filter, IDP(arr), {'filter_fn': lambda x: x >= 5}),
         ]
-        for dpipe, input_dp, args, kargs in unpicklable_datapipes:
+        for dpipe, input_dp, kargs in unpicklable_datapipes:
             with self.assertRaises(AttributeError):
-                p = pickle.dumps(dpipe(input_dp, *args, **kargs))  # type: ignore
+                p = pickle.dumps(dpipe(input_dp, **kargs))  # type: ignore
 
     def test_map_datapipe(self):
         arr = range(10)
@@ -220,7 +278,13 @@ class TestFunctionalIterDataPipe(TestCase):
         for x, y in zip(map_dp, input_dp):
             self.assertEqual(x, torch.tensor(y, dtype=torch.float))
 
-        map_dp = dp.iter.Map(input_dp, torch.int, fn=fn, sum=True)  # type: ignore
+        map_dp = dp.iter.Map(input_dp, fn=fn, fn_args=(torch.int, ), fn_kwargs={'sum': True})  # type: ignore
+        self.assertEqual(len(input_dp), len(map_dp))
+        for x, y in zip(map_dp, input_dp):
+            self.assertEqual(x, torch.tensor(y, dtype=torch.int).sum())
+
+        from functools import partial
+        map_dp = dp.iter.Map(input_dp, fn=partial(fn, dtype=torch.int, sum=True))  # type: ignore
         self.assertEqual(len(input_dp), len(map_dp))
         for x, y in zip(map_dp, input_dp):
             self.assertEqual(x, torch.tensor(y, dtype=torch.int).sum())
@@ -335,11 +399,11 @@ class TestFunctionalIterDataPipe(TestCase):
                 return data >= val
             return True
 
-        filter_dp = dp.iter.Filter(input_ds, 5, filter_fn=_filter_fn)
+        filter_dp = dp.iter.Filter(input_ds, filter_fn=_filter_fn, fn_args=(5, ))
         for data, exp in zip(filter_dp, range(10)):
             self.assertEqual(data, exp)
 
-        filter_dp = dp.iter.Filter(input_ds, filter_fn=_filter_fn, val=5, clip=True)
+        filter_dp = dp.iter.Filter(input_ds, filter_fn=_filter_fn, fn_kwargs={'val': 5, 'clip': True})
         for data, exp in zip(filter_dp, range(5, 10)):
             self.assertEqual(data, exp)
 
