@@ -18,7 +18,7 @@ from torch.utils.data import (_utils, Dataset, IterableDataset, TensorDataset, D
                               ChainDataset, BufferedShuffleDataset)
 from torch.utils.data._utils import MP_STATUS_CHECK_INTERVAL
 from torch.utils.data.dataset import random_split
-from torch._utils import ExceptionWrapper
+from torch._utils import ExceptionWrapper, _RemoteTraceback, LocalException
 from torch.testing._internal.common_utils import (TestCase, run_tests, TEST_NUMPY, IS_WINDOWS,
                                                   IS_PYTORCH_CI, NO_MULTIPROCESSING_SPAWN, skipIfRocm, slowTest,
                                                   load_tests, TEST_WITH_ROCM, TEST_WITH_TSAN, IS_SANDCASTLE)
@@ -365,7 +365,7 @@ class ErrorTrackingProcess(mp.Process):
         if self._exception is None:
             return None
         else:
-            return self._exception.exc_type(self._exception.exc_msg)
+            return self._exception.exc
 
     # ESRCH means that os.kill can't finds alive proc
     def send_signal(self, signum, ignore_ESRCH=False):
@@ -835,7 +835,7 @@ class TestDataLoader(TestCase):
         while True:
             try:
                 next(it)
-            except NotImplementedError:
+            except (NotImplementedError, LocalException):
                 errors += 1
             except StopIteration:
                 self.assertEqual(errors,
@@ -843,14 +843,29 @@ class TestDataLoader(TestCase):
                 return
 
     def test_error_in_init(self):
-        for num_workers in [0, 2]:
-            loader = self._get_data_loader(ErrorIterableDataset(), num_workers=num_workers)
-            with self.assertRaisesRegex(RuntimeError, 'Error in __iter__'):
-                list(iter(loader))
+        loader = self._get_data_loader(ErrorIterableDataset(), num_workers=0)
+        # Single-process raise original Exception
+        with self.assertRaisesRegex(RuntimeError, 'Error in __iter__'):
+            list(iter(loader))
+
+        loader = self._get_data_loader(ErrorIterableDataset(), num_workers=2)
+        # Multiprocessing re-raise by LocalException with traceback of original Exception
+        with self.assertRaises(LocalException,
+                               msg="Re-raise the exception in DataLoader "
+                                   "worker process \\d") as cm:
+            list(iter(loader))
+            self.assertIsInstance(cm.exception.__cause__, _RemoteTraceback)
+            self.assertRegex(str(cm.exception.__cause__),
+                             r"RuntimeError: Error in __iter__$")
 
         loader = self._get_data_loader(self.dataset, num_workers=2, worker_init_fn=error_worker_init_fn)
-        with self.assertRaisesRegex(RuntimeError, 'Error in worker_init_fn'):
+        with self.assertRaises(LocalException,
+                               msg="Re-raise the exception in DataLoader "
+                                   "worker process \\d") as cm:
             list(iter(loader))
+            self.assertIsInstance(cm.exception.__cause__, _RemoteTraceback)
+            self.assertRegex(str(cm.exception.__cause__),
+                             r"RuntimeError: Error in worker_init_fn$")
 
     def test_typing(self):
         from typing import List
@@ -985,8 +1000,10 @@ except RuntimeError as e:
             try:
                 self.assertFalse(p.is_alive())
                 self.assertNotEqual(p.exitcode, 0)
-                self.assertIsInstance(p.exception, RuntimeError)
-                self.assertRegex(str(p.exception), r'DataLoader timed out after \d+ seconds')
+                self.assertIsInstance(p.exception, LocalException)
+                self.assertEqual(str(p.exception), 'Re-raise the exception in background')
+                self.assertIsInstance(p.exception.__cause__, _RemoteTraceback)
+                self.assertRegex(str(p.exception.__cause__), r'DataLoader timed out after \d+ seconds')
             finally:
                 p.terminate()
 
@@ -1003,8 +1020,10 @@ except RuntimeError as e:
         try:
             self.assertFalse(p.is_alive())
             self.assertNotEqual(p.exitcode, 0)
-            self.assertIsInstance(p.exception, RuntimeError)
-            self.assertRegex(str(p.exception), r'My Error')
+            self.assertIsInstance(p.exception, LocalException)
+            self.assertEqual(str(p.exception), 'Re-raise the exception in background')
+            self.assertIsInstance(p.exception.__cause__, _RemoteTraceback)
+            self.assertRegex(str(p.exception.__cause__), r'RuntimeError: My Error$')
         finally:
             p.terminate()
 
