@@ -132,8 +132,26 @@ class ImageHandler:
         self.imagespec = imagespec.lower()
 
     def __call__(self, key, data):
-        import numpy as np
-        import PIL.Image
+        try:
+            import numpy as np
+        except ImportError as e:
+            try:
+                import pip  # type: ignore
+                pip.main(['intall', '--user', 'numpy'])
+                import numpy as np
+            except ImportError:
+                raise e
+
+        try:
+            import PIL.Image
+        except ImportError as e:
+            try:
+                import pip  # type: ignore
+                pip.main(['install', '--user', 'Pillow'])
+                import PIL.Image
+            except ImportError:
+                raise e
+
         extension = re.sub(r".*[.]", "", key)
         if extension.lower() not in "jpg jpeg png ppm pgm pbm pnm".split():
             return None
@@ -182,8 +200,16 @@ def torch_video(key, data):
     if extension not in "mp4 ogv mjpeg avi mov h264 mpg webm wmv".split():
         return None
 
-    # add `type: ignore` to avoid mypy's warning on import missing
-    import torchvision.io  # type: ignore
+    try:
+        import torchvision.io
+    except ImportError as e:
+        try:
+            import pip  # type: ignore
+            pip.main(['install', '--user', 'torchvision'])
+            import torchvision.io
+        except ImportError:
+            raise e
+
     with tempfile.TemporaryDirectory() as dirname:
         fname = os.path.join(dirname, f"file.{extension}")
         with open(fname, "wb") as stream:
@@ -201,8 +227,16 @@ def torch_audio(key, data):
     if extension not in ["flac", "mp3", "sox", "wav", "m4a", "ogg", "wma"]:
         return None
 
-    # add `type: ignore` to avoid mypy's warning on import missing
-    import torchaudio  # type: ignore
+    try:
+        import torchaudio
+    except ImportError as e:
+        try:
+            import pip  # type: ignore
+            pip.main(['install', '--user', 'torchaudio'])
+            import torchaudio
+        except ImportError:
+            raise e
+
     with tempfile.TemporaryDirectory() as dirname:
         fname = os.path.join(dirname, f"file.{extension}")
         with open(fname, "wb") as stream:
