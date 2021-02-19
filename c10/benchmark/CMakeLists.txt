@@ -1,4 +1,6 @@
 # ---[ Benchmark binaries.
+cmake_policy(SET CMP0069 NEW)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 file(GLOB_RECURSE C10_ALL_BENCH_FILES *.cpp)
 if(BUILD_TEST)

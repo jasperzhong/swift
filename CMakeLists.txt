@@ -22,6 +22,9 @@ endif()
 # ---[ Project and semantic versioning.
 project(Torch CXX C)
 
+cmake_policy(SET CMP0069 NEW)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   set(LINUX TRUE)
 else()

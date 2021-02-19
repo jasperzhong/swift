@@ -2,6 +2,9 @@ project(libshm C CXX)
 cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
 cmake_policy(VERSION 2.6)
 
+cmake_policy(SET CMP0069 NEW)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+
 set(TORCH_ROOT ${CMAKE_CURRENT_LIST_DIR}/../../../)
 include(${TORCH_ROOT}/cmake/public/threads.cmake)
 
