@@ -66,12 +66,23 @@ struct Argument {
 
   std::string formatTypeMismatchMsg(const std::string& actual_type) const {
     std::string inferred_type_hint;
+    std::string err_msg_for_int_float_literals;
     if (is_inferred_type()) {
       inferred_type_hint = c10::str(
           "Inferred '",
           name(),
           "' to be of type 'Tensor' ",
           "because it was not annotated with an explicit type.\n");
+    } else if(type()->kind() == FloatType::Kind || type()->kind() == IntType::Kind) {
+      std::string value_str = type()->kind() == FloatType::Kind ? "(1.0)" : "(1)";
+      std::string recieved_str = actual_type == "int" ? "(1)" : "(1.0)";
+      if (actual_type == "int" || actual_type == "float") {
+      err_msg_for_int_float_literals = c10::str(
+          "May be you assigned a '",
+           type()->repr_str(),
+          " literal ", value_str, " instead of '",
+          actual_type, "' literal ", recieved_str, "?\n");
+      }
     }
     return c10::str(
         "Expected a value of type '",
@@ -81,7 +92,8 @@ struct Argument {
         "' but instead found type '",
         actual_type,
         "'.\n",
-        inferred_type_hint);
+        inferred_type_hint,
+        err_msg_for_int_float_literals);
   }
 
   Argument cloneWithType(TypePtr new_type) const {
