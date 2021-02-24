@@ -14,6 +14,7 @@
 #include <c10d/ProcessGroup.hpp>
 #include <c10d/comm.hpp>
 #include <c10d/default_comm_hooks.hpp>
+#include <c10d/Utils.hpp>
 #include <torch/csrc/autograd/function.h>
 #include <torch/csrc/autograd/variable.h>
 #include <torch/csrc/distributed/autograd/context/context.h>
