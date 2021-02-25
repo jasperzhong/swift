@@ -657,6 +657,11 @@ Vec256<T> inline clamp_min(const Vec256<T> &a, const Vec256<T> &min_vec) {
   return c;
 }
 
+template <class T>
+std::tuple<Vec256<T>, Vec256<T>> complex_constructor(const Vec256<T>& a, const Vec256<T>& b) {
+  return std::tuple<Vec256<T>, Vec256<T>>(a, b);
+}
+
 struct Vec256i;
 
 #ifdef CPU_CAPABILITY_AVX2
