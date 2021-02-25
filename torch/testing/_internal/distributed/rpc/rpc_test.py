@@ -625,8 +625,12 @@ class RpcTest(RpcAgentTestFixture):
         with self.assertRaisesRegex(AttributeError, msg):
             rref.rpc_sync().non_exist()
 
+        # Note: re-creating rref for each test to remove effect of cached type
+        rref = rpc.remote(dst, my_function, args=(torch.ones(2, 2), 1, 3))
         with self.assertRaisesRegex(AttributeError, msg):
-            rref.rpc_async().non_exist()
+            rref.rpc_async().non_exist().wait()
+
+        rref = rpc.remote(dst, my_function, args=(torch.ones(2, 2), 1, 3))
 
         with self.assertRaisesRegex(AttributeError, msg):
             rref.remote().non_exist()
@@ -5391,15 +5395,18 @@ class TensorPipeAgentRpcTest(RpcAgentTestFixture):
         slow_rref = rpc.remote(dst, MyClass, args=(torch.ones(2, 2), True))
         timeout = 0.01
         rref_api = getattr(slow_rref, rref_proxy_api)
-        # Note that even when we call rref.rpc_async() in this case, we
-        # time out in future creation, not waiting for future. This is because
-        # rref proxy function calls rref._get_type before returning future,
-        # which blocks on the RRef being created on owner node, until the
-        # specified timeout.
-        with self.assertRaisesRegex(RuntimeError, expected_error):
-            rref_api(timeout=timeout).my_instance_method(torch.ones(2, 2))
+        expect_raise_inline = rref_proxy_api in ["rpc_sync", "remote"]
+        with self.assertRaisesRegex(RuntimeError, expected_error) if expect_raise_inline else contextlib.suppress():
+            result = rref_api(timeout=timeout).my_instance_method(torch.ones(2, 2))
+
+        if not expect_raise_inline:
+            with self.assertRaisesRegex(RuntimeError, expected_error):
+                result.wait()
+        else:
+            with self.assertRaisesRegex(RuntimeError, expected_error):
+                rref_api(timeout=timeout).my_instance_method(torch.ones(2, 2)).wait()
 
     @dist_init
     def test_rref_proxy_timeout(self):
-        for rpc_api in ["rpc_sync", "rpc_async", "remote"]:
+        for rpc_api in ["rpc_async", "rpc_sync", "remote"]:
             self._test_rref_proxy_timeout(rpc_api)
