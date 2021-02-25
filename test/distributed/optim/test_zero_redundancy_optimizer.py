@@ -13,9 +13,8 @@ import torch.distributed as dist
 from typing import List, Any, Type, cast
 from torch.distributed.optim import ZeroRedundancyOptimizer
 from torch.optim import SGD
-from torch.testing._internal.common_distributed import skip_if_no_gpu, MultiProcessTestCase
 from torch.distributed.optim.zero_redundancy_optimizer import _broadcast_object
-from torch.testing._internal.common_distributed import skip_if_rocm
+from torch.testing._internal import common_utils, common_distributed
 
 import copy
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -234,7 +233,7 @@ class TestZeroRedundancyOptimizerDistributed(TestZeroRedundancyOptimizer):
     def world_size(self):
         return max(2, torch.cuda.device_count())
 
-    @skip_if_rocm
+    @common_distributed.skip_if_rocm
     def test_step(self):
         """ Check that the ZeroRedundancyOptimizer wrapper properly exposes the `.step()` interface"""
         if self.rank > 1 or (BACKEND == dist.Backend.NCCL and torch.cuda.device_count() < 2):
@@ -261,7 +260,7 @@ class TestZeroRedundancyOptimizerDistributed(TestZeroRedundancyOptimizer):
             self.assertEqual(m.weight, torch.tensor([[0.75]], device=self.device))
             self.assertEqual(m.bias, torch.tensor([1.85], device=self.device))
 
-    @skip_if_rocm
+    @common_distributed.skip_if_rocm
     def test_step_with_closure(self):
         """ Check that the ZeroRedundancyOptimizer wrapper properly exposes the `.step(closure)` interface"""
 
@@ -481,7 +480,7 @@ class TestZeroRedundancyOptimizerDistributed(TestZeroRedundancyOptimizer):
             )
             check(optimizer)
 
-    @skip_if_no_gpu
+    @common_distributed.skip_if_no_gpu
     def test_pytorch_parity(self):
         """When combined with DDP, check that ZeroRedundancyOptimizer(optimizer) and the same monolithic optimizer
         give the exact same results
@@ -558,4 +557,4 @@ class TestZeroRedundancyOptimizerDistributed(TestZeroRedundancyOptimizer):
 
 if __name__ == "__main__":
     # ! unittest should not be used here, else the tests are not properly registered
-    torch.testing._internal.common_utils.run_tests()
+    common_utils.run_tests()
