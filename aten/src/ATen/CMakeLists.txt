@@ -116,7 +116,141 @@ append_filelist("jit_core_sources" ATen_CORE_SRCS)
 
 add_subdirectory(quantized)
 add_subdirectory(nnapi)
-set(all_cpu_cpp ${base_cpp} ${ATen_CORE_SRCS} ${native_cpp} ${native_sparse_cpp} ${native_quantized_cpp} ${native_mkl_cpp} ${native_mkldnn_cpp} ${native_utils_cpp} ${native_xnnpack} ${generated_cpp} ${core_generated_cpp} ${ATen_CPU_SRCS} ${ATen_QUANTIZED_SRCS} ${ATen_NNAPI_SRCS} ${cpu_kernel_cpp})
+
+message(STATUS "ATen_CPU_SRCS sources before set: ")
+foreach(tmp ${ATen_CPU_SRCS})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+if(BUILD_LITE_INTERPRETER)
+  list(APPEND ATen_CPU_SRCS_LITE "")
+  append_filelist("aten_cpu_source_list" ATen_CPU_SRCS_LITE)
+  append_filelist("aten_native_source_list" ATen_CPU_SRCS_LITE)
+
+  set(all_cpu_cpp ${generated_cpp} ${core_generated_cpp} ${ATen_CPU_SRCS_LITE} ${cpu_kernel_cpp})
+  append_filelist("jit_core_sources" all_cpu_cpp)
+else()
+  set(all_cpu_cpp ${base_cpp} ${ATen_CORE_SRCS} ${native_cpp} ${native_sparse_cpp} ${native_quantized_cpp} ${native_mkl_cpp} ${native_mkldnn_cpp} ${native_utils_cpp} ${native_xnnpack} ${generated_cpp} ${core_generated_cpp} ${ATen_CPU_SRCS} ${ATen_QUANTIZED_SRCS} ${ATen_NNAPI_SRCS} ${cpu_kernel_cpp})
+endif()
+
+# list(APPEND all_cpu_cpp_lite ${generated_cpp_lite} ${core_generated_cpp_lite} ${ATen_CPU_SRCS_LITE} ${cpu_kernel_cpp})
+
+list(SORT all_cpu_cpp)
+list(SORT all_cpu_cpp_lite)
+
+message(STATUS "atttten cpu sources lite: ")
+foreach(tmp ${ATen_CPU_SRCS_LITE})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "ATen_CPU_SRCS sources: ")
+foreach(tmp ${ATen_CPU_SRCS})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "base_cpp sources: ")
+foreach(tmp ${base_cpp})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "ATen_CORE_SRCS sources: ")
+foreach(tmp ${ATen_CORE_SRCS})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "ATen_CORE_SRCS_LITE sources: ")
+foreach(tmp ${ATen_CORE_SRCS_LITE})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "native_cpp sources: ")
+foreach(tmp ${native_cpp})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "native_sparse_cpp sources: ")
+foreach(tmp ${native_sparse_cpp})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "native_quantized_cpp sources: ")
+foreach(tmp ${native_quantized_cpp})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "native_mkl_cpp sources: ")
+foreach(tmp ${native_mkl_cpp})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "native_mkldnn_cpp sources: ")
+foreach(tmp ${native_mkldnn_cpp})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "native_utils_cpp sources: ")
+foreach(tmp ${native_utils_cpp})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "ATen_QUANTIZED_SRCS sources: ")
+foreach(tmp ${ATen_QUANTIZED_SRCS})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+
+
+
+message(STATUS "native_quantized_cpp sources: ")
+foreach(tmp ${native_quantized_cpp})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "ATen_QUANTIZED_SRCS sources: ")
+foreach(tmp ${ATen_QUANTIZED_SRCS})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "cpu_kernel_cpp sources: ")
+foreach(tmp ${cpu_kernel_cpp})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+
+
+
+message(STATUS "generated_cpp sources: ")
+foreach(tmp ${generated_cpp})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "core_generated_cpp sources: ")
+foreach(tmp ${core_generated_cpp})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "generated_cpp_lite: ")
+foreach(tmp ${generated_cpp_lite})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "core_generated_cpp_lite: ")
+foreach(tmp ${core_generated_cpp_lite})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+message(STATUS "all_cpu_cpp_lite: ")
+foreach(tmp ${all_cpu_cpp_lite})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+
+message(STATUS "all_cpu_cpp: ")
+foreach(tmp ${all_cpu_cpp})
+  message(STATUS "  " ${tmp})
+endforeach()
+
+
 if(AT_MKL_ENABLED)
   set(all_cpu_cpp ${all_cpu_cpp} ${mkl_cpp})
 endif()
