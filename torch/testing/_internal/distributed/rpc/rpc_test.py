@@ -3221,7 +3221,7 @@ class RpcTest(RpcAgentTestFixture):
         self.assertEqual(fut.wait(), torch.ones(n, n) * 2)
 
         with self.assertRaisesRegex(
-            RuntimeError,
+            TypeError,
             "my\\_function\\(\\) missing 2 required positional arguments"
         ):
             cb_fut.wait()
@@ -3234,7 +3234,7 @@ class RpcTest(RpcAgentTestFixture):
         fut1 = fut0.then(lambda x: x + 1)
 
         with self.assertRaisesRegex(
-            RuntimeError,
+            TypeError,
             "unsupported operand type\\(s\\) for \\+"
         ):
             fut1.wait()
