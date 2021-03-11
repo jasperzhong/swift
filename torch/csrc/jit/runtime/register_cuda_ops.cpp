@@ -1,5 +1,6 @@
 // This file registers special JIT operators used to implement the PyTorch CUDA
 // API in TorchScript.
+#include <cstdint>
 #ifndef __HIP_PLATFORM_HCC__
 #include <torch/csrc/api/include/torch/utils.h>
 #include <torch/csrc/jit/cuda/cuda.h>
@@ -18,7 +19,7 @@ c10::AliasAnalysisKind aliasAnalysisFromSchema() {
 
 RegisterOperators const reg({
     Operator(
-        "cuda::current_stream(int64_t val) -> __torch__.torch.classes.cuda.Stream",
+        "_cuda::current_stream(int64_t val) -> __torch__.torch.classes.cuda.Stream",
         [](Stack* stack) {
           auto idx = uint16_t(pop(stack).toInt());
           auto s = c10::cuda::getCurrentCUDAStream(idx);
@@ -27,7 +28,7 @@ RegisterOperators const reg({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "cuda::default_stream(int64_t val) -> __torch__.torch.classes.cuda.Stream",
+        "_cuda::default_stream(int64_t val) -> __torch__.torch.classes.cuda.Stream",
         [](Stack* stack) {
           auto idx = uint16_t(pop(stack).toInt());
           auto s = c10::cuda::getDefaultCUDAStream(idx);
@@ -36,14 +37,14 @@ RegisterOperators const reg({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "cuda::_current_device() -> int",
+        "_cuda::current_device() -> int",
         [](Stack* stack) {
           auto v = c10::cuda::current_device();
           push(stack, static_cast<int>(v));
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "cuda::_set_device(int64_t val) -> ()",
+        "_cuda::set_device(int64_t val) -> ()",
         [](Stack* stack) {
           int64_t idx = -1;
           pop(stack, idx);
@@ -51,7 +52,7 @@ RegisterOperators const reg({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "cuda::device_index(Device device) -> int",
+        "_cuda::device_index(Device device) -> int",
         [](Stack* stack) {
           auto device = pop(stack);
           auto idx = device.toDevice().index();
@@ -59,11 +60,11 @@ RegisterOperators const reg({
         },
         aliasAnalysisFromSchema()),
     Operator(
-        "cuda::device_count() -> int",
+        "_cuda::device_count() -> int",
         [](Stack* stack) { push(stack, at::cuda::device_count()); },
         aliasAnalysisFromSchema()),
     Operator(
-        "cuda::set_stream(__torch__.torch.classes.cuda.Stream stream) -> ()",
+        "_cuda::set_stream(__torch__.torch.classes.cuda.Stream stream) -> ()",
         [](Stack* stack) {
           auto v = pop(stack);
           auto s = v.toCustomClass<torch::jit::CUDAStream>();
