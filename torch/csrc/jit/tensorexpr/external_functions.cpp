@@ -192,6 +192,27 @@ void nnc_aten_mean(
   }
 }
 
+void nnc_aten_addmm(
+    int64_t bufs_num,
+    void** buf_data,
+    int64_t* buf_ranks,
+    int64_t* buf_dims,
+    int8_t* buf_dtypes,
+    int64_t args_num,
+    int64_t* extra_args) {
+  std::vector<at::Tensor> tensors =
+      constructTensors(bufs_num, buf_data, buf_ranks, buf_dims, buf_dtypes);
+
+  at::Tensor& r = tensors[0];
+  const at::Tensor& x = tensors[1];
+  const at::Tensor& y = tensors[2];
+  const at::Tensor& z = tensors[3];
+  try {
+    at::addmm_out(r, x, y, z, extra_args[0], extra_args[1]);
+  } catch (...) {
+  }
+}
+
 const static RegisterNNCExternalFunction nnc_conv2d(
     "nnc_aten_conv2d",
     nnc_aten_conv2d);
@@ -206,6 +227,9 @@ const static RegisterNNCExternalFunction nnc_adaptive_avg_pool2d(
 const static RegisterNNCExternalFunction nnc_mean(
     "nnc_aten_mean",
     nnc_aten_mean);
+static const RegisterNNCExternalFunction nnc_addmm(
+    "nnc_aten_addmm",
+    nnc_aten_addmm);
 
 } // namespace tensorexpr
 } // namespace jit
