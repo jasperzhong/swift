@@ -1039,6 +1039,7 @@ class ForeachBinaryFuncInfo(OpInfo):
                  dtypesIfROCM=None,
                  safe_casts_outputs=False,
                  sample_inputs_func=sample_inputs_foreach,
+                 supports_alpha_param=False,
                  **kwargs):
         super(ForeachBinaryFuncInfo, self).__init__(name,
                                                     dtypes=dtypes,
@@ -1052,6 +1053,7 @@ class ForeachBinaryFuncInfo(OpInfo):
         self.method_variant = foreach_method
         self.inplace_variant = foreach_method_inplace
         self.ref = torch_ref_method
+        self.supports_alpha_param = supports_alpha_param
 
 class HermitianOpInfo(OpInfo):
     """Operator information for Hermitian functions
@@ -1670,11 +1672,10 @@ def sample_inputs_lerp(op_info, device, dtype, requires_grad):
     return samples
 
 foreach_binary_op_db: List[OpInfo] = [
-    ForeachBinaryFuncInfo('add'),
-    ForeachBinaryFuncInfo('sub'),
+    ForeachBinaryFuncInfo('add', supports_alpha_param=True),
+    ForeachBinaryFuncInfo('sub', supports_alpha_param=True),
     ForeachBinaryFuncInfo('mul'),
-    ForeachBinaryFuncInfo('div',
-                          safe_casts_outputs=True),
+    ForeachBinaryFuncInfo('div', safe_casts_outputs=True),
 ]
 
 foreach_unary_op_db: List[OpInfo] = [
