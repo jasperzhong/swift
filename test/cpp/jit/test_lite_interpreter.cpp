@@ -8,6 +8,7 @@
 #include <torch/csrc/jit/frontend/resolver.h>
 #include <torch/csrc/jit/mobile/import.h>
 #include <torch/csrc/jit/mobile/module.h>
+#include <torch/csrc/jit/mobile/versioned_operators.h>
 #include <torch/csrc/jit/serialization/export.h>
 #include <torch/csrc/jit/serialization/import.h>
 #include <torch/custom_class.h>
@@ -941,6 +942,21 @@ TEST(LiteInterpreterTest, OpNameExportFetchRootOperators) {
   };
   EXPECT_EQ(operator_names, expected_operator_names)
       << "Expected the root operator lists to be the same";
+}
+
+TEST(LiteInterpreterTest, OpVersionTable) {
+  c10::OperatorName op1_name("aten::_convolution", "");
+  ASSERT_THROWS_WITH_MESSAGE(
+      torch::jit::mobile::operator_resolver(
+          op1_name, /*op_version*/ -1, /*model_version*/ 4),
+      "is not compatible in this runtime");
+  ASSERT_THROWS_WITH_MESSAGE(
+      torch::jit::mobile::operator_resolver(
+          op1_name, /*op_version*/ 2, /*model_version*/ 4),
+      "is not compatible in this runtime");
+
+  auto table = torch::jit::mobile::get_op_version_table();
+  EXPECT_EQ(table["aten::_convolution"].size(), 2);
 }
 
 namespace {
