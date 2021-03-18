@@ -1029,6 +1029,30 @@ class ForeachUnaryFuncInfo(OpInfo):
         self.inplace_variant = foreach_method_inplace
         self.ref = torch_ref_method
 
+class ForeachBinaryFuncInfo(OpInfo):
+    """Early version of a specialized OpInfo for foreach binary functions"""
+    def __init__(self,
+                 name,
+                 dtypes=all_types_and(torch.bool, torch.half, torch.bfloat16),
+                 dtypesIfCPU=all_types_and(torch.bool, torch.half, torch.bfloat16),
+                 dtypesIfCUDA=all_types_and(torch.bool, torch.half, torch.bfloat16),
+                 dtypesIfROCM=None,
+                 safe_casts_outputs=False,
+                 sample_inputs_func=sample_inputs_foreach,
+                 **kwargs):
+        super(ForeachBinaryFuncInfo, self).__init__(name,
+                                                    dtypes=dtypes,
+                                                    dtypesIfCPU=dtypesIfCPU,
+                                                    dtypesIfCUDA=dtypesIfCUDA,
+                                                    dtypesIfROCM=dtypesIfROCM,
+                                                    safe_casts_outputs=safe_casts_outputs,
+                                                    sample_inputs_func=sample_inputs_func,
+                                                    **kwargs)
+        foreach_method, foreach_method_inplace, torch_ref_method = get_foreach_method_names(name)
+        self.method_variant = foreach_method
+        self.inplace_variant = foreach_method_inplace
+        self.ref = torch_ref_method
+
 class HermitianOpInfo(OpInfo):
     """Operator information for Hermitian functions
     These are functions that take Hermitian matrices as input.
@@ -1574,7 +1598,6 @@ def sample_inputs_masked_select(op_info, device, dtype, requires_grad):
 
     return samples
 
-
 def sample_inputs_polar(op_info, device, dtype, requires_grad):
     def _make_tensor_helper(shape, low=None, high=None):
         return make_tensor(shape, device, dtype, low=low, high=high, requires_grad=requires_grad)
@@ -1645,6 +1668,14 @@ def sample_inputs_lerp(op_info, device, dtype, requires_grad):
         )
 
     return samples
+
+foreach_binary_op_db: List[OpInfo] = [
+    ForeachBinaryFuncInfo('add'),
+    ForeachBinaryFuncInfo('sub'),
+    ForeachBinaryFuncInfo('mul'),
+    ForeachBinaryFuncInfo('div',
+                          safe_casts_outputs=True),
+]
 
 foreach_unary_op_db: List[OpInfo] = [
     ForeachUnaryFuncInfo('exp'),
