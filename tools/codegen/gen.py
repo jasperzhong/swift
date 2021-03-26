@@ -336,6 +336,124 @@ struct TORCH_API {name} : public {parent_class} {{
 }};
 """
 
+refactor_count = 0
+
+def decorate_type(type: str) -> str:
+    type = re.escape(type)
+    if type in ['bool', 'int64_t', 'c10::optional<int64_t>', 'c10::optional<bool>']:
+        type = '(?:const\\s*)?' + type
+    type = type.replace("\\&", "&")                              # Don't need to escape &
+    type = type.replace("\\ ", "\\s*")                           # match any whitespaces
+    type = type.replace('Tensor', '(?:at::)?(?:Tensor|SparseTensor)')
+    type = type.replace('c10::optional', '(?:c10::)?optional')
+    type = type.replace('MemoryFormat', '(?:c10::)?MemoryFormat')
+    type = type.replace('std::array<bool,', 'std::array<bool\\s*,\\s*')
+
+    return type
+
+@with_native_function
+def compute_out_convention_refactor_for_native_function(g: NativeFunction) -> List[str]:
+    if local.use_c10_dispatcher() is UseC10Dispatcher.full:
+        return []
+
+    returns_type = native.returns_type(g.func.returns)
+    args = native.arguments(g.func)
+
+    if not g.func.is_out_fn():
+        # only handles out convention refactor in this one
+        return []
+
+    for arg in args:
+        # TensorOptions
+        if isinstance(arg.argument, TensorOptionsArguments):
+            print('quit because of ', arg.argument)
+            return []
+
+        # Alternative way would be to see if a.argument.type is an OptionalType and under the hood is a Tensor type?? 
+        # String matching seems to be easier 
+        if isinstance(arg.argument, Argument) and 'Tensor?' in str(arg.argument.type):
+            print('quit because of ', arg.argument)
+            return []
+
+    to_move = 0
+    for i in range(len(args)):
+        if args[i].argument.type.is_tensor_like() and args[i].argument.is_write:
+            to_move += 1
+        else:
+            break
+    if to_move == 0:
+        print(f'WARNING: Nothing generated for {g.func.name}')
+        return []
+
+    global refactor_count
+    refactor_count += 1
+    if refactor_count > 10000:
+        return []
+    print(refactor_count)
+
+    ns = list(g.dispatch.values())
+
+    rs = []
+    # Sometimes a function name shows up multiple times; only generate
+    # it once!
+    seen = set()
+    for n in ns:
+        if "legacy::" in n:
+            continue
+        if n in seen:
+            continue
+        seen.add(n)
+
+        begin_out_tensor_pattern = f'\\s*{decorate_type("Tensor &")}[^,]*'
+        if to_move == 1:
+            current_signature = "([\s&\*]+{}\\s*\\()({}),\\s*({}[^,)]*)\\)(\\s*\\{{)".format(
+                re.escape(n),
+                begin_out_tensor_pattern,
+                "[^,]*,\\s*".join(decorate_type(a.type) for a in args[1:])
+            )
+        elif to_move == 2:
+            current_signature=""
+            current_signature = "([\s&\*]+{}\\s*\\()({},{}),\\s*({}[^,)]*)\\)(\\s*\\{{)".format(
+                re.escape(n),
+                begin_out_tensor_pattern,
+                begin_out_tensor_pattern,
+                "[^,]*,\\s*".join(decorate_type(a.type) for a in args[2:])
+            )
+        elif to_move == 3:
+            current_signature=""
+            current_signature = "([\s&\*]+{}\\s*\\()({},{},{}),\\s*({}[^,)]*)\\)(\\s*\\{{)".format(
+                re.escape(n),
+                begin_out_tensor_pattern,
+                begin_out_tensor_pattern,
+                begin_out_tensor_pattern,
+                "[^,]*,\\s*".join(decorate_type(a.type) for a in args[3:])
+            )
+        else:
+            raise
+
+        rs.append(f"""\
+
+    {g.loc}
+    fastmod '{current_signature}' '${{1}}${{3}}, ${{2}})${{4}}' aten/src/ATen/native/
+    """)
+
+    return rs
+
+
+
+@with_native_function
+def compute_out_convention_refactor(g: Union[NativeFunctionsGroup, NativeFunction]) -> List[str]:
+    if (isinstance(g, NativeFunctionsGroup) and g.structured) or local.use_c10_dispatcher() is UseC10Dispatcher.full:
+        return []
+
+    if isinstance(g, NativeFunctionsGroup):
+        if g.structured:
+            return []
+        else:
+            return list(concatMap(compute_out_convention_refactor_for_native_function, g.functions()))
+    else:
+        return compute_out_convention_refactor_for_native_function(g)
+
 # Generates RegisterBackendSelect.cpp, a series of kernels which provide
 # specialized computation of dispatch key for operator signatures which cannot
 # be easily done automatically using templating.
@@ -973,6 +1091,10 @@ def main() -> None:
     })
     cpu_fm.write('NativeFunctions.h', lambda: {
         'native_function_declarations': list(concatMap(dest.compute_native_function_declaration, grouped_native_functions)),
+    })
+
+    cpu_fm.write('Refactors.yaml', lambda: {
+        'refactors': list(concatMap(compute_out_convention_refactor, grouped_native_functions)),
     })
 
     cpu_fm.write('Declarations.yaml', lambda: format_yaml([compute_declaration_yaml(f) for f in native_functions]))
