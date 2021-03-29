@@ -295,6 +295,22 @@
   dispatch:
     CompositeExplicitAutograd: _conj
 
+- func: view_as_real_physical(Tensor(a) self) -> Tensor(a)
+  use_c10_dispatcher: full
+  variants: function
+
+- func: conj(Tensor(a) self) -> Tensor(a)
+  use_c10_dispatcher: full
+  variants: function, method
+
+- func: conj_physical_(Tensor(a!) self) -> Tensor(a!)
+  use_c10_dispatcher: full
+  variants: function, method
+
+- func: resolve_conj(Tensor(a) self) -> Tensor(a)
+  use_c10_dispatcher: full
+  variants: function, method
+
 - func: acos(Tensor self) -> Tensor
   variants: function, method
   dispatch:

@@ -95,6 +95,10 @@ TensorImpl::TensorImpl(Storage&& storage, DispatchKeySet key_set, const caffe2::
     key_set_ = key_set | getAutogradRelatedKeySetFromBackend(k);
   }
 
+  if (is_conj()) {
+    TORCH_INTERNAL_ASSERT(isComplexType(typeMetaToScalarType(dtype())));
+  }
+
   // we would also like to check that non-cpu devices have an index, but some Caffe2 operators create
   // Storages with default devices.
 }

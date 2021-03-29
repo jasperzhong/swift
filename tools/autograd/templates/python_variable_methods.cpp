@@ -226,6 +226,17 @@ static PyObject * THPVariable_numel(PyObject* self, PyObject* args)
    END_HANDLE_TH_ERRORS
 }
 
+static PyObject * THPVariable_is_conj(PyObject* self, PyObject* args)
+{
+   HANDLE_TH_ERRORS
+   if (check_has_torch_function(self)) {
+     return handle_torch_function(self, "is_conj");
+   }
+   auto& self_ = reinterpret_cast<THPVariable*>(self)->cdata;
+   return wrap(self_.is_conj());
+   END_HANDLE_TH_ERRORS
+}
+
 static Tensor dispatch_contiguous(const Tensor & self, at::MemoryFormat memory_format) {
   pybind11::gil_scoped_release no_gil;
   OptionalDeviceGuard device_guard(device_of(self));
@@ -1184,6 +1195,7 @@ PyMethodDef variable_methods[] = {
   {"bool", castPyCFunctionWithKeywords(THPVariable_bool), METH_VARARGS | METH_KEYWORDS, NULL},
   {"half", castPyCFunctionWithKeywords(THPVariable_half), METH_VARARGS | METH_KEYWORDS, NULL},
   {"int", castPyCFunctionWithKeywords(THPVariable_int), METH_VARARGS | METH_KEYWORDS, NULL},
+  {"is_conj", castPyCFunctionWithKeywords(THPVariable_conj), METH_NOARGS, NULL},
   {"is_contiguous", castPyCFunctionWithKeywords(THPVariable_is_contiguous), METH_VARARGS | METH_KEYWORDS, NULL},
   {"item", THPVariable_item, METH_NOARGS, NULL},
   {"long", castPyCFunctionWithKeywords(THPVariable_long), METH_VARARGS | METH_KEYWORDS, NULL},

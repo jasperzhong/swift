@@ -677,6 +677,26 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
    */
   const at::Tensor& grad() const;
 
+
+  /**
+   * Whether or not the imaginary part of the tensor should be negated
+   */
+  inline bool is_conj() const {
+    return key_set_.has(DispatchKey::Conjugate);
+  }
+
+  /**
+   * Set whether or not to take the conjugate of the tensor (flip the imaginary bit).
+   */
+  void set_conj(bool value) {
+    if (value) {
+      key_set_ = key_set_.add(DispatchKey::Conjugate);
+      TORCH_INTERNAL_ASSERT(isComplexType(typeMetaToScalarType(dtype())));
+    } else {
+      key_set_ = key_set_.remove(DispatchKey::Conjugate);
+    }
+  }
+
   /**
    * Return the accumulated gradient of a tensor. This gradient is computed
    * using forward mode AD.
@@ -1866,6 +1886,7 @@ protected:
   // live in Tensor after the split
   // The logic is that if Extend() or ReserveSpace() were ever called,
   // then subsequent Resize()s will not free up Storage.
+<<<<<<< HEAD
   bool reserved_ : 1;
 
   // The set of DispatchKeys which describe this tensor.  NB: this
@@ -1874,6 +1895,9 @@ protected:
   //
   // INVARIANT: named_tensor_meta_ != nullptr  <==>  key_set_.has(DispatchKey::Named)
   DispatchKeySet key_set_;
+=======
+  bool reserved_ = false;
+>>>>>>> 2a10c35bd8 (Conjugate view tensor)
 };
 
 // Note [TensorImpl size constraints]

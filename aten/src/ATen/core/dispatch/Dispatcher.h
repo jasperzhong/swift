@@ -160,6 +160,8 @@ public:
 
   // Invoke an operator via the boxed calling convention using an IValue stack
   void callBoxed(const OperatorHandle& op, Stack* stack) const;
+  void callBoxedWithDispatchKey(const OperatorHandle& op, DispatchKey dispatchKey, Stack* stack) const;
+  void redispatchBoxed(const OperatorHandle& op, DispatchKey currentDispatchKey, Stack* stack) const;
 
   // TODO: This will only be useful if we write a backend fallback that plumbs dispatch keys (currently there are none)
   // See Note [Plumbing Keys Through The Dispatcher]
@@ -341,8 +343,13 @@ public:
     c10::Dispatcher::singleton().callBoxed(*this, stack);
   }
 
+<<<<<<< HEAD
   void redispatchBoxed(DispatchKeySet ks, Stack* stack) const {
     c10::Dispatcher::singleton().redispatchBoxed(*this, ks, stack);
+=======
+  void redispatchBoxed(DispatchKey currentDispatchKey, Stack* stack) const {
+    c10::Dispatcher::singleton().redispatchBoxed(*this, currentDispatchKey, stack);
+>>>>>>> 2a10c35bd8 (Conjugate view tensor)
   }
 
 private:
@@ -464,11 +471,17 @@ inline Return Dispatcher::redispatch(const TypedOperatorHandle<Return (Args...)>
   return kernel.template call<Return, Args...>(op, currentDispatchKeySet, std::forward<Args>(args)...);
 }
 
+<<<<<<< HEAD
 inline void Dispatcher::callBoxed(const OperatorHandle& op, Stack* stack) const {
   // note: this doesn't need the mutex because write operations on the list keep iterators intact.
   const auto& entry = op.operatorDef_->op;
   auto dispatchKeySet = entry.dispatchKeyExtractor().getDispatchKeySetBoxed(stack);
   const auto& kernel = entry.lookup(dispatchKeySet.highestPriorityTypeId());
+=======
+inline void Dispatcher::callBoxedWithDispatchKey(const OperatorHandle& op, DispatchKey dispatchKey, Stack* stack) const {
+  const auto& entry = op.operatorIterator_->op;
+  const auto& kernel = entry.lookup(dispatchKey);
+>>>>>>> 2a10c35bd8 (Conjugate view tensor)
 #ifndef PYTORCH_DISABLE_PER_OP_PROFILING
   bool pre_sampled = false;
   if (C10_UNLIKELY(at::shouldRunRecordFunction(&pre_sampled))) {
@@ -497,6 +510,20 @@ inline void Dispatcher::redispatchBoxed(const OperatorHandle& op, DispatchKeySet
   const auto& entry = op.operatorDef_->op;
   const auto& kernel = entry.lookup(dispatchKeySet.highestPriorityTypeId());
   return kernel.callBoxed(op, dispatchKeySet, stack);
+}
+
+inline void Dispatcher::redispatchBoxed(const OperatorHandle& op, DispatchKey currentDispatchKey, Stack* stack) const {
+  auto dispatchKey = op.operatorIterator_->op.dispatchKeyExtractor().getDispatchKeyBoxed(
+      DispatchKeySet(DispatchKeySet::FULL_AFTER, currentDispatchKey), stack
+  );
+  return callBoxedWithDispatchKey(op, dispatchKey, stack);
+}
+
+inline void Dispatcher::callBoxed(const OperatorHandle& op, Stack* stack) const {
+  // note: this doesn't need the mutex because write operations on the list keep iterators intact.
+  auto dispatchKey = op.operatorIterator_->op.dispatchKeyExtractor().getDispatchKeyBoxed(
+      DispatchKeySet::FULL, stack);
+  return callBoxedWithDispatchKey(op, dispatchKey, stack);
 }
 
 } // namespace c10
