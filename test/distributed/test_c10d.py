@@ -2223,6 +2223,16 @@ class SparseGradientModule(nn.Module):
     def forward(self, x):
         return F.softmax(self.embedding(x), dim=1)
 
+class MixedDenseSparseGradientModule(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.embedding = nn.EmbeddingBag(10, 10, sparse=True)
+        self.fc = nn.Linear(10, 10)
+
+    def forward(self, x):
+        x = self.embedding(x)
+        return F.softmax(self.fc(x), dim=1)
+
 
 @unittest.skipIf(
     TEST_WITH_TSAN,
@@ -3455,7 +3465,7 @@ class DistributedDataParallelTest(MultiProcessTestCase):
             self.assertEqual(p_withload, p_withoutload)
             self.assertEqual(p_non_ddp_withload, p_withoutload)
 
-    def _run_and_verify_sparse_gradients(self, vanilla_model, ddp_model):
+    def _run_and_verify_gradients(self, vanilla_model, ddp_model):
         mult = 2
         batch_size = mult * self.world_size
         criterion = nn.CrossEntropyLoss()
@@ -3471,33 +3481,39 @@ class DistributedDataParallelTest(MultiProcessTestCase):
         criterion(ddp_model(partial_input), partial_target).backward()
 
         # Check that the gradients are sparse and identical
-        vanilla_parameter = next(vanilla_model.parameters())
-        ddp_parameter = next(ddp_model.parameters())
-        self.assertEqual(vanilla_parameter.grad, ddp_parameter.grad)
+        for vanilla_parameter, ddp_parameter in zip(vanilla_model.parameters(), ddp_model.parameters()):
+            self.assertEqual(vanilla_parameter.grad, ddp_parameter.grad)
 
-    def _test_sparse_gradients(self, gradient_as_bucket_view=False):
+    def _test_gradients(self, vanilla_model, gradient_as_bucket_view=False):
         store = c10d.FileStore(self.file_name, self.world_size)
         process_group = c10d.ProcessGroupGloo(store, self.rank, self.world_size)
 
         # Ensure initialized weights and inputs are identical across processes
         torch.manual_seed(1337)
 
-        vanilla_model = SparseGradientModule()
         ddp_model = DistributedDataParallel(
             copy.deepcopy(vanilla_model),
             process_group=process_group,
             gradient_as_bucket_view=gradient_as_bucket_view,
         )
 
-        self._run_and_verify_sparse_gradients(vanilla_model, ddp_model)
+        self._run_and_verify_gradients(vanilla_model, ddp_model)
 
     @requires_gloo()
     def test_sparse_gradients(self):
-        self._test_sparse_gradients()
+        self._test_gradients(SparseGradientModule())
 
     @requires_gloo()
     def test_sparse_gradients_grad_is_view(self):
-        self._test_sparse_gradients(gradient_as_bucket_view=True)
+        self._test_gradients(SparseGradientModule(), gradient_as_bucket_view=True)
+
+    @requires_gloo()
+    def test_mixed_dense_sparse_gradients(self):
+        self._test_gradients(MixedDenseSparseGradientModule())
+
+    @requires_gloo()
+    def test_mixed_dense_sparse_gradients_grad_is_view(self):
+        self._test_gradients(MixedDenseSparseGradientModule(), gradient_as_bucket_view=True)
 
     def _test_grad_layout(self, replica_devices, layer_devs, local_batch_size):
         store = c10d.FileStore(self.file_name, self.world_size)
@@ -4114,10 +4130,9 @@ class DistributedDataParallelTest(MultiProcessTestCase):
         ):
             model.register_comm_hook(None, dummy_hook)
 
-    @requires_gloo()
-    def test_ddp_comm_hook_sparse_gradients(self):
+    def _test_ddp_comm_hook_gradients(self, vanilla_model):
         """
-        Runs "test_sparse_gradients" unit test with DDP communication hook. We define a
+        Runs "test_gradients" unit test with DDP communication hook. We define a
         simple hook that does allreduce and works with gloo backend for this test.
         """
         store = c10d.FileStore(self.file_name, self.world_size)
@@ -4126,7 +4141,6 @@ class DistributedDataParallelTest(MultiProcessTestCase):
         # Ensure initialized weights and inputs are identical across processes
         torch.manual_seed(1337)
 
-        vanilla_model = SparseGradientModule()
         ddp_model = DistributedDataParallel(
             copy.deepcopy(vanilla_model),
             process_group=process_group,
@@ -4147,7 +4161,15 @@ class DistributedDataParallelTest(MultiProcessTestCase):
 
         ddp_model.register_comm_hook(None, allreduce_hook_gloo)
 
-        self._run_and_verify_sparse_gradients(vanilla_model, ddp_model)
+        self._run_and_verify_gradients(vanilla_model, ddp_model)
+
+    @requires_gloo()
+    def test_ddp_comm_hook_sparse_gradients(self):
+        self._test_ddp_comm_hook_gradients(SparseGradientModule())
+
+    @requires_gloo()
+    def test_ddp_comm_hook_mixed_dense_sparse_gradients(self):
+        self._test_ddp_comm_hook_gradients(MixedDenseSparseGradientModule())
 
     class AcceptsParam(torch.nn.Module):
         def __init__(self, p, factor):
