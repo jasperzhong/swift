@@ -76,6 +76,9 @@ def export(model, args, f, export_params=True, verbose=False, training=None,
            do_constant_folding=True, example_outputs=None, strip_doc_string=True,
            dynamic_axes=None, keep_initializers_as_inputs=None, custom_opsets=None,
            enable_onnx_checker=True, use_external_data_format=False):
+    import builtins
+    len_backup = builtins.len
+    builtins.len = lambda x:x.__len__()
     if aten or export_raw_ir:
         assert operator_export_type is None
         assert aten ^ export_raw_ir
@@ -92,7 +95,7 @@ def export(model, args, f, export_params=True, verbose=False, training=None,
             dynamic_axes=dynamic_axes, keep_initializers_as_inputs=keep_initializers_as_inputs,
             custom_opsets=custom_opsets, enable_onnx_checker=enable_onnx_checker,
             use_external_data_format=use_external_data_format)
-
+    builtins.len = len_backup
 
 def _is_constant_tensor_list(node):
     if node.kind() != "prim::Constant":
@@ -160,8 +163,10 @@ def _optimize_graph(graph, operator_export_type, _disable_torch_constant_prop=Fa
         # For example, the number of outputs from split (and whether it is static or dynamic) is unknown
         # until the point where it is unpacked by listUnpack node.
         # This pass does a preprocess, and prepares the nodes such that enough context can be received
-        # by the symbolic function.
+        # by the symbolic functon.
+        print('pre remove: ', graph)
         torch._C._jit_pass_onnx_remove_inplace_ops_for_onnx(graph, module)
+        print('after remove: ', graph)
         torch._C._jit_pass_onnx_preprocess(graph)
 
         # onnx does not support tuples, so try to remove them
@@ -501,6 +506,7 @@ def _model_to_graph(model, args, verbose=False,
 
     if verbose:
         print(graph)
+    print(graph)
 
     params_dict = torch._C._jit_pass_filter_non_tensor_arguments(params_dict)
     torch._C._jit_decay_packed_param_input_types(graph)
