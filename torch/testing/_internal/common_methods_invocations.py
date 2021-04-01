@@ -2150,9 +2150,9 @@ foreach_pointwise_op_db: List[OpInfo] = [
 foreach_min_max_op_db: List[OpInfo] = [
     ForeachFuncInfo('maximum',
                     has_no_inplace=True,
-                    dtypes=all_types(),
-                    dtypesIfCPU=all_types(),
-                    dtypesIfCUDA=all_types(),
+                    dtypes=floating_types_and(torch.bfloat16, torch.bool, torch.half),
+                    dtypesIfCPU=floating_types_and(torch.bfloat16, torch.bool, torch.half),
+                    dtypesIfCUDA=floating_types_and(torch.bfloat16, torch.bool, torch.half),
                     skips=(
                         # cannot convert float infinity to integer
                         SkipInfo('TestForeach', 'test_min_max_inf_nan',
@@ -2163,9 +2163,9 @@ foreach_min_max_op_db: List[OpInfo] = [
 
     ForeachFuncInfo('minimum',
                     has_no_inplace=True,
-                    dtypes=all_types(),
-                    dtypesIfCPU=all_types(),
-                    dtypesIfCUDA=all_types(),
+                    dtypes=floating_types_and(torch.bfloat16, torch.bool, torch.half),
+                    dtypesIfCPU=floating_types_and(torch.bfloat16, torch.bool, torch.half),
+                    dtypesIfCUDA=floating_types_and(torch.bfloat16, torch.bool, torch.half),
                     skips=(
                         # cannot convert float infinity to integer
                         SkipInfo('TestForeach', 'test_min_max_inf_nan',
