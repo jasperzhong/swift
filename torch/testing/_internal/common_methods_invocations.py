@@ -1240,6 +1240,119 @@ class ForeachUnaryFuncInfo(OpInfo):
         self.inplace_variant = foreach_method_inplace
         self.ref = torch_ref_method
 
+class ForeachBinaryFuncInfo(OpInfo):
+    """Early version of a specialized OpInfo for foreach binary functions"""
+    def __init__(self,
+                 name,
+                 dtypes=all_types_and(torch.bool, torch.half, torch.bfloat16),
+                 dtypesIfCPU=all_types_and(torch.bool, torch.half, torch.bfloat16),
+                 dtypesIfCUDA=all_types_and(torch.bool, torch.half, torch.bfloat16),
+                 dtypesIfROCM=None,
+                 safe_casts_outputs=False,
+                 sample_inputs_func=sample_inputs_foreach,
+                 **kwargs):
+        super(ForeachBinaryFuncInfo, self).__init__(name,
+                                                    dtypes=dtypes,
+                                                    dtypesIfCPU=dtypesIfCPU,
+                                                    dtypesIfCUDA=dtypesIfCUDA,
+                                                    dtypesIfROCM=dtypesIfROCM,
+                                                    safe_casts_outputs=safe_casts_outputs,
+                                                    sample_inputs_func=sample_inputs_func,
+                                                    **kwargs)
+        foreach_method, foreach_method_inplace, torch_ref_method = get_foreach_method_names(name)
+        self.method_variant = foreach_method
+        self.inplace_variant = foreach_method_inplace
+        self.ref = torch_ref_method
+
+class HermitianOpInfo(OpInfo):
+    """Operator information for Hermitian functions
+    These are functions that take Hermitian matrices as input.
+    They require a modified function to be tested for gradcheck, because the finite-difference algorithm
+    for calculating derivatives does not preserve the Hermitian property of the input and returning incorrect results.
+    """
+
+    def __init__(self,
+                 name,
+                 *,
+                 skips=tuple(),
+                 **kwargs):
+        new_skips = (
+            *skips,
+            # These tests do not take into account custom op.get_op()
+            # TODO: implement op.input_func instead of modifying op.get_op()
+            # See https://github.com/pytorch/pytorch/issues/50837
+            SkipInfo('TestCommon', 'test_variant_consistency_jit'),
+        )
+
+        super().__init__(name=name,
+                         skips=new_skips,
+                         **kwargs)
+
+    def get_op(self):
+        """
+        Returns the function variant of the operator, torch.<op_name>,
+        compatible with gradcheck for Hermitian functions.
+        It works only for single input argument.
+        """
+        def hermitian_func(non_hermitian_input, **kwargs):
+            hermitian_input = non_hermitian_input + non_hermitian_input.conj().transpose(-2, -1)
+            return self.op(hermitian_input, **kwargs)
+
+        return hermitian_func
+
+
+class TriangularOpInfo(OpInfo):
+    """Operator information for function that take lower or upper triangular matrices as input.
+    They require a modified function to be tested for gradcheck, because the finite-difference algorithm
+    for calculating derivatives does not preserve the triangular property of the input and returning incorrect results.
+    """
+
+    def __init__(self,
+                 name,
+                 *,
+                 skips=tuple(),
+                 **kwargs):
+        new_skips = (
+            *skips,
+            # These tests do not take into account custom op.get_op()
+            # TODO: implement op.input_func instead of modifying op.get_op()
+            # See https://github.com/pytorch/pytorch/issues/50837
+            SkipInfo('TestCommon', 'test_variant_consistency_jit'),
+        )
+
+        super().__init__(name=name,
+                         skips=new_skips,
+                         **kwargs)
+
+    def get_op(self):
+        """
+        Returns the function variant of the operator, torch.<op_name>,
+        compatible with gradcheck for triangular input functions.
+        It works only for single input argument and upper kwarg
+        """
+        def triangular_func(non_triangular_input, upper=False):
+            if upper:
+                triangular_input = non_triangular_input.triu()
+            else:
+                triangular_input = non_triangular_input.tril()
+            return self.op(triangular_input, upper=upper)
+
+        return triangular_func
+
+    def get_method(self):
+        """
+        Returns the method variant of the operator
+        compatible with gradcheck for triangular input functions.
+        It works only for single input argument and upper kwarg
+        """
+        def triangular_func(non_triangular_input, upper=False):
+            if upper:
+                triangular_input = non_triangular_input.triu()
+            else:
+                triangular_input = non_triangular_input.tril()
+            return self.method_variant(triangular_input, upper=upper)
+
+        return triangular_func
 
 def sample_inputs_linalg_cholesky_inverse(op_info, device, dtype, requires_grad=False):
     # Generate Cholesky factors of positive-definite (non-singular) Hermitian (symmetric) matrices
@@ -1812,7 +1925,6 @@ def sample_inputs_masked_select(op_info, device, dtype, requires_grad):
 
     return samples
 
-
 def sample_inputs_polar(op_info, device, dtype, requires_grad):
     def _make_tensor_helper(shape, low=None, high=None):
         return make_tensor(shape, device, dtype, low=low, high=high, requires_grad=requires_grad)
@@ -2012,6 +2124,13 @@ def sample_inputs_lerp(op_info, device, dtype, requires_grad):
         )
 
     return samples
+foreach_binary_op_db: List[OpInfo] = [
+    ForeachBinaryFuncInfo('add'),
+    ForeachBinaryFuncInfo('sub'),
+    ForeachBinaryFuncInfo('mul'),
+    ForeachBinaryFuncInfo('div',
+                          safe_casts_outputs=True),
+]
 
 foreach_unary_op_db: List[OpInfo] = [
     ForeachUnaryFuncInfo('exp'),
