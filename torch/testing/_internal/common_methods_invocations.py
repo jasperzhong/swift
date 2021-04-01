@@ -16,7 +16,7 @@ from typing import List, Sequence, Tuple, Dict, Any, Union
 from torch.testing import \
     (make_non_contiguous, _dispatch_dtypes, floating_types, floating_types_and,
      floating_and_complex_types, floating_and_complex_types_and,
-     all_types_and_complex_and, all_types_and, all_types_and_complex, all_types,
+     all_types_and_complex_and, all_types_and, all_types_and_complex,
      integral_types_and, integral_types)
 from torch.testing._internal.common_device_type import \
     (skipIf, skipMeta, skipCUDAIfNoMagma, skipCUDAIfNoMagmaAndNoCusolver, skipCUDAIfNoCusolver,
@@ -2136,14 +2136,14 @@ def sample_inputs_lerp(op_info, device, dtype, requires_grad):
 # Foreach pointwise ops
 foreach_pointwise_op_db: List[OpInfo] = [
     ForeachFuncInfo('addcmul',
-                    dtypes=all_types(),
-                    dtypesIfCPU=all_types(),
-                    dtypesIfCUDA=all_types()),
+                    dtypes=floating_and_complex_types(),
+                    dtypesIfCPU=floating_and_complex_types(),
+                    dtypesIfCUDA=floating_and_complex_types_and(torch.bfloat16, torch.half)),
 
     ForeachFuncInfo('addcdiv',
-                    dtypes=floating_types(),
-                    dtypesIfCPU=floating_types(),
-                    dtypesIfCUDA=floating_types()),
+                    dtypes=floating_and_complex_types(),
+                    dtypesIfCPU=floating_and_complex_types(),
+                    dtypesIfCUDA=floating_and_complex_types_and(torch.bfloat16, torch.half)),
 ]
 
 # Foreach min/max ops
