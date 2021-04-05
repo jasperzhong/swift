@@ -831,12 +831,14 @@ if(USE_BREAKPAD)
 
   file(MAKE_DIRECTORY ${BREAKPAD_INCLUDES})
 
+  include(ProcessorCount)
+  ProcessorCount(N)
   ExternalProject_Add(
       libbreakpad
       PREFIX ${BREAKPAD_BIN}
       SOURCE_DIR ${BREAKPAD_DIR}
       CONFIGURE_COMMAND mkdir -p ${LSS_DEST} && cp ${LSS_SOURCE}/linux_syscall_support.h ${LSS_DEST} && ${BREAKPAD_DIR}/configure --silent --srcdir=${BREAKPAD_DIR} --prefix=${BREAKPAD_BIN}
-      BUILD_COMMAND make --silent
+      BUILD_COMMAND make -j ${N} --silent
       INSTALL_COMMAND make install --silent > /dev/null
       BUILD_BYPRODUCTS ${BREAKPAD_STATIC_LIB}
   )

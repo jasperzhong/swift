@@ -10,5 +10,7 @@ TORCH_API void _enable_minidump_collection(const std::string& dir);
 
 TORCH_API const std::string& _get_minidump_directory();
 
+TORCH_API void _write_minidump(std::exception_ptr e);
+
 } // namespace crash_handler
 } // namepsace torch

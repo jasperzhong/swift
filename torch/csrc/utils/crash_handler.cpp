@@ -54,5 +54,13 @@ const std::string& _get_minidump_directory() {
 }
 #endif
 
+void _write_minidump(std::exception_ptr e) {
+  if (!handler) {
+    return;
+  }
+  handler->WriteMinidump();
+}
+
+
 } // namespace crash_handler
 } // namespace torch

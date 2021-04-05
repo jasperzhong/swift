@@ -74,6 +74,10 @@
 #include <callgrind.h>
 #endif
 
+#if defined(__linux__)
+#include <client/linux/handler/exception_handler.h> // NOLINT
+#endif
+
 namespace py = pybind11;
 
 PyObject* module;
@@ -910,6 +914,8 @@ PyObject* initModule() {
 
   // Automatically translate errors thrown from pybind11 functions
   py::register_exception_translator([](std::exception_ptr e) { // NOLINT
+    torch::crash_handler::_write_minidump(e);
+
     try {
       if (e) {
         std::rethrow_exception(e);
