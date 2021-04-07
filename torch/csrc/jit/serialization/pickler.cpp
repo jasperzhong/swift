@@ -12,7 +12,6 @@ namespace torch {
 namespace jit {
 
 using ::c10::IValue;
-
 // Protocol 2 is the highest that can be decoded by Python 2
 // See https://docs.python.org/3/library/pickle.html#data-stream-format
 constexpr static uint8_t PROTOCOL_VERSION = 2;
@@ -293,8 +292,20 @@ void Pickler::pushStorageOfTensor(const at::Tensor& tensor) {
   std::string data_type =
       std::string(toString(tensor.scalar_type())).append("Storage");
   pushGlobal("torch", data_type);
+
   // root_key
-  pushString(c10::to_string(tensor_data_.size()));
+  // if tensors_archive_table_ includes the tensor, root_key will be,
+  // for example: constants/0, such that it refers to the existing tensor
+  // archive/index.
+  const auto& found = tensors_archive_table_.find(tensor);
+  std::string root_key;
+  if (found != tensors_archive_table_.end()) {
+    std::string archive_name_slash = found->second.first + "/";
+    root_key = archive_name_slash + c10::to_string(found->second.second);
+  } else {
+    root_key = c10::to_string(tensor_data_.size());
+  }
+  pushString(root_key);
   // location
   pushString(tensor.device().str());
   // size

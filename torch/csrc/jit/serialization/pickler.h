@@ -14,6 +14,35 @@
 namespace torch {
 namespace jit {
 
+struct tensor_value_hash {
+  std::size_t operator()(const at::Tensor& tensor) const {
+    std::stringstream tensor_stream;
+    tensor_stream << tensor;
+    std::string tensor_str = tensor_stream.str();
+    std::size_t h1 = std::hash<std::string>{}(tensor_str);
+    return h1;
+  }
+};
+
+struct tensor_value_equal {
+  bool operator()(const at::Tensor& a, const at::Tensor& b) const {
+    std::stringstream a_stream;
+    a_stream << a;
+    std::string a_str = a_stream.str();
+
+    std::stringstream b_stream;
+    b_stream << b;
+    std::string b_str = b_stream.str();
+    return a_str == b_str;
+  }
+};
+
+using TensorIndexMap = std::unordered_map<
+    at::Tensor,
+    std::pair<std::string, int>,
+    tensor_value_hash,
+    tensor_value_equal>;
+
 // See Python's pickletools.py for a detailed description of each of these codes
 enum class PickleOpCode : char {
   MARK = '(',
@@ -149,6 +178,11 @@ class TORCH_API Pickler {
     return tensor_data_;
   }
 
+  void updateTensorsArchiveTable(const TensorIndexMap& tensors_archive_table) {
+    tensors_archive_table_.insert(
+        tensors_archive_table.begin(), tensors_archive_table.end());
+  }
+
   void pushEmptyDict();
   void pushDict(const IValue& ivalue);
   void pushInt(int64_t value);
@@ -259,6 +293,15 @@ class TORCH_API Pickler {
   // List of tensor storages to serialize in the same binary as the pickle data
   // similar to ivalues, they are memoized using BINPUT
   std::vector<at::Tensor> tensor_data_;
+
+  // tensors_archive_table_ is a map of (tensor) => (archive_name, index)
+  // when the tensor exists in the map, it is available under the corresponding
+  // archive, and there is no need to rewrite the tensor. It will just update
+  // archive_name.pkl with the corresponding archive path, for example:
+  // constants/0. Currently, this map is only used for bytecode archive
+  // referring constant archive.
+  TensorIndexMap tensors_archive_table_;
+
   std::unordered_map<const void*, uint32_t> memoized_storage_map_;
 
   std::unordered_map<std::string, uint32_t> memoized_globals_map_;
