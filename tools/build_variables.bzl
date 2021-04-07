@@ -327,6 +327,9 @@ libtorch_distributed_sources = [
     "torch/csrc/distributed/rpc/types.cpp",
     "torch/csrc/distributed/rpc/utils.cpp",
     "torch/csrc/distributed/rpc/metrics/registry.cpp",
+    "torch/csrc/distributed/spmd/engine.cpp",
+    "torch/csrc/distributed/spmd/event_impl.cpp",
+    "torch/csrc/distributed/spmd/event.cpp",
 ]
 
 jit_sources_full = [
@@ -636,6 +639,8 @@ libtorch_python_distributed_sources = libtorch_python_distributed_core_sources +
     "torch/csrc/distributed/rpc/testing/init.cpp",
     "torch/csrc/distributed/rpc/unpickled_python_call.cpp",
     "torch/csrc/distributed/rpc/unpickled_python_remote_call.cpp",
+    "torch/csrc/distributed/spmd/event_handler_impl.cpp",
+    "torch/csrc/distributed/spmd/init.cpp",
     "torch/csrc/jit/runtime/register_distributed_ops.cpp",
 ]
 
