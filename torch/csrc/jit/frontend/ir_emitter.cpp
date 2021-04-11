@@ -1,4 +1,5 @@
 #include <torch/csrc/jit/frontend/ir_emitter.h>
+#include "ATen/core/jit_type_base.h"
 
 #include <c10/util/Exception.h>
 #include <c10/util/StringUtil.h>
@@ -147,7 +148,7 @@ struct CondValue {
       c10::optional<bool> static_if)
       : value_(value),
         refinements_(std::move(refinements)),
-        static_if_(static_if) {}
+        static_if_(static_if){}
   CondValue(
       Graph& g,
       const SourceRange& loc,
@@ -168,6 +169,7 @@ struct CondValue {
 
  private:
   Value* value_;
+
   RefinementSet refinements_;
   c10::optional<bool>
       static_if_; // certain expression cause us to emit a static if statement
@@ -398,6 +400,7 @@ struct Environment {
     }
     if (as_simple_value) {
       if (annotated_type &&
+          (as_simple_value->type()->kind() != TypeKind::AnyType) &&
           !as_simple_value->type()->isSubtypeOf(annotated_type)) {
         throw ErrorReport(loc)
             << "Variable '" << name << "' is annotated with type "
@@ -1236,16 +1239,17 @@ struct to_ir {
             }
           }
         }
-        auto expr_out = emitToBool(expr.range(), emitExpr(expr));
+        auto expr_out = emitExpr(expr);
+        auto expr_out_bool = emitToBool(expr.range(), expr_out);
         c10::optional<bool> static_if = c10::nullopt;
-        auto kind = expr_out->node()->kind();
+        auto kind = expr_out_bool->node()->kind();
         if (kind == aten::is_scripting) {
           static_if = true;
         } else if (kind == aten::has_torch_function) {
           static_if = false;
         }
         // MetaCompile on boolean literals and constants
-        if (auto maybe_ivalue = toIValue(expr_out)) {
+        if (auto maybe_ivalue = toIValue(expr_out_bool)) {
           static_if = maybe_ivalue->toBool();
         }
         return CondValue(expr_out, RefinementSet({}), static_if);
@@ -1399,7 +1403,8 @@ struct to_ir {
 
     // if it's an OR the first expr is emitted in the true branch
     // and the second expr in the false branch, if it's an AND the opposite
-    auto get_const_expr = [&] { return graph->insertConstant(is_or, loc); };
+    // auto get_const_expr = [&] { return graph->insertConstant(is_or, loc); };
+    auto get_const_expr = [&] { return lhs.value(); };
 
     c10::optional<CondValue> rhs;
     auto get_continue_expr = [&] {
@@ -2691,6 +2696,8 @@ struct to_ir {
         return "__and__";
       case '|':
         return "__or__";
+      case TK_OR:
+        return "__or__";
       case '^':
         return "__xor__";
       case TK_IN:
@@ -3538,7 +3545,17 @@ struct to_ir {
       case TK_IS:
       case TK_ISNOT:
       case TK_AND:
-      case TK_OR:
+      case TK_OR: {
+        auto expr = Expr(tree);
+        auto binop = BinOp(expr);
+        if (type_hint != nullptr) {
+          std::cout << "HINT: " << c10::typeKindToString(type_hint->kind()) << std::endl;
+        }
+        auto cond =  emitShortCircuitLogical(
+            binop.range(), binop.lhs(), binop.rhs(), expr.kind() == TK_OR);
+        std::cout << "HI: " << c10::typeKindToString(cond.value()->type()->kind()) << std::endl;
+        return cond.value();
+      }
       case TK_NOT: {
         return emitCondExpr(Expr(tree)).value();
       }
