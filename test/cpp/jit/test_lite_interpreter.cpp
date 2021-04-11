@@ -453,7 +453,7 @@ TEST(LiteInterpreterTest, ModuleInfoBasic) {
   )JIT");
 
   std::stringstream ss;
-  m._save_for_mobile(ss, {}, true);
+  m._save_for_mobile(ss, {}, caffe2::serialize::kProducedBytecodeVersion, true);
   mobile::Module bc = _load_for_mobile(ss);
 
   std::unordered_set<std::string> module_debug_info_set;
@@ -511,7 +511,7 @@ TEST(LiteInterpreterTest, OneSubmoduleModuleInfo) {
   )JIT");
 
   std::stringstream ss;
-  b._save_for_mobile(ss, {}, true);
+  b._save_for_mobile(ss, {}, caffe2::serialize::kProducedBytecodeVersion, true);
   mobile::Module bc = _load_for_mobile(ss);
 
   std::unordered_set<std::string> module_debug_info_set;
@@ -553,7 +553,8 @@ TEST(LiteInterpreterTest, TwoSubmodulesModuleInfo) {
   )JIT");
 
   std::stringstream ss;
-  c._save_for_mobile(ss, {}, true);
+  c._save_for_mobile(ss, {}, caffe2::serialize::kProducedBytecodeVersion, true);
+
   mobile::Module bc = _load_for_mobile(ss);
 
   std::unordered_set<std::string> module_debug_info_set;
@@ -594,10 +595,45 @@ TEST(LiteInterpreterTest, SequentialModuleInfo) {
       return self.A0.forward(self.B0.forward(x))
   )JIT");
 
-  std::stringstream ss;
-  c._save_for_mobile(ss, {}, true);
-  mobile::Module bc = _load_for_mobile(ss);
+  //  mobile::Module bc =
+  //  _load_for_mobile("/Users/chenlai/Documents/pytorch/reuse_constant/tmp/zip/example.ptl");
+  //    Module m =
+  //    load("/Users/chenlai/Documents/pytorch/reuse_constant/tmp/zip/example_small.ptl");
+  //  m._save_for_mobile("/Users/chenlai/Documents/pytorch/reuse_constant/tmp/zip/example_resave.ptl");
+  //  Module m =
+  //  load("/Users/chenlai/Documents/pytorch/reuse_constant/tmp/prod_models/model_GEvf3Ai5k7F7yyQDAHSqkcT3BphpbmQwAAAA.ptl");
+  //    Module m = load(
+  //        "/Users/chenlai/Documents/pytorch/reuse_constant/tmp/zip/example_resave.ptl");
+  //  Module m_4 =
+  //  load("/Users/chenlai/Documents/pytorch/reuse_constant/tmp/prod_models/model_GIUuJgnMqK6yz3cBAHIwqieH2f4PbmQwAAAA_4.ptl");
+  //  Module m_5 = load(
+  //      "/Users/chenlai/Documents/pytorch/reuse_constant/tmp/prod_models/model_GIUuJgnMqK6yz3cBAHIwqieH2f4PbmQwAAAA_5.ptl");
+  //  mobile::Module m_m_4 =
+  //  _load_for_mobile("/Users/chenlai/Documents/pytorch/reuse_constant/tmp/prod_models/model_GIUuJgnMqK6yz3cBAHIwqieH2f4PbmQwAAAA_4.ptl");
+  //    mobile::Module m_m_5 =
+  //    _load_for_mobile("/Users/chenlai/Documents/pytorch/reuse_constant/tmp/prod_models/model_GIUuJgnMqK6yz3cBAHIwqieH2f4PbmQwAAAA_5.ptl");
+  //  m._save_for_mobile(
+  //      "/Users/chenlai/Documents/pytorch/reuse_constant/tmp/zip/example_small_v4.ptl",
+  //      {},
+  //      caffe2::serialize::kProducedBytecodeVersion - 1);
+  //  m_5._save_for_mobile(
+  //      "/Users/chenlai/Documents/pytorch/reuse_constant/tmp/zip/example_small_v5.ptl",
+  //      {},
+  //      caffe2::serialize::kProducedBytecodeVersion);
+  //  Module m =
+  //  load("/Users/chenlai/Documents/pytorch/reuse_constant/tmp/prod_models/model_GD3KrQiyNkGTdbACACg60Fjyy8VLbmQwAAAA_4.ptl");
+  //    m._save_for_mobile(
+  //        "/Users/chenlai/Documents/pytorch/reuse_constant/tmp/zip/model_GD3_tmp.ptl",
+  //        {},
+  //        caffe2::serialize::kProducedBytecodeVersion);
 
+  //  c._save_for_mobile("/Users/chenlai/Documents/pytorch/reuse_constant/tmp/test.ptl");
+  //  mobile::Module cc = _load_for_mobile(
+  //      "/Users/chenlai/Documents/pytorch/reuse_constant/tmp/zip/example_small.ptl");
+
+  std::stringstream ss;
+  c._save_for_mobile(ss, {}, caffe2::serialize::kProducedBytecodeVersion, true);
+  mobile::Module bc = _load_for_mobile(ss);
   std::unordered_set<std::string> module_debug_info_set;
   size_t pc = 0;
   while (true) {
@@ -660,7 +696,8 @@ TEST(LiteInterpreterTest, HierarchyModuleInfo) {
   )JIT");
 
   std::stringstream ss;
-  c._save_for_mobile(ss, {}, true);
+  c._save_for_mobile(ss, {}, caffe2::serialize::kProducedBytecodeVersion, true);
+
   mobile::Module bc = _load_for_mobile(ss);
 
   std::unordered_set<std::string> module_debug_info_set;
@@ -703,7 +740,7 @@ TEST(LiteInterpreterTest, DuplicatedClassTypeModuleInfo) {
   )JIT");
 
   std::stringstream ss;
-  b._save_for_mobile(ss, {}, true);
+  b._save_for_mobile(ss, {}, caffe2::serialize::kProducedBytecodeVersion, true);
   mobile::Module bc = _load_for_mobile(ss);
 
   std::unordered_set<std::string> module_debug_info_set;
