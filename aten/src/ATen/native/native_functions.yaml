@@ -8938,3 +8938,16 @@
   variants: function
   dispatch:
     CPU: _segment_reduce_cpu
+
+# Functions which do no work and simply return `self`. Used to measure overhead.
+- func: _noop_unary(Tensor self) -> Tensor
+  variants: function, method
+  dispatch:
+    CPU: _noop_unary_cpu
+    CUDA: _noop_unary_cuda
+
+- func: _noop_binary(Tensor self, Tensor other) -> Tensor
+  variants: function, method
+  dispatch:
+    CPU: _noop_binary_cpu
+    CUDA: _noop_binary_cuda
