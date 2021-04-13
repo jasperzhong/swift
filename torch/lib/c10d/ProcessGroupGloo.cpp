@@ -172,7 +172,7 @@ class GlooStore : public ::gloo::rendezvous::Store {
  public:
   GlooStore(const c10::intrusive_ptr<::c10d::Store>& store) : store_(store) {}
 
-  void set(const std::string& key, const std::vector<uint8_t>& value) override {
+  void set(const std::string& key, const std::vector<uint8_t>& value) {
     store_->set(key, value);
   }
 
@@ -183,7 +183,7 @@ class GlooStore : public ::gloo::rendezvous::Store {
 
   // Note: The second argument is just a placeholder because C++ does not allow
   // overloading when only return types are different
-  std::vector<uint8_t> get(const std::string& key, int /* unused */ = -1) override {
+  std::vector<uint8_t> get(const std::string& key, int /* unused */ = -1) {
     auto value = store_->get(key);
     return value;
   }
