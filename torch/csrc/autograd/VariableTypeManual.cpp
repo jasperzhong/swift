@@ -36,38 +36,7 @@ C10_EXPORT std::vector<at::DeprecatedTypeProperties*> allCUDATypes() {
   return allTypesForBackends({ Backend::CUDA, Backend::SparseCUDA });
 }
 
-namespace {
-const Variable & checked_cast_variable(const Tensor & t, const char * name, int pos) {
-  if (!t.defined()) {
-    AT_ERROR("Expected a Tensor of type Variable but found an undefined Tensor for argument #", pos, " '", name, "'");
-  }
-  return t;
-}
-
-Variable & checked_cast_variable(Tensor & t, const char * name, int pos) {
-  if (!t.defined()) {
-    AT_ERROR("Expected a Tensor of type Variable but found an undefined Tensor for argument #", pos, " '", name, "'");
-  }
-  return t;
-}
-}
-
-const Tensor & unpack(const Tensor & t, const char * name, int pos) {
-  return checked_cast_variable(t, name, pos);
-}
-
-Tensor & unpack(Tensor & t, const char * name, int pos) {
-  return checked_cast_variable(t, name, pos);
-}
-
-Tensor unpack_opt(const Tensor & t, const char * name, int pos) {
-  if (!t.defined()) {
-    return Tensor();
-  }
-  return unpack(t, name, pos);
-}
-
-std::vector<at::Tensor> unpack(at::TensorList tl, const char *name, int pos) {
+std::vector<at::Tensor> unpack_list(at::TensorList tl, const char *name, int pos) {
   std::vector<at::Tensor> ret(tl.size());
   for (size_t i = 0; i < tl.size(); ++i) {
     const auto &t = tl[i];
@@ -83,7 +52,7 @@ namespace {
 
 // Taken from codegened version
 Tensor _fw_primal(const Tensor & self, int64_t level) {
-  auto& self_ = unpack(self, "self", 0);
+  UNPACK_TENSOR(self, 0);  // auto& self_ = self;
   std::shared_ptr<Identity> grad_fn;
   if (compute_requires_grad( self )) {
     grad_fn = std::make_shared<Identity>();
@@ -118,8 +87,8 @@ Tensor _fw_primal(const Tensor & self, int64_t level) {
 Tensor & copy_(c10::DispatchKeySet ks, Tensor & self, const Tensor & src, bool non_blocking) {
   // TODO: once copy is exposed in Declarations.yaml we may be able to bind
   // it automatically
-  auto& self_ = unpack(self, "self", 0);
-  auto& src_ = unpack(src, "src", 1);
+  UNPACK_TENSOR(self, 0);  // auto& self_ = self;
+  UNPACK_TENSOR(src, 1);   // auto& src_ = src;
   std::shared_ptr<CopyBackwards> grad_fn;
   auto requires_grad = compute_requires_grad(self, src);
   requires_grad &= isDifferentiableType(self.scalar_type());
@@ -161,7 +130,7 @@ const Tensor& resize_(
     const Tensor& self,
     IntArrayRef size,
     c10::optional<MemoryFormat> optional_memory_format) {
-  auto& self_ = unpack(self, "self", 0);
+  UNPACK_TENSOR(self, 0);  // auto& self_ = self;
   if (self.requires_grad()) {
     AT_ERROR("cannot resize variables that require grad");
   }
@@ -182,8 +151,8 @@ const Tensor& resize_as_(
     const Tensor& self,
     const Tensor& the_template,
     c10::optional<MemoryFormat> optional_memory_format) {
-  auto& self_ = unpack(self, "self", 0);
-  auto& the_template_ = unpack(the_template, "the_template", 1);
+  UNPACK_TENSOR(self, 0);          // auto& self_ = self;
+  UNPACK_TENSOR(the_template, 1);  // auto& the_template_ = the_template;
   if (self.requires_grad()) {
     AT_ERROR("cannot resize variables that require grad");
   }
