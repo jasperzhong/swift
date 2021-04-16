@@ -1313,7 +1313,20 @@ class Quantizer:
                                 # handler logic to take this into account.
                                 value = CopyNodeQuantizeHandler  # type: ignore
 
-                            this_node_qconfig = self.qconfig_map[node.name]
+                            # to properly check for dtype support, we need to
+                            # navigate to the base node of an add-relu or mul-relu
+                            # pattern
+                            base_node = node
+                            if (
+                                (node.op == 'call_function' and
+                                 node.target is torch.nn.functional.relu) or
+                                (node.op == 'call_module' and
+                                 isinstance(modules[node.target], torch.nn.ReLU))
+                            ):
+                                base_node = node.args[0]
+
+                            this_node_qconfig = \
+                                self.qconfig_map[base_node.name]
                             if this_node_qconfig:
                                 dtypes = get_qconfig_dtypes(this_node_qconfig)
                                 # TODO(future PR): update the pattern to quantize
@@ -1326,15 +1339,21 @@ class Quantizer:
 
                                 # note: the value of is_reference is unknown at prepare, so we have to cover both cases
                                 # handle is_reference = False
-                                skip_match_not_is_reference = node.target in binary_op_supported_dtypes and \
-                                    dtypes not in binary_op_supported_dtypes[node.target]
+                                skip_match_not_is_reference = (
+                                    (base_node.target in binary_op_supported_dtypes) and
+                                    (dtypes not in binary_op_supported_dtypes[base_node.target])
+                                )
 
                                 # handle is_reference = True
-                                supported_is_reference = node.target in binary_reference_op_supported_dtypes and \
-                                    dtypes in binary_reference_op_supported_dtypes[node.target]
+                                match_supported_is_reference = (
+                                    (node.target in binary_reference_op_supported_dtypes) and
+                                    (dtypes in binary_reference_op_supported_dtypes[node.target])
+                                )
 
                                 # only skip if unsupported
                                 skip_this_match = skip_match_not_is_reference and not supported_is_reference
+
+
 
                         if not skip_this_match:
                             matched: List[Any] = []
