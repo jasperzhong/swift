@@ -284,8 +284,6 @@ void cpu_max_pool_backward_channels_last(
 
       for (int64_t oh = 0; oh < output_height; oh++) {
         for (int64_t ow = 0; ow < output_width; ow++) {
-          int64_t index = oh * output_width + ow;
-
           scalar_t* gout = grad_output_ptr + oh * output_width * channels + ow * channels;
           int64_t* ind = indices_ptr + oh * output_width * channels + ow * channels;
           // TODO: gcc vectorization
