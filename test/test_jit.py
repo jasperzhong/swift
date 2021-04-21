@@ -996,6 +996,13 @@ class TestJit(JitTestCase):
         checkBackwardTwiceScript(test_script_backward_twice_with_saved_values, (inp1, inp2), False)
         checkBackwardTwiceScript(test_script_backward_twice_with_saved_values, (inp1, inp2), True)
 
+    def test_optional_inputs(self):
+        def fn(t, n: Optional[int]):
+            return torch.fft.fftn(t, n)
+
+            a = torch.rand(2, 3)
+            self.checkScript(fn, (a, 3, ))
+
     def test_diff_subgraph_clones_constants(self):
         @torch.jit.script
         def f(x, y):
