@@ -162,6 +162,9 @@ void initJITBindings(PyObject* module) {
           })
       .def("_jit_pass_lower_all_tuples", LowerAllTuples)
       .def(
+          "_new_symbolic_shape_symbol",
+          []() { return ShapeSymbol::newSymbol().value(); })
+      .def(
           "_jit_register_operator_shape_function",
           RegisterOperatorShapeFunction)
       .def("_jit_pass_propagate_shapes_on_graph", PropagateShapesOnGraph)
