@@ -341,7 +341,7 @@ class CppSignature:
         returns_type = cpp.returns_type(self.func.returns).cpp_type()
         cpp_args = [a.decl() for a in self.arguments()]
         if is_redispatching_fn:
-            cpp_args = ['c10::DispatchKeySet dispatchKeySet'] + cpp_args
+            cpp_args = ['c10::DispatchCache dispatchCache'] + cpp_args
         cpp_args_str = ', '.join(cpp_args)
         name = prefix + self.name()
         return f"{returns_type} {name}({cpp_args_str})"
@@ -352,7 +352,7 @@ class CppSignature:
         returns_type = cpp.returns_type(self.func.returns).cpp_type()
         cpp_args = [a.defn() for a in self.arguments()]
         if is_redispatching_fn:
-            cpp_args = ['c10::DispatchKeySet dispatchKeySet'] + cpp_args
+            cpp_args = ['c10::DispatchCache dispatchCache'] + cpp_args
         cpp_args_str = ', '.join(cpp_args)
         name = prefix + self.name()
         return f"{returns_type} {name}({cpp_args_str})"

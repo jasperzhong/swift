@@ -1,4 +1,5 @@
 #include <ATen/core/boxing/KernelFunction.h>
+#include <ATen/core/dispatch/dispatch_cache.h>
 #include <ATen/core/dispatch/Dispatcher.h>
 
 #include <sstream>
@@ -10,7 +11,7 @@ namespace c10 {
 // be handled specially.  Its semantics is that it redispatches to the
 // *next* dispatch key that would have been processed, skipping the current
 // one.
-void fallthrough_kernel(OperatorKernel*, const OperatorHandle&, DispatchKeySet, Stack*) {
+void fallthrough_kernel(OperatorKernel*, const OperatorHandle&, DispatchCache, Stack*) {
   TORCH_INTERNAL_ASSERT(0,
     "fallthrough_kernel was executed but it should have been short-circuited by the dispatcher. "
     "This could occur if you registered a fallthrough kernel as a override for a specific operator "
@@ -19,7 +20,7 @@ void fallthrough_kernel(OperatorKernel*, const OperatorHandle&, DispatchKeySet, 
     "let us know in the bug tracker.");
 }
 
-void ambiguous_autogradother_kernel(OperatorKernel*, const OperatorHandle& op, DispatchKeySet, Stack*) {
+void ambiguous_autogradother_kernel(OperatorKernel*, const OperatorHandle& op, DispatchCache, Stack*) {
   TORCH_INTERNAL_ASSERT(0,
     op.operator_name(), " has kernels registered to both CompositeImplicitAutograd and a backend mapped to AutogradOther. "
     "This makes the backend kernel unreachable; the dispatcher will always prefer the CompositeImplicitAutograd lowering "
@@ -31,7 +32,7 @@ void ambiguous_autogradother_kernel(OperatorKernel*, const OperatorHandle& op, D
     "\nCanonical state\n~~~~~~~~~~~\n", op.dumpState(), "\n\n");
 }
 
-void named_not_supported_kernel(OperatorKernel*, const OperatorHandle& op, DispatchKeySet, Stack*) {
+void named_not_supported_kernel(OperatorKernel*, const OperatorHandle& op, DispatchCache, Stack*) {
   // DO NOT LOOK AT STACK, YOU HAVE SHORT CIRCUITED BOXING
   // See Note [named_not_supported_kernel]
   TORCH_CHECK(0,

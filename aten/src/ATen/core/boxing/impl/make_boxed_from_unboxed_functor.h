@@ -2,6 +2,7 @@
 
 #include <ATen/core/ivalue.h>
 #include <ATen/core/stack.h>
+#include <ATen/core/dispatch/dispatch_cache.h>
 #include <c10/util/Metaprogramming.h>
 
 namespace c10 {
@@ -400,7 +401,7 @@ namespace impl {
   template<class KernelFunctor, class OpSignature>
   struct wrap_kernel_functor_unboxed_ final {};
 
-  // This specialization is for kernels with a first argument that is NOT of type DispatchKeySet
+  // This specialization is for kernels with a first argument that is NOT of type DispatchCache
   // This includes kernels with 0 arguments.
   template<class KernelFunctor, class ReturnType, class... ParameterTypes>
   struct wrap_kernel_functor_unboxed_<KernelFunctor, ReturnType(ParameterTypes...)> final {
@@ -410,34 +411,34 @@ namespace impl {
       "Parameter types mismatch");
 
     // See [Note: Argument forwarding in the dispatcher] for why ParameterTypes doesn't use &&
-    static ReturnType call(OperatorKernel* functor, DispatchKeySet, ParameterTypes... args) {
+    static ReturnType call(OperatorKernel* functor, DispatchCache, ParameterTypes... args) {
       KernelFunctor* functor_ = static_cast<KernelFunctor*>(functor);
       // Note [Plumbing Keys Through The Dispatcher 2]
       // See Note [Plumbing Keys Through The Dispatcher] for the background.
-      // This functor explicitly takes in a dispatchKeySet and drops it on the floor- it does not forward it to the registered kernel.
+      // This functor explicitly takes in a DispatchCache and drops it on the floor- it does not forward it to the registered kernel.
       //
       // This is due to the calling convention within the dispatcher, which expects all registered kernels to have a first argument of type
-      // DispatchKeySet.
+      // DispatchCache.
       // This is not the case for pretty much all manually written kernels, however- this functor serves to separate the calling convention
       // of the dispatcher from the calling convention of manually written kernels.
       return (*functor_)(std::forward<ParameterTypes>(args)...);
     }
   };
 
-  // This specialization is for kernels with a first argument of type DispatchKeySet
+  // This specialization is for kernels with a first argument of type DispatchCache
   template<class KernelFunctor, class ReturnType, class... ParameterTypes>
-  struct wrap_kernel_functor_unboxed_<KernelFunctor, ReturnType(DispatchKeySet, ParameterTypes...)> final {
+  struct wrap_kernel_functor_unboxed_<KernelFunctor, ReturnType(DispatchCache, ParameterTypes...)> final {
     static_assert(std::is_same<ReturnType, typename guts::infer_function_traits_t<KernelFunctor>::return_type>::value,
       "Return type mismatch");
-    static_assert(std::is_same<guts::typelist::typelist<DispatchKeySet, ParameterTypes...>, typename guts::infer_function_traits_t<KernelFunctor>::parameter_types>::value,
+    static_assert(std::is_same<guts::typelist::typelist<DispatchCache, ParameterTypes...>, typename guts::infer_function_traits_t<KernelFunctor>::parameter_types>::value,
       "Parameter types mismatch");
 
     // See [Note: Argument forwarding in the dispatcher] for why ParameterTypes doesn't use &&
-    static ReturnType call(OperatorKernel* functor, DispatchKeySet dispatchKeySet, ParameterTypes... args) {
+    static ReturnType call(OperatorKernel* functor, DispatchCache dispatchCache, ParameterTypes... args) {
       KernelFunctor* functor_ = static_cast<KernelFunctor*>(functor);
-      // We're explicitly taking in a dispatchKeySet and forwarding it to the registered kernel.
+      // We're explicitly taking in a DispatchCache and forwarding it to the registered kernel.
       // See Note [Plumbing Keys Through The Dispatcher 2] for details.
-      return (*functor_)(dispatchKeySet, std::forward<ParameterTypes>(args)...);
+      return (*functor_)(dispatchCache, std::forward<ParameterTypes>(args)...);
     }
   };
 
@@ -448,14 +449,14 @@ namespace impl {
 
   template<class Functor, bool AllowDeprecatedTypes, size_t... ivalue_arg_indices,  typename... ArgTypes>
   std::decay_t<typename guts::infer_function_traits_t<Functor>::return_type>
-  call_functor_with_args_from_stack_(OperatorKernel* functor, DispatchKeySet dispatchKeySet, Stack* stack, std::index_sequence<ivalue_arg_indices...>, guts::typelist::typelist<ArgTypes...>*) {
+  call_functor_with_args_from_stack_(OperatorKernel* functor, DispatchCache dispatchCache, Stack* stack, std::index_sequence<ivalue_arg_indices...>, guts::typelist::typelist<ArgTypes...>*) {
     (void)(stack); // when sizeof...(ivalue_arg_indices) == 0, this argument would be unused and we have to silence the compiler warning.
 
-    // We're explicitly filtering out DispatchKeySet from the argument list.
-    // Some kernels take a DispatchKeySet as their first argument in order to plumb keys through the dispatcher.
-    // We don't want to expose the DispatchKeySet type to jit, so we don't include this argument on the stack.
+    // We're explicitly filtering out DispatchCache from the argument list.
+    // Some kernels take a DispatchCache as their first argument in order to plumb keys through the dispatcher.
+    // We don't want to expose the DispatchCache type to jit, so we don't include this argument on the stack.
     // See Note [Plumbing Keys Through The Dispatcher] for the background.
-    return wrap_kernel_functor_unboxed<Functor>::call(functor, dispatchKeySet,
+    return wrap_kernel_functor_unboxed<Functor>::call(functor, dispatchCache,
       ivalue_to_arg<typename decay_if_not_tensor<ArgTypes>::type, AllowDeprecatedTypes>::call(
         torch::jit::peek(*stack, ivalue_arg_indices, sizeof...(ivalue_arg_indices))
     )...);
@@ -463,14 +464,14 @@ namespace impl {
 
   template<class Functor, bool AllowDeprecatedTypes>
   std::decay_t<typename guts::infer_function_traits_t<Functor>::return_type>
-  call_functor_with_args_from_stack(OperatorKernel* functor, DispatchKeySet dispatchKeySet, Stack* stack) {
-    // We're explicitly filtering out DispatchKeySet from the argument list.
-    // Some kernels take a DispatchKeySet as their first argument in order to plumb keys through the dispatcher.
-    // We don't want to expose the DispatchKeySet type to jit, so we don't include this argument on the stack.
+  call_functor_with_args_from_stack(OperatorKernel* functor, DispatchCache dispatchCache, Stack* stack) {
+    // We're explicitly filtering out DispatchCache from the argument list.
+    // Some kernels take a DispatchCache as their first argument in order to plumb keys through the dispatcher.
+    // We don't want to expose the DispatchCache type to jit, so we don't include this argument on the stack.
     // See Note [Plumbing Keys Through The Dispatcher] for the background.
-    using ArgTypes = typename c10::remove_DispatchKeySet_arg_from_func<Functor>::parameter_types;
+    using ArgTypes = typename c10::remove_DispatchCache_arg_from_func<Functor>::parameter_types;
     constexpr size_t num_ivalue_args = guts::typelist::size<ArgTypes>::value;
-    return call_functor_with_args_from_stack_<Functor, AllowDeprecatedTypes>(functor, dispatchKeySet, stack, std::make_index_sequence<num_ivalue_args>(), static_cast<ArgTypes*>(nullptr));
+    return call_functor_with_args_from_stack_<Functor, AllowDeprecatedTypes>(functor, dispatchCache, stack, std::make_index_sequence<num_ivalue_args>(), static_cast<ArgTypes*>(nullptr));
   }
 
   // push_outputs
@@ -522,13 +523,13 @@ namespace impl {
     static_assert(std::is_base_of<OperatorKernel, KernelFunctor>::value,
       "Tried to register a kernel functor using the kernel<Functor>() API, but it doesn't inherit from c10::OperatorKernel. Please have the functor inherit from it.");
 
-    static void call(OperatorKernel* functor, const OperatorHandle&, DispatchKeySet dispatchKeySet, Stack* stack) {
+    static void call(OperatorKernel* functor, const OperatorHandle&, DispatchCache dispatchCache, Stack* stack) {
       using ReturnType = typename guts::infer_function_traits_t<KernelFunctor>::return_type;
-      // We're explicitly filtering out DispatchKeySet from the argument list.
-      // Some kernels take a DispatchKeySet as their first argument in order to plumb keys through the dispatcher.
-      // We don't want to expose the DispatchKeySet type to jit, so we don't include this argument on the stack.
+      // We're explicitly filtering out DispatchCache from the argument list.
+      // Some kernels take a DispatchCache as their first argument in order to plumb keys through the dispatcher.
+      // We don't want to expose the DispatchCache type to jit, so we don't include this argument on the stack.
       // See Note [Plumbing Keys Through The Dispatcher] for the background.
-      using ArgTypes = typename c10::remove_DispatchKeySet_arg_from_func<KernelFunctor>::parameter_types;
+      using ArgTypes = typename c10::remove_DispatchCache_arg_from_func<KernelFunctor>::parameter_types;
       constexpr bool has_outputs = !std::is_same<void, ReturnType>::value;
       constexpr size_t num_inputs = guts::typelist::size<ArgTypes>::value;
 #ifdef __cpp_if_constexpr
@@ -540,10 +541,10 @@ namespace impl {
         // and don't get a dangling reference. This is only required because some kernels still return `Tensor&`.
 #ifdef __cpp_if_constexpr
         using ReturnType_ = std::decay_t<ReturnType>;
-        ReturnType_ output = call_functor_with_args_from_stack<KernelFunctor, AllowDeprecatedTypes>(functor, dispatchKeySet, stack);
+        ReturnType_ output = call_functor_with_args_from_stack<KernelFunctor, AllowDeprecatedTypes>(functor, dispatchCache, stack);
 #else
         using ReturnType_ = std::decay_t<typename decltype(delay_check)::template type_identity<ReturnType>>;
-        ReturnType_ output = call_functor_with_args_from_stack<KernelFunctor, AllowDeprecatedTypes>(functor, dispatchKeySet, delay_check(stack));
+        ReturnType_ output = call_functor_with_args_from_stack<KernelFunctor, AllowDeprecatedTypes>(functor, dispatchCache, delay_check(stack));
 #endif
         torch::jit::drop(*stack, num_inputs);
         push_outputs<ReturnType_, AllowDeprecatedTypes>::call(std::move(output), stack);
@@ -552,7 +553,7 @@ namespace impl {
 #else
       }, /* else */ [&] {
 #endif
-        call_functor_with_args_from_stack<KernelFunctor, AllowDeprecatedTypes>(functor, dispatchKeySet, stack);
+        call_functor_with_args_from_stack<KernelFunctor, AllowDeprecatedTypes>(functor, dispatchCache, stack);
         torch::jit::drop(*stack, num_inputs);
 #ifdef __cpp_if_constexpr
       }

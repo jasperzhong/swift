@@ -3,6 +3,7 @@
 #include <ATen/SequenceNumber.h>
 #include <ATen/core/boxing/KernelFunction.h>
 #include <ATen/core/boxing/impl/boxing.h>
+#include <ATen/core/dispatch/dispatch_cache.h>
 #include <ATen/core/dispatch/OperatorEntry.h>
 #include <ATen/core/dispatch/CppSignature.h>
 #include <ATen/core/dispatch/RegistrationHandleRAII.h>
@@ -152,21 +153,21 @@ public:
 
 
   template<class Return, class... Args>
-  static Return callWithDispatchKeySlowPath(const TypedOperatorHandle<Return (Args...)>& op, bool pre_sampled, DispatchKeySet dispatchKeySet, const KernelFunction& kernel, Args... args);
+  static Return callWithDispatchKeySlowPath(const TypedOperatorHandle<Return (Args...)>& op, bool pre_sampled, DispatchCache dispatchCache, const KernelFunction& kernel, Args... args);
 
   // Like call, but intended for use in a redispatch in kernels that have explicitly performed the DispatchKey update calculatulation.
   // This will take the DispatchKeySet completely as is and dispatch to the kernel of the corresponding highest priority key in the set.
   // Note that this version of redispatch treats the inputted DispatchKeySet *as is*, and does NOT mask out the highest priority key.
   // See Note [Plumbing Keys Through The Dispatcher]
   template<class Return, class... Args>
-  Return redispatch(const TypedOperatorHandle<Return (Args...)>& op, DispatchKeySet currentDispatchKeySet, Args... args) const;
+  Return redispatch(const TypedOperatorHandle<Return (Args...)>& op, DispatchCache dispatchCache, Args... args) const;
 
   // Invoke an operator via the boxed calling convention using an IValue stack
   void callBoxed(const OperatorHandle& op, Stack* stack) const;
 
   // TODO: This will only be useful if we write a backend fallback that plumbs dispatch keys (currently there are none)
   // See Note [Plumbing Keys Through The Dispatcher]
-  void redispatchBoxed(const OperatorHandle& op, DispatchKeySet dispatchKeySet, Stack* stack) const;
+  void redispatchBoxed(const OperatorHandle& op, DispatchCache dispatchCache, Stack* stack) const;
 
 
   // ------------------------------------------------------------------------
@@ -344,8 +345,8 @@ public:
     c10::Dispatcher::singleton().callBoxed(*this, stack);
   }
 
-  void redispatchBoxed(DispatchKeySet ks, Stack* stack) const {
-    c10::Dispatcher::singleton().redispatchBoxed(*this, ks, stack);
+  void redispatchBoxed(DispatchCache dispatchCache, Stack* stack) const {
+    c10::Dispatcher::singleton().redispatchBoxed(*this, dispatchCache, stack);
   }
 
 private:
@@ -394,8 +395,8 @@ public:
   }
 
   // See [Note: Argument forwarding in the dispatcher] for why Args doesn't use &&
-  C10_ALWAYS_INLINE Return redispatch(DispatchKeySet currentDispatchKeySet, Args... args) const {
-    return c10::Dispatcher::singleton().redispatch<Return, Args...>(*this, currentDispatchKeySet, std::forward<Args>(args)...);
+  C10_ALWAYS_INLINE Return redispatch(DispatchCache dispatchCache, Args... args) const {
+    return c10::Dispatcher::singleton().redispatch<Return, Args...>(*this, dispatchCache, std::forward<Args>(args)...);
   }
 
 private:
@@ -420,12 +421,12 @@ struct CaptureKernelCall {
   CaptureKernelCall(
       const F& kernel,
       const TypedOperatorHandle<ReturnType(Args...)>& op,
-      const DispatchKeySet& dispatchKeySet,
+      const DispatchCache& dispatchCache,
       Args&&... args)
       // Calls the kernel and capture the result in output_.
       : output_{kernel.template call<ReturnType, Args...>(
             op,
-            dispatchKeySet,
+            dispatchCache,
             std::forward<Args>(args)...)} {}
   // Wraps the return values in a Stack.
   Stack getOutputs() {
@@ -457,11 +458,11 @@ struct CaptureKernelCall<void> {
   CaptureKernelCall(
       const F& kernel,
       const TypedOperatorHandle<void(Args...)>& op,
-      const DispatchKeySet& dispatchKeySet,
+      const DispatchCache& dispatchCache,
       Args&&... args) {
     // Calling the kernel and no need to capture void.
     kernel.template call<void, Args...>(
-        op, dispatchKeySet, std::forward<Args>(args)...);
+        op, dispatchCache, std::forward<Args>(args)...);
   }
   Stack getOutputs() {
     return Stack();
@@ -473,7 +474,7 @@ struct CaptureKernelCall<void> {
 
 // See [Note: Argument forwarding in the dispatcher] for why Args doesn't use &&
 template<class Return, class... Args>
-inline Return Dispatcher::callWithDispatchKeySlowPath(const TypedOperatorHandle<Return(Args...)>& op, bool pre_sampled, DispatchKeySet dispatchKeySet, const KernelFunction& kernel, Args... args) {
+inline Return Dispatcher::callWithDispatchKeySlowPath(const TypedOperatorHandle<Return(Args...)>& op, bool pre_sampled, DispatchCache dispatchCache, const KernelFunction& kernel, Args... args) {
     // Check if we need to run callbacks registered with RecordFunction
     // If true and callbacks need inputs, we box the arguments and pass
     // them into the callbacks and also into the kernel call
@@ -482,7 +483,7 @@ inline Return Dispatcher::callWithDispatchKeySlowPath(const TypedOperatorHandle<
     // the function call or prematurely box them
   at::RecordFunction guard(at::RecordScope::FUNCTION, pre_sampled);
   if (C10_UNLIKELY(guard.isActive())) {
-    auto dispatchKey = dispatchKeySet.highestPriorityTypeId();
+    auto dispatchKey = dispatchCache.ks.highestPriorityTypeId();
     if (op.operatorDef_->op.isObserved()) {
       if (guard.needsInputs()) {
         runRecordFunction(guard, op, dispatchKey, impl::boxArgs(args...));
@@ -493,7 +494,7 @@ inline Return Dispatcher::callWithDispatchKeySlowPath(const TypedOperatorHandle<
         // Calls the kernel and capture the output temporarily to pass to
         // RecordFunction.
         detail::CaptureKernelCall<Return> captureKernelCall(
-            kernel, op, dispatchKeySet, std::forward<Args>(args)...);
+            kernel, op, dispatchCache, std::forward<Args>(args)...);
         guard.setOutputs(captureKernelCall.getOutputs());
         // Releases the captured output to return to caller.
         return std::move(captureKernelCall).release();
@@ -501,7 +502,7 @@ inline Return Dispatcher::callWithDispatchKeySlowPath(const TypedOperatorHandle<
     }
   }
   // keeping the guard alive while executing the kernel
-  return kernel.template call<Return, Args...>(op, dispatchKeySet, std::forward<Args>(args)...);
+  return kernel.template call<Return, Args...>(op, dispatchCache, std::forward<Args>(args)...);
 }
 
 // See [Note: Argument forwarding in the dispatcher] for why Args doesn't use &&
@@ -515,6 +516,7 @@ C10_DISPATCHER_INLINE_UNLESS_MOBILE Return Dispatcher::call(const TypedOperatorH
     );
   TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!c10::isAliasDispatchKey(dispatchKeySet.highestPriorityTypeId()));
   const KernelFunction& kernel = op.operatorDef_->op.lookup(dispatchKeySet.highestPriorityTypeId());
+  DispatchCache dispatchCache = {dispatchKeySet};
 #ifndef PYTORCH_DISABLE_PER_OP_PROFILING
   // By default, when there're no high-frequency or non-sampled callbacks,
   // RecordFunction is pre-sampled as a perf optimization;
@@ -524,19 +526,19 @@ C10_DISPATCHER_INLINE_UNLESS_MOBILE Return Dispatcher::call(const TypedOperatorH
   // the callbacks
   bool pre_sampled = false;
   if (C10_UNLIKELY(at::shouldRunRecordFunction(&pre_sampled))) {
-    return callWithDispatchKeySlowPath<Return, Args...>(op, pre_sampled, dispatchKeySet, kernel, std::forward<Args>(args)...);
+    return callWithDispatchKeySlowPath<Return, Args...>(op, pre_sampled, dispatchCache, kernel, std::forward<Args>(args)...);
   }
 #endif  // PYTORCH_DISABLE_PER_OP_PROFILING
-  return kernel.template call<Return, Args...>(op, dispatchKeySet, std::forward<Args>(args)...);
+  return kernel.template call<Return, Args...>(op, dispatchCache, std::forward<Args>(args)...);
 }
 
 // See [Note: Argument forwarding in the dispatcher] for why Args doesn't use &&
 template<class Return, class... Args>
-inline Return Dispatcher::redispatch(const TypedOperatorHandle<Return (Args...)>& op, DispatchKeySet currentDispatchKeySet, Args... args) const {
+inline Return Dispatcher::redispatch(const TypedOperatorHandle<Return (Args...)>& op, DispatchCache dispatchCache, Args... args) const {
   detail::unused_arg_(args...);  // workaround for a false-positive warning about unused parameters in gcc 5
   // do not use RecordFunction on redispatch
-  const KernelFunction& kernel = op.operatorDef_->op.lookup(currentDispatchKeySet.highestPriorityTypeId());
-  return kernel.template call<Return, Args...>(op, currentDispatchKeySet, std::forward<Args>(args)...);
+  const KernelFunction& kernel = op.operatorDef_->op.lookup(dispatchCache.ks.highestPriorityTypeId());
+  return kernel.template call<Return, Args...>(op, dispatchCache, std::forward<Args>(args)...);
 }
 
 inline void Dispatcher::callBoxed(const OperatorHandle& op, Stack* stack) const {
@@ -544,6 +546,7 @@ inline void Dispatcher::callBoxed(const OperatorHandle& op, Stack* stack) const 
   const auto& entry = op.operatorDef_->op;
   auto dispatchKeySet = entry.dispatchKeyExtractor().getDispatchKeySetBoxed(stack);
   const auto& kernel = entry.lookup(dispatchKeySet.highestPriorityTypeId());
+  DispatchCache dispatchCache = {dispatchKeySet};
 #ifndef PYTORCH_DISABLE_PER_OP_PROFILING
   bool pre_sampled = false;
   if (C10_UNLIKELY(at::shouldRunRecordFunction(&pre_sampled))) {
@@ -560,7 +563,7 @@ inline void Dispatcher::callBoxed(const OperatorHandle& op, Stack* stack) const 
       }
     }
     // keeping the guard alive while executing the kernel
-    kernel.callBoxed(op, dispatchKeySet, stack);
+    kernel.callBoxed(op, dispatchCache, stack);
     // track outputs
     if (C10_UNLIKELY(
             guard.isActive() && entry.isObserved() && guard.needsOutputs())) {
@@ -569,14 +572,14 @@ inline void Dispatcher::callBoxed(const OperatorHandle& op, Stack* stack) const 
     return;
   }
 #endif  // PYTORCH_DISABLE_PER_OP_PROFILING
-  kernel.callBoxed(op, dispatchKeySet, stack);
+  kernel.callBoxed(op, dispatchCache, stack);
 }
 
-inline void Dispatcher::redispatchBoxed(const OperatorHandle& op, DispatchKeySet dispatchKeySet, Stack* stack) const {
+inline void Dispatcher::redispatchBoxed(const OperatorHandle& op, DispatchCache dispatchCache, Stack* stack) const {
   // note: this doesn't need the mutex because write operations on the list keep iterators intact.
   const auto& entry = op.operatorDef_->op;
-  const auto& kernel = entry.lookup(dispatchKeySet.highestPriorityTypeId());
-  return kernel.callBoxed(op, dispatchKeySet, stack);
+  const auto& kernel = entry.lookup(dispatchCache.ks.highestPriorityTypeId());
+  return kernel.callBoxed(op, dispatchCache, stack);
 }
 
 } // namespace c10

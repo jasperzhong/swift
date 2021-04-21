@@ -224,7 +224,7 @@ class ComputeFunction:
 
             dispatcher_exprs = translate(sig.arguments(), dispatcher_sig.arguments())
             if self.is_redispatching_fn:
-                dispatcher_exprs_str = ', '.join(['dispatchKeySet'] + [a.expr for a in dispatcher_exprs])
+                dispatcher_exprs_str = ', '.join(['dispatchCache'] + [a.expr for a in dispatcher_exprs])
                 dispatcher_call = 'redispatch'
             else:
                 dispatcher_exprs_str = ', '.join(a.expr for a in dispatcher_exprs)
@@ -403,7 +403,8 @@ C10_ALWAYS_INLINE
     .findSchemaOrThrow("aten::{f.func.name.name}", "{f.func.name.overload_name}")
     .typed<{dispatcher_sig.type()}>();
   {compute_dk}
-  return op.redispatch(_dk, {', '.join(a.expr for a in dispatcher_exprs)});
+  DispatchCache _dc = {{ _dk }};
+  return op.redispatch(_dc, {', '.join(a.expr for a in dispatcher_exprs)});
 }}
 """
         elif self.target is Target.REGISTRATION:

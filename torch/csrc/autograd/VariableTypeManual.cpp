@@ -7,6 +7,7 @@
 #include <ATen/TracerMode.h>
 #include <ATen/RedispatchFunctions.h>
 #include <ATen/core/op_registration/op_registration.h>
+#include <ATen/core/dispatch/dispatch_cache.h>
 #include <c10/util/irange.h>
 #include <torch/library.h>
 
@@ -84,7 +85,7 @@ Tensor _fw_primal(const Tensor & self, int64_t level) {
 }
 
 // We don't have an outplace copy, so this can't be generated automatically
-Tensor & copy_(c10::DispatchKeySet ks, Tensor & self, const Tensor & src, bool non_blocking) {
+Tensor & copy_(c10::DispatchCache dispatchCache, Tensor & self, const Tensor & src, bool non_blocking) {
   // TODO: once copy is exposed in Declarations.yaml we may be able to bind
   // it automatically
   UNPACK_TENSOR(self, 0);  // auto& self_ = self;
@@ -101,7 +102,7 @@ Tensor & copy_(c10::DispatchKeySet ks, Tensor & self, const Tensor & src, bool n
   }
   {
     at::AutoDispatchBelowAutograd mode;
-    at::redispatch::copy_(ks & c10::after_autograd_keyset, self_, src_, non_blocking);
+    at::redispatch::copy_(dispatchCache & c10::after_autograd_keyset, self_, src_, non_blocking);
   }
   rebase_history(self , std::move(grad_fn));
 
@@ -126,7 +127,7 @@ Tensor & copy_(c10::DispatchKeySet ks, Tensor & self, const Tensor & src, bool n
 }
 
 const Tensor& resize_(
-    c10::DispatchKeySet ks,
+    c10::DispatchCache dispatchCache,
     const Tensor& self,
     IntArrayRef size,
     c10::optional<MemoryFormat> optional_memory_format) {
@@ -136,7 +137,7 @@ const Tensor& resize_(
   }
   {
     at::AutoDispatchBelowAutograd mode;
-    at::redispatch::resize_(ks & c10::after_autograd_keyset, self_, size, optional_memory_format);
+    at::redispatch::resize_(dispatchCache & c10::after_autograd_keyset, self_, size, optional_memory_format);
   }
 
   if (self._fw_grad(/* level */ 0).defined()) {
@@ -147,7 +148,7 @@ const Tensor& resize_(
 }
 
 const Tensor& resize_as_(
-    c10::DispatchKeySet ks,
+    c10::DispatchCache dispatchCache,
     const Tensor& self,
     const Tensor& the_template,
     c10::optional<MemoryFormat> optional_memory_format) {
@@ -158,7 +159,7 @@ const Tensor& resize_as_(
   }
   {
     at::AutoDispatchBelowAutograd mode;
-    at::redispatch::resize_as_(ks & c10::after_autograd_keyset, self_, the_template_, optional_memory_format);
+    at::redispatch::resize_as_(dispatchCache & c10::after_autograd_keyset, self_, the_template_, optional_memory_format);
   }
 
   // Handle fw grad
@@ -254,10 +255,10 @@ TORCH_LIBRARY_IMPL(aten, Autograd, m) {
 }} // namespace autograd::VariableType
 
 namespace InplaceOrView {
-  Tensor & copy_(c10::DispatchKeySet ks, Tensor & self, const Tensor & src, bool non_blocking) {
+  Tensor & copy_(c10::DispatchCache dispatchCache, Tensor & self, const Tensor & src, bool non_blocking) {
     {
       at::AutoDispatchBelowInplaceOrView guard;
-      at::redispatch::copy_(ks & c10::after_InplaceOrView_keyset, self, src, non_blocking);
+      at::redispatch::copy_(dispatchCache & c10::after_InplaceOrView_keyset, self, src, non_blocking);
     }
     torch::autograd::increment_version(self);
     return self;

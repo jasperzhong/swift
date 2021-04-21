@@ -1,7 +1,7 @@
 #pragma once
 
 #include <typeindex>
-#include <c10/core/DispatchKeySet.h>
+#include <ATen/core/dispatch/dispatch_cache.h>
 #include <c10/macros/Macros.h>
 #include <c10/util/Metaprogramming.h>
 #include <c10/util/Type.h>
@@ -21,11 +21,11 @@ public:
     template<class FuncType>
     static CppSignature make() {
         // Normalize functors, lambdas, function pointers, etc. into the plain function type
-        // The first argument of the schema might be of type DispatchKeySet, in which case we remove it.
+        // The first argument of the schema might be of type DispatchCache, in which case we remove it.
         // We do this to guarantee that all CppSignature's for an operator will match, even if they're registered
         // with different calling conventions.
         // See Note [Plumbing Keys Through The Dispatcher]
-        using decayed_function_type = typename c10::remove_DispatchKeySet_arg_from_func<std::decay_t<FuncType>>::func_type;
+        using decayed_function_type = typename c10::remove_DispatchCache_arg_from_func<std::decay_t<FuncType>>::func_type;
 
         return CppSignature(std::type_index(typeid(decayed_function_type)));
     }

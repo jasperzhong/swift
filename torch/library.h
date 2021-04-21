@@ -59,6 +59,7 @@
 /// ```
 
 #include <c10/core/DispatchKey.h>
+#include <ATen/core/dispatch/dispatch_cache.h>
 #include <ATen/core/op_registration/op_allowlist.h>
 #include <ATen/core/op_registration/infer_schema.h>
 #if defined(EXPOSE_C2_OPS) || !defined(CAFFE2_IS_XPLAT_BUILD)
@@ -204,7 +205,7 @@ public:
 
   // Variant that takes in a boxed kernel function with a plumbed DispatchKeySet.
   // See Note [Plumbing Keys Through The Dispatcher] for details.
-  template<c10::KernelFunction::BoxedKernelFunction_withDispatchKeys* func>
+  template<c10::KernelFunction::BoxedKernelFunction_withDispatchCache* func>
   static CppFunction makeFromBoxedFunction() {
     // TODO: more user friendly API
     return CppFunction(

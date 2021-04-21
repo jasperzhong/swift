@@ -333,7 +333,7 @@ def emit_inplace_or_view_body(fn: NativeFunctionWithDifferentiabilityInfo) -> Li
 
     # code-generated InplaceOrView kernels plumb and recompute dispatch keys directly through the kernel for performance.
     # See Note [Plumbing Keys Through The Dispatcher] for details.
-    dispatch_key_set = 'ks & c10::after_InplaceOrView_keyset'
+    dispatch_key_set = 'dispatchCache & c10::after_InplaceOrView_keyset'
     redispatch_args = ', '.join([dispatch_key_set] + [a.expr for a in dispatcher_exprs])
 
     # Note that this calls the slow, dispatching variants of manual_cpp_binding ops.
@@ -371,7 +371,7 @@ def gen_formals(f: NativeFunction) -> str:
     return ', '.join(
         # code-generated autograd kernels plumb and recompute dispatch keys directly through the kernel for performance.
         # See Note [Plumbing Keys Through The Dispatcher] for details.
-        ['c10::DispatchKeySet ks'] +
+        ['c10::DispatchCache dispatchCache'] +
         [f'{cpp.argument_type(a, binds="__placeholder__").cpp_type()} {a.name}'
          for a in f.func.schema_order_arguments()]
     )

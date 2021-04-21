@@ -2,6 +2,7 @@
 #include <ATen/core/boxing/impl/make_boxed_from_unboxed_functor.h>
 #include <ATen/core/boxing/impl/WrapFunctionIntoFunctor.h>
 #include <ATen/core/boxing/impl/WrapFunctionIntoRuntimeFunctor.h>
+#include <ATen/core/dispatch/dispatch_cache.h>
 
 namespace c10 {
 
@@ -18,8 +19,8 @@ inline KernelFunction::KernelFunction(std::unique_ptr<OperatorKernel> functor, I
 {}
 
 template<KernelFunction::BoxedKernelFunction* func>
-inline void KernelFunction::make_boxed_function(OperatorKernel*, const OperatorHandle& opHandle, DispatchKeySet, Stack* stack) {
-    // Note that we're dropping the DispatchKeySet argument.
+inline void KernelFunction::make_boxed_function(OperatorKernel*, const OperatorHandle& opHandle, DispatchCache, Stack* stack) {
+    // Note that we're dropping the DispatchCache argument.
     // See Note [Plumbing Keys Through The Dispatcher 2] for details.
     func(opHandle, stack);
 }
@@ -28,10 +29,10 @@ inline bool KernelFunction::isValidUnboxed() const {
     return unboxed_kernel_func_ != nullptr;
 }
 
-template<KernelFunction::BoxedKernelFunction_withDispatchKeys* func>
-inline void KernelFunction::make_boxed_function(OperatorKernel*, const OperatorHandle& opHandle, DispatchKeySet ks, Stack* stack) {
+template<KernelFunction::BoxedKernelFunction_withDispatchCache* func>
+inline void KernelFunction::make_boxed_function(OperatorKernel*, const OperatorHandle& opHandle, DispatchCache dispatchCache, Stack* stack) {
     // See Note [Plumbing Keys Through The Dispatcher 2] for details.
-    func(opHandle, ks, stack);
+    func(opHandle, dispatchCache, stack);
 }
 
 inline bool KernelFunction::isValid() const {
@@ -42,29 +43,29 @@ inline bool KernelFunction::isFallthrough() const {
     return boxed_kernel_func_ == &fallthrough_kernel;
 }
 
-inline void KernelFunction::callBoxed(const OperatorHandle& opHandle, DispatchKeySet dispatchKeySet, Stack* stack) const {
+inline void KernelFunction::callBoxed(const OperatorHandle& opHandle, DispatchCache dispatchCache, Stack* stack) const {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
         boxed_kernel_func_ != nullptr,
         "Tried to call KernelFunction::callBoxed() on an uninitialized KernelFunction."
     );
-    (*boxed_kernel_func_)(functor_.get(), opHandle, dispatchKeySet, stack);
+    (*boxed_kernel_func_)(functor_.get(), opHandle, dispatchCache, stack);
 }
 
 template<class Return, class... Args>
-inline Return callUnboxedKernelFunction(void* unboxed_kernel_func, OperatorKernel* functor, DispatchKeySet dispatchKeySet, Args&&... args) {
-    using ActualSignature = Return (OperatorKernel*, DispatchKeySet, Args...);
+inline Return callUnboxedKernelFunction(void* unboxed_kernel_func, OperatorKernel* functor, DispatchCache dispatchCache, Args&&... args) {
+    using ActualSignature = Return (OperatorKernel*, DispatchCache, Args...);
     ActualSignature* func = reinterpret_cast<ActualSignature*>(unboxed_kernel_func);
-    return (*func)(functor, dispatchKeySet, std::forward<Args>(args)...);
+    return (*func)(functor, dispatchCache, std::forward<Args>(args)...);
 }
 
 template<class Return, class... Args>
-C10_ALWAYS_INLINE Return KernelFunction::call(const OperatorHandle& opHandle, DispatchKeySet dispatchKeySet, Args... args) const {
+C10_ALWAYS_INLINE Return KernelFunction::call(const OperatorHandle& opHandle, DispatchCache dispatchCache, Args... args) const {
     // note: Args above is intentionally not Args&&. We don't want perfect
     // forwarding, which would require Args to be deduced, but instead we
     // want callers to explicitly specify the Args.
 
     if (C10_LIKELY(unboxed_kernel_func_ != nullptr)) {
-        return callUnboxedKernelFunction<Return, Args...>(unboxed_kernel_func_, functor_.get(), dispatchKeySet, std::forward<Args>(args)...);
+        return callUnboxedKernelFunction<Return, Args...>(unboxed_kernel_func_, functor_.get(), dispatchCache, std::forward<Args>(args)...);
     }
 
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(
@@ -76,7 +77,7 @@ C10_ALWAYS_INLINE Return KernelFunction::call(const OperatorHandle& opHandle, Di
         boxed_kernel_func_,
         functor_.get(),
         opHandle,
-        dispatchKeySet,
+        dispatchCache,
         std::forward<Args>(args)...
     );
 }
@@ -90,7 +91,7 @@ inline KernelFunction KernelFunction::makeFromBoxedFunction() {
     );
 }
 
-template<KernelFunction::BoxedKernelFunction_withDispatchKeys* func>
+template<KernelFunction::BoxedKernelFunction_withDispatchCache* func>
 inline KernelFunction KernelFunction::makeFromBoxedFunction() {
     return KernelFunction(
         nullptr,  // no functor_ object
