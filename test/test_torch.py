@@ -5721,7 +5721,7 @@ class TestTorchDeviceType(TestCase):
         x = torch.empty(0, device="cpu")
         y = torch.empty(0, device=device)
         self.assertRaisesRegex(
-            RuntimeError, "multinomial arguments must have the same device",
+            RuntimeError, "the same device",
             lambda: torch.multinomial(x, 2, out=y))
 
     @deviceCountAtLeast(2)
@@ -5730,13 +5730,13 @@ class TestTorchDeviceType(TestCase):
         x = torch.empty(0, device=devices[0])
         y = torch.empty(0, device=devices[1])
         self.assertRaisesRegex(
-            RuntimeError, "multinomial arguments must have the same device",
+            RuntimeError, "the same device",
             lambda: torch.multinomial(x, 2, out=y))
 
     @deviceCountAtLeast(2)
     @onlyCUDA
     def test_device_guard(self, devices):
-        # verify that all operators with `device_guard: False` behave properly with multiple devices.
+        # verify that all operators with `device_check_and_guard: False` behave properly with multiple devices.
         # TODO: if we had operator introspection we could figure out this set of operators automatically...
         x = torch.randn((1, 2, 3), device=devices[1])
         y = torch.zeros((1, 3, 2), device=devices[1])
