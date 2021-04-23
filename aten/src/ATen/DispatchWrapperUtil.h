@@ -1,5 +1,8 @@
 #pragma once
 
+#include <ATen/Tensor.h>
+#include <ATen/TensorUtils.h>
+#include <ATen/core/List.h>
 #include <c10/core/TensorOptions.h>
 
 /*
@@ -36,7 +39,7 @@
  */
 
 namespace c10 {
-namespace impl {
+namespace detail {
 
 inline c10::optional<MemoryFormat>
 check_tensor_options_and_extract_memory_format(
@@ -57,5 +60,52 @@ check_tensor_options_and_extract_memory_format(
     return options.memory_format_opt();
   }
 }
-} // namespace impl
+
+inline void common_device_check_failure(optional<Device>& common_device, const at::Tensor& tensor, at::CheckedFrom methodName, at::CheckedFrom argName) {
+  TORCH_CHECK(false,
+    "Expected all tensors to be on the same device, but "
+    "found at least two devices, ", common_device.value(), " and ", tensor.device(), "! "
+    "(when checking arugment for argument ", argName, " in method ", methodName, ")");
+}
+
+inline void undefined_device_check_failure(at::CheckedFrom methodName, at::CheckedFrom argName) {
+  TORCH_CHECK(false,
+    "Tensor is undefined."
+    "(when checking arugment for argument ", argName, " in method ", methodName, ")");
+}
+
+inline void check_or_update_common_device(optional<Device>& common_device, const at::Tensor& tensor, at::CheckedFrom methodName, at::CheckedFrom argName) {
+  if (C10_UNLIKELY(!tensor.defined())) {
+    // TODO: Don't allow undefined tensor input
+    return;
+  }
+
+  if (!common_device.has_value()) {
+    common_device = tensor.device();
+    return;
+  }
+
+  if (C10_UNLIKELY(common_device != tensor.device())) {
+    common_device_check_failure(common_device, tensor, methodName, argName);
+  }
+}
+
+inline void check_or_update_common_device(optional<Device>& common_device, const optional<at::Tensor>& tensor, at::CheckedFrom methodName, at::CheckedFrom argName) {
+  if (tensor.has_value()) {
+    check_or_update_common_device(common_device, tensor.value(), methodName, argName);
+  }
+}
+
+inline void check_or_update_common_device(optional<Device>& common_device, at::TensorList tensors, at::CheckedFrom methodName, at::CheckedFrom argName) {
+  for (const auto& tensor : tensors) {
+    check_or_update_common_device(common_device, tensor, methodName, argName);
+  }
+}
+
+inline void check_or_update_common_device(optional<Device>& common_device, const List<optional<at::Tensor>>& tensors, at::CheckedFrom methodName, at::CheckedFrom argName) {
+  for (const auto& tensor : tensors) {
+    check_or_update_common_device(common_device, tensor, methodName, argName);
+  }
+}
+} // namespace detail
 } // namespace c10

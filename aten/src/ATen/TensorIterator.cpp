@@ -1,4 +1,5 @@
 #include <ATen/native/TensorIterator.h>
+#include <c10/core/DeviceGuard.h>
 
 #include <array>
 #include <ATen/ExpandUtils.h>
@@ -633,6 +634,12 @@ int TensorIteratorBase::num_reduce_dims() const {
 }
 
 void TensorIteratorBase::for_each(loop2d_t loop, int64_t grain_size) {
+  OptionalDeviceGuard device_guard(
+      guarded_ || common_device_.is_cpu()
+          ? nullopt
+          : c10::optional<Device>(common_device_));
+  guarded_ = true;
+
   int64_t numel = this->numel();
   if (numel == 0) {
     return;
@@ -655,7 +662,13 @@ StrideVector TensorIteratorBase::get_strides() const {
   return strides;
 }
 
-void TensorIteratorBase::serial_for_each(loop2d_t loop, Range range) const {
+void TensorIteratorBase::serial_for_each(loop2d_t loop, Range range) {
+  OptionalDeviceGuard device_guard(
+      guarded_ || common_device_.is_cpu()
+          ? nullopt
+          : c10::optional<Device>(common_device_));
+  guarded_ = true;
+
   if (range.size() == 0) {
     return;
   }

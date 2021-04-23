@@ -283,7 +283,7 @@ public:
     serial_for_each(loop_2d_from_1d(loop), range);
   }
 
-  void serial_for_each(loop2d_t loop, Range range) const;
+  void serial_for_each(loop2d_t loop, Range range);
 
   /// Create a strides array for a Tensor with shape of this iterator. The
   /// parameter `element_size` specifies the size of Tensor's data type in
@@ -438,6 +438,9 @@ protected:
   /// This is currently defined as kCPU, or the device of the first non-CPU
   /// tensor argument. See TensorIteratorBase::compute_types for details.
   Device common_device_ = kCPU;
+
+  // HACK, just for test
+  bool guarded_ = false;
 
   /// Set by split(), see should_accumulate() and is_final_output()
   bool accumulate_ = false;

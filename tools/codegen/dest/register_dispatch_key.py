@@ -1,5 +1,4 @@
 from typing import List, Optional, Union
-import itertools
 from typing_extensions import Literal
 from dataclasses import dataclass
 import textwrap
@@ -158,7 +157,7 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
 
             device_guard = "// DeviceGuard omitted"  # default
 
-            if f.device_guard and is_cuda_dispatch_key(self.dispatch_key):
+            if f.common_device_guard and is_cuda_dispatch_key(self.dispatch_key):
                 has_tensor_options = any(isinstance(a.argument, TensorOptionsArguments) for a in args)
                 if has_tensor_options:
                     # kernel is creating a tensor
@@ -166,20 +165,13 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
   const DeviceGuard device_guard(device_or_default(device));"""
                 else:
                     # kernel is operating on existing tensors
-
-                    # There is precedence for which argument we use to do
-                    # device guard.  This describes the precedence order.
-                    self_arg = [f.func.arguments.self_arg.argument] if f.func.arguments.self_arg is not None else []
-                    candidate_args = itertools.chain(
-                        self_arg,
-                        f.func.arguments.out,
-                        f.func.arguments.flat_positional
-                    )
-
-                    # Only tensor like arguments are eligible
-                    device_of = next((f'{a.name}' for a in candidate_args if a.type.is_tensor_like()), None)
-                    if device_of is not None:
-                        device_guard = f"const OptionalDeviceGuard device_guard(device_of({device_of}));"
+                    device_guard = 'c10::optional<Device> common_device = nullopt;'
+                    for arg in f.func.arguments.flat_positional:
+                        # Only tensor like arguments are eligible
+                        if arg.type.is_tensor_like():
+                            device_guard += f"""
+  c10::detail::check_or_update_common_device(common_device, {arg.name}, "{name}", "{arg.name}");"""
+                    device_guard += "\n  const OptionalDeviceGuard device_guard(common_device);\n"
 
             return f"""\
 namespace {{

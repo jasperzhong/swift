@@ -3814,7 +3814,7 @@ class TestLinalg(TestCase):
 
         if self.device_type != 'cpu':
             x_cpu = x.expand(3).cpu()
-            check(x_cpu, y.to(x.dtype), 'expected all tensors to be on the same device')
+            check(x_cpu, y.to(x.dtype), 'tensors to be on the same device')
 
     @onlyOnCPUAndCUDA
     def test_vdot_invalid_args(self, device):
@@ -5127,13 +5127,13 @@ class TestLinalg(TestCase):
             # device of out and input should match
             wrong_device = 'cpu' if self.device_type != 'cpu' else 'cuda'
             out = torch.empty_like(reflectors).to(wrong_device)
-            with self.assertRaisesRegex(RuntimeError, "Expected result and input tensors to be on the same device"):
+            with self.assertRaisesRegex(RuntimeError, "to be on the same device"):
                 torch.linalg.householder_product(reflectors, tau, out=out)
 
             # device of tau and input should match
             wrong_device = 'cpu' if self.device_type != 'cpu' else 'cuda'
             tau = tau.to(wrong_device)
-            with self.assertRaisesRegex(RuntimeError, "Expected input and tau to be on the same device"):
+            with self.assertRaisesRegex(RuntimeError, "to be on the same device"):
                 torch.linalg.householder_product(reflectors, tau)
 
     @precisionOverride({torch.complex64: 5e-6})
@@ -6073,7 +6073,8 @@ scipy_lobpcg  | {:10.2e}  | {:10.2e}  | {:6} | N/A
 
             b = torch.randn(3, 1, device=b_device)
             A = torch.randn(3, 3, device=A_device)
-            err_str = "Expected b and A to be on the same device"
+            err_str = "to be on the same device"
+
             with self.assertRaisesRegex(RuntimeError, err_str):
                 torch.solve(b, A)
 
@@ -6876,7 +6877,7 @@ scipy_lobpcg  | {:10.2e}  | {:10.2e}  | {:6} | N/A
         if torch.cuda.is_available():
             wrong_device = 'cpu' if self.device_type != 'cpu' else 'cuda'
             out = torch.empty(0, device=wrong_device, dtype=dtype)
-            with self.assertRaisesRegex(RuntimeError, "Expected result and input tensors to be on the same device"):
+            with self.assertRaisesRegex(RuntimeError, "to be on the same device"):
                 torch.cholesky_inverse(a, out=out)
 
         # cholesky_inverse raises an error for invalid inputs on CPU
