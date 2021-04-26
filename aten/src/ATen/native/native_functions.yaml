@@ -4304,6 +4304,9 @@
     SparseCPU: sparse_mask_cpu
     SparseCUDA: sparse_mask_cuda
 
+- func: _to_cpu(Tensor[] tensors) -> Tensor[]
+  variants: function
+
 - func: to_dense(Tensor self, ScalarType? dtype=None) -> Tensor
   variants: method
   dispatch:
