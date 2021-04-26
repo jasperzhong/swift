@@ -8,6 +8,7 @@ This template will be consumed by `cpp_jit.py`, and will replace:
 sections with user provided statements.
 */
 
+#include <cassert>
 #include <string>
 
 #include <callgrind.h>
@@ -24,17 +25,17 @@ static_assert(false);
 int main(int argc, char* argv[]) {
     // This file should only be called inside of `Timer`, so we can adopt a
     // very simple and rigid argument parsing scheme.
-    TORCH_CHECK(argc == 9);
-    TORCH_CHECK(std::string(argv[1]) == "--number");
+    assert(argc == 9);
+    assert(std::string(argv[1]) == "--number");
     auto number = std::stoi(argv[2]);
 
-    TORCH_CHECK(std::string(argv[3]) == "--number_warmup");
+    assert(std::string(argv[3]) == "--number_warmup");
     auto number_warmup = std::stoi(argv[4]);
 
-    TORCH_CHECK(std::string(argv[5]) == "--repeats");
+    assert(std::string(argv[5]) == "--repeats");
     auto repeats = std::stoi(argv[6]);
 
-    TORCH_CHECK(std::string(argv[7]) == "--number_threads");
+    assert(std::string(argv[7]) == "--number_threads");
     auto number_threads = std::stoi(argv[8]);
     torch::set_num_threads(number_threads);
 

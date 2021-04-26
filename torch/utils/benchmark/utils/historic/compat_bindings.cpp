@@ -32,5 +32,5 @@ void _valgrind_toggle_and_dump_stats() {
 PYBIND11_MODULE(callgrind_bindings, m) {
     m.def("_valgrind_supported_platform", &_valgrind_supported_platform);
     m.def("_valgrind_toggle", &_valgrind_toggle);
-    m.def("_valgrind_toggle_and_dump_stats", &_valgrind_dump_stats);
+    m.def("_valgrind_toggle_and_dump_stats", &_valgrind_toggle_and_dump_stats);
 }
