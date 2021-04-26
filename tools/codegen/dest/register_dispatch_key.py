@@ -4,12 +4,13 @@ from typing_extensions import Literal
 from dataclasses import dataclass
 import textwrap
 
-from tools.codegen.context import method_with_native_function
+from tools.codegen.context import method_with_native_function, with_native_function
 from tools.codegen.utils import Target, mapMaybe
 from tools.codegen.model import (DispatchKey, NativeFunction,
                                  NativeFunctionsGroup, SchemaKind,
+                                 ExternalBackendFunctionsGroup, ExternalBackendFunction,
                                  TensorOptionsArguments, assert_never,
-                                 is_cuda_dispatch_key,
+                                 is_cuda_dispatch_key, BaseType, BaseTy,
                                  is_structured_dispatch_key)
 from tools.codegen.api.types import (BaseCType, Binding, ConstRefCType,
                                      CppSignature, CppSignatureGroup,
@@ -17,6 +18,9 @@ from tools.codegen.api.types import (BaseCType, Binding, ConstRefCType,
                                      NativeSignature, tensorT, NamedCType)
 import tools.codegen.api.meta as meta
 import tools.codegen.api.structured as structured
+import tools.codegen.api.dispatcher as dispatcher
+import tools.codegen.api.cpp as cpp
+from tools.codegen.dest.gen_external_aten_fallbacks import requires_backend_wrapper
 from tools.codegen.api.translate import translate
 from tools.codegen.selective_build.selector import SelectiveBuilder
 
@@ -56,14 +60,35 @@ class RegisterDispatchKey:
     # Whether or not we are actually code-genning for ROCm
     rocm: bool
 
+    # The namespace that the kernels are written in. This is just `at::native` for in-tree kernels.
+    cpp_namespace: str
+
     @method_with_native_function
-    def __call__(self, f: Union[NativeFunctionsGroup, NativeFunction]) -> List[str]:
+    def __call__(self, f: Union[
+            NativeFunctionsGroup,
+            NativeFunction,
+            ExternalBackendFunctionsGroup,
+            ExternalBackendFunction]
+    ) -> List[str]:
         if isinstance(f, NativeFunctionsGroup):
             if f.structured:
                 return self.gen_structured(f)
             else:
                 return list(mapMaybe(self.gen_unstructured, f.functions()))
-        elif isinstance(f, NativeFunction):
+        elif isinstance(f, ExternalBackendFunctionsGroup):
+            if f.structured:
+                raise AssertionError("structured kernels not implemented yet for external backends")
+            elif f.primary == f.functional:
+                # For external backends that specify that they'd like to primarily implement functional kernels (namely XLA),
+                # we can generate anonymous wrappers for the out and in-place kernels for them, even for un-structured operators.
+                # Note that we can't go the other way around (generate the functional using the out), since we don't know
+                # how to create the output tensor without a meta function.
+                return self.gen_out_inplace_wrappers(f)
+            else:
+                # For backends that implement out kernels, they need to port their ops to structured
+                # if they want generated functional/inplace kernels.
+                return list(mapMaybe(self.gen_unstructured, f.functions()))
+        elif isinstance(f, NativeFunction) or isinstance(f, ExternalBackendFunction):
             r = self.gen_unstructured(f)
             return [] if r is None else [r]
         else:
@@ -88,12 +113,38 @@ class RegisterDispatchKey:
             self.target,
             self.selector,
             self.rocm,
+            self.cpp_namespace,
             g
         )
         return list(mapMaybe(structured_gen.gen_one, g.functions()))
 
-    @method_with_native_function
-    def gen_unstructured(self, f: NativeFunction) -> Optional[str]:
+    def gen_unstructured(
+            self,
+            native_or_external: Union[NativeFunction, ExternalBackendFunction],
+            *,
+            # Only applies to ExternalBackendFunction objects.
+            # True for inplace/out functions that don't have kernels, but do have corresponding functional kernels.
+            is_generated_wrapper: bool = False,
+    ) -> Optional[str]:
+        sig: Union[NativeSignature, DispatcherSignature]
+        if isinstance(native_or_external, ExternalBackendFunction):
+            if not requires_backend_wrapper(native_or_external) and not is_generated_wrapper:
+                return None
+            # If the backend doesn't have a kernel, we don't generate an anonymous wrapper or a dispatcher registration for it
+            # (fallbacks to CPU are generated elsewhere).
+            if native_or_external.metadata is None and not is_generated_wrapper:
+                # TODO: Right now, we generate "fast-path" `at::xla::{op}` kernels for all non-composite ops,
+                # including those with CPU fallbacks. That logic will have to change if CPU fallbacks become a boxed kernel.
+                if self.target is not Target.NAMESPACED_DEFINITION and self.target is not Target.NAMESPACED_DECLARATION:
+                    return None
+            f = native_or_external.native_function
+            sig = self.external_backend_wrapper_sig(native_or_external)
+        elif isinstance(native_or_external, NativeFunction):
+            f = native_or_external
+            sig = NativeSignature(f.func, prefix='wrapper_')
+        else:
+            assert_never(f)
+
         inplace_meta = False
         if self.dispatch_key not in f.dispatch:
             if (self.dispatch_key == DispatchKey.Meta and
@@ -112,8 +163,6 @@ class RegisterDispatchKey:
         if self.target is Target.REGISTRATION and not self.selector.is_native_function_selected(f):
             return None
 
-        sig = NativeSignature(f.func, prefix='wrapper_')
-
         name = sig.name()
         returns_type = sig.returns_type().cpp_type()
         args = sig.arguments()
@@ -129,9 +178,19 @@ class RegisterDispatchKey:
             return result
         elif self.target is Target.NAMESPACED_DEFINITION:
             def generate_defn(cpp_sig: CppSignature) -> str:
+                # This is needed in order for namespaced definitions to call into CPU fallbacks,
+                # which live in a different namespace.
+                # TODO: this logic will change if we implement a boxed CPU fallback.
+                if isinstance(native_or_external, ExternalBackendFunction) \
+                        and native_or_external.metadata is None \
+                        and not is_generated_wrapper:
+                    # See Note [External Backends Follow Dispatcher convention]
+                    kernel_name = f'{self.cpp_namespace}::AtenXlaTypeDefault::{dispatcher.name(f.func)}'
+                else:
+                    kernel_name = sig.name()
                 return f"""
 {cpp_sig.defn()} {{
-return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), sig.arguments()))});
+return {kernel_name}({', '.join(e.expr for e in translate(cpp_sig.arguments(), sig.arguments()))});
 }}
 """
             result = generate_defn(cpp_sig_group.signature)
@@ -152,7 +211,11 @@ return {sig.name()}({', '.join(e.expr for e in translate(cpp_sig.arguments(), si
 }}
 """
 
-            impl_name = f"at::native::{f.dispatch[self.dispatch_key]}"
+            if isinstance(native_or_external, ExternalBackendFunction):
+                # TODO: remove this difference and merge the two cases when we remove xla-specific logic
+                impl_name = f"{self.cpp_namespace}::AtenXlaType::{f.dispatch[self.dispatch_key]}"
+            else:
+                impl_name = f"{self.cpp_namespace}::{f.dispatch[self.dispatch_key]}"
 
             args_exprs_str = ', '.join(a.name for a in args)
 
@@ -196,11 +259,73 @@ namespace {{
             if f.manual_kernel_registration:
                 return None
             else:
-                dispatcher_sig = DispatcherSignature.from_schema(f.func)
                 payload = f"TORCH_FN({name})"
                 return f'm.impl("{f.func.name}",\n{payload});\n'
         else:
             assert_never(self.target)
+
+    def external_backend_wrapper_sig(self, f: ExternalBackendFunction) -> DispatcherSignature:
+        # See Note [External Backends Follow Dispatcher convention]
+        return DispatcherSignature.from_schema(f.native_function.func, prefix='wrapper_', append_overload_name=True)
+
+    def gen_out_inplace_wrappers(self, g: ExternalBackendFunctionsGroup) -> List[str]:
+        def gets_generated_out_inplace_wrapper(f: ExternalBackendFunction) -> bool:
+            return f.native_function.func.kind() is not SchemaKind.functional \
+                and f.metadata is None and g.functional.metadata is not None
+
+        @with_native_function
+        def gen_wrapper(f: ExternalBackendFunction) -> Optional[str]:
+            # Only anonymous definitions get "special treatment" for out/inplace wrappers.
+            # All other functionality can be directly pulled from gen_unstructured.
+            if self.target is not Target.ANONYMOUS_DEFINITION:
+                is_generated_wrapper = gets_generated_out_inplace_wrapper(f)
+                return self.gen_unstructured(f, is_generated_wrapper=is_generated_wrapper)
+
+            if f.native_function.func.kind() is SchemaKind.functional:
+                # Wrappers are generated for out/inplace kernels, using the functional kernel,
+                # so the functional kernel itself is generated normally.
+                return self.gen_unstructured(f)
+            if f.metadata is not None:
+                # If the backend provided their own out/inplace kernel, use it.
+                return self.gen_unstructured(f)
+
+            if not gets_generated_out_inplace_wrapper(f):
+                return None
+
+            # Special out/inplace wrapper logic starts here.
+            dispatcher_sig = self.external_backend_wrapper_sig(f)
+            name = dispatcher_sig.name()
+
+            # See Note [External Backends Follow Dispatcher convention]
+            dispatcher_order_args = dispatcher.jit_arguments(f.native_function.func)
+            tensors = [a for a in dispatcher_order_args if a.type == BaseType(BaseTy.Tensor)]
+            print_args_str = ''.join([f' << " {a.name}=" << {a.name}.toString()' for a in tensors])
+
+            functional_result_name = f'{name}_tmp'
+            return_names = cpp.return_names(f.native_function)
+            if len(return_names) > 1:
+                updates = '\n  '.join(
+                    f'at::_copy_from_and_resize(std::get<{i}>({functional_result_name}), {ret_name});'
+                    for i, ret_name in enumerate(return_names))
+                returns = f'{dispatcher_sig.returns_type().cpp_type()}({", ".join(return_names)})'
+            else:
+                ret_name = return_names[0]
+                updates = f'at::_copy_from_and_resize({functional_result_name}, {ret_name});'
+                returns = ret_name
+
+            functional_sig = self.external_backend_wrapper_sig(g.functional)
+
+            return f"""\
+{dispatcher_sig.defn()} {{
+  XLA_FN_TRACK(3);
+  TF_VLOG(3) << "XLA {name} :"{print_args_str};
+  auto {functional_result_name} = {functional_sig.name()}({", ".join(a.name for a in functional_sig.arguments())});
+  {updates}
+  return {returns};
+}}
+
+"""
+        return list(mapMaybe(gen_wrapper, g.functions(functional_first=True)))
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

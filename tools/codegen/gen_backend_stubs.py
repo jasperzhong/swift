@@ -2,7 +2,7 @@ import pathlib
 import argparse
 import os
 import yaml
-from typing import List, Dict, Union, Tuple, Sequence
+from typing import List, Dict, Union, Tuple, Sequence, Optional
 from tools.codegen.gen import FileManager, get_grouped_native_functions, parse_native_yaml
 from tools.codegen.model import (ExternalBackendFunction, ExternalBackendFunctionsGroup,
                                  NativeFunction, NativeFunctionsGroup, OperatorName,
@@ -17,13 +17,14 @@ try:
     # use faster C loader if available
     from yaml import CSafeLoader as Loader
 except ImportError:
-    from yaml import SafeLoader as Loader  # type: ignore
+    from yaml import SafeLoader as Loader  # type: ignore[misc]
 
 
+# Parses the backend's yaml file and returns (BackendDispatchKey, AutogradDispatchKey, cpp_namespace, backend_kernel_list)
 def parse_backend_yaml(
         backend_yaml_path: str,
         grouped_native_functions: Sequence[Union[NativeFunction, NativeFunctionsGroup]]
-) -> Tuple[str, List[Union[ExternalBackendFunction, ExternalBackendFunctionsGroup]]]:
+) -> Tuple[DispatchKey, Optional[DispatchKey], str, List[Union[ExternalBackendFunction, ExternalBackendFunctionsGroup]]]:
     with open(backend_yaml_path, 'r') as f:
         yaml_values = yaml.load(f, Loader=Loader)
     assert isinstance(yaml_values, dict)
@@ -71,7 +72,8 @@ Only the following keys are supported: {", ".join(valid_keys)}'
         for f in concatMap(lambda f: [f] if isinstance(f, NativeFunction) else list(f.functions()), grouped_native_functions)
     }
 
-    def kernel_name(func: FunctionSchema) -> str:
+    def external_kernel_name(func: FunctionSchema) -> str:
+        # Note [External Backends Follow Dispatcher convention]
         # For external backends, we enforce that their names and signatures match the dispatcher convention
         return dispatcher.name(func)
 
@@ -83,17 +85,17 @@ Only the following keys are supported: {", ".join(valid_keys)}'
             m = metadata.get(f.func.name, None)
             dispatch_key = DispatchKey.parse(f'Autograd{backend}') \
                 if m is not None and m.is_autograd else DispatchKey.parse(backend)
-            kernel = kernel_name(f.func)
+            kernel = external_kernel_name(f.func)
             return ExternalBackendFunction(NativeFunction.with_dispatch_entry(f, dispatch_key, kernel), dispatch_key, m)
         elif isinstance(g, NativeFunctionsGroup):
             out_meta = metadata.get(g.out.func.name, None)
-            kernel = kernel_name(g.out.func)
+            kernel = external_kernel_name(g.out.func)
             dispatch_key = DispatchKey.parse(f'Autograd{backend}') \
                 if out_meta is not None and out_meta.is_autograd else DispatchKey.parse(backend)
             out = ExternalBackendFunction(NativeFunction.with_dispatch_entry(g.out, dispatch_key, kernel), dispatch_key, out_meta)
 
             functional_meta = metadata.get(g.functional.func.name, None)
-            kernel = kernel_name(g.functional.func)
+            kernel = external_kernel_name(g.functional.func)
             dispatch_key = DispatchKey.parse(f'Autograd{backend}') \
                 if functional_meta is not None and functional_meta.is_autograd else DispatchKey.parse(backend)
             functional = ExternalBackendFunction(
@@ -109,7 +111,7 @@ autograd key. They can not be mix and matched. If this is something you need, fe
             inplace = None
             if g.inplace:
                 inplace_meta = metadata.get(g.inplace.func.name, None)
-                kernel = kernel_name(g.inplace.func)
+                kernel = external_kernel_name(g.inplace.func)
                 dispatch_key = DispatchKey.parse(f'Autograd{backend}') \
                     if inplace_meta is not None and inplace_meta.is_autograd else DispatchKey.parse(backend)
                 inplace = ExternalBackendFunction(
@@ -128,7 +130,7 @@ autograd key. They can not be mix and matched. If this is something you need, fe
             assert_never(g)
     for op_name in metadata.keys():
         assert op_name in native_functions_map, f"Found an invalid operator name: {op_name}"
-    return cpp_namespace, [native_to_external(g) for g in grouped_native_functions]
+    return backend_key, autograd_key, cpp_namespace, [native_to_external(g) for g in grouped_native_functions]
 
 def main() -> None:
     parser = argparse.ArgumentParser(description='Generate backend stub files')
@@ -157,7 +159,7 @@ def run(source_yaml: str, output_dir: str, dry_run: bool) -> None:
 
     native_yaml_path = os.path.join(pytorch_root, 'aten/src/ATen/native/native_functions.yaml')
     grouped_native_functions = get_grouped_native_functions(native_yaml_path)
-    cpp_namespace, external_backend_functions = parse_backend_yaml(source_yaml, grouped_native_functions)
+    backend_key, autograd_key, cpp_namespace, external_backend_functions = parse_backend_yaml(source_yaml, grouped_native_functions)
 
     native_functions = parse_native_yaml(native_yaml_path)
 
@@ -170,6 +172,68 @@ def run(source_yaml: str, output_dir: str, dry_run: bool) -> None:
         'cpp_namespace': cpp_namespace,
         'dispatch_xla_declarations': list(concatMap(dest.compute_native_function_declaration, external_backend_functions)),
     })
+
+
+    external_backend_functions_no_autograd = [f for f in external_backend_functions if not f.is_autograd_kernel]
+    external_backend_functions_autograd = [f for f in external_backend_functions if f.is_autograd_kernel]
+
+    external_backend_headers = '''\
+#include <tensorflow/compiler/xla/xla_client/debug_macros.h>
+#include <tensorflow/compiler/xla/xla_client/metrics.h>
+#include <tensorflow/compiler/xla/xla_client/tf_logging.h>
+#include <torch_xla/csrc/function_call_tracker.h>
+#include <torch_xla/csrc/aten_xla_type.h>
+#include <torch_xla/csrc/aten_xla_type_default.h>'''
+
+    fm.write_with_template(f'Register{backend_key}.cpp', 'RegisterDispatchKey.cpp', lambda: {
+        'extra_cuda_headers': '',
+        'legacy_th_headers': '',
+        'external_backend_headers': external_backend_headers,
+        'DispatchKey': backend_key,
+        'dispatch_namespace': backend_key.lower(),
+        'dispatch_namespaced_definitions': list(concatMap(
+            dest.RegisterDispatchKey(
+                backend_key, Target.NAMESPACED_DEFINITION, selector, rocm=False, cpp_namespace=cpp_namespace),
+            external_backend_functions_no_autograd
+        )),
+        'dispatch_anonymous_definitions': list(concatMap(
+            dest.RegisterDispatchKey(
+                backend_key, Target.ANONYMOUS_DEFINITION, selector, rocm=False, cpp_namespace=cpp_namespace),
+            external_backend_functions_no_autograd
+        )),
+        'dispatch_registrations': list(concatMap(
+            dest.RegisterDispatchKey(backend_key, Target.REGISTRATION, selector, rocm=False, cpp_namespace=cpp_namespace),
+            external_backend_functions_no_autograd
+        )),
+    })
+
+    # If they have at least one autograd entry in their yaml file
+    if autograd_key is not None:
+        assert len(external_backend_functions_autograd) > 0
+        autograd_dispatchkey: DispatchKey = autograd_key  # make mypy happy
+        fm.write_with_template(f'Register{autograd_key}.cpp', 'RegisterDispatchKey.cpp', lambda: {
+            'extra_cuda_headers': '',
+            'legacy_th_headers': '',
+            'external_backend_headers': external_backend_headers,
+            'DispatchKey': autograd_dispatchkey,
+            'dispatch_namespace': autograd_dispatchkey.lower(),
+            'dispatch_namespaced_definitions': list(concatMap(
+                dest.RegisterDispatchKey(
+                    autograd_dispatchkey, Target.NAMESPACED_DEFINITION, selector, rocm=False, cpp_namespace=cpp_namespace),
+                external_backend_functions_autograd
+            )),
+            'dispatch_anonymous_definitions': list(concatMap(
+                dest.RegisterDispatchKey(
+                    autograd_dispatchkey, Target.ANONYMOUS_DEFINITION, selector, rocm=False, cpp_namespace=cpp_namespace),
+                external_backend_functions_autograd
+            )),
+            'dispatch_registrations': list(concatMap(
+                dest.RegisterDispatchKey(
+                    autograd_dispatchkey, Target.REGISTRATION, selector, rocm=False, cpp_namespace=cpp_namespace),
+                external_backend_functions_autograd
+            )),
+        })
+
 
     fm.write('aten_xla_type_default.h', lambda: {
         'generated_comment': generated_comment,
@@ -188,10 +252,7 @@ def run(source_yaml: str, output_dir: str, dry_run: bool) -> None:
             dest.GenExternalAtenFallback(Target.NAMESPACED_DEFINITION), external_backend_functions
         )),
         'dispatch_registrations': list(concatMap(
-            dest.GenExternalAtenFallback(Target.REGISTRATION), [e for e in external_backend_functions if not e.is_autograd_kernel]
-        )),
-        'dispatch_autograd_registrations': list(concatMap(
-            dest.GenExternalAtenFallback(Target.REGISTRATION), [e for e in external_backend_functions if e.is_autograd_kernel]
+            dest.GenExternalAtenFallback(Target.REGISTRATION), external_backend_functions
         )),
     })
 
