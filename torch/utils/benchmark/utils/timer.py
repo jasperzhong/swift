@@ -8,13 +8,14 @@ import numpy as np
 import torch
 from torch.utils.benchmark.utils import common, cpp_jit
 from torch.utils.benchmark.utils._stubs import TimerClass, TimeitModuleType
+from torch.utils.benchmark.utils.historic.back_testing import IS_BACK_TESTING
 from torch.utils.benchmark.utils.valgrind_wrapper import timer_interface as valgrind_timer_interface
 
 
 __all__ = ["Timer", "timer", "Language"]
 
 
-if torch.has_cuda and torch.cuda.is_available():
+if not IS_BACK_TESTING and torch.has_cuda and torch.cuda.is_available():
     def timer() -> float:
         torch.cuda.synchronize()
         return timeit.default_timer()
@@ -473,11 +474,12 @@ class Timer(object):
         if repeats is not None and repeats < 1:
             raise ValueError("If specified, `repeats` must be >= 1")
 
-        # Check that the statement is valid. It doesn't guarantee success, but it's much
-        # simpler and quicker to raise an exception for a faulty `stmt` or `setup` in
-        # the parent process rather than the valgrind subprocess.
-        self._timer.timeit(1)
         is_python = (self._language == Language.PYTHON)
+        if is_python:
+            # Check that the statement is valid. It doesn't guarantee success, but it's much
+            # simpler and quicker to raise an exception for a faulty `stmt` or `setup` in
+            # the parent process rather than the valgrind subprocess.
+            self._timer.timeit(1)
         assert is_python or not self._globals
         result = valgrind_timer_interface.wrapper_singleton().collect_callgrind(
             task_spec=self._task_spec,
