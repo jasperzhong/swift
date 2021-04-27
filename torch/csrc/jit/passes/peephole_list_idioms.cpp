@@ -150,7 +150,13 @@ struct ListLenRefiner {
                 ? boolean_value_refinements_[if_n.cond()].false_refine()
                 : empty);
 
-        joinIfRefinements(n, throwing_blocks_, block_refinements, true_block_refinements, false_block_refinements, boolean_value_refinements_);
+        joinIfRefinements(
+            n,
+            throwing_blocks_,
+            block_refinements,
+            true_block_refinements,
+            false_block_refinements,
+            boolean_value_refinements_);
       }
     }
     active_refinements_.pop_back();
