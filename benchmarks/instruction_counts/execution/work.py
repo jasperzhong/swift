@@ -27,7 +27,7 @@ _USE_NOISE_POLICE = (os.getenv("USE_NOISE_POLICE") or "").lower() in ("1", "true
 _ENV = "MKL_THREADING_LAYER=GNU"
 _PYTHON = "python"
 RUN_TEMPLATE = "{cmd}"
-if USE_NOISE_POLICE:
+if _USE_NOISE_POLICE:
     RUN_TEMPLATE = (
         "sudo systemd-run "
         "--slice=workload.slice --same-dir --wait --collect --service-type=exec --pty "
