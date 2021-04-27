@@ -20,9 +20,15 @@ else:
     PopenType = subprocess.Popen
 
 
+_USE_NOISE_POLICE = (os.getenv("USE_NOISE_POLICE") or "").lower() in ("1", "true")
+
+
 # Mitigate https://github.com/pytorch/pytorch/issues/37377
 _ENV = "MKL_THREADING_LAYER=GNU"
 _PYTHON = "python"
+if _USE_NOISE_POLICE:
+    _PYTHON = f"sudo systemd-run --slice=workload.slice --same-dir --wait --collect --service-type=exec --pty --uid={os.environ['USER']} {_PYTHON}"
+
 PYTHON_CMD = f"{_ENV} {_PYTHON}"
 
 # We must specify `bash` so that `source activate ...` always works
@@ -90,7 +96,7 @@ class _BenchmarkProcess:
 
         cmd.append(_ENV)
 
-        if self._cpu_list is not None:
+        if self._cpu_list is not None and not _USE_NOISE_POLICE:
             cmd.extend([
                 f"GOMP_CPU_AFFINITY={self._cpu_list}",
                 "taskset",
