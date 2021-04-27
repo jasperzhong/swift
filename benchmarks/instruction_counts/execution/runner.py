@@ -152,7 +152,7 @@ class Runner:
                 active_jobs.append(job)
                 continue
 
-            if job.work_order.allow_failure and (job._proc.poll() or isinstance(result, WorkerFailure)):
+            if job.work_order.allow_failure and (job._proc.poll() or isinstance(job.result, WorkerFailure)):
                 print("Task failed, but `allow_failure=True`")
                 continue
 
