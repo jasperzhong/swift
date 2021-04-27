@@ -26,8 +26,12 @@ _USE_NOISE_POLICE = (os.getenv("USE_NOISE_POLICE") or "").lower() in ("1", "true
 # Mitigate https://github.com/pytorch/pytorch/issues/37377
 _ENV = "MKL_THREADING_LAYER=GNU"
 _PYTHON = "python"
-if _USE_NOISE_POLICE:
-    _PYTHON = f"sudo systemd-run --slice=workload.slice --same-dir --wait --collect --service-type=exec --pty --uid={os.environ['USER']} {_PYTHON}"
+RUN_TEMPLATE = "{cmd}"
+if USE_NOISE_POLICE:
+    RUN_TEMPLATE = (
+        "sudo systemd-run "
+        "--slice=workload.slice --same-dir --wait --collect --service-type=exec --pty "
+        f"--uid={os.environ['USER']} echo $({RUN_TEMPLATE})")
 
 PYTHON_CMD = f"{_ENV} {_PYTHON}"
 
@@ -109,7 +113,7 @@ class _BenchmarkProcess:
             _PYTHON, WORKER_PATH,
             "--communication_file", self._communication_file,
         ])
-        return " ".join(cmd)
+        return RUN_TEMPLATE.format(cmd=" ".join(cmd))
 
     @property
     def duration(self) -> float:

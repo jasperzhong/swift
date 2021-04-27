@@ -7,7 +7,7 @@ import threading
 import time
 from typing import Dict, List, Optional, Set, Tuple, Union
 
-from execution.work import PYTHON_CMD, SHELL, InProgress, WorkOrder
+from execution.work import PYTHON_CMD, RUN_TEMPLATE, SHELL, InProgress, WorkOrder
 from worker.main import WorkerFailure, WorkerOutput
 
 
@@ -82,10 +82,12 @@ class Runner:
         self,
         work_items: Tuple[WorkOrder, ...],
         core_pool: Optional[CorePool] = None,
+        display_progress: bool = True,
         cadence: float = 1.0,
     ) -> None:
         self._work_items: Tuple[WorkOrder, ...] = work_items
         self._core_pool: CorePool = core_pool or CorePool(0, CPU_COUNT - 4)
+        self._display_progress = display_progress
         self._cadence: float = cadence
 
         # Working state.
@@ -186,17 +188,18 @@ class Runner:
         self._work_queue.extend(work_queue)
 
     def _print_progress(self) -> None:
-        fraction = f"{len(self._results)} / {len(self._work_items)}"
-        elapsed = f"{time.time() - self._start_time:.0f} seconds"
-        if len(self._results) < 5:
-            eta = "Unknown"
-        else:
-            remaining = len(self._work_items) - len(self._results)
-            iters_remaining = math.ceil(remaining / self._core_pool._num_cores)
-            mean_time = sum(self._durations.values()) / len(self._durations)
-            eta_minutes = math.ceil(iters_remaining * mean_time / 60)
-            eta = f"~{eta_minutes:.0f} minute{'s' if eta_minutes > 1 else ''}"
-        print(f"\r{fraction} ({elapsed}), ETA: {eta}", end="")
+        if self._display_progress:
+            fraction = f"{len(self._results)} / {len(self._work_items)}"
+            elapsed = f"{time.time() - self._start_time:.0f} seconds"
+            if len(self._results) < 5:
+                eta = "Unknown"
+            else:
+                remaining = len(self._work_items) - len(self._results)
+                iters_remaining = math.ceil(remaining / self._core_pool._num_cores)
+                mean_time = sum(self._durations.values()) / len(self._durations)
+                eta_minutes = math.ceil(iters_remaining * mean_time / 60)
+                eta = f"~{eta_minutes:.0f} minute{'s' if eta_minutes > 1 else ''}"
+            print(f"\r{fraction} ({elapsed}), ETA: {eta}", end="")
 
     def _force_shutdown(self, verbose: bool = False) -> None:
         """Try to interrupt jobs, and kill if need be.
@@ -248,6 +251,7 @@ class Runner:
 
         for source_cmd in (source_cmds or {""}):
             cmd = f'{source_cmd}{PYTHON_CMD} -c "import torch"'
+            cmd = RUN_TEMPLATE.format(cmd=cmd)
             proc = subprocess.run(
                 cmd,
                 shell=True,
