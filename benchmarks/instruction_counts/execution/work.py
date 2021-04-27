@@ -44,6 +44,7 @@ class WorkOrder:
     source_cmd: Optional[str] = None
     timeout: Optional[float] = None
     retries: int = 0
+    allow_failure: bool = False
 
     def __hash__(self) -> int:
         return id(self)

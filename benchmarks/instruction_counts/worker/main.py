@@ -48,13 +48,13 @@ WORKER_PATH = os.path.abspath(__file__)
 # to have to compile C++ timers anyway (as they're used as a check before
 # calling Valgrind), so we may as well grab wall times for reference. They
 # are comparatively inexpensive.
-MIN_RUN_TIME = 5
+MIN_RUN_TIME = 60
 
 # Repeats are inexpensive as long as they are all run in the same process. This
 # also lets us filter outliers (e.g. malloc arena reorganization), so we don't
 # need a high CALLGRIND_NUMBER to get good data.
 CALLGRIND_NUMBER = 100
-CALLGRIND_REPEATS = 5
+CALLGRIND_REPEATS = 10
 
 
 @dataclasses.dataclass(frozen=True)

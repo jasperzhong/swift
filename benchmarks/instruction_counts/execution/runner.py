@@ -150,6 +150,10 @@ class Runner:
                 active_jobs.append(job)
                 continue
 
+            if job.work_order.allow_failure and (job._proc.poll() or isinstance(result, WorkerFailure)):
+                print("Task failed, but `allow_failure=True`")
+                continue
+
             result: Union[WorkerOutput, WorkerFailure] = job.result
             if isinstance(result, WorkerOutput):
                 self._results[job.work_order] = result
