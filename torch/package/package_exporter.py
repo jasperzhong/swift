@@ -10,6 +10,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    NamedTuple,
     Optional,
     Sequence,
     Set,
@@ -45,6 +46,13 @@ class DeniedModuleError(Exception):
     """
 
     pass
+
+
+class BrokenModule(NamedTuple):
+    """Instances of this class are used to represent modules that cannot be imported.
+    """
+    name: str
+    reason: str
 
 
 class PackageExporter:
@@ -83,6 +91,7 @@ class PackageExporter:
         f: Union[str, Path, BinaryIO],
         importer: Union[Importer, Sequence[Importer]] = sys_importer,
         verbose: bool = True,
+        raise_packaging_errors: bool = True,
     ):
         """
         Create an exporter.
@@ -94,6 +103,8 @@ class PackageExporter:
                 If a sequence of importers are passsed, an ``OrderedImporter`` will be constructed out of them.
             verbose: Print information about dependency resolution to stdout.
                 Useful for tracking down why certain files get included.
+            raise_packaging_errors: If True, errors related to packaging (e.g. on module import, module source
+                lookup) are not ignored.
         """
         if isinstance(f, (Path, str)):
             f = str(f)
@@ -107,6 +118,8 @@ class PackageExporter:
         self.extern_modules: List[str] = []
         self.provided: Dict[str, bool] = {}
         self.verbose = verbose
+        self.raise_packaging_errors = raise_packaging_errors
+        self.broken_modules: Set[BrokenModule] = set()
 
         if isinstance(importer, Importer):
             self.importer = importer
@@ -359,21 +372,27 @@ node [shape=box];
                 for this package.
             dependencies (bool, optional): If ``True``, we scan the source for dependencies.
         """
-        if isinstance(module, str):
-            module_name = module
-            module_obj = self._import_module(module_name)
-        else:
-            module_name = module.__name__
-            module_obj = module
+        try:
+            if isinstance(module, str):
+                module_name = module
+                module_obj = self._import_module(module_name)
+            else:
+                module_name = module.__name__
+                module_obj = module
 
-        source = self._get_source_of_module(module_obj)
-        self.save_source_string(
-            module_name,
-            source,
-            hasattr(module_obj, "__path__"),
-            dependencies,
-            module_obj.__file__,
-        )
+            source = self._get_source_of_module(module_obj)
+            self.save_source_string(
+                module_name,
+                source,
+                hasattr(module_obj, "__path__"),
+                dependencies,
+                module_obj.__file__,
+            )
+        except (ModuleNotFoundError, ValueError) as e:
+            if self.raise_packaging_errors:
+                raise
+            else:
+                self.broken_modules.add(BrokenModule(module_name, str(e)))
 
     def save_pickle(
         self, package: str, resource: str, obj: Any, dependencies: bool = True
