@@ -8,6 +8,9 @@
 #include <thread>
 #include <vector>
 
+#include <ATen/core/ivalue.h>
+#include <ATen/core/ivalue_inl.h>
+
 #include <c10d/ProcessGroup.hpp>
 #include <c10d/Types.hpp>
 #include <c10d/Utils.hpp>
@@ -90,15 +93,22 @@ class ProcessGroupMPI : public ProcessGroup {
               OpType::UNKNOWN,
               profilingTitle,
               inputTensors),
-          outputs_(outputs) {}
+          outputs_(outputs),
+          future_(c10::make_intrusive<at::ivalue::Future>(
+            c10::ListType::create(c10::TensorType::get()))) {}
 
-   virtual std::vector<at::Tensor> result() override;
+    virtual std::vector<at::Tensor> result() override;
+
+    c10::intrusive_ptr<c10::ivalue::Future> getFuture() override;
 
    protected:
     friend class ProcessGroupMPI;
 
    private:
+    void finishCompleteFuture(std::exception_ptr eptr = nullptr);
+
     const std::shared_ptr<std::vector<at::Tensor>> outputs_;
+    c10::intrusive_ptr<at::ivalue::Future> future_;
   };
 
   class AsyncWork : public ProcessGroup::Work {

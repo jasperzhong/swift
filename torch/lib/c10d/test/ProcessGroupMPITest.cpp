@@ -11,7 +11,8 @@
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 
-// Wait for work to complete
+// Wait for work to complete. To be removed once all works are migrated
+// to futures.
 void waitWork(
     c10::intrusive_ptr<::c10d::ProcessGroupMPI> pg,
     std::vector<c10::intrusive_ptr<c10d::ProcessGroup::Work>> works,
@@ -26,6 +27,32 @@ void waitWork(
     if (outputTensors) {
       auto outputs = work->result();
       outputTensors->emplace_back(outputs);
+    }
+  }
+}
+
+// Wait using Futures
+void waitFuture(
+    c10::intrusive_ptr<::c10d::ProcessGroupMPI> pg,
+    std::vector<c10::intrusive_ptr<c10d::ProcessGroup::Work>> works,
+    std::vector<std::vector<at::Tensor>>* outputTensors) {
+  for (auto& work : works) {
+    auto fut = work->getFuture();
+    try {
+      fut->wait();
+    } catch (const std::exception& ex) {
+      std::cerr << "Exception received: " << ex.what() << std::endl;
+      pg->abort();
+    }
+    if (outputTensors) {
+      auto result = fut->value();
+      if (result.isNone()) {
+        outputTensors->emplace_back();
+      } else if (result.isTensorList()) {
+        outputTensors->emplace_back(result.toTensorVector());
+      } else {
+        throw std::runtime_error("future result should be tensor list or none");
+      }
     }
   }
 }
@@ -48,7 +75,7 @@ void testAllreduce(int iter = 1000) {
 
   std::vector<std::vector<at::Tensor>> outputTensors;
 
-  waitWork(pg, works, &outputTensors);
+  waitFuture(pg, works, &outputTensors);
 
   // Get the world size
   auto worldSize = pg->getSize();
@@ -90,7 +117,7 @@ void testBroadcast(int iter = 10000) {
 
   std::vector<std::vector<at::Tensor>> outputTensors;
 
-  waitWork(pg, works, &outputTensors);
+  waitFuture(pg, works, &outputTensors);
 
   // Verify outputs
   for (int i = 0; i < iter; ++i) {
@@ -123,7 +150,7 @@ void testReduce(int iter = 10000) {
 
   std::vector<std::vector<at::Tensor>> outputTensors;
 
-  waitWork(pg, works, &outputTensors);
+  waitFuture(pg, works, &outputTensors);
 
   // Get the world size
   auto worldSize = pg->getSize();
@@ -171,7 +198,7 @@ void testAllgather(int iter = 10000) {
 
   std::vector<std::vector<at::Tensor>> outputTensors;
 
-  waitWork(pg, works, &outputTensors);
+  waitFuture(pg, works, &outputTensors);
 
   // Verify outputs
   for (int i = 0; i < iter; ++i) {
@@ -221,7 +248,7 @@ void testGather(int iter = 1000) {
 
   std::vector<std::vector<at::Tensor>> outputTensors;
 
-  waitWork(pg, works, &outputTensors);
+  waitFuture(pg, works, &outputTensors);
 
   // Verify outputs
   if (rank == 0) {
@@ -280,7 +307,7 @@ void testScatter(int iter = 1) {
 
   std::vector<std::vector<at::Tensor>> outputTensors;
 
-  waitWork(pg, works, &outputTensors);
+  waitFuture(pg, works, &outputTensors);
 
   // Verify outputs
   for (int i = 0; i < iter; ++i) {

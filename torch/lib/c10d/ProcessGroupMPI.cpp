@@ -102,6 +102,25 @@ std::vector<at::Tensor> ProcessGroupMPI::WorkMPI::result() {
   }
 }
 
+c10::intrusive_ptr<c10::ivalue::Future> ProcessGroupMPI::WorkMPI::getFuture() {
+  return future_;
+}
+
+void ProcessGroupMPI::WorkMPI::finishCompleteFuture(std::exception_ptr eptr) {
+  if (eptr) {
+    future_->setError(eptr);
+    future_->markCompleted();
+    finish(eptr);
+  } else {
+    if (outputs_.get()) {
+      future_->markCompleted(at::IValue(*outputs_));
+    } else {
+      future_->markCompleted();
+    }
+    finish();
+  }
+}
+
 ProcessGroupMPI::AsyncWork::AsyncWork(
     MPI_Request request,
     const std::vector<at::Tensor>* outputs,
@@ -346,9 +365,9 @@ void ProcessGroupMPI::runLoop() {
 
     try {
       workEntry->run(workEntry);
-      work->finish();
+      work->finishCompleteFuture();
     } catch (...) {
-      work->finish(std::current_exception());
+      work->finishCompleteFuture(std::current_exception());
     }
 
     lock.lock();
