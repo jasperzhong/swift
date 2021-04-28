@@ -21,23 +21,6 @@ from typing import Iterable, Sequence, Tuple
 TORCH_ROOT = functools.reduce(
     lambda s, _: os.path.split(s)[0], range(5), os.path.abspath(__file__))
 
-BACKPORT_NAME = "utils_backport"
-PATTERNS = (
-    # Point imports at the new namespace.
-    ("torch.utils", f"torch.{BACKPORT_NAME}"),
-
-    (
-        "IS_BACK_TESTING_OVERRIDE: bool = False",
-        "IS_BACK_TESTING_OVERRIDE: bool = True"
-    ),
-)
-
-
-def clean_backport(destination_install: str) -> None:
-    destination_root = os.path.join(destination_install, BACKPORT_NAME)
-    if os.path.exists(destination_root):
-        shutil.rmtree(destination_root)
-
 
 def backport(destination_install: str) -> None:
     assert os.path.split(TORCH_ROOT)[1] == "torch"
@@ -46,9 +29,8 @@ def backport(destination_install: str) -> None:
             f"`{destination_install}` does not appear to be the root of a "
             "PyTorch installation.")
 
-    destination_root = os.path.join(destination_install, BACKPORT_NAME)
-    clean_backport(destination_install)
-    os.makedirs(destination_root)
+    destination_root = os.path.join(destination_install, "utils")
+    os.makedirs(destination_root, exist_ok=True)
 
     source_root = os.path.join(TORCH_ROOT, "utils")
     for d, _, files in os.walk(os.path.join(source_root, "benchmark")):
@@ -59,9 +41,6 @@ def backport(destination_install: str) -> None:
             src = os.path.join(d, fname)
             with open(src, "rt") as f:
                 contents = f.read()
-
-            for old, new in PATTERNS:
-                contents = re.sub(old, new, contents)
 
             dest = re.sub(f"^{source_root}", destination_root, src)
             os.makedirs(os.path.split(dest)[0], exist_ok=True)
