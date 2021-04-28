@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING
 import torch
 
 
-IS_BACK_TESTING_OVERRIDE: bool = False
+IS_BACK_TESTING_OVERRIDE: bool = True
 IS_BACK_TESTING: bool = not all([
     hasattr(torch._C, "_valgrind_supported_platform"),
     hasattr(torch._C, "_valgrind_toggle"),

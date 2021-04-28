@@ -7,7 +7,7 @@ import threading
 import time
 from typing import Dict, List, Optional, Set, Tuple, Union
 
-from execution.work import PYTHON_CMD, RUN_TEMPLATE, SHELL, InProgress, WorkOrder
+from execution.work import PYTHON_CMD, RUN_TEMPLATE, InProgress, WorkOrder
 from worker.main import WorkerFailure, WorkerOutput
 
 
@@ -251,14 +251,13 @@ class Runner:
 
         for source_cmd in (source_cmds or {""}):
             cmd = f'{source_cmd}{PYTHON_CMD} -c "import torch"'
-            cmd = RUN_TEMPLATE.format(cmd=cmd)
+            cmd = RUN_TEMPLATE.format(cmd=cmd.replace('"', '\"'))
             proc = subprocess.run(
                 cmd,
                 shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 encoding="utf-8",
-                executable=SHELL,
             )
 
             if proc.returncode:
