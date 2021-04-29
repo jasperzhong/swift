@@ -52,14 +52,15 @@
 #include <ATen/native/IndexingUtils.h>
 
 #include <ATen/ATen.h>
-#include <ATen/NativeFunctions.h>
 #include <ATen/ExpandUtils.h>
 #include <ATen/MemoryOverlap.h>
-#include <ATen/native/TensorIterator.h>
+#include <ATen/NativeFunctions.h>
+#include <ATen/Parallel.h>
 #include <ATen/native/BinaryOps.h>
 #include <ATen/native/Copy.h>
 #include <ATen/native/Resize.h>
-#include <ATen/Parallel.h>
+#include <ATen/native/TensorIterator.h>
+#include <ATen/native/XTensorIterator.h>
 
 #include <c10/util/irange.h>
 
@@ -607,7 +608,7 @@ Tensor& index_add_cpu_(Tensor & self, int64_t dim, const Tensor & index, const T
     auto self_stride_bytes = self.stride(dim) * elementSize(self.scalar_type());
     auto source_stride_bytes = source.stride(dim) * elementSize(source.scalar_type());
     auto self_dim_size = self.size(dim);
-    auto iter = TensorIterator::binary_op(selfSlice, selfSlice, sourceSlice);
+    auto iter = XTensorIterator::binary_op(selfSlice, selfSlice, sourceSlice);
 
     AT_DISPATCH_INDEX_TYPES(index.scalar_type(), "index_add_cpu_", [&] () {
       auto index_data = index_contig.data_ptr<index_t>();
