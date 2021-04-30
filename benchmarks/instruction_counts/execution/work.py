@@ -34,8 +34,8 @@ RUN_TEMPLATE = f'{SHELL} <<< "{{cmd}}"'
 if _USE_NOISE_POLICE:
     RUN_TEMPLATE = (
         "sudo systemd-run "
-        "--slice=workload.slice --same-dir --wait --collect --service-type=exec --pty "
-        f'--uid=$USER --setenv=PATH="${{PATH}}" {RUN_TEMPLATE}')
+        "--slice=workload.slice --same-dir --wait --collect --service-type=exec --pty --pipe "
+        f'--uid=$USER --setenv=PATH="${{{{PATH}}}}" {RUN_TEMPLATE}')
 
 PYTHON_CMD = f"{_ENV} {_PYTHON}"
 
@@ -113,7 +113,7 @@ class _BenchmarkProcess:
             _PYTHON, WORKER_PATH,
             "--communication_file", self._communication_file,
         ])
-        return RUN_TEMPLATE.format(cmd=" ".join(cmd).replace('"', '\"'))
+        return RUN_TEMPLATE.format(cmd=" ".join(cmd).replace('"', '\\"'))
 
     @property
     def duration(self) -> float:

@@ -154,6 +154,8 @@ class Runner:
 
             if job.work_order.allow_failure and (job._proc.poll() or isinstance(job.result, WorkerFailure)):
                 print("Task failed, but `allow_failure=True`")
+                assert job.cpu_list is not None
+                self._core_pool.release(job.cpu_list)
                 continue
 
             result: Union[WorkerOutput, WorkerFailure] = job.result
@@ -251,7 +253,7 @@ class Runner:
 
         for source_cmd in (source_cmds or {""}):
             cmd = f'{source_cmd}{PYTHON_CMD} -c "import torch"'
-            cmd = RUN_TEMPLATE.format(cmd=cmd.replace('"', '\"'))
+            cmd = RUN_TEMPLATE.format(cmd=cmd.replace('"', '\\"'))
             proc = subprocess.run(
                 cmd,
                 shell=True,
