@@ -643,8 +643,9 @@ class _ValgrindWrapper(object):
                     "--number_threads", str(task_spec.num_threads),
                 ]
 
+            env = os.environ.copy()
+            env.setdefault("PYTHONMALLOC", "malloc")
             valgrind_invocation, valgrind_invocation_output = run([
-                f"PYTHONMALLOC={os.getenv('PYTHONMALLOC') or 'malloc'}",
                 "valgrind",
                 "--tool=callgrind",
                 f"--callgrind-out-file={callgrind_out}",
@@ -652,7 +653,7 @@ class _ValgrindWrapper(object):
                 "--dump-instr=yes",
                 "--instr-atstart=yes",
                 "--collect-atstart=no",
-            ] + run_loop_cmd)
+            ] + run_loop_cmd, env=env)
 
             if valgrind_invocation.returncode:
                 error_report = ""
