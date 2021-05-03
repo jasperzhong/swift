@@ -48,7 +48,7 @@ WORKER_PATH = os.path.abspath(__file__)
 # to have to compile C++ timers anyway (as they're used as a check before
 # calling Valgrind), so we may as well grab wall times for reference. They
 # are comparatively inexpensive.
-MIN_RUN_TIME = 60
+MIN_RUN_TIME = 45
 
 # Repeats are inexpensive as long as they are all run in the same process. This
 # also lets us filter outliers (e.g. malloc arena reorganization), so we don't
@@ -139,7 +139,7 @@ def _run(timer_args: WorkerTimerArgs) -> WorkerOutput:
         language=timer_args.language,
     )
 
-    m = timer.blocked_autorange(min_run_time=MIN_RUN_TIME)
+    m0 = timer.blocked_autorange(min_run_time=MIN_RUN_TIME)
 
     stats: Tuple[CallgrindStats, ...] = timer.collect_callgrind(
         number=CALLGRIND_NUMBER,
@@ -148,8 +148,10 @@ def _run(timer_args: WorkerTimerArgs) -> WorkerOutput:
         retain_out_file=False,
     )
 
+    m1 = timer.blocked_autorange(min_run_time=MIN_RUN_TIME)
+
     return WorkerOutput(
-        wall_times=tuple(m.times),
+        wall_times=tuple(m0.times + m1.times),
         instructions=tuple(s.counts(denoise=True) for s in stats)
     )
 

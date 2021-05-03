@@ -644,6 +644,7 @@ class _ValgrindWrapper(object):
                 ]
 
             valgrind_invocation, valgrind_invocation_output = run([
+                f"PYTHONMALLOC={os.getenv('PYTHONMALLOC') or 'malloc'}",
                 "valgrind",
                 "--tool=callgrind",
                 f"--callgrind-out-file={callgrind_out}",
