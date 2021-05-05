@@ -4830,6 +4830,15 @@ class MyConvNetForMNIST(nn.Module):
             return self.net(x)
 
 
+class RRefModuleWrapper(nn.Module):
+    def __init__(self, clazz, args):
+        super().__init__()
+        self.module = clazz(*args)
+
+    def forward(self, x_rref):
+        return self.module(x_rref.to_here())
+
+
 class TensorPipeAgentCudaRpcTest(RpcAgentTestFixture):
 
     def _test_device_maps(self, options, errMsg="Invalid device_map"):
@@ -5858,6 +5867,102 @@ class TensorPipeAgentCudaRpcTest(RpcAgentTestFixture):
             )
 
             rpc.shutdown()
+
+    def _test_stress_rref_forward(self):
+        options = self.rpc_backend_options
+        for peer_rank in range(self.world_size):
+            options.set_device_map(worker_name(peer_rank), {self.rank: peer_rank})
+
+        rpc.init_rpc(
+            name=worker_name(self.rank),
+            backend=self.rpc_backend,
+            rank=self.rank,
+            world_size=self.world_size,
+            rpc_backend_options=options,
+        )
+
+        if self.rank == 0:
+            # this is master
+            nets = []
+            for peer_rank in range(1, 4):
+                nets.append(rpc.remote(
+                    worker_name(peer_rank),
+                    RRefModuleWrapper,
+                    args=(nn.Identity, []),
+                ).remote().cuda(peer_rank))
+
+            tik = torch.cuda.Event(enable_timing=True)
+            tok = torch.cuda.Event(enable_timing=True)
+
+            def run():
+                for scale in [1, 2, 4, 8]:
+                    size = 1000 * scale
+                    x_rref = RRef(torch.zeros(size, size).cuda(0), devices=[0])
+                    tik.record()
+                    for _ in range(10):
+                        for net in nets:
+                            x_rref = net.remote().forward(x_rref)
+                        x_rref.to_here()
+                    tok.record()
+                    torch.cuda.current_stream(0).synchronize()
+                    print(f"scale = {scale}, total forward time {tik.elapsed_time(tok)}")
+
+            run()
+            print("====== warm up done =====")
+            run()
+
+        rpc.shutdown()
+
+    @skip_if_lt_x_gpu(4)
+    def test_stress_rref_forward(self):
+        self._test_stress_rref_forward()
+
+    def _test_stress_tensor_forward(self):
+        options = self.rpc_backend_options
+        for peer_rank in range(self.world_size):
+            options.set_device_map(worker_name(peer_rank), {self.rank: peer_rank})
+
+        rpc.init_rpc(
+            name=worker_name(self.rank),
+            backend=self.rpc_backend,
+            rank=self.rank,
+            world_size=self.world_size,
+            rpc_backend_options=options,
+        )
+
+        if self.rank == 0:
+            # this is master
+            nets = []
+            for peer_rank in range(1, 4):
+                nets.append(rpc.remote(
+                    worker_name(peer_rank),
+                    nn.Identity,
+                ).remote().cuda(peer_rank))
+
+            tik = torch.cuda.Event(enable_timing=True)
+            tok = torch.cuda.Event(enable_timing=True)
+
+            def run():
+                for scale in [1, 2, 4, 8]:
+                    size = 1000 * scale
+                    x = torch.zeros(size, size).cuda(0)
+                    tik.record()
+                    for _ in range(10):
+                        for net in nets:
+                            x = net.rpc_sync().forward(x)
+                    tok.record()
+                    torch.cuda.current_stream(0).synchronize()
+                    print(f"scale = {scale}, total forward time {tik.elapsed_time(tok)}")
+
+            run()
+            print("====== warm up done =====")
+            run()
+
+        rpc.shutdown()
+
+    @skip_if_lt_x_gpu(4)
+    def test_stress_tensor_forward(self):
+        self._test_stress_tensor_forward()
 
     @skip_if_lt_x_gpu(1)
     def test_devices_option_mismatch_reverse(self):
