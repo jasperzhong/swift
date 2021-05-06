@@ -1,6 +1,7 @@
 import builtins
 import functools
 import inspect
+import importlib
 import math
 import os
 from types import CodeType, FunctionType, ModuleType
@@ -138,7 +139,7 @@ class Tracer(TracerBase):
 
         # Python modules to apply autowrap to at the start, in addition to
         # modules we see while tracing
-        self._autowrap_search: List[ModuleType] = list(autowrap_modules)
+        self._autowrap_search: List[str] = [mod.__name__ for mod in autowrap_modules]
         self.enable_cpatching = enable_cpatching
 
         self.submodule_paths: Optional[Dict[torch.nn.Module, str]] = None
@@ -428,7 +429,8 @@ class Tracer(TracerBase):
                 _patch_wrapped_functions(patcher)
                 _autowrap_check(patcher, fn_globals, self._autowrap_function_ids)
                 for module in self._autowrap_search:
-                    _autowrap_check(patcher, module.__dict__, self._autowrap_function_ids)
+                    module_obj = importlib.import_module(module)
+                    _autowrap_check(patcher, module_obj.__dict__, self._autowrap_function_ids)
 
                 self.create_node('output', 'output', (self.create_arg(fn(*args)),), {},
                                  type_expr=fn.__annotations__.get('return', None))
