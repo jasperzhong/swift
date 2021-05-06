@@ -338,6 +338,24 @@ Vec256<double> inline minimum(const Vec256<double>& a, const Vec256<double>& b) 
   return _mm256_or_pd(min, isnan);
 }
 
+// std::fmax, which returns the non-NaN input if either input is a NaN.
+template <>
+Vec256<double> inline fmax(const Vec256<double>& a, const Vec256<double>& b) {
+  // Use the fact that _mm256_max_pd returns b if either a or b is NaN.
+  Vec256<double> max = _mm256_max_pd(a, b);
+  Vec256<double> isnan = _mm256_cmp_pd(b, b, _CMP_UNORD_Q);
+  return Vec256<double>::blendv(max, a, isnan);
+}
+
+// std::fmin, which returns the non-NaN input if either input is a NaN.
+template <>
+Vec256<double> inline fmin(const Vec256<double>& a, const Vec256<double>& b) {
+  // Use the fact that _mm256_min_pd returns b if either a or b is NaN.
+  Vec256<double> min = _mm256_min_pd(a, b);
+  Vec256<double> isnan = _mm256_cmp_pd(b, b, _CMP_UNORD_Q);
+  return Vec256<double>::blendv(min, a, isnan);
+}
+
 template <>
 Vec256<double> inline clamp(const Vec256<double>& a, const Vec256<double>& min, const Vec256<double>& max) {
   return _mm256_min_pd(max, _mm256_max_pd(min, a));
