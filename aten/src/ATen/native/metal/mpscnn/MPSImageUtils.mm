@@ -146,6 +146,9 @@ MPSImage* createStaticImage(
 
 MPSTemporaryImage* createTemporaryImage(MetalCommandBuffer* buffer, IntArrayRef sizes) {
   TORCH_CHECK(buffer);
+  if(sizes[0] == 0){
+    return nil;
+  }
   MPSImageDescriptor* desc = [MPSImageDescriptor
       imageDescriptorWithChannelFormat:MPSImageFeatureChannelFormatFloat16
                                  width:sizes[3]

@@ -20,6 +20,9 @@ Tensor neuronKernel(const Tensor& input, MPSCNNNeuron* neuron) {
   IntArrayRef outputSize = input.sizes();
   IntArrayRef textureSize = outputSize;
   MetalTensorImplStorage mt{outputSize.vec()};
+    if(outputSize[0] == 0){
+        return makeTensor(std::move(mt), input.options());
+    }
   MetalCommandBuffer* commandBuffer = getCommandBufferFromTensor(input);
   mt.texture()->allocateTemporaryStorage(textureSize, commandBuffer);
   MPSImage* Y = mt.texture()->image();

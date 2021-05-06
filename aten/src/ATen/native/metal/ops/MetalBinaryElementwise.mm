@@ -112,7 +112,11 @@ Tensor binaryElementwiseMPSCNNKernel(
   if (broadCastFirstInput(X1, X2)) {
     outputSize = input2.sizes();
   }
-  MetalTensorImplStorage mt{outputSize.vec()};
+    MetalTensorImplStorage mt{outputSize.vec()};
+    if(outputSize[0] == 0){
+        return makeTensor(std::move(mt), input1.options());
+    }
+
   MetalCommandBuffer* cb1 = getCommandBufferFromTensor(input1);
   MetalCommandBuffer* cb2 = getCommandBufferFromTensor(input2);
   TORCH_CHECK(
