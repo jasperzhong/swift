@@ -21,9 +21,7 @@ class TestPackageFX(PackageTestCase):
     """Tests for compatibility with FX."""
 
     def test_package_fx_simple(self):
-        class SimpleTest(torch.nn.Module):
-            def forward(self, x):
-                return torch.relu(x + 3.0)
+        from package_fx_test_utils import SimpleTest
 
         st = SimpleTest()
         traced = symbolic_trace(st)
@@ -115,6 +113,32 @@ class TestPackageFX(PackageTestCase):
         # not the same as in the outer env.
         packaged_dependency = pi.import_module("package_a.subpackage")
         self.assertTrue(packaged_dependency is not package_a.subpackage)
+
+    def test_package_fx_custom_tracer(self):
+        """
+        Tests that if a GraphModule containing a Graph
+        produced using a custom Tracer is packaged, is it unpackaged
+        using the same custom Tracer.
+        """
+        from package_fx_test_utils import MyModule, PackageFXTestTracer
+
+        my_mod = MyModule()
+        tracer = PackageFXTestTracer()
+        graph = tracer.trace(my_mod)
+
+        self.assertIs(graph.tracer, tracer)
+
+        gm = GraphModule(my_mod, graph)
+
+        f = BytesIO()
+        with PackageExporter(f, verbose=False) as pe:
+            pe.save_pickle("model", "model.pkl", gm)
+
+        f.seek(0)
+        pi = PackageImporter(f)
+        loaded = pi.load_pickle("model", "model.pkl")
+
+        self.assertTrue(loaded.graph.tracer.is_package_fx_test_tracer)
 
 
 if __name__ == "__main__":

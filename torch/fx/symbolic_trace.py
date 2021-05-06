@@ -437,6 +437,8 @@ class Tracer(TracerBase):
 
         self.submodule_paths = None
 
+        self.graph.tracer = self
+
         return self.graph
 
 
