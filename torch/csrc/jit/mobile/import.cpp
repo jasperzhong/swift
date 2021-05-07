@@ -258,9 +258,7 @@ std::unordered_set<std::string> BytecodeDeserializer::
     TORCH_CHECK(
         op_item.size() == 2, "There should be two parts in an operator name.");
     auto op_found = function->append_operator(
-        op_item[0].toString()->string(),
-        op_item[1].toString()->string(),
-        model_version);
+        op_item[0].toString()->string(), op_item[1].toString()->string());
     if (!op_found) {
       unsupported_op_names.emplace(operator_str(
           op_item[0].toString()->string(), op_item[1].toString()->string()));
@@ -280,8 +278,9 @@ void BytecodeDeserializer::parseMethods(
   TORCH_CHECK(vals.size() > 0, "Bytecode has no elements. ");
   // Initialized with the version number when kProducedBytecodeVersion was
   // introduced. The old models (some of them already in production) without
-  // version number don't have to be re-generated.
-  int64_t model_version = 0x3L;
+  // version number are seen as version 3 (deprecated).
+  constexpr uint64_t default_version = 0x3L;
+  uint64_t model_version = default_version;
   size_t method_i_start = 0;
   if (vals[0].isInt()) {
     model_version = vals[0].toInt();
