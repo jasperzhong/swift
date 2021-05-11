@@ -525,8 +525,7 @@ class QuantizationTestCase(TestCase):
             self.assertEqual(outputs[True], outputs[False])
 
             # non debug graph should produce quantized op
-            FileCheck().check(quantized_op) \
-                       .run(models[False].graph)
+            FileCheck().check(quantized_op).run(models[False].graph)  # type: ignore[attr-defined]
 
         return models[False]
 
@@ -853,7 +852,7 @@ class QuantizationTestCase(TestCase):
             loaded_qemb = nnq.EmbeddingBag(num_embeddings=num_embeddings, embedding_dim=embedding_dim,
                                            include_last_offset=True, mode='sum', dtype=dtype)
         else:
-            loaded_qemb = nnq.Embedding(num_embeddings=num_embeddings, embedding_dim=embedding_dim, dtype=dtype)  # type: ignore[assignment]
+            loaded_qemb = nnq.Embedding(num_embeddings=num_embeddings, embedding_dim=embedding_dim, dtype=dtype)  # type: ignore[assignment]  # noqa: B950
         self.check_eager_serialization(qemb, loaded_qemb, inputs)
 
         loaded_qemb.load_state_dict(loaded_dict)
@@ -869,7 +868,7 @@ class QuantizationTestCase(TestCase):
             float_embedding = torch.nn.EmbeddingBag(num_embeddings=num_embeddings, embedding_dim=embedding_dim,
                                                     include_last_offset=True, scale_grad_by_freq=False, mode='sum')
         else:
-            float_embedding = torch.nn.Embedding(num_embeddings=num_embeddings, embedding_dim=embedding_dim)  # type: ignore[assignment]
+            float_embedding = torch.nn.Embedding(num_embeddings=num_embeddings, embedding_dim=embedding_dim)  # type: ignore[assignment]  # noqa: B950
 
         if set_qconfig:
             float_qparams_observer = PerChannelMinMaxObserver.with_args(dtype=dtype,
