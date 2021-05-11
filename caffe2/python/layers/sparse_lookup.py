@@ -32,13 +32,13 @@ logger = logging.getLogger(__name__)
 def get_trainer_version_based_on_optim(optim_def):
     if isinstance(optim_def, Optimizer) and hasattr(optim_def, "engine"):
         logger.info(
-            "Attempting to set trainer version for engine {}".format(optim_def.engine)
+            "Attempting to set trainer version for engine {}".format(optim_def.engine)  # type: ignore[attr-defined]
         )
-        if optim_def.engine in FP16_ENGINES:
-            logger.info("Setting FP16 trainer for engine {}".format(optim_def.engine))
+        if optim_def.engine in FP16_ENGINES:  # type: ignore[attr-defined]
+            logger.info("Setting FP16 trainer for engine {}".format(optim_def.engine))  # type: ignore[attr-defined]
             return "fp16"
         else:
-            logger.info("Setting FP32 trainer for engine {}".format(optim_def.engine))
+            logger.info("Setting FP32 trainer for engine {}".format(optim_def.engine))  # type: ignore[attr-defined]
             return "fp32"
     else:
         return "fp32"
@@ -181,7 +181,7 @@ class SparseLookup(ModelLayer):
         )
 
         self.input_dim = input_dim
-        self.shape = [input_dim] + inner_shape
+        self.shape = [input_dim] + inner_shape  # type: ignore[operator]
 
         self.trainer_version = get_trainer_version_based_on_optim(
             weight_optim
@@ -282,10 +282,10 @@ class SparseLookup(ModelLayer):
             )
             return [RowwiseQuantized8BitsWeight(self.w)]
         else:
-            RowwiseQuantized8BitsWeight = collections.namedtuple(
+            RowwiseQuantized8BitsWeight = collections.namedtuple(  # type: ignore[no-redef]
                 'RowwiseQuantized8BitsWeight', 'w, scale_bias'
             )
-            return [RowwiseQuantized8BitsWeight(self.w, self.scale_bias)]
+            return [RowwiseQuantized8BitsWeight(self.w, self.scale_bias)]  # type: ignore[call-arg]
 
     def _get_default_init_op(self):
         scale = math.sqrt(self.uniform_weight_init_scale_numerator / self.input_dim)
@@ -297,7 +297,7 @@ class SparseLookup(ModelLayer):
         else:
             raise NotImplementedError(
                 "Train version {} is not currently supported for sparse feature {}".format(
-                    trainer_version, self.sparse_key
+                    trainer_version, self.sparse_key  # type: ignore[name-defined]
                 )
             )
 
@@ -525,7 +525,7 @@ class SparseLookup(ModelLayer):
         elif _is_id_score_list(self.input_record):
             self._add_ops_id_score_list(net, version=version)
         else:
-            raise "Unsupported input type {0}".format(self.input_record)
+            raise "Unsupported input type {0}".format(self.input_record)  # type: ignore[misc]
 
     def add_train_ops(self, net):
         self._add_ops(net, self.trainer_version, is_train=True)
