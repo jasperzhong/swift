@@ -66,11 +66,15 @@ std::pair<IValue, IValue> getFunctionTuple(
     const Function& func,
     BackendDebugHandleManager& debug_handle_manager) {
   auto graph = func.graph()->copy();
+  int64_t writeVersion = caffe2::serialize::kProducedBytecodeVersion;
+  if (BytecodeWriteVersion) {
+    writeVersion = BytecodeWriteVersion.value();
+  }
 
   Inline(*graph);
 
   std::shared_ptr<MobileCode> code;
-  if (caffe2::serialize::kProducedBytecodeVersion == 6) {
+  if (writeVersion == 6) {
     code = std::make_shared<MobileCode>(
         graph, func.name(), false /* emit_default_input_instructions */);
   } else {
@@ -173,7 +177,7 @@ std::pair<IValue, IValue> getFunctionTuple(
     if (it != op_to_specified_args.end()) {
       num_args = it->second;
     }
-    if (caffe2::serialize::kProducedBytecodeVersion == 6) {
+    if (writeVersion == 6) {
       operators.emplace_back(
           Tup({opname.name, opname.overload_name, num_args}));
     } else {
@@ -565,8 +569,13 @@ void ScriptModuleSerializer::writeByteCode(
     const bool save_mobile_debug_info) {
   std::vector<c10::IValue> elements;
   BackendDebugHandleManager debug_handle_manager;
-  elements.emplace_back(
-      static_cast<int64_t>(caffe2::serialize::kProducedBytecodeVersion));
+  if(BytecodeWriteVersion.has_value()) {
+    elements.emplace_back(
+        static_cast<int64_t>(BytecodeWriteVersion.value()));
+  } else {
+    elements.emplace_back(
+        static_cast<int64_t>(caffe2::serialize::kProducedBytecodeVersion));
+  }
   std::vector<c10::IValue> debug_info_elements;
   // Always save debug handles
   debug_info_elements.emplace_back(
