@@ -183,7 +183,7 @@ struct KinetoThreadLocalState : public ProfilerThreadLocalState {
       memory_events_.end());
   }
 
-  std::vector<KinetoEvent> kineto_events_;
+  std::vector<_KinetoEvent> kineto_events_;
   std::unique_ptr<libkineto::CpuTraceBuffer> cpu_trace;
   std::vector<libkineto::GenericTraceActivity> memory_events_;
 };
@@ -416,7 +416,7 @@ void enableProfiler(
   state->mark("__start_profile", false);
 }
 
-std::unique_ptr<ProfilerResult> disableProfiler() {
+std::unique_ptr<_ProfilerResult> disableProfiler() {
   // all the DebugInfoBase objects are scope based and supposed to use DebugInfoGuard
   auto state = c10::ThreadLocalDebugInfo::_pop(c10::DebugInfoKind::PROFILER_STATE);
 
@@ -441,7 +441,7 @@ std::unique_ptr<ProfilerResult> disableProfiler() {
   auto trace = libkineto::api().activityProfiler().stopTrace();
   TORCH_CHECK(trace);
   state_ptr->addTraceEvents(*trace);
-  return std::make_unique<ProfilerResult>(
+  return std::make_unique<_ProfilerResult>(
       std::move(state_ptr->kineto_events_),
       state_ptr->consolidate(),
       std::move(trace));
@@ -455,7 +455,7 @@ void addMetadataJson(const std::string& key, const std::string& value) {
   }
 }
 
-KinetoEvent& KinetoEvent::activity(const libkineto::TraceActivity& activity) {
+_KinetoEvent& _KinetoEvent::activity(const libkineto::TraceActivity& activity) {
   name_ = activity.name();
   device_index_ = activity.deviceId();
   device_resource_id_ = activity.resourceId();
@@ -474,7 +474,7 @@ KinetoEvent& KinetoEvent::activity(const libkineto::TraceActivity& activity) {
   return *this;
 }
 
-int64_t KinetoEvent::cudaElapsedUs() const {
+int64_t _KinetoEvent::cudaElapsedUs() const {
   if (!cuda_event_start_ || !cuda_event_end_) {
     return -1;
   }
@@ -488,7 +488,7 @@ int64_t KinetoEvent::cudaElapsedUs() const {
   return -1;
 }
 
-c10::DeviceType KinetoEvent::deviceType() const {
+c10::DeviceType _KinetoEvent::deviceType() const {
   // fallthrough
   switch (activity_type_) {
     case (uint8_t)libkineto::ActivityType::GPU_MEMCPY:
@@ -504,16 +504,16 @@ c10::DeviceType KinetoEvent::deviceType() const {
   TORCH_CHECK(false, "Unknown activity type");
 }
 
-ProfilerResult::ProfilerResult(
-    std::vector<KinetoEvent> events,
+_ProfilerResult::_ProfilerResult(
+    std::vector<_KinetoEvent> events,
     thread_event_lists legacy_events,
     std::unique_ptr<libkineto::ActivityTraceInterface> trace)
   : events_(std::move(events)),
     legacy_events_(std::move(legacy_events)),
     trace_(std::move(trace)) {}
-ProfilerResult::~ProfilerResult() = default;
+_ProfilerResult::~_ProfilerResult() = default;
 
-void ProfilerResult::save(const std::string& path) {
+void _ProfilerResult::save(const std::string& path) {
   // Kineto's save is destructive
   TORCH_CHECK(!saved_, "Trace is already saved");
   trace_->save(path);
