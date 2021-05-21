@@ -132,6 +132,14 @@ class AbstractTestCases:
             self.assertEqual(x.half().dtype, torch.float16)
             self.assertEqual(x.int().dtype, torch.int32)
             self.assertEqual(x.bfloat16().dtype, torch.bfloat16)
+            cfloat = x.cfloat()
+            self.assertEqual(cfloat.dtype, torch.complex64)
+            self.assertEqual(cfloat.real, x.float())
+            self.assertEqual(cfloat.imag, torch.zeros_like(cfloat.imag))
+            cdouble = x.cdouble()
+            self.assertEqual(cdouble.dtype, torch.complex128)
+            self.assertEqual(cdouble.real, x.double())
+            self.assertEqual(cdouble.imag, torch.zeros_like(cdouble.imag))
 
         def test_doc_template(self) -> None:
             from torch._torch_docs import __file__ as doc_file
@@ -5661,12 +5669,21 @@ else:
                 dest_ones.masked_scatter_(mask, src_ones)
                 self.assertEqual(dest_ones, dest_ones_expected, atol=0, rtol=0)
 
-                # make src smaller. this should fail
-                src = torch.zeros(num_copy - 1, dtype=dt, device=device)
-                with self.assertRaises(RuntimeError):
-                    dest.masked_scatter_(mask, src)
+                # Bound checking in CUDA is done inside a kernel
+                # in order to avoid synchronization, but this means
+                # we can not clear the failures. So there is no way
+                # to test it then recover.
+                if self.device_type != 'cuda':
+                    # make src smaller. this should fail
+                    src = torch.zeros(num_copy - 1, dtype=dt, device=device)
+                    with self.assertRaises(RuntimeError):
+                        dest.masked_scatter_(mask, src)
 
-        self.assertEqual(len(w), 3)
+
+        if self.device_type != 'cuda':
+            self.assertEqual(len(w), 3)
+        else:
+            self.assertEqual(len(w), 2)
 
         warn = 'masked_scatter_ received a mask with dtype torch.uint8,'
         for wi in w:
@@ -5683,6 +5700,15 @@ else:
         mask = torch.tensor([True, False, True], device=device)
         dst = dst.masked_scatter(mask, src)
         self.assertEqual(dst, torch.tensor([True, True, True], device=device))
+
+    @onlyCUDA
+    @largeTensorTest('30GB')
+    def test_masked_scatter_large_tensor(self, device):
+        t_cpu = torch.empty(2**31 + 1, dtype=torch.bool).random_()
+        t = t_cpu.to(device)
+        result_cpu = t_cpu.masked_scatter(t_cpu, t_cpu)
+        result = t.masked_scatter(t, t)
+        self.assertEqual(result, result_cpu)
 
     @dtypes(*torch.testing.get_all_dtypes())
     def test_masked_select(self, device, dtype):
@@ -7998,9 +8024,6 @@ tensor_op_tests = [
     ('split', '', _small_3d, lambda t, d: [2], 1e-5, 1e-5, 1e-5, _types, _cpu_types, False),
     ('split', 'dim', _small_3d, lambda t, d: [2, 1], 1e-5, 1e-5, 1e-5, _types, _cpu_types, False),
     ('split', 'neg_dim', _small_3d, lambda t, d: [2, -3], 1e-5, 1e-5, 1e-5, _types, _cpu_types, False),
-    ('squeeze', '', _new_t((1, 2, 1, 4)), lambda t, d: [],),
-    ('squeeze', 'dim', _new_t((1, 2, 1, 4)), lambda t, d: [2], ),
-    ('squeeze', 'neg_dim', _new_t((1, 2, 1, 4)), lambda t, d: [-2], ),
     ('t', '', _new_t((1, 2)), lambda t, d: [],),
     ('take', '', _new_t((3, 4)),
         lambda t, d: [torch.LongTensor([[0], [-2]]).to(device=d)],
