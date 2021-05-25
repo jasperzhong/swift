@@ -143,6 +143,7 @@ Non-linear Activations (weighted sum, nonlinearity)
     nn.SELU
     nn.CELU
     nn.GELU
+    nn.GLU
     nn.Sigmoid
     nn.SiLU
     nn.Softplus
