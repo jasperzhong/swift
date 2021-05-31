@@ -12,7 +12,7 @@ namespace {
 
 template <typename scalar_t>
 void cpu_avg_pool(
-    Tensor& output_,
+    const Tensor& output_,
     const Tensor& input_,
     int kW, int kH,
     int dW, int dH,
@@ -96,7 +96,7 @@ void cpu_avg_pool(
 
 template <typename scalar_t>
 void cpu_avg_pool_channels_last(
-    Tensor& output_,
+    const Tensor& output_,
     const Tensor& input_,
     int kW, int kH,
     int dW, int dH,
@@ -209,7 +209,7 @@ void cpu_avg_pool_channels_last(
 
 template <typename scalar_t>
 void cpu_avg_pool_backward(
-    Tensor& grad_input_,
+    const Tensor& grad_input_,
     const Tensor& grad_output_,
     int kW, int kH,
     int dW, int dH,
@@ -277,7 +277,7 @@ void cpu_avg_pool_backward(
 
 template <typename scalar_t>
 void cpu_avg_pool_backward_channels_last(
-    Tensor& grad_input_,
+    const Tensor& grad_input_,
     const Tensor& grad_output_,
     int kW, int kH,
     int dW, int dH,
@@ -357,7 +357,7 @@ void cpu_avg_pool_backward_channels_last(
 
 
 void avg_pool2d_kernel_impl(
-    Tensor& output,
+    const Tensor& output,
     const Tensor& input,
     int kW, int kH,
     int dW, int dH,
@@ -383,7 +383,7 @@ void avg_pool2d_kernel_impl(
 }
 
 void avg_pool2d_backward_kernel_impl(
-    Tensor& grad_input,
+    const Tensor& grad_input,
     const Tensor& grad_output,
     int kW, int kH,
     int dW, int dH,
