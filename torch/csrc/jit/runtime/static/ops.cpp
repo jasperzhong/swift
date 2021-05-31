@@ -465,9 +465,9 @@ void optimizePointwise(
     int width) {
   using namespace torch::jit::tensorexpr;
   std::vector<For*> loops = ln->getLoopStmtsFor(target);
-  For *outer, *inner, *tail;
+  For *inner, *tail;
   TORCH_CHECK(loops.size() > 0, "No loops created for pointwise op");
-  ln->splitWithTail(loops[0], width, &outer, &inner, &tail);
+  ln->splitWithTail(loops[0], width, &inner, &tail);
   ln->vectorize(inner);
 }
 
@@ -1333,9 +1333,9 @@ REGISTER_OPERATOR_FUNCTOR(aten::div, aten_div, [](Node* n) -> SROperator {
   }
   return [](ProcessedNode* p_node) {
     const auto& in0_t = p_node->Input(0).toTensor();
-    c10::optional<std::string> rounding_mode = c10::nullopt;
+    c10::optional<c10::string_view> rounding_mode = c10::nullopt;
     if (p_node->inputs().size() > 2) {
-      rounding_mode = p_node->Input(2).toOptional<std::string>();
+      rounding_mode = p_node->Input(2).toOptional<c10::string_view>();
     }
 
     if (p_node->Output(0).isNone()) {
