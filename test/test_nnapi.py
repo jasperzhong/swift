@@ -186,7 +186,7 @@ class TestNNAPI(TestCase):
                 self.check(UnaryModule(), torch.tensor([-1.0, 1.0]))
 
     def test_pointwise_binary(self):
-        for op in ["add", "sub", "mul"]:
+        for op in ["add", "sub", "mul", "div"]:
             with self.subTest(op):
                 class BinaryModule(torch.nn.Module):
                     def forward(self, lhs, rhs):
@@ -196,6 +196,8 @@ class TestNNAPI(TestCase):
                             return lhs - rhs
                         if op == "mul":
                             return lhs * rhs
+                        if op == "div":
+                            return lhs / rhs
                         raise Exception("Bad op")
 
                 self.check(
@@ -219,6 +221,16 @@ class TestNNAPI(TestCase):
                             torch.tensor([1.0, 2.0]),
                             torch.tensor([[3.0, 4.0], [5.0, 6.0]]),
                         ])
+
+                # Test flexible size
+                self.check(
+                    BinaryModule(),
+                    [
+                        torch.tensor([[1.0, 2.0]]),
+                        torch.tensor([[3.0, 4.0], [5.0, 6.0]]),
+                    ],
+                    convert_args=[torch.zeros(1, 2), torch.zeros(2, 2)],
+                )
 
     def test_hardtanh(self):
         inp = torch.tensor([-2.0, -0.5, 0.5, 2.0, 7.0])
