@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-import scipy.special
 
 import unittest
 import math
@@ -17,6 +16,9 @@ from torch.testing._internal.common_utils import (
 from torch.testing._internal.common_device_type import (
     instantiate_device_type_tests, onlyCPU, dtypes, dtypesIfCUDA, dtypesIfCPU,
     onlyOnCPUAndCUDA, onlyCUDA, largeTensorTest, precisionOverride)
+
+if TEST_SCIPY:
+    import scipy.special
 
 # TODO: replace with make_tensor
 def _generate_input(shape, dtype, device, with_extremal):
