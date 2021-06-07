@@ -6,6 +6,7 @@
 #include <c10/util/irange.h>
 #include <ATen/core/grad_mode.h>
 #include <ATen/core/function.h>
+#include <torch/csrc/jit/ir/type_hashing.h>
 #include <iostream>
 
 namespace c10 {
@@ -346,21 +347,57 @@ c10::optional<TypePtr> unifyTypeList(
     why_not << "Cannot get unified type from empty list";
     return c10::nullopt;
   }
+  // Get the smallest common supertype of all the elements. We
+  // need to use the O(N^2) algorithm instead of using
+  // `std::accumulate` to account for the case that two types
+  // cannot themselves be unified, but there exists some mutual
+  // parent type later in `elements`. (E.g. T2 <: T1, T3 <: T1,
+  // `elements` = {T2, T3, T1}. The real supertype should be `T1`,
+  // not `c10::nullopt`)
 
-  TypePtr ret_type = elements.at(0);
-  for (size_t i = 1; i < elements.size() && ret_type; ++i) {
-    auto maybe_unified = unifyTypes(ret_type, elements.at(i));
-    if (!maybe_unified) {
-      why_not << "Could not unify type list since element " << i << " of type "
-              << elements.at(i)->repr_str()
-              << " did not match the types before it ("
-              << ret_type->repr_str() << ")";
-      return c10::nullopt;
+  // Set of possible parent types
+  std::unordered_set<TypePtr, torch::jit::HashType, torch::jit::EqualType> seen;
+
+  for (const auto& type : elements) {
+    seen.insert(type);
+
+    // We'll modify `seen` during this loop, so we need to make a copy
+    // of the values that we want to iterate over
+    std::vector<TypePtr> to_iterate{seen.begin(), seen.end()};
+
+    for (const auto& comparison : to_iterate) {
+      // Don't bother comparing if it's already in our set of
+      // possible supertypes
+      if (*type == *comparison) {
+        continue;
+      }
+
+      auto maybe_parent = unifyTypes(type, comparison, /*default_to_any=*/false);
+
+      // This logic covers the case in which `unifyTypes` returns a
+      // completely new type (e.g. `unifyTypes(T, None)` produces
+      // `Optional[T]`)
+      if (maybe_parent) {
+        seen.insert(*maybe_parent);
+
+        if (type->isSubtypeOf(*maybe_parent)) {
+          seen.erase(type);
+        }
+
+        if (comparison->isSubtypeOf(*maybe_parent)) {
+          seen.erase(comparison);
+        }
+      }
+
     }
-    ret_type = maybe_unified.value();
   }
 
-  return ret_type;
+  if (seen.size() != 1) {
+    why_not << "Could not unify type list";
+    return c10::nullopt;
+  }
+
+  return c10::optional<TypePtr>{*seen.begin()};
 }
 
 MatchTypeReturn matchTypeVariables(
