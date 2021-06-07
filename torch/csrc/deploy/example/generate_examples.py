@@ -54,3 +54,6 @@ if __name__ == "__main__":
         e.mock("iopath.**")
         e.intern("**")
         e.save_pickle("fn", "fn.pkl", load_library)
+
+    with PackageExporter(p / "uses_distributed") as e:
+        e.save_source_string("uses_distributed", "import torch.distributed; assert torch.distributed.is_available()")
