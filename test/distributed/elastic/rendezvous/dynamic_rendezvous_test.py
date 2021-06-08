@@ -454,6 +454,42 @@ class BackendRendezvousStateHolderTest(TestCase, CustomAssertMixin):
 
         self.assert_state_equal(state_holder.state, expected_state)
 
+    def _test_sync_sanitizes_state_if_no_participants_left(self, state: _RendezvousState) -> None:
+        expected_state = copy.deepcopy(state)
+
+        if state.complete:
+            expected_state.complete = False
+            expected_state.round = 1000
+        else:
+            expected_state.deadline = None
+
+        expected_state.participants = {}
+        expected_state.wait_list = set()
+        expected_state.last_heartbeats = {}
+
+        for node in state.last_heartbeats:
+            state.last_heartbeats[node] = self._now - timedelta(seconds=100)
+
+        self._backend.set_state_internal(state)
+
+        state_holder = self._create_state_holder()
+
+        state_holder.sync()
+
+        self.assert_state_equal(state_holder.state, expected_state)
+
+    def test_sync_sanitizes_state_if_no_participants_left(self) -> None:
+        state = self._create_state()
+
+        self._test_sync_sanitizes_state_if_no_participants_left(state)
+
+    def test_sync_sanitizes_state_if_no_participants_left_and_rendezvous_is_open(self) -> None:
+        state = self._create_state()
+
+        state.complete = False
+
+        self._test_sync_sanitizes_state_if_no_participants_left(state)
+
     def test_sync_raises_error_if_backend_state_is_corrupt(self) -> None:
         self._backend.corrupt_state()
 
