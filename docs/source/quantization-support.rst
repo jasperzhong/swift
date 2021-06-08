@@ -265,6 +265,7 @@ Quantized version of standard NN layers.
   quantized representation of 6
 * :class:`~torch.nn.quantized.ELU` — ELU
 * :class:`~torch.nn.quantized.Hardswish` — Hardswish
+* :class:`~torch.nn.quantized.BatchNorm1d` — BatchNorm1d. *Note: this module is usually fused with Conv or Linear. Performance on ARM is not optimized*.
 * :class:`~torch.nn.quantized.BatchNorm2d` — BatchNorm2d. *Note: this module is usually fused with Conv or Linear. Performance on ARM is not optimized*.
 * :class:`~torch.nn.quantized.BatchNorm3d` — BatchNorm3d. *Note: this module is usually fused with Conv or Linear. Performance on ARM is not optimized*.
 * :class:`~torch.nn.quantized.LayerNorm` — LayerNorm. *Note: performance on ARM is not optimized*.

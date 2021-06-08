@@ -24,6 +24,7 @@ from .utils import get_combined_dict
 DEFAULT_STATIC_QUANT_MODULE_MAPPINGS : Dict[Callable, Any] = {
     QuantStub: nnq.Quantize,
     DeQuantStub: nnq.DeQuantize,
+    nn.BatchNorm1d: nnq.BatchNorm1d,
     nn.BatchNorm2d: nnq.BatchNorm2d,
     nn.BatchNorm3d: nnq.BatchNorm3d,
     nn.Conv1d: nnq.Conv1d,
