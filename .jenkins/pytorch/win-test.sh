@@ -55,9 +55,10 @@ fi
 
 run_tests() {
     # Run nvidia-smi if available
-    for path in  /c/Program Files/NVIDIA Corporation/NVSMI/nvidia-smi.exe /c/Windows/System32/nvidia-smi.exe; do
-        if [ -x $path ]; then
-            $path;
+    for path in '/c/Program Files/NVIDIA Corporation/NVSMI/nvidia-smi.exe' /c/Windows/System32/nvidia-smi.exe; do
+        if [[ -x "$path" ]]; then
+            # nvidia-smi doesn't necessarily need to pass here, it's just informational
+            "$path" || echo "true";
             break
         fi
     done
