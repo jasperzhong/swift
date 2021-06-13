@@ -1,11 +1,12 @@
 #include <ATen/core/Dict.h>
 #include <ATen/core/Tensor.h>
+#include <ATen/core/function.h>
 #include <ATen/core/function_schema.h>
+#include <ATen/core/grad_mode.h>
 #include <ATen/core/jit_type.h>
 #include <c10/macros/Macros.h>
+#include <c10/util/Optional.h>
 #include <c10/util/irange.h>
-#include <ATen/core/grad_mode.h>
-#include <ATen/core/function.h>
 #include <iostream>
 
 namespace c10 {
@@ -1079,6 +1080,40 @@ void ClassType::addMethod(torch::jit::Function* method) {
   methods_.push_back(method);
 }
 
+void ClassType::addOverloadedMethod(torch::jit::Function* method) {
+  // we can't use old findMethod because it searches based on the string name of
+  // function
+  auto check_duplicate_in_methods =
+      std::find(methods_.begin(), methods_.end(), method);
+  if (check_duplicate_in_methods != methods_.end()) {
+    return;
+  }
+
+  auto it = overloaded_name_map.insert(
+      std::make_pair(method->name(), std::vector<string>()));
+  // check to ensure same method is not getting registered twice
+  auto check_duplicate_in_overloaded_methods =
+      std::find(overloaded_methods_.begin(), overloaded_methods_.end(), method);
+  if (check_duplicate_in_overloaded_methods != overloaded_methods_.end()) {
+    return;
+  }
+
+  // create a mangled name for this function and bookkeep
+  // the mangled name and its corresponding function.
+  auto method_offset = it.first->second.size();
+  const std::string& mangled_name =
+      method->name() + "__" + c10::guts::to_string(method_offset);
+  overloaded_methods_.push_back(method);
+  it.first->second.push_back(mangled_name);
+  // if there is any method with this mangled name, we won't add this method
+  if (findMethod(mangled_name)) {
+    return;
+  }
+  // registers where this overloaded function is stored in the
+  // overloaded_methods vector.
+  mangled_to_function_[mangled_name] = overloaded_methods_.size() - 1;
+}
+
 const std::vector<torch::jit::Function*>& ClassType::getForwardHooks() const {
     return forward_hooks_;
 }
@@ -1382,11 +1417,33 @@ void ClassType::checkForwardHookSchema(
 }
 
 torch::jit::Function* ClassType::findMethod(const std::string& name) const {
+  // if this is overloaded, there are multiple methods with the
+  // same name. Since this method is expected to work correctly
+  // only for normal methods, we just return nullptr.
+  // TODO: We can optimize this by doing:
+  //     1. Assume method is not overloaded
+  //     2. Move method only when there is another method with same name.
+  if (auto overloaded_methods = findOverloadedMethod(name)) {
+    if (overloaded_methods.value().size() == 1) {
+      return getMangledOverloadedMethod(overloaded_methods.value()[0]);
+    }
+    TORCH_WARN(
+        "There are multiple overloads registered for method name: ", name);
+    return nullptr;
+  }
+
+  // if the name is already mangled, we know there is only
+  // one corresponding function.
+  if (auto mangled_method = getMangledOverloadedMethod(name)) {
+    return mangled_method;
+  }
+
   for (auto method : methods_) {
     if (name == method->name()) {
       return method;
     }
   }
+
   return nullptr;
 }
 torch::jit::Function& ClassType::getMethod(const std::string& name) const {
@@ -1399,6 +1456,24 @@ torch::jit::Function& ClassType::getMethod(const std::string& name) const {
       repr_str(),
       "'");
   return *method;
+}
+
+c10::optional<std::vector<std::string>> ClassType::findOverloadedMethod(
+    const std::string& name) const {
+  auto it = overloaded_name_map.find(name);
+  if (it != overloaded_name_map.end()) {
+    return it->second;
+  }
+  return c10::nullopt;
+}
+
+torch::jit::Function* ClassType::getMangledOverloadedMethod(
+    const std::string& name) const {
+  auto it = mangled_to_function_.find(name);
+  if (it != mangled_to_function_.end()) {
+    return overloaded_methods_[it->second];
+  }
+  return nullptr;
 }
 
 torch::jit::Function* ClassType::findHook(const std::string& name) const {
@@ -1616,6 +1691,11 @@ ClassType::ClassType(
 
 const std::vector<torch::jit::Function*>& ClassType::methods() const {
   return methods_;
+}
+
+const std::vector<torch::jit::Function*>& ClassType::overloaded_methods()
+    const {
+  return overloaded_methods_;
 }
 
 void ClassType::checkNotExist(const std::string& name, const std::string& what) const {

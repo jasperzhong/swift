@@ -44,10 +44,10 @@ void registerCustomClassMethod(std::unique_ptr<jit::Function> fn) {
 }
 
 std::vector<c10::FunctionSchema> customClassSchemasForBCCheck() {
-    auto& methods = customClassMethods();
-    return c10::fmap(methods, [](const std::unique_ptr<jit::Function>& fn) {
-      return fn->getSchema();
-    });
+  auto& methods = customClassMethods();
+  return c10::fmap(methods, [](const std::unique_ptr<jit::Function>& fn) {
+    return fn->getSchema();
+  });
 }
 
 namespace detail {

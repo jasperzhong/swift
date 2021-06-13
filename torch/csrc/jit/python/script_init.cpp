@@ -1422,13 +1422,16 @@ void initJitScriptBindings(PyObject* module) {
             // see: [pybind11 varargs]
             HANDLE_TH_ERRORS
             Method& method = py::cast<Method&>(args[0]);
-
+            auto input_args = tuple_slice(std::move(args), 1);
+            auto input_kwargs = std::move(kwargs);
+            auto resolved_method = match_overloaded_methods(
+                method.owner(), method.name(), input_args, input_kwargs);
+            if (resolved_method.has_value()) {
+              return invokeScriptMethodFromPython(
+                  resolved_method.value(), input_args, input_kwargs);
+            }
             return invokeScriptMethodFromPython(
-                method,
-                // NOLINTNEXTLINE(performance-move-const-arg)
-                tuple_slice(std::move(args), 1),
-                // NOLINTNEXTLINE(performance-move-const-arg)
-                std::move(kwargs));
+                method, input_args, input_kwargs);
             END_HANDLE_TH_ERRORS_PYBIND
           })
       .def_property_readonly("graph", &Method::graph)

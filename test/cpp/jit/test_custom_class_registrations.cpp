@@ -98,6 +98,32 @@ struct FooReadWrite : torch::CustomClassHolder {
   FooReadWrite(int64_t x_, int64_t y_) : x(x_), y(y_) {}
 };
 
+struct FooOverload : torch::CustomClassHolder {
+  int x, y;
+  FooOverload() : x(0), y(0) {}
+  FooOverload(int x_, int y_) : x(x_), y(y_) {}
+
+  int64_t increment(int64_t z) {
+    return (x + y) * z;
+  }
+  int64_t increment(int64_t z, int64_t t) {
+    return (x + y) * z + t;
+  }
+  int64_t increment(int64_t z, const std::string& value) {
+    return (x + y) * (z + 3);
+  }
+};
+
+struct FooOverloadInit : torch::CustomClassHolder {
+  int x, y;
+  FooOverloadInit() : x(0), y(0) {}
+  FooOverloadInit(int x_, int y_) : x(x_), y(y_) {}
+  FooOverloadInit(int x_, int y_, const std::string& val) : x(x_ + 2), y(0) {}
+  int64_t increment(int64_t z) {
+    return (x + y) * z;
+  }
+};
+
 struct LambdaInit : torch::CustomClassHolder {
   int x, y;
   LambdaInit(int x_, int y_) : x(x_), y(y_) {}
@@ -325,6 +351,28 @@ TORCH_LIBRARY(_TorchScriptTesting, m) {
       .def(torch::init<int64_t, int64_t>())
       .def_readwrite("x", &FooReadWrite::x)
       .def_readonly("y", &FooReadWrite::y);
+
+  m.class_<FooOverload>("_FooOverload")
+      .def(torch::init<int64_t, int64_t>())
+      .def(
+          "increment",
+          (int64_t(FooOverload::*)(int64_t, int64_t))(&FooOverload::increment))
+      // to test if Torchbind doesn't register same method twice
+      .def(
+          "increment",
+          (int64_t(FooOverload::*)(int64_t, int64_t))(&FooOverload::increment))
+      .def(
+          "increment",
+          (int64_t(FooOverload::*)(int64_t))(&FooOverload::increment))
+      .def(
+          "increment",
+          (int64_t(FooOverload::*)(int64_t, const std::string&))(
+              &FooOverload::increment));
+
+  m.class_<FooOverloadInit>("_FooOverloadInit")
+      .def(torch::init<int64_t, int64_t>())
+      .def(torch::init<int64_t, int64_t, const std::string&>())
+      .def("increment", &FooOverloadInit::increment);
 
   m.class_<LambdaInit>("_LambdaInit")
       .def(torch::init([](int64_t x, int64_t y, bool swap) {

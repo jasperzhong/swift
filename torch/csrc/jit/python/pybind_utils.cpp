@@ -7,6 +7,26 @@
 namespace torch {
 namespace jit {
 
+c10::optional<Method> match_overloaded_methods(
+    Module owner,
+    const std::string& method_name,
+    const struct tuple_slice& args,
+    const pybind11::kwargs& kwargs) {
+  auto methods = owner.get_overloaded_methods(method_name);
+  if (methods.has_value()) {
+    for (auto& method : methods.value()) {
+      try {
+        createStackForSchema(
+            method.function().getSchema(), args, kwargs, owner._ivalue());
+        return method;
+      } catch (schema_match_error& error) {
+        continue;
+      }
+    }
+  }
+  return c10::nullopt;
+}
+
 // This is a hack to remove instances deleted in C++ from the PyBind cache
 // C++->Python. We need this because otherwise we may get the old Python object
 // if C++ creates a new object at the memory location of the deleted object.

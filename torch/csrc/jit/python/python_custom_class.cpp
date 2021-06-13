@@ -2,6 +2,8 @@
 
 #include <torch/csrc/jit/frontend/sugared_value.h>
 
+#include <torch/csrc/jit/python/pybind_utils.h>
+
 #include <fmt/format.h>
 
 namespace torch {
@@ -13,6 +15,20 @@ struct CustomObjectProxy;
 py::object ScriptClass::__call__(py::args args, py::kwargs kwargs) {
   auto instance =
       Object(at::ivalue::Object::create(class_type_, /*numSlots=*/1));
+  auto input_args = std::move(args);
+  auto input_kwargs = std::move(kwargs);
+  // this is to work around the warning that will say
+  // there are multiple __init__ methods.
+  auto overloaded_methods = instance.type()->findOverloadedMethod("__init__");
+  if (overloaded_methods.has_value()) {
+    auto resolved_init_method = match_overloaded_methods(
+        instance._ivalue(), "__init__", input_args, input_kwargs);
+    // NOLINTNEXTLINE(performance-move-const-arg)
+    invokeScriptMethodFromPython(
+        resolved_init_method.value(), std::move(input_args), input_kwargs);
+    return py::cast(instance);
+  }
+
   Function* init_fn = instance.type()->findMethod("__init__");
   TORCH_CHECK(
       init_fn,
@@ -21,8 +37,8 @@ py::object ScriptClass::__call__(py::args args, py::kwargs kwargs) {
           "Did you forget to add '.def(torch::init<...>)' to its registration?",
           instance.type()->repr_str()));
   Method init_method(instance._ivalue(), init_fn);
-  // NOLINTNEXTLINE(performance-move-const-arg)
-  invokeScriptMethodFromPython(init_method, std::move(args), std::move(kwargs));
+  invokeScriptMethodFromPython(
+      init_method, std::move(input_args), input_kwargs);
   return py::cast(instance);
 }
 

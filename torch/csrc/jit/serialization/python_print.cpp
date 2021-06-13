@@ -1072,25 +1072,34 @@ struct PythonPrintImpl {
       case prim::CallMethod: {
         const auto& self = node->inputs().at(0);
         const auto& methodName = node->s(attr::name);
-        stmt << "(" << useOf(self) << ")"
-             << "." << methodName << "(";
-        for (size_t i = 1; i < node->inputs().size(); i++) {
-          stmt << useOf(node->inputs()[i]) << ", ";
-        }
-        stmt << ")";
-
         if (auto selfClass = self->type()->cast<ClassType>()) {
           deps_table_.add(selfClass);
-          const Function& method = selfClass->getMethod(node->s(attr::name));
-          TORCH_INTERNAL_ASSERT(
-              method.qualname() ==
-              QualifiedName(selfClass->name()->qualifiedName(), methodName));
+          // check if the method is overloaded and if it is, we serialize
+          // only the qualified name. Since this call happens after first
+          // round of schema matching, we guarantee that methodName is
+          // either mangled or a name of not-overloaded method.
+          Function* method = selfClass->findMethod(methodName);
+          if (auto overloaded_methods =
+                  selfClass->findOverloadedMethod(method->name())) {
+            stmt << "(" << useOf(self) << ")"
+                 << "." << method->qualname().name() << "(";
+          } else {
+            stmt << "(" << useOf(self) << ")"
+                 << "." << methodName << "(";
+          }
         } else if (auto selfInterface = self->type()->cast<InterfaceType>()) {
           deps_table_.add(selfInterface);
+          stmt << "(" << useOf(self) << ")"
+               << "." << methodName << "(";
         } else {
           TORCH_INTERNAL_ASSERT(
               false, "method call to unhandled type in serialization");
         }
+
+        for (size_t i = 1; i < node->inputs().size(); i++) {
+          stmt << useOf(node->inputs()[i]) << ", ";
+        }
+        stmt << ")";
 
       } break;
       case aten::_unwrap_optional: {
