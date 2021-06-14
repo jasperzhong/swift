@@ -517,8 +517,8 @@ std::pair<std::shared_ptr<TracingState>, Stack> trace(
     if (getInlineEverythingMode()) {
       Inline(*graph);
     }
-    FixupTraceScopeBlocks(graph, self);
-    NormalizeOps(graph);
+    fixUpTraceScopeBlocks(graph, self);
+    normalizeOps(graph);
     return {state, out_stack};
   } catch (...) {
     tracer::abandon();

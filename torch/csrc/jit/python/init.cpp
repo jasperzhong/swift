@@ -264,12 +264,12 @@ void initJITBindings(PyObject* module) {
       .def(
           "_jit_pass_dce",
           [](std::shared_ptr<Graph>& g) {
-            return EliminateDeadCode(g->block()); // overload resolution
+            return eliminateDeadCode(g->block()); // overload resolution
           })
       .def(
           "_jit_pass_dce_allow_deleting_nodes_with_side_effects",
           [](std::shared_ptr<Graph>& g) {
-            return EliminateDeadCode(
+            return eliminateDeadCode(
                 g->block(),
                 true,
                 DCESideEffectPolicy::
@@ -410,7 +410,7 @@ void initJITBindings(PyObject* module) {
       .def(
           "_jit_pass_remove_inplace_ops",
           [](const std::shared_ptr<Graph>& g) { return RemoveInplaceOps(g); })
-      .def("_jit_pass_constant_pooling", ConstantPooling)
+      .def("_jit_pass_constant_pooling", constantPooling)
       .def(
           "_jit_pass_create_functional_graphs",
           [](std::shared_ptr<Graph>& g) { return CreateFunctionalGraphs(g); })
@@ -456,7 +456,7 @@ void initJITBindings(PyObject* module) {
       .def(
           "_jit_pass_canonicalize",
           [](const std::shared_ptr<Graph>& g) { return Canonicalize(g); })
-      .def("_jit_pass_lint", LintGraph)
+      .def("_jit_pass_lint", lintGraph)
       .def(
           "_jit_pass_complete_shape_analysis",
           [](const std::shared_ptr<Graph>& graph,
@@ -515,7 +515,7 @@ void initJITBindings(PyObject* module) {
       .def(
           "_jit_pass_constant_propagation_immutable_types",
           [](std::shared_ptr<Graph>& g) {
-            return ConstantPropagationImmutableTypes(g);
+            return constantPropagationImmutableTypes(g);
           })
       .def(
           "_jit_pass_constant_propagation",

@@ -822,9 +822,9 @@ struct CudaGraphFuser {
         continue;
       }
       auto subgraph = node->g(attr::Subgraph);
-      EliminateDeadCode(subgraph);
+      eliminateDeadCode(subgraph);
       EliminateCommonSubexpression(subgraph);
-      ConstantPooling(subgraph);
+      constantPooling(subgraph);
     }
   }
 
@@ -1088,7 +1088,7 @@ void CudaFuseGraph(std::shared_ptr<Graph>& graph) {
   EliminateCommonSubexpression(graph);
   // We might have emitted a fair amount of useless shape propagating code, so
   // remove it
-  EliminateDeadCode(graph);
+  eliminateDeadCode(graph);
   // Improve the quality of shape propagation code that was left
   PeepholeOptimizeShapeExpressions(graph->block());
 
