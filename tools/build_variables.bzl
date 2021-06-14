@@ -164,6 +164,7 @@ core_sources_full_mobile = [
     "torch/csrc/jit/api/compilation_unit.cpp",
     "torch/csrc/jit/frontend/parser.cpp",
     "torch/csrc/jit/frontend/run_cleanup_passes.cpp",
+    "torch/csrc/jit/frontend/schema_emitter.cpp",
     "torch/csrc/jit/frontend/schema_matching.cpp",
     "torch/csrc/jit/frontend/script_type_parser.cpp",
     "torch/csrc/jit/frontend/sugared_value.cpp",

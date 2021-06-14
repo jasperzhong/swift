@@ -2,6 +2,7 @@
 
 #include <c10/util/irange.h>
 #include <torch/csrc/jit/frontend/schema_matching.h>
+#include <torch/csrc/jit/frontend/ir_emitter_utils.h>
 #include <torch/csrc/jit/passes/canonicalize.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/passes/inliner.h>
@@ -429,7 +430,8 @@ void createMethodCalls(const std::shared_ptr<Graph>& g) {
       for (Value* i : n->inputs()) {
         nvs.emplace_back(i->node()->sourceRange(), i);
       }
-      auto schema = matchSchema(f->getSchema(), n->sourceRange(), *g, nvs, {});
+      auto schema = matchSchemaAndPrepareGraph(
+          f->getSchema(), n->sourceRange(), *g, nvs, {});
       Value* retval = g->insertMethodCall(f->qualname().name(), schema);
       n->output()->replaceAllUsesWith(retval);
       n->destroy();

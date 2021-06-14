@@ -128,7 +128,7 @@ std::shared_ptr<SugaredValue> PythonValue::call(
   auto inputs = toValues(*m.graph(), argsWithSelf);
 
   MatchedSchema matched_schema =
-      matchSchema(schema, loc, *m.graph(), argsWithSelf, kwargs);
+      matchSchemaAndPrepareGraph(schema, loc, *m.graph(), argsWithSelf, kwargs);
 
   // If if a function is marked as dropped,
   // we throw an exception if it is invoked.
