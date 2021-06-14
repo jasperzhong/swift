@@ -92,7 +92,7 @@ class ProcessGroupNCCL : public ProcessGroup {
     bool isSuccess() const override;
 
     // Same as calling synchronize() for NCCL work.
-    bool wait(std::chrono::milliseconds timeout = kNoTimeout) override;
+    bool wait(std::chrono::milliseconds timeout = c10::ivalue::kNoTimeout) override;
 
     void abort() override;
 
@@ -111,12 +111,6 @@ class ProcessGroupNCCL : public ProcessGroup {
     // Helper function that checks if the NCCL kernels have finished
     // execution on the GPUs
     bool finishedGPUExecution();
-
-    // Get a Future object that will be marked as completed internally.
-    c10::intrusive_ptr<c10::ivalue::Future> getFuture() override;
-
-    // Helper function that sets an exception_ptr on the WorkNCCL object.
-    void setException(std::exception_ptr exception_ptr);
 
     // Helper function that returns True if the WorkNCCL object has timed out
     // and False otherwise.
@@ -175,9 +169,6 @@ class ProcessGroupNCCL : public ProcessGroup {
     // Store a reference to NCCL collective's outputs, used by result and to
     // give a more descriptive message when representing the Work as a string.
     std::shared_ptr<std::vector<at::Tensor>> outputs_;
-
-    // The future returned by getFuture.
-    c10::intrusive_ptr<at::ivalue::Future> future_;
 
     friend class ProcessGroupNCCL;
   };

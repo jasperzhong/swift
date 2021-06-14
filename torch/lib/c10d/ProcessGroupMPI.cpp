@@ -101,18 +101,12 @@ std::vector<at::Tensor> ProcessGroupMPI::WorkMPI::result() {
   return outputTensors_;
 }
 
-c10::intrusive_ptr<c10::ivalue::Future> ProcessGroupMPI::WorkMPI::getFuture() {
-  return future_;
-}
-
 void ProcessGroupMPI::WorkMPI::finishWorkMPIError(std::exception_ptr eptr) {
-  future_->setError(eptr);
   finish(eptr);
 }
 
 void ProcessGroupMPI::WorkMPI::finishWorkMPI() {
-  future_->markCompleted(at::IValue(outputTensors_));
-  finish();
+  finish(at::IValue(outputTensors_));
 }
 
 ProcessGroupMPI::AsyncWork::AsyncWork(
@@ -147,12 +141,6 @@ bool ProcessGroupMPI::AsyncWork::isCompleted() {
     return false;
   }
 
-  // request_ == MPI_REQUEST_NULL; the work has completed
-  // Populate exception if request was not successful
-  if (status_.MPI_ERROR != MPI_SUCCESS) {
-    populateException();
-  }
-
   return true;
 }
 
@@ -173,10 +161,7 @@ bool ProcessGroupMPI::AsyncWork::wait(std::chrono::milliseconds /* unused */) {
   if (request_ == MPI_REQUEST_NULL) {
     // AsyncWork needs to manually call profiling end callbacks if they are set,
     // since it does not call ProcessGroup::finish().
-    if (ProcessGroup::Work::recordFunctionEndCallback_) {
-      ProcessGroup::Work::recordFunctionEndCallback_();
-      ProcessGroup::Work::recordFunctionEndCallback_ = nullptr;
-    }
+    future_->markCompleted(at::IValue(outputTensors_));
     return true;
   }
 
@@ -186,15 +171,14 @@ bool ProcessGroupMPI::AsyncWork::wait(std::chrono::milliseconds /* unused */) {
 
   // AsyncWork needs to manually call profiling end callbacks if they are set,
   // since it does not call ProcessGroup::finish().
-  if (ProcessGroup::Work::recordFunctionEndCallback_) {
-    ProcessGroup::Work::recordFunctionEndCallback_();
-    ProcessGroup::Work::recordFunctionEndCallback_ = nullptr;
-  }
 
   if (!ok) {
-    populateException();
-    std::rethrow_exception(exception_);
+    auto eptr = getMPIException();
+    future_->setError(eptr);
+    std::rethrow_exception(eptr);
   }
+  future_->markCompleted(at::IValue(outputTensors_));
+
   // Always return true, because abort API is not implemented.
   return true;
 }
@@ -207,12 +191,12 @@ std::vector<at::Tensor> ProcessGroupMPI::AsyncWork::result() {
   return outputTensors_;
 }
 
-void ProcessGroupMPI::AsyncWork::populateException() {
+std::exception_ptr ProcessGroupMPI::AsyncWork::getMPIException() {
   std::array<char, MPI_MAX_ERROR_STRING> buf;
   int len = buf.size();
   MPI_CHECK(MPI_Error_string(status_.MPI_ERROR, buf.data(), &len));
-  exception_ =
-      std::make_exception_ptr(std::runtime_error(std::string(buf.data(), len)));
+  return std::make_exception_ptr(
+      std::runtime_error(std::string(buf.data(), len)));
 }
 
 // Static global states

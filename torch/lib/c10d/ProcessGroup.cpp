@@ -59,7 +59,8 @@ ProcessGroup::Work::Work(
     OpType opType,
     const char* profilingTitle,
     const c10::optional<std::vector<at::Tensor>>& inputTensors)
-    : rank_(rank), opType_(opType) {
+    : rank_(rank), opType_(opType), future_(c10::make_intrusive<c10::ivalue::Future>(
+      c10::ListType::create(c10::TensorType::get()))) {
   if (profilingTitle != nullptr) {
     auto recordingFunction =
         std::make_shared<at::RecordFunction>(at::RecordScope::USER_SCOPE);
@@ -77,10 +78,18 @@ ProcessGroup::Work::Work(
         }
       }
       recordingFunction->before(profilingTitle, inputs);
-      std::function<void()> end_handler = [this, recordingFunction]() {
+      std::function<void()> end_handler = [recordingFunction]() {
         recordingFunction->end();
       };
-      recordFunctionEndCallback_ = at::wrapPropagateTLSState(end_handler);
+      auto recordFunctionEndCallback = at::wrapPropagateTLSState(end_handler);
+
+      // Add a callback that runs profiling end callbacks. wrapCallback() in
+      // CUDA future blocks the stream this callback runs on the corresponding
+      // cudaEvents_ ensuring appropriate synchronization.
+      future_->addCallback(
+          [recordFunctionEndCallback](c10::ivalue::Future& /*unused*/) {
+            recordFunctionEndCallback();
+          });
     }
   }
 }
@@ -92,18 +101,21 @@ OpType ProcessGroup::Work::retrieveOpType() {
 ProcessGroup::Work::~Work() {}
 
 bool ProcessGroup::Work::isCompleted() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return completed_;
+  return future_->completed();
 }
 
 bool ProcessGroup::Work::isSuccess() const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return !exception_;
+  return !future_->hasError();
+}
+
+void ProcessGroup::Work::setError(std::exception_ptr eptr) {
+  if (future_->exception_ptr() != nullptr) {
+    future_->setError(eptr);
+  }
 }
 
 std::exception_ptr ProcessGroup::Work::exception() const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return exception_;
+  return future_->exception_ptr();
 }
 
 int ProcessGroup::Work::sourceRank() const {
@@ -119,23 +131,12 @@ std::vector<at::Tensor> ProcessGroup::Work::result() {
 void ProcessGroup::Work::synchronize() {}
 
 bool ProcessGroup::Work::wait(std::chrono::milliseconds timeout) {
-  std::unique_lock<std::mutex> lock(mutex_);
-  if (timeout == kNoTimeout) {
-    // This waits without a timeout.
-    cv_.wait(lock, [&] { return completed_; });
-  } else {
-    // Waits for the user-provided timeout.
-    cv_.wait_for(lock, timeout, [&] { return completed_; });
-    if (!completed_) {
-      // Throw exception if the wait operation timed out and the work was not
-      // completed.
-      throw std::runtime_error("Operation timed out!");
-    }
-  }
-  if (exception_) {
-    std::rethrow_exception(exception_);
-  }
+  future_->wait(timeout);
+
+  // FIXME: Future already sycnronizes relevant cuda streams, we
+  // can remove respective methods and remove the call here.
   synchronize();
+
   // Always return true, because abort API is not implemented.
   return true;
 }
@@ -145,31 +146,25 @@ void ProcessGroup::Work::abort() {
 }
 
 c10::intrusive_ptr<c10::ivalue::Future> ProcessGroup::Work::getFuture() {
-  TORCH_CHECK(false, "ProcessGroup::Work::getFuture not implemented.")
+  return future_;
+}
+
+void ProcessGroup::Work::finish(c10::IValue value) {
+  future_->markCompleted(value);
 }
 
 void ProcessGroup::Work::finish(std::exception_ptr exception) {
-  std::unique_lock<std::mutex> lock(mutex_);
-  completed_ = true;
-  exception_ = exception;
-  if (recordFunctionEndCallback_) {
-    recordFunctionEndCallback_();
-    recordFunctionEndCallback_ = nullptr;
+  if (exception) {
+    future_->setError(exception);
+  } else {
+    future_->markCompleted(c10::IValue());
   }
-  lock.unlock();
-  cv_.notify_all();
 }
 
 void ProcessGroup::Work::finishAndThrow(std::exception_ptr exception) {
-  std::unique_lock<std::mutex> lock(mutex_);
-  completed_ = true;
-  exception_ = exception;
-  if (recordFunctionEndCallback_) {
-    recordFunctionEndCallback_();
-    recordFunctionEndCallback_ = nullptr;
-  }
-  if (exception_) {
-    std::rethrow_exception(exception_);
+  finish(exception);
+  if (exception) {
+    std::rethrow_exception(exception);
   }
 }
 

@@ -82,9 +82,6 @@ class ProcessGroupGloo : public ProcessGroup {
     virtual void run() = 0;
 
     std::vector<at::Tensor> result() override;
-
-    c10::intrusive_ptr<c10::ivalue::Future> getFuture() override;
-
    protected:
     friend class ProcessGroupGloo;
 
@@ -93,7 +90,6 @@ class ProcessGroupGloo : public ProcessGroup {
     void finishWorkGlooError(std::exception_ptr eptr);
 
     const std::vector<std::vector<at::Tensor>> outputTensors_;
-    c10::intrusive_ptr<at::ivalue::Future> future_;
   };
 
   // Wrap c10d store as Gloo store
@@ -146,7 +142,7 @@ class ProcessGroupGloo : public ProcessGroup {
         at::Tensor& tensor,
         std::unique_ptr<::gloo::transport::UnboundBuffer> buffer);
 
-    bool wait(std::chrono::milliseconds timeout = kNoTimeout) override;
+    bool wait(std::chrono::milliseconds timeout = c10::ivalue::kNoTimeout) override;
 
     void abort() override;
 
@@ -164,13 +160,15 @@ class ProcessGroupGloo : public ProcessGroup {
 
     int sourceRank() const override;
 
-    bool wait(std::chrono::milliseconds timeout = kNoTimeout) override;
+    bool wait(std::chrono::milliseconds timeout = c10::ivalue::kNoTimeout) override;
 
     void abort() override;
 
    protected:
     at::Tensor tensor_;
     std::unique_ptr<::gloo::transport::UnboundBuffer> buffer_;
+
+    mutable std::mutex mutex_;
     int srcRank_;
   };
 

@@ -81,7 +81,7 @@ class NCCLTest : public NCCLTestBase {
 
   void wait(
       c10::intrusive_ptr<ProcessGroup::Work>& work,
-      std::chrono::milliseconds timeout = kNoTimeout) {
+      std::chrono::milliseconds timeout = c10::ivalue::kNoTimeout) {
     c10::cuda::CUDAMultiStreamGuard guard(streams_);
     work->wait(timeout);
   }

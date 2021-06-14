@@ -20,7 +20,6 @@
 // SEE RFC: https://github.com/pytorch/pytorch/issues/39662
 // *************************************************************************
 
-constexpr auto kNoTimeout = std::chrono::milliseconds(0);
 constexpr auto kProcessGroupDefaultTimeout =
     std::chrono::milliseconds(30 * 60 * 1000);
 
@@ -137,29 +136,27 @@ class ProcessGroup : public torch::CustomClassHolder {
     //   if (!success) { std::rethrow_exception(exception()); }
     //   return success;
     //
-    virtual bool wait(std::chrono::milliseconds timeout = kNoTimeout);
+    virtual bool wait(std::chrono::milliseconds timeout = c10::ivalue::kNoTimeout);
 
     virtual void abort();
 
     // Returns a Future object that will be associated with the completion of
     // work. Only NCCL backend is currently supported.
-    virtual c10::intrusive_ptr<c10::ivalue::Future> getFuture();
+    c10::intrusive_ptr<c10::ivalue::Future> getFuture();
 
     OpType retrieveOpType();
 
    protected:
+    void setError(std::exception_ptr eptr);
+
     // Completes the work object and optionally sets the exception in a
     // thread-safe manner. Notifies all waiting condition variables as well.
     void finish(std::exception_ptr exception = nullptr);
+    void finish(c10::IValue);
 
     // Similar to finish, but throws an exception if one is already set or
     // provided by the user.
     void finishAndThrow(std::exception_ptr exception);
-
-    mutable std::mutex mutex_;
-    std::condition_variable cv_;
-    bool completed_ = false;
-    std::exception_ptr exception_;
 
     // Current rank of the node.
     const int rank_;
@@ -167,9 +164,8 @@ class ProcessGroup : public torch::CustomClassHolder {
     // Operation type that this work object refers to.
     OpType opType_;
 
-    // When profiling, the callback to record end of operation event. This
-    // callback needs to be called when collective operation is complete.
-    std::function<void()> recordFunctionEndCallback_;
+    std::vector<at::Tensor> outputTensors_;
+    c10::intrusive_ptr<at::ivalue::Future> future_;
   };
 
   // ProcessGroup Options is a base struct that defines the basic options

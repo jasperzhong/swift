@@ -1465,7 +1465,7 @@ Example::
       .def(
           "wait",
           &::c10d::ProcessGroup::Work::wait,
-          py::arg("timeout") = kNoTimeout,
+          py::arg("timeout") = c10::ivalue::kNoTimeout,
           py::call_guard<py::gil_scoped_release>())
       .def(
           "get_future",
@@ -1611,7 +1611,7 @@ Example::
 
   module.attr("_DEFAULT_FIRST_BUCKET_BYTES") = ::c10d::kDefaultFirstBucketBytes;
   module.attr("_DEFAULT_PG_TIMEOUT") = py::cast(kProcessGroupDefaultTimeout);
-  module.attr("_DEFAULT_NO_TIMEOUT") = py::cast(kNoTimeout);
+  module.attr("_DEFAULT_NO_TIMEOUT") = py::cast(c10::ivalue::kNoTimeout);
 
   Py_RETURN_TRUE;
 }

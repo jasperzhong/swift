@@ -249,8 +249,14 @@ ProcessGroupNCCL::WorkNCCL::WorkNCCL(const WorkNCCL& w)
       blockingWait_(w.blockingWait_),
       opTimeout_(w.opTimeout_),
       workStartTime_(w.workStartTime_) {
-  completed_ = w.completed_;
-  exception_ = w.exception_;
+  // Note: These copies are not intended to be used as WorkNCCL object, but
+  // mere information containers for postprocessing of WorkNCCL objects: error
+  // handling and cleanup work.
+  // FIXME: Maybe create a separate field/class for handling exceptions instead of
+  // propagating them via future_ field.
+  if (w.exception()) {
+    setError(w.exception());
+  }
 }
 
 ProcessGroupNCCL::WorkNCCL::~WorkNCCL() {}
@@ -276,19 +282,12 @@ void ProcessGroupNCCL::WorkNCCL::checkAndSetException() {
   }
 
   auto exception_ptr = checkForNCCLErrors(ncclComms_);
-  std::unique_lock<std::mutex> lock(mutex_);
-  exception_ = exception_ptr;
-  if (exception_) {
+  if (exception_ptr) {
+    setError(exception_ptr);
     LOG(INFO) << "[Rank " << rank_ << "]"
               << " found async exception when checking for NCCL errors: "
-              << getExceptionMsgFromExceptionPtr(exception_);
+              << getExceptionMsgFromExceptionPtr(exception());
   }
-}
-
-void ProcessGroupNCCL::WorkNCCL::setException(
-    std::exception_ptr exception_ptr) {
-  std::unique_lock<std::mutex> lock(mutex_);
-  exception_ = exception_ptr;
 }
 
 // Helper that checks if the NCCL kernels are completed on the GPUs
@@ -318,9 +317,7 @@ void ProcessGroupNCCL::WorkNCCL::checkAndThrowException() {
 }
 
 void ProcessGroupNCCL::WorkNCCL::handleNCCLGuard() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  completed_ = true;
-  if (exception_) {
+  if (exception()) {
     auto exceptionMsg = c10::str(
         "Some NCCL operations have failed or timed out. Due to the ",
         "asynchronous nature of CUDA kernels, subsequent GPU operations ",
@@ -328,14 +325,14 @@ void ProcessGroupNCCL::WorkNCCL::handleNCCLGuard() {
         "we are taking the entire process down.");
     LOG(ERROR) << exceptionMsg;
     C10_LOG_API_USAGE_ONCE("ProcessGroupNCCL.WorkNCCL.handleNCCLGuard");
-    std::rethrow_exception(exception_);
+    std::rethrow_exception(exception());
   }
 }
 
 void ProcessGroupNCCL::WorkNCCL::synchronize() {
   // Call Synchronize without a timeout. We use this method to avoid adding a
   // timeout argument to the public synchronize API.
-  synchronizeInternal(kNoTimeout);
+  synchronizeInternal(c10::ivalue::kNoTimeout);
 }
 
 void ProcessGroupNCCL::WorkNCCL::synchronizeStreams() {
@@ -356,7 +353,7 @@ void ProcessGroupNCCL::WorkNCCL::synchronizeInternal(
     // Use the passed in timeout if provided, otherwise use the default
     // opTimeout for each WorkNCCL object.
     std::chrono::milliseconds workTimeout =
-        timeout == kNoTimeout ? opTimeout_ : timeout;
+        timeout == c10::ivalue::kNoTimeout ? opTimeout_ : timeout;
     // Wait for the operation to complete.
     while (!isCompleted()) {
       if (timedOut()) {
@@ -569,7 +566,7 @@ void ProcessGroupNCCL::abortTimedOutCollectives(
       LOG(ERROR) << exceptionMsg;
       std::exception_ptr exception_ptr =
           std::make_exception_ptr(std::runtime_error(exceptionMsg));
-      work.setException(exception_ptr);
+      work.setError(exception_ptr);
       for (const auto& ncclComm : work.ncclComms_) {
         ncclComm->ncclCommAbort();
         abortedCommIds.emplace(buildNcclUniqueIdStr(ncclComm->getNcclId()));
@@ -1050,11 +1047,6 @@ std::vector<at::Tensor> ProcessGroupNCCL::WorkNCCL::result() {
   return *outputs_;
 }
 
-c10::intrusive_ptr<c10::ivalue::Future> ProcessGroupNCCL::WorkNCCL::
-    getFuture() {
-  return future_;
-}
-
 void ProcessGroupNCCL::workEnqueue(
     c10::intrusive_ptr<ProcessGroupNCCL::WorkNCCL> work) {
   if (!terminateProcessGroup_.load()) {
@@ -1146,17 +1138,7 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::collective(
 
   {
     c10::cuda::CUDAMultiStreamGuard streamGuard(ncclStreams_[key]);
-    work->future_ = c10::make_intrusive<at::ivalue::Future>(
-        c10::ListType::create(c10::TensorType::get()),
-        devices);
-
-    // Add a callback that runs profiling end callbacks. wrapCallback() in CUDA
-    // future blocks the stream this callback runs on the corresponding
-    // cudaEvents_ ensuring appropriate synchronization.
-    if (work->recordFunctionEndCallback_) {
-      work->future_->addCallback(
-          [work](at::ivalue::Future& /* unused */) { work->recordFunctionEndCallback_(); });
-    }
+    work->future_->setDevices(devices);
     work->future_->markCompleted(at::IValue(*work->outputs_));
   }
 
@@ -1253,20 +1235,9 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::pointToPoint(
   // send().
   {
     c10::cuda::CUDAMultiStreamGuard streamGuard(ncclStreams_[key]);
-    work->future_ = c10::make_intrusive<at::ivalue::Future>(
-        c10::ListType::create(c10::TensorType::get()),
-        devices);
+    work->future_->setDevices(devices);
     work->future_->markCompleted(at::IValue(*work->outputs_));
   }
-
-  // Add a callback that runs profiling end callbacks. wrapCallback() in CUDA
-  // future blocks the stream this callback runs on the corresponding
-  // cudaEvents_ ensuring appropriate synchronization.
-  if (work->recordFunctionEndCallback_) {
-    work->future_->addCallback(
-        [work](at::ivalue::Future& /* unused */) { work->recordFunctionEndCallback_(); });
-  }
-
   return work;
 }
 
