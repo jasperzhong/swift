@@ -39,7 +39,7 @@ bool is_square_or_vec(int64_t dim_i, int64_t dim_j, int64_t dim_k) {
 }
 
 template <typename scalar_t>
-void s_addmm_out_sparse_dense_worker(int64_t nnz, int64_t dim_i, int64_t dim_j, int64_t dim_k, Tensor& r, Scalar beta, const Tensor& t, Scalar alpha, const Tensor& csr, const Tensor& col_indices, const Tensor& values, const Tensor& dense) {
+void s_addmm_out_sparse_dense_worker(int64_t nnz, int64_t dim_i, int64_t dim_j, int64_t dim_k, const Tensor& r, Scalar beta, const Tensor& t, Scalar alpha, const Tensor& csr, const Tensor& col_indices, const Tensor& values, const Tensor& dense) {
 
   scalar_t cast_alpha = alpha.to<scalar_t>();
   scalar_t cast_beta = beta.to<scalar_t>();
@@ -87,13 +87,13 @@ void s_addmm_out_sparse_dense_worker(int64_t nnz, int64_t dim_i, int64_t dim_j, 
 }
 
 // Functions for matrix multiplication.
-Tensor& addmm_out_sparse_csr_dense_cpu(
+const Tensor& addmm_out_sparse_csr_dense_cpu(
     const Tensor& self,
     const SparseCsrTensor& sparse,
     const Tensor& dense,
     const Scalar& beta,
     const Scalar& alpha,
-    Tensor& r) {
+    const Tensor& r) {
   TORCH_INTERNAL_ASSERT(sparse.is_sparse_csr());
   Tensor t = *expand_size(self, {sparse.size(0), dense.size(1)}, "addmm_out_sparse_csr");
 
@@ -181,10 +181,10 @@ Tensor addmm_sparse_csr_dense(
   return r;
 }
 
-SparseCsrTensor& _sparse_csr_mm_out(
+const SparseCsrTensor& _sparse_csr_mm_out(
     const SparseCsrTensor& sparse,
     const Tensor& dense,
-    SparseCsrTensor& result) {
+    const SparseCsrTensor& result) {
   Tensor t = at::zeros({}, dense.options());
   return at::addmm_out(result, t, sparse, dense, 0.0, 1.0); // redispatch!
 }
@@ -209,12 +209,12 @@ Tensor add_sparse_csr(const Tensor& self, const Tensor& other, const Scalar& alp
   return at::add_out(result, self, other, alpha); // redispatch!
 }
 
-Tensor& add_sparse_csr_(Tensor& self, const Tensor& other, const Scalar& alpha) {
+const Tensor& add_sparse_csr_(const Tensor& self, const Tensor& other, const Scalar& alpha) {
   return at::add_out(self, self, other, alpha); // redispatch!
 }
 
-Tensor& add_out_dense_sparse_csr_cpu(
-    Tensor& out,
+const Tensor& add_out_dense_sparse_csr_cpu(
+    const Tensor& out,
     const Tensor& dense,
     const SparseCsrTensor& src,
     const Scalar& alpha) {
@@ -306,11 +306,11 @@ Tensor& add_out_dense_sparse_csr_cpu(
   return out;
 }
 
-Tensor& add_out_sparse_csr_cpu(
+const Tensor& add_out_sparse_csr_cpu(
     const Tensor& self,
     const SparseCsrTensor& other,
     const Scalar& alpha,
-    SparseCsrTensor& out) {
+    const SparseCsrTensor& out) {
   if (self.layout() == kStrided) {
     return add_out_dense_sparse_csr_cpu(out, self, other, alpha);
   } else {
