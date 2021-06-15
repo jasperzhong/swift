@@ -124,6 +124,29 @@ struct TORCH_API CompilationUnit {
       ResolverPtr rcb,
       bool is_module = false);
 
+  void replace_function(const c10::QualifiedName name, std::unique_ptr<torch::jit::GraphFunction> fn) {
+    auto it = dict_.find(name);
+    auto index = it->second;
+    old_functions_.push_back(std::move(functions_[index]));
+    functions_[index] = std::move(fn);
+    dict_.erase(it);
+    dict_[name] = index;
+    // functions_.push_back(std::move(new_fn));
+    // dict_[functions_[functions_.size()-1]->qualname()] = functions_.size()-1;
+  }
+
+  std::unique_ptr<torch::jit::GraphFunction> make_function(
+      c10::QualifiedName name,
+      std::shared_ptr<Graph> graph,
+      bool shouldMangle = false) {
+    if (shouldMangle) {
+      name = mangle(name);
+    }
+    auto new_fn = torch::make_unique<GraphFunction>(
+        std::move(name), std::move(graph), nullptr);
+    return new_fn;
+  }
+
   Function* create_function(
       c10::QualifiedName name,
       std::shared_ptr<Graph> graph,
@@ -315,6 +338,7 @@ struct TORCH_API CompilationUnit {
     return *functions_.back();
   }
   std::vector<std::unique_ptr<Function>> functions_;
+  std::vector<std::unique_ptr<Function>> old_functions_;
   // for fast lookup
   std::unordered_map<c10::QualifiedName, size_t> dict_;
   std::unordered_map<c10::QualifiedName, size_t> classDict_;
