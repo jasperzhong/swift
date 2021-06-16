@@ -1,6 +1,7 @@
 from typing import List, Optional
 import logging
 
+import torch
 import torch.distributed.rpc as rpc
 import torch.optim as optim
 import torch.jit as jit
@@ -63,6 +64,9 @@ class _ScriptLocalOptimizer(nn.Module):
 
         self.optim.step(grads)
 
+        if len(all_local_grads) > 0:
+            torch.cuda.current_stream(list(all_local_grads.items())[0][0].device).synchronize()
+
 
 # TODO (wanchaol): remove/merge this with ScriptLocalOptimizer once
 # we have converted all to functional optimizer in distributed.optim
@@ -90,6 +94,9 @@ class _LocalOptimizer(object):
             for param, grad in all_local_grads.items():
                 param.grad = grad
             self.optim.step()
+
+        if len(all_local_grads) > 0:
+            torch.cuda.current_stream(list(all_local_grads.items())[0][0].device).synchronize()
 
 
 def _new_local_optimizer(optim_cls, local_params_rref, *args, **kwargs):
