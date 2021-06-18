@@ -879,6 +879,13 @@ if torch.distributed.rpc.is_available():
                 "RRef[int]"
             )
         return getattr(ann, "__origin__", None) is RRef
+    def is_rref_instance(obj) -> bool:
+        return isinstance(obj, RRef)
+
+else:
+    def is_rref_instance(obj) -> bool:
+        # If the RPC module doesn't exist then RRefs don't exist either.
+        return False 
 
 def is_final(ann) -> bool:
     return ann.__module__ in {'typing', 'typing_extensions'} and \
@@ -1169,6 +1176,10 @@ class _TensorExtractor(pickle.Pickler):
         # even if a type isn't listed here this won't block users, since thet
         # can just add a __getstate__ or __reduce__ method to their class.
         if isinstance(obj, LockType):
+            return ""
+        # RRefs (and in fact Futures too) don't technically contain a value,
+        # they just contain the means to access a value.
+        if is_rref_instance(obj):
             return ""
         return None
 
