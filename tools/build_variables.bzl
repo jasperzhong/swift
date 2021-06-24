@@ -331,6 +331,8 @@ libtorch_distributed_base_sources = [
     "torch/lib/c10d/ParamCommsUtils.cpp",
     "torch/lib/c10d/PrefixStore.cpp",
     "torch/lib/c10d/ProcessGroup.cpp",
+    "torch/lib/c10d/torch_ucc.cpp",
+    "torch/lib/c10d/torch_ucc_comm.cpp",
     "torch/lib/c10d/ProcessGroupGloo.cpp",
     "torch/lib/c10d/ProcessGroupMPI.cpp",
     "torch/lib/c10d/ProcessGroupWrapper.cpp",

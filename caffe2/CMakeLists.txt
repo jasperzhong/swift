@@ -1971,3 +1971,6 @@ if(BUILD_PYTHON)
   install(DIRECTORY ${CMAKE_BINARY_DIR}/caffe2 DESTINATION ${PYTHON_LIB_REL_PATH}
           FILES_MATCHING PATTERN "*.py")
 endif()
+
+# link_directories("/opt/ucf/ucc/lib")
+target_link_libraries(torch_cpu PUBLIC ucp ucs /opt/ucf/ucc/lib/libucc.so)

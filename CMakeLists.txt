@@ -888,6 +888,7 @@ include_directories(BEFORE ${PROJECT_SOURCE_DIR})
 # These need to take precedence over their empty counterparts located
 # in PROJECT_SOURCE_DIR.
 include_directories(BEFORE ${PROJECT_BINARY_DIR})
+include_directories(BEFORE /opt/ucf/ucc/include)
 
 include_directories(BEFORE ${PROJECT_SOURCE_DIR}/aten/src/)
 include_directories(BEFORE ${PROJECT_BINARY_DIR}/aten/src/)

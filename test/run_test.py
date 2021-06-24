@@ -375,6 +375,11 @@ if dist.is_available():
             'WORLD_SIZE': '2' if torch.cuda.device_count() == 2 else '3',
             'TEST_REPORT_SOURCE_OVERRIDE': 'dist-gloo'
         }
+    if True:
+        DISTRIBUTED_TESTS_CONFIG['ucc'] = {
+            'WORLD_SIZE': '2' if torch.cuda.device_count() == 2 else '3',
+            'TEST_REPORT_SOURCE_OVERRIDE': 'dist-ucc'
+        }
 
 # https://stackoverflow.com/questions/2549939/get-signal-names-from-numbers-in-python
 SIGNALS_TO_NAMES_DICT = {getattr(signal, n): n for n in dir(signal)
@@ -674,6 +679,8 @@ def test_distributed(test_module, test_directory, options):
             'MPI not available -- MPI backend tests will be skipped')
     config = DISTRIBUTED_TESTS_CONFIG
     for backend, env_vars in config.items():
+        if backend != 'ucc':
+            continue
         if sys.platform == 'win32' and backend != 'gloo':
             continue
         if backend == 'mpi' and not mpi_available:

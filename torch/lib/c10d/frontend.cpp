@@ -20,6 +20,7 @@
 #ifdef USE_C10D_NCCL
 #include <c10d/ProcessGroupNCCL.hpp>
 #endif
+#include <c10d/torch_ucc.hpp>
 
 #ifdef USE_C10D_MPI
 #include <c10d/ProcessGroupMPI.hpp>
@@ -218,6 +219,9 @@ c10::intrusive_ptr<ProcessGroup> DistributedC10d::newProcessGroupHelper(
       AT_ERROR(
           "Attempting to create NCCL-based process group while NCCL is either not enabled or built");
 #endif // USE_C10D_NCCL
+    } else if (backend == "ucc") {
+      pg = c10::make_intrusive<ProcessGroupUCC>(
+          prefix_store, rank, world_size);
     } else {
       // TODO: discuss to figure out how to extend this to third party backends?
       AT_ERROR("Unsupported backend type: ", backend);

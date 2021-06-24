@@ -19,6 +19,8 @@
 #include <c10d/ProcessGroupNCCL.hpp>
 #endif
 
+#include <c10d/torch_ucc.hpp>
+
 #ifdef USE_C10D_MPI
 #include <c10d/ProcessGroupMPI.hpp>
 #endif
@@ -1420,6 +1422,23 @@ Example::
       "_group_start", []() { ::c10d::ProcessGroupNCCL::groupStart(); });
   processGroupNCCL.def_static(
       "_group_end", []() { ::c10d::ProcessGroupNCCL::groupEnd(); });
+#endif
+
+#if true
+  auto processGroupUCC =
+      intrusive_ptr_no_gil_destructor_class_<::c10d::ProcessGroupUCC>(
+          module, "ProcessGroupUCC", processGroup)
+          .def(
+              py::init([](const c10::intrusive_ptr<::c10d::Store>& store,
+                          int rank,
+                          int size) {
+                return c10::make_intrusive<::c10d::ProcessGroupUCC>(
+                    store, rank, size);
+              }),
+              py::arg("store"),
+              py::arg("rank"),
+              py::arg("size"),
+              py::call_guard<py::gil_scoped_release>());
 #endif
 
 #ifdef USE_C10D_MPI
