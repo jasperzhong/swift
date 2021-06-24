@@ -76,6 +76,30 @@ namespace c10d {
     (_ucp_tag_mask) = (uint64_t)-1;                                \
   } while (0)
 
+#ifdef USE_CUDA
+#define SAVE_TENSOR(_TENSOR, _DATA)                 \
+  if ((_TENSOR).device().is_cuda()) {               \
+    c10::cuda::CUDACachingAllocator::recordStream(  \
+        (_TENSOR).storage().data_ptr(), (*stream)); \
+  } else {                                          \
+    (_DATA) = {(_TENSOR)};                          \
+  }
+
+#define SAVE_TENSORS(_TENSORS, _DATA)                     \
+  if ((_TENSORS)[0].device().is_cuda()) {                 \
+    for (const auto i : c10::irange((_TENSORS).size())) { \
+      c10::cuda::CUDACachingAllocator::recordStream(      \
+          (_TENSORS)[i].storage().data_ptr(), (*stream)); \
+    }                                                     \
+  } else {                                                \
+    (_DATA) = (_TENSORS);                                 \
+  }
+#else
+#define SAVE_TENSOR(_TENSOR, _DATA) (_DATA) = {(_TENSOR)};
+
+#define SAVE_TENSORS(_TENSORS, _DATA) (_DATA) = (_TENSORS);
+#endif
+
 enum torch_ucx_tag_type_t { TORCH_UCX_P2P_TAG, TORCH_UCX_OOB_TAG };
 
 struct event_pool_t {
@@ -139,6 +163,7 @@ class TORCH_API ProcessGroupUCC : public ProcessGroup {
     bool wait(std::chrono::milliseconds timeout = kUnsetTimeout) override;
     void finalize();
     std::unique_ptr<WorkData> data;
+    c10::intrusive_ptr<c10::ivalue::Future> getFuture() override;
 #ifdef USE_CUDA
     std::unique_ptr<at::cuda::CUDAEvent> fence = nullptr;
     event_pool_t* ep = nullptr;
@@ -147,6 +172,13 @@ class TORCH_API ProcessGroupUCC : public ProcessGroup {
     ucc_status_t status_;
     ucc_coll_req_h request_;
     CommBase* comm_;
+  private:
+    // Store a reference to collective's outputs, used by result and to
+    // give a more descriptive message when representing the Work as a string.
+    std::shared_ptr<std::vector<at::Tensor>> outputs_;
+
+    // The future returned by getFuture.
+    c10::intrusive_ptr<at::ivalue::Future> future_;
   };
 
   explicit ProcessGroupUCC(

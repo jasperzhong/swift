@@ -151,6 +151,11 @@ void ProcessGroupUCC::WorkUCC::finalize() {
   }
 }
 
+c10::intrusive_ptr<c10::ivalue::Future> ProcessGroupUCC::WorkUCC::
+    getFuture() {
+  return future_;
+}
+
 CommPG::CommPG(torch_ucc_oob_coll_info_t* oob_info,
     c10::Device dev)
     : ucx_comm(oob_info->size),
@@ -428,6 +433,7 @@ c10::intrusive_ptr<ProcessGroupUCC::WorkUCC> CommPG::enqueue_cuda_collective(
   ucc_ee_ack_event(ee, post_ev);
   auto work = c10::make_intrusive<ProcessGroupUCC::WorkUCC>(
       opType, UCC_INPROGRESS, request, ee, &ucc_comm);
+  work->outputs_ = std::make_shared<std::vector<at::Tensor>>(data->src);
   work->data = std::move(data);
   work->ep = ep;
   cuda_ev->record(stream);
@@ -520,6 +526,25 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupUCC::collective_post(
     cuda_ev->block(*stream);
     auto work = comm->enqueue_cuda_collective(opType, coll, std::move(data),
                                     team, cuda_ee, std::move(cuda_ev), *stream, &ep);
+
+    // Future only needs to be created and marked completed with outputs
+    {
+      c10::cuda::CUDAMultiStreamGuard streamGuard(*stream);
+      std::vector<c10::Device> devList{dev};
+      work->future_ = c10::make_intrusive<at::ivalue::Future>(
+          c10::ListType::create(c10::TensorType::get()),
+          devList);
+      work->future_->markCompleted(at::IValue(*work->outputs_));
+    }
+
+    // Add a callback that runs profiling end callbacks. wrapCallback() in CUDA
+    // future blocks the stream this callback runs on the corresponding
+    // cudaEvents_ ensuring appropriate synchronization.
+    if (work->recordFunctionEndCallback_) {
+      work->future_->addCallback(
+          [work](at::ivalue::Future& /* unused */) { work->recordFunctionEndCallback_(); });
+    }
+
     return work;
   }
 #endif
@@ -554,8 +579,9 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupUCC::allgather(
   coll.dst.info_v.datatype = UCC_DT_UINT8;
   coll.dst.info_v.mem_type =
       ucc_mtype_map.at(outputTensors[0][0].device().type());
-  data->src = inputTensors;
-  data->dst = outputTensors[0];
+  SAVE_TENSORS(inputTensors, data->src);
+  SAVE_TENSORS(outputTensors[0], data->dst);
+
   return collective_post(
       OpType::ALLGATHER,
       coll,
@@ -592,7 +618,8 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupUCC::allreduce(
   coll.dst.info.count = tensor.numel();
   coll.dst.info.datatype = ucc_dtype_map.at(tensor.scalar_type());
   coll.dst.info.mem_type = ucc_mtype_map.at(tensor.device().type());
-  data->src = tensors;
+  SAVE_TENSORS(tensors, data->src);
+
   return collective_post(
       OpType::ALLREDUCE,
       coll,
@@ -669,8 +696,9 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupUCC::alltoall_base(
     coll.flags = UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER |
                  UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
   }
-  data->src = {inputTensor};
-  data->dst = {outputTensor};
+  SAVE_TENSOR(inputTensor, data->src);
+  SAVE_TENSOR(outputTensor, data->dst);
+
   return collective_post(
       OpType::ALLTOALL_BASE,
       coll,
@@ -704,7 +732,7 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupUCC::broadcast(
   coll.src.info.datatype = ucc_dtype_map.at(tensor.scalar_type());
   coll.src.info.mem_type = ucc_mtype_map.at(tensor.device().type());
   coll.root = opts.rootRank;
-  data->src = tensors;
+  SAVE_TENSORS(tensors, data->src);
 
   return collective_post(
       OpType::BROADCAST,
