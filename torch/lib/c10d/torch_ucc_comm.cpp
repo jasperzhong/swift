@@ -67,14 +67,12 @@ ucc_status_t oob_allgather(
     size_t msglen,
     void* coll_info,
     void** req) {
-  static int msg_id = 0;
   torch_ucc_oob_coll_info_t* info =
       reinterpret_cast<torch_ucc_oob_coll_info_t*>(coll_info);
   std::vector<uint8_t> val = std::vector<uint8_t>(
       reinterpret_cast<uint8_t*>(sbuf),
       reinterpret_cast<uint8_t*>(sbuf) + msglen);
-  info->store->set(info->getKey("teamr" + std::to_string(info->rank) + ":" + std::to_string(msg_id)), val);
-  msg_id++;
+  info->store->set(info->getKey("teamr" + std::to_string(info->rank)), val);
   info->rbuf = rbuf;
   info->msglen = msglen;
   *req = coll_info;
@@ -82,24 +80,22 @@ ucc_status_t oob_allgather(
 }
 
 ucc_status_t oob_allgather_test(void* req) {
-  static int msg_id = 0;
   torch_ucc_oob_coll_info_t* info =
       reinterpret_cast<torch_ucc_oob_coll_info_t*>(req);
 
   for (int r = 0; r < info->size; r++) {
-    if (!info->store->check({info->getKey("teamr" + std::to_string(r) + ":" + std::to_string(msg_id))})) {
+    if (!info->store->check({info->getKey("teamr" + std::to_string(r))})) {
       return UCC_INPROGRESS;
     }
   }
   for (int r = 0; r < info->size; r++) {
     std::vector<uint8_t> data =
-        info->store->get(info->getKey("teamr" + std::to_string(r) + ":" + std::to_string(msg_id)));
+        info->store->get(info->getKey("teamr" + std::to_string(r)));
     memcpy(
         (void*)((ptrdiff_t)info->rbuf + info->msglen * r),
         data.data(),
         info->msglen);
   }
-  msg_id++;
   return UCC_OK;
 }
 
