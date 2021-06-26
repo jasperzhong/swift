@@ -363,6 +363,12 @@ c10::optional<TypePtr> unifyTypeList(
   return ret_type;
 }
 
+c10::optional<TypePtr> unifyTypeList(
+    at::ArrayRef<TypePtr> elements) {
+      std::stringstream nowhere;
+      return unifyTypeList(elements, nowhere);
+}
+
 MatchTypeReturn matchTypeVariables(
     TypePtr formal,
     TypePtr actual,

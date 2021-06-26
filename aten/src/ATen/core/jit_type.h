@@ -1576,6 +1576,9 @@ TORCH_API c10::optional<TypePtr> unifyTypeList(
     at::ArrayRef<TypePtr> elements,
     std::ostream& why_not);
 
+c10::optional<TypePtr> unifyTypeList(
+    at::ArrayRef<TypePtr> elements);
+
 namespace detail {
 template <typename T>
 struct getTypePtr_ final {
