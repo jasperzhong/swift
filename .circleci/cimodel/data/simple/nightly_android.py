@@ -40,7 +40,7 @@ class AndroidNightlyJob:
         props_dict = {
             "name": full_job_name,
             "requires": self.requires,
-            "filters": {"branches": {"only": "nightly"}},
+            # "filters": {"branches": {"only": "nightly"}},
         }
 
         props_dict.update(self.extra_props)
@@ -55,9 +55,13 @@ BASE_REQUIRES = [DOCKER_REQUIREMENT_NDK]
 
 WORKFLOW_DATA = [
     AndroidNightlyJob(["x86_32"], "pytorch_linux_build", requires=BASE_REQUIRES),
+    AndroidNightlyJob(["x86_32_fulljit"], "pytorch_linux_build", requires=BASE_REQUIRES),
     AndroidNightlyJob(["x86_64"], "pytorch_linux_build", requires=BASE_REQUIRES),
+    AndroidNightlyJob(["x86_64_fulljit"], "pytorch_linux_build", requires=BASE_REQUIRES),
     AndroidNightlyJob(["arm", "v7a"], "pytorch_linux_build", requires=BASE_REQUIRES),
+    AndroidNightlyJob(["arm", "v7a", "fulljit"], "pytorch_linux_build", requires=BASE_REQUIRES),
     AndroidNightlyJob(["arm", "v8a"], "pytorch_linux_build", requires=BASE_REQUIRES),
+    AndroidNightlyJob(["arm", "v8a", "fulljit"], "pytorch_linux_build", requires=BASE_REQUIRES),
     AndroidNightlyJob(["android_gradle"], "pytorch_android_gradle_build",
                       with_docker=False,
                       requires=[
@@ -65,6 +69,18 @@ WORKFLOW_DATA = [
                           "nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_build",
                           "nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_build",
                           "nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_build"]),
+    AndroidNightlyJob(["android_fulljit_gradle"], "pytorch_android_fulljit_gradle_build",
+                      with_docker=False,
+                      requires=[
+                          "nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_fulljit_build",
+                          "nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_fulljit_build",
+                          "nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_fulljit_build",
+                          "nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_fulljit_build"]),
+    AndroidNightlyJob(["x86_32_android_fulljit_publish_snapshot"], "pytorch_android_publish_snapshot",
+                      extra_props={"context": "org-member"},
+                      with_docker=False,
+                      requires=["nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_android_fulljit_gradle_build"],
+                      no_build_suffix=True),
     AndroidNightlyJob(["x86_32_android_publish_snapshot"], "pytorch_android_publish_snapshot",
                       extra_props={"context": "org-member"},
                       with_docker=False,

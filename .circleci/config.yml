@@ -283,11 +283,15 @@ pytorch_params: &pytorch_params
     build_only:
       type: string
       default: ""
+    lite_interpreter:
+      type: string
+      default: "1"
   environment:
     BUILD_ENVIRONMENT: << parameters.build_environment >>
     DOCKER_IMAGE: << parameters.docker_image >>
     USE_CUDA_DOCKER_RUNTIME: << parameters.use_cuda_docker_runtime >>
     BUILD_ONLY: << parameters.build_only >>
+    BUILD_LITE_INTERPRETER: << parameters.lite_interpreter >>
   resource_class: << parameters.resource_class >>
 
 pytorch_android_params: &pytorch_android_params
@@ -1571,6 +1575,96 @@ jobs:
         path: ~/workspace/build_android_artifacts/artifacts.tgz
         destination: artifacts.tgz
 
+  pytorch_android_fulljit_gradle_build:
+    environment:
+      BUILD_ENVIRONMENT: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-gradle-build
+      DOCKER_IMAGE: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
+      PYTHON_VERSION: "3.6"
+    resource_class: large
+    machine:
+      image: ubuntu-2004:202104-01
+    steps:
+    - checkout
+    - calculate_docker_image_tag
+    - setup_linux_system_environment
+    - setup_ci_environment
+    - run:
+        name: pytorch android fulljit gradle build
+        no_output_timeout: "1h"
+        command: |
+          set -eux
+          docker_image_commit=${DOCKER_IMAGE}:${DOCKER_TAG}-${CIRCLE_SHA1}
+
+          docker_image_libtorch_android_x86_32=${docker_image_commit}-android-x86_32
+          docker_image_libtorch_android_x86_64=${docker_image_commit}-android-x86_64
+          docker_image_libtorch_android_arm_v7a=${docker_image_commit}-android-arm-v7a
+          docker_image_libtorch_android_arm_v8a=${docker_image_commit}-android-arm-v8a
+
+          echo "docker_image_commit: "${docker_image_commit}
+          echo "docker_image_libtorch_android_x86_32: "${docker_image_libtorch_android_x86_32}
+          echo "docker_image_libtorch_android_x86_64: "${docker_image_libtorch_android_x86_64}
+          echo "docker_image_libtorch_android_arm_v7a: "${docker_image_libtorch_android_arm_v7a}
+          echo "docker_image_libtorch_android_arm_v8a: "${docker_image_libtorch_android_arm_v8a}
+
+          # x86_32
+          time docker pull ${docker_image_libtorch_android_x86_32} >/dev/null
+          export id_x86_32=$(docker run --env-file "${BASH_ENV}" -e GRADLE_OFFLINE=1 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -t -d -w /var/lib/jenkins ${docker_image_libtorch_android_x86_32})
+
+          export COMMAND='((echo "sudo chown -R jenkins workspace" && echo "export BUILD_LITE_INTERPRETER=0") | docker exec -u jenkins -i "$id_x86_32" bash) 2>&1'
+          echo ${COMMAND} > ./command.sh && unbuffer bash ./command.sh | ts
+
+          # arm-v7a
+          time docker pull ${docker_image_libtorch_android_arm_v7a} >/dev/null
+          export id_arm_v7a=$(docker run --env-file "${BASH_ENV}" --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -t -d -w /var/lib/jenkins ${docker_image_libtorch_android_arm_v7a})
+
+          export COMMAND='((echo "sudo chown -R jenkins workspace" && echo "export BUILD_LITE_INTERPRETER=0") | docker exec -u jenkins -i "$id_arm_v7a" bash) 2>&1'
+          echo ${COMMAND} > ./command.sh && unbuffer bash ./command.sh | ts
+
+          mkdir -p ~/workspace/build_android_install_arm_v7a
+          docker cp $id_arm_v7a:/var/lib/jenkins/workspace/build_android/install ~/workspace/build_android_install_arm_v7a
+
+          # x86_64
+          time docker pull ${docker_image_libtorch_android_x86_64} >/dev/null
+          export id_x86_64=$(docker run --env-file "${BASH_ENV}" --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -t -d -w /var/lib/jenkins ${docker_image_libtorch_android_x86_64})
+
+          export COMMAND='((echo "sudo chown -R jenkins workspace" && echo "export BUILD_LITE_INTERPRETER=0") | docker exec -u jenkins -i "$id_x86_64" bash) 2>&1'
+          echo ${COMMAND} > ./command.sh && unbuffer bash ./command.sh | ts
+
+          mkdir -p ~/workspace/build_android_install_x86_64
+          docker cp $id_x86_64:/var/lib/jenkins/workspace/build_android/install ~/workspace/build_android_install_x86_64
+
+          # arm-v8a
+          time docker pull ${docker_image_libtorch_android_arm_v8a} >/dev/null
+          export id_arm_v8a=$(docker run --env-file "${BASH_ENV}" --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -t -d -w /var/lib/jenkins ${docker_image_libtorch_android_arm_v8a})
+
+          export COMMAND='((echo "sudo chown -R jenkins workspace" && echo "export BUILD_LITE_INTERPRETER=0") | docker exec -u jenkins -i "$id_arm_v8a" bash) 2>&1'
+          echo ${COMMAND} > ./command.sh && unbuffer bash ./command.sh | ts
+
+          mkdir -p ~/workspace/build_android_install_arm_v8a
+          docker cp $id_arm_v8a:/var/lib/jenkins/workspace/build_android/install ~/workspace/build_android_install_arm_v8a
+
+          docker cp ~/workspace/build_android_install_arm_v7a $id_x86_32:/var/lib/jenkins/workspace/build_android_install_arm_v7a
+          docker cp ~/workspace/build_android_install_x86_64 $id_x86_32:/var/lib/jenkins/workspace/build_android_install_x86_64
+          docker cp ~/workspace/build_android_install_arm_v8a $id_x86_32:/var/lib/jenkins/workspace/build_android_install_arm_v8a
+
+          # run gradle buildRelease
+          export COMMAND='((echo "sudo chown -R jenkins workspace && cd workspace && ./.circleci/scripts/build_android_gradle.sh") | docker exec -u jenkins -i "$id_x86_32" bash) 2>&1'
+          echo ${COMMAND} > ./command.sh && unbuffer bash ./command.sh | ts
+
+          mkdir -p ~/workspace/build_android_artifacts
+          docker cp $id_x86_32:/var/lib/jenkins/workspace/android/artifacts.tgz ~/workspace/build_android_artifacts/
+
+          output_image=$docker_image_libtorch_android_x86_32-gradle
+          docker commit "$id_x86_32" ${output_image}
+          time docker push ${output_image}
+    - upload_binary_size_for_android_build:
+        build_type: prebuilt
+        artifacts: /home/circleci/workspace/build_android_artifacts/artifacts.tgz
+    - store_artifacts:
+        path: ~/workspace/build_android_artifacts/artifacts.tgz
+        destination: artifacts.tgz
+
+
   pytorch_android_publish_snapshot:
     environment:
       BUILD_ENVIRONMENT: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-gradle-publish-snapshot
@@ -1634,6 +1728,49 @@ jobs:
           export id=$(docker run --env-file "${BASH_ENV}" --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -t -d -w /var/lib/jenkins ${docker_image_libtorch_android_x86_32})
 
           export COMMAND='((echo "export BUILD_ENVIRONMENT=${BUILD_ENVIRONMENT}" && echo "export GRADLE_OFFLINE=1" && echo "sudo chown -R jenkins workspace && cd workspace && ./.circleci/scripts/build_android_gradle.sh") | docker exec -u jenkins -i "$id" bash) 2>&1'
+          echo ${COMMAND} > ./command.sh && unbuffer bash ./command.sh | ts
+
+          mkdir -p ~/workspace/build_android_x86_32_artifacts
+          docker cp $id:/var/lib/jenkins/workspace/android/artifacts.tgz ~/workspace/build_android_x86_32_artifacts/
+
+          output_image=${docker_image_libtorch_android_x86_32}-gradle
+          docker commit "$id" ${output_image}
+          time docker push ${output_image}
+    - upload_binary_size_for_android_build:
+        build_type: prebuilt-single
+        artifacts: /home/circleci/workspace/build_android_x86_32_artifacts/artifacts.tgz
+    - store_artifacts:
+        path: ~/workspace/build_android_x86_32_artifacts/artifacts.tgz
+        destination: artifacts.tgz
+
+
+  pytorch_android_gradle_build-x86_32_fulljit:
+    environment:
+      BUILD_ENVIRONMENT: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-gradle-build-only-x86_32
+      DOCKER_IMAGE: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
+      PYTHON_VERSION: "3.6"
+    resource_class: large
+    machine:
+      image: ubuntu-2004:202104-01
+    steps:
+    - checkout
+    - calculate_docker_image_tag
+    - setup_linux_system_environment
+    - checkout
+    - setup_ci_environment
+    - run:
+        name: pytorch android full jit  gradle build only x86_32 (for PR)
+        no_output_timeout: "1h"
+        command: |
+          set -e
+          docker_image_libtorch_android_x86_32=${DOCKER_IMAGE}:${DOCKER_TAG}-${CIRCLE_SHA1}-android-x86_32
+          echo "docker_image_libtorch_android_x86_32: "${docker_image_libtorch_android_x86_32}
+
+          # x86
+          time docker pull ${docker_image_libtorch_android_x86_32} >/dev/null
+          export id=$(docker run --env-file "${BASH_ENV}" --cap-add=SYS_PTRACE --security-opt seccomp=unconfined -t -d -w /var/lib/jenkins ${docker_image_libtorch_android_x86_32})
+
+          export COMMAND='((echo "export BUILD_ENVIRONMENT=${BUILD_ENVIRONMENT} && echo "export BUILD_LITE_INTERPRETER=0"" && echo "export GRADLE_OFFLINE=1" && echo "sudo chown -R jenkins workspace && cd workspace && ./.circleci/scripts/build_android_gradle.sh") | docker exec -u jenkins -i "$id" bash) 2>&1'
           echo ${COMMAND} > ./command.sh && unbuffer bash ./command.sh | ts
 
           mkdir -p ~/workspace/build_android_x86_32_artifacts
@@ -7204,6 +7341,13 @@ workflows:
           requires:
             - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
       - pytorch_linux_build:
+          build_environment: "pytorch-linux-xenial-py3-clang5-android-ndk-r19c-x86_32_fulljit-build"
+          docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
+          lite_interpreter: "0"
+          name: pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_fulljit_build
+          requires:
+            - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+      - pytorch_linux_build:
           build_environment: "pytorch-linux-xenial-py3-clang5-android-ndk-r19c-x86_64-build"
           docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
           filters:
@@ -7213,6 +7357,19 @@ workflows:
                 - /ci-all\/.*/
                 - /release\/.*/
           name: pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_build
+          requires:
+            - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+      - pytorch_linux_build:
+          build_environment: "pytorch-linux-xenial-py3-clang5-android-ndk-r19c-x86_64_fulljit-build"
+          docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
+          filters:
+            branches:
+              only:
+                - master
+                - /ci-all\/.*/
+                - /release\/.*/
+          lite_interpreter: "0"
+          name: pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_fulljit_build
           requires:
             - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
       - pytorch_linux_build:
@@ -7228,6 +7385,19 @@ workflows:
           requires:
             - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
       - pytorch_linux_build:
+          build_environment: "pytorch-linux-xenial-py3-clang5-android-ndk-r19c-arm-v7a-fulljit-build"
+          docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
+          filters:
+            branches:
+              only:
+                - master
+                - /ci-all\/.*/
+                - /release\/.*/
+          lite_interpreter: "0"
+          name: pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_fulljit_build
+          requires:
+            - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+      - pytorch_linux_build:
           build_environment: "pytorch-linux-xenial-py3-clang5-android-ndk-r19c-arm-v8a-build"
           docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
           filters:
@@ -7239,6 +7409,19 @@ workflows:
           name: pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_build
           requires:
             - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+      - pytorch_linux_build:
+          build_environment: "pytorch-linux-xenial-py3-clang5-android-ndk-r19c-arm-v8a-fulljit-build"
+          docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
+          filters:
+            branches:
+              only:
+                - master
+                - /ci-all\/.*/
+                - /release\/.*/
+          lite_interpreter: "0"
+          name: pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_fulljit_build
+          requires:
+            - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
       - pytorch_android_gradle_build-x86_32:
           filters:
             branches:
@@ -7248,6 +7431,15 @@ workflows:
           name: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-gradle-build-x86_32
           requires:
             - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_build
+      - pytorch_android_gradle_build-x86_32_fulljit:
+          filters:
+            branches:
+              only:
+                - /gh\/.*\/head/
+                - /pull\/.*/
+          name: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-gradle-build-x86_32_fulljit
+          requires:
+            - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_fulljit_build
       - pytorch_android_gradle_custom_build_single:
           filters:
             branches:
@@ -7280,6 +7472,19 @@ workflows:
             - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_build
             - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_build
             - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_build
+      - pytorch_android_fulljit_gradle_build:
+          filters:
+            branches:
+              only:
+                - master
+                - /ci-all\/.*/
+                - /release\/.*/
+          name: pytorch-fulljit-linux-xenial-py3-clang5-android-ndk-r19c-gradle-build
+          requires:
+            - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_fulljit_build
+            - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_fulljit_build
+            - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_fulljit_build
+            - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_fulljit_build
       - pytorch_ios_build:
           build_environment: pytorch-ios-12.0.0-x86_64_build
           ios_arch: x86_64
@@ -7553,54 +7758,72 @@ workflows:
       - pytorch_linux_build:
           build_environment: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-x86_32
           docker_image: 308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c
-          filters:
-            branches:
-              only: nightly
           name: nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_build
+          requires:
+            - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+      - pytorch_linux_build:
+          build_environment: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-x86_32_fulljit
+          docker_image: 308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+          name: nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_fulljit_build
           requires:
             - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
       - pytorch_linux_build:
           build_environment: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-x86_64
           docker_image: 308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c
-          filters:
-            branches:
-              only: nightly
           name: nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_build
+          requires:
+            - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+      - pytorch_linux_build:
+          build_environment: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-x86_64_fulljit
+          docker_image: 308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+          name: nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_fulljit_build
           requires:
             - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
       - pytorch_linux_build:
           build_environment: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-arm-v7a
           docker_image: 308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c
-          filters:
-            branches:
-              only: nightly
           name: nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_build
+          requires:
+            - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+      - pytorch_linux_build:
+          build_environment: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-arm-v7a-fulljit
+          docker_image: 308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+          name: nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_fulljit_build
           requires:
             - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
       - pytorch_linux_build:
           build_environment: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-arm-v8a
           docker_image: 308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c
-          filters:
-            branches:
-              only: nightly
           name: nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_build
           requires:
             - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+      - pytorch_linux_build:
+          build_environment: pytorch-linux-xenial-py3-clang5-android-ndk-r19c-arm-v8a-fulljit
+          docker_image: 308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+          name: nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_fulljit_build
+          requires:
+            - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
       - pytorch_android_gradle_build:
-          filters:
-            branches:
-              only: nightly
           name: nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_android_gradle_build
           requires:
             - nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_build
             - nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_build
             - nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_build
             - nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_build
+      - pytorch_android_fulljit_gradle_build:
+          name: nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_android_fulljit_gradle_build
+          requires:
+            - nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_fulljit_build
+            - nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_fulljit_build
+            - nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_fulljit_build
+            - nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_fulljit_build
       - pytorch_android_publish_snapshot:
           context: org-member
-          filters:
-            branches:
-              only: nightly
+          name: nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_android_fulljit_publish_snapshot
+          requires:
+            - nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_android_fulljit_gradle_build
+      - pytorch_android_publish_snapshot:
+          context: org-member
           name: nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_android_publish_snapshot
           requires:
             - nightly_pytorch_linux_xenial_py3_clang5_android_ndk_r19c_android_gradle_build
@@ -9176,9 +9399,23 @@ workflows:
           requires:
             - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
       - pytorch_linux_build:
+          build_environment: "pytorch-linux-xenial-py3-clang5-android-ndk-r19c-x86_32_fulljit-build"
+          docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
+          lite_interpreter: "0"
+          name: pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_fulljit_build
+          requires:
+            - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+      - pytorch_linux_build:
           build_environment: "pytorch-linux-xenial-py3-clang5-android-ndk-r19c-x86_64-build"
           docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
           name: pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_build
+          requires:
+            - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+      - pytorch_linux_build:
+          build_environment: "pytorch-linux-xenial-py3-clang5-android-ndk-r19c-x86_64_fulljit-build"
+          docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
+          lite_interpreter: "0"
+          name: pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_fulljit_build
           requires:
             - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
       - pytorch_linux_build:
@@ -9188,9 +9425,23 @@ workflows:
           requires:
             - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
       - pytorch_linux_build:
+          build_environment: "pytorch-linux-xenial-py3-clang5-android-ndk-r19c-arm-v7a-fulljit-build"
+          docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
+          lite_interpreter: "0"
+          name: pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_fulljit_build
+          requires:
+            - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+      - pytorch_linux_build:
           build_environment: "pytorch-linux-xenial-py3-clang5-android-ndk-r19c-arm-v8a-build"
           docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
           name: pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_build
+          requires:
+            - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
+      - pytorch_linux_build:
+          build_environment: "pytorch-linux-xenial-py3-clang5-android-ndk-r19c-arm-v8a-fulljit-build"
+          docker_image: "308535385114.dkr.ecr.us-east-1.amazonaws.com/pytorch/pytorch-linux-xenial-py3-clang5-android-ndk-r19c"
+          lite_interpreter: "0"
+          name: pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_fulljit_build
           requires:
             - docker-pytorch-linux-xenial-py3-clang5-android-ndk-r19c
       - pytorch_android_gradle_build:
@@ -9200,6 +9451,13 @@ workflows:
             - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_build
             - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_build
             - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_build
+      - pytorch_android_fulljit_gradle_build:
+          name: pytorch-fulljit-linux-xenial-py3-clang5-android-ndk-r19c-gradle-build
+          requires:
+            - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_32_fulljit_build
+            - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_x86_64_fulljit_build
+            - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v7a_fulljit_build
+            - pytorch_linux_xenial_py3_clang5_android_ndk_r19c_arm_v8a_fulljit_build
       - pytorch_linux_build:
           build_environment: pytorch-linux-xenial-py3-clang5-mobile-code-analysis
           build_only: "1"
