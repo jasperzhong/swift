@@ -4024,6 +4024,21 @@ def sample_inputs_kthvalue(op_info, device, dtype, requires_grad, **kwargs):
 
     return [SampleInput(tensor, args=args) for tensor, args in test_cases]
 
+def sample_inputs_attn(op_info, device, dtype, requires_grad, **kwargs):
+    def _tensor(shape):
+        return make_tensor(shape, device, dtype, low=None, high=None, requires_grad=requires_grad)
+
+    def generator():
+        for dim1 in range(1, 10):
+            for dim2 in range(1, 10):
+                for dim3 in range(1, 10):
+                    q = _tensor((dim1, dim2))
+                    k = _tensor((dim1, dim2))
+                    v = _tensor((dim1, dim3))
+                    yield SampleInput(q, args=(k, v))
+
+    return list(generator())
+
 foreach_unary_op_db: List[OpInfo] = [
     ForeachUnaryFuncInfo('exp'),
     ForeachUnaryFuncInfo('acos'),
@@ -6917,6 +6932,23 @@ op_db: List[OpInfo] = [
            # the gradient check for complex fails.
            backward_dtypes=floating_types_and(torch.float16, torch.bfloat16),
            ),
+    OpInfo('attn',
+           dtypes=floating_types(),
+           sample_inputs_func=sample_inputs_attn,
+           skips=(
+               SkipInfo('TestCommon', 'test_out'),
+               SkipInfo('TestOpInfo', 'test_unsupported_dtypes'),
+           )),
+]
+
+op_db: List[OpInfo] = [
+    OpInfo('attn',
+           dtypes=floating_types(),
+           sample_inputs_func=sample_inputs_attn,
+           skips=(
+               SkipInfo('TestCommon', 'test_out'),
+               SkipInfo('TestOpInfo', 'test_unsupported_dtypes'),
+           )),
 ]
 
 # Common operator groupings
