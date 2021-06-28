@@ -250,6 +250,9 @@ Tensor lu_unpack_backward(
 Tensor cat_jvp(at::TensorList tensors, int64_t dim);
 Tensor cumprod_jvp(Tensor self_t, Tensor self_p, Tensor result, int dim);
 
+std::tuple<Tensor, Tensor, Tensor> attn_backward(const std::vector<torch::autograd::Variable> &grads,
+        const Tensor& q, const Tensor& k, const Tensor& v);
+
 } // namespace details
 } // namespace generated
 } // namespace autograd

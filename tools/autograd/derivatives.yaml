@@ -2106,3 +2106,6 @@
 
 - name: segment_reduce(Tensor data, str reduce, *, Tensor? lengths=None, Tensor? indices=None, int axis=0, bool unsafe=False, Scalar? initial=None) -> Tensor
   data: segment_reduce_backward(grad, result, data, lengths)
+
+- name: attn(Tensor q, Tensor k, Tensor v) -> (Tensor output, Tensor attn)
+  q, k, v: attn_backward(grads, q, k, v)
