@@ -47,7 +47,7 @@ def PyTorchLinuxWorkflow(
     build_environment: str,
     docker_image_base: str,
     test_runner_type: str,
-    on_pull_request: bool = False,
+    on_pull_request: bool = True,
     enable_doc_jobs: bool = False,
     num_test_shards: int = 1,
 ) -> PyTorchWorkflow:
