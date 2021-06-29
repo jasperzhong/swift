@@ -55,6 +55,7 @@ class _NormBase(Module):
             self.register_buffer('num_batches_tracked',
                                  torch.tensor(0, dtype=torch.long,
                                               **{k: v for k, v in factory_kwargs.items() if k != 'dtype'}))
+            self.num_batches_tracked: Optional[Tensor]
         else:
             self.register_buffer("running_mean", None)
             self.register_buffer("running_var", None)
@@ -144,7 +145,7 @@ class _BatchNorm(_NormBase):
         if self.training and self.track_running_stats:
             # TODO: if statement only here to tell the jit to skip emitting this when it is None
             if self.num_batches_tracked is not None:  # type: ignore[has-type]
-                self.num_batches_tracked = self.num_batches_tracked + 1  # type: ignore[has-type]
+                self.num_batches_tracked += 1  # type: ignore[has-type]
                 if self.momentum is None:  # use cumulative moving average
                     exponential_average_factor = 1.0 / float(self.num_batches_tracked)
                 else:  # use exponential moving average
@@ -694,7 +695,7 @@ class SyncBatchNorm(_BatchNorm):
 
         if self.training and self.track_running_stats:
             assert self.num_batches_tracked is not None
-            self.num_batches_tracked = self.num_batches_tracked + 1
+            self.num_batches_tracked += 1
             if self.momentum is None:  # use cumulative moving average
                 exponential_average_factor = 1.0 / self.num_batches_tracked.item()
             else:  # use exponential moving average
