@@ -232,6 +232,8 @@ def get_ignored_functions() -> Set[Callable]:
         Tensor._python_dispatch.__get__,
         Tensor._conj,
         Tensor._conj_physical,
+        Tensor._noop_unary,
+        Tensor._noop_binary,
     }
 
 

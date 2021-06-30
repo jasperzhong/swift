@@ -50,6 +50,22 @@ BENCHMARKS: FlatIntermediateDefinition = flatten({
         ),
     },
 
+    "Overhead": GroupedVariants(*parse_stmts(r"""
+        Python                                   | C++
+        ---------------------------------------- | ----------------------------------------
+        # @setup                                 | // @setup
+        x = torch.ones((1,))                     | auto x = torch::ones({1});
+        y = torch.ones((1,))                     | auto y = torch::ones({1});
+                                                 |
+        # @function                              | // @function
+        torch._noop_unary(x)                     | torch::_noop_unary(x);
+        torch._noop_binary(x, y)                 | torch::_noop_binary(x, y);
+                                                 |
+        # @method                                | // @method
+        x._noop_unary()                          | x._noop_unary();
+        x._noop_binary(y)                        | x._noop_binary(y);
+    """)),
+
     "Pointwise": {
         "Math": GroupedVariants(*parse_stmts(r"""
             Python                                   | C++
