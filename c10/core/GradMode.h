@@ -1,10 +1,19 @@
 #pragma once
 
+#include <c10/core/impl/ThreadLocalState.h>
 #include <c10/macros/Macros.h>
 
 namespace c10 {
 
 struct TORCH_API GradMode {
+  // TLS lookup is expensive and this API boils down to a single access on the
+  // struct, so if we already have the TLS handy there is a significant
+  // performance gain from reusing it and inlining the access. Otherwise, the
+  // no argument overload serves as a generic fallback.
+  static inline bool is_enabled(const impl::PODLocalState* const tls) {
+    return !(tls->GradMode_disabled);
+  }
+
   static bool is_enabled();
   static void set_enabled(bool enabled);
 };
