@@ -58,19 +58,15 @@ namespace at {
  * Users should use `c10::InferenceMode` here so that it'll properly throw an
  * error saying "one of the variables needed for gradient computation has be modified."
  */
-struct TORCH_API AutoDispatchBelowAutograd {
-  AutoDispatchBelowAutograd() :
-    autograd_guard_(c10::autograd_dispatch_keyset) {
-  }
+SPECIALIZE_EXCLUDE_GUARD(
+  AutoDispatchBelowAutograd,
+  c10::autograd_dispatch_keyset,
+  /*has_overlap=*/false);
 
-  // disable all autograd dispatch keys
-  c10::impl::ExcludeDispatchKeyGuard autograd_guard_;
-};
 
 // TODO: AutoNonVariableTypeMode should be removed in release 1.10.
 struct TORCH_API AutoNonVariableTypeMode {
-  AutoNonVariableTypeMode(bool enabled = true) :
-    autograd_guard_(c10::autograd_dispatch_keyset) {
+  AutoNonVariableTypeMode(bool enabled = true) {
     TORCH_WARN_ONCE("AutoNonVariableTypeMode is deprecated and will be removed in 1.10 release. "
         "For kernel implementations please use AutoDispatchBelowADInplaceOrView instead, "
         "If you are looking for a user facing API to enable running your inference-only "
@@ -81,7 +77,7 @@ struct TORCH_API AutoNonVariableTypeMode {
   }
 
   // disable all autograd dispatch keys
-  c10::impl::ExcludeDispatchKeyGuard autograd_guard_;
+  AutoDispatchBelowAutograd autograd_guard_;
 };
 
 /* Note [AutoDispatchBelowADInplaceOrView]
@@ -94,11 +90,9 @@ struct TORCH_API AutoNonVariableTypeMode {
  *   you never go back to a kernel on same dispatch key until
  *   you finish the current op.
  */
-struct TORCH_API AutoDispatchBelowADInplaceOrView {
-  AutoDispatchBelowADInplaceOrView() :
-    dispatch_key_guard_(c10::autograd_dispatch_keyset_with_ADInplaceOrView) {
-  }
-  // disable Autograd & ADInplaceOrView dispatch keys
-  c10::impl::ExcludeDispatchKeyGuard dispatch_key_guard_;
-};
+SPECIALIZE_EXCLUDE_GUARD(
+  AutoDispatchBelowADInplaceOrView,
+  c10::autograd_dispatch_keyset_with_ADInplaceOrView,
+  /*has_overlap=*/false);
+
 } // namespace at
