@@ -6,6 +6,7 @@ from typing import Dict
 
 import torch
 from torch import nn
+from torch.ao.utils import _module_to_fqn, _fqn_to_module
 from torch.nn.utils import parametrize
 
 from .utils import FakeSparsity
@@ -13,24 +14,6 @@ from .utils import FakeSparsity
 SUPPORTED_MODULES = {
     nn.Linear
 }
-
-def _module_to_fqn(model, layer, prefix=''):
-    for name, child in model.named_children():
-        new_name = prefix + '.' + name
-        if child is layer:
-            return new_name
-        child_path = _module_to_fqn(child, layer, prefix=new_name)
-        if child_path is not None:
-            return child_path
-    return None
-
-def _fqn_to_module(model, path):
-    path = path.split('.')
-    for name in path:
-        model = getattr(model, name, None)
-        if model is None:
-            return None
-    return model
 
 
 class BaseSparsifier(abc.ABC):
