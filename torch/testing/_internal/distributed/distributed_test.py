@@ -809,21 +809,21 @@ class DistributedTest:
             dist.broadcast(tensor, src=group[0], group=group_id)
             self.assertEqual(_build_tensor(2, value=0), tensor.to("cpu"))
 
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @require_world_size(3)
         @skip_if_lt_x_gpu(2)
         def test_backend_group(self):
             self._test_group_override_backend(self._init_group_test)
 
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(3)
         def test_backend_full_group(self):
             self._test_group_override_backend(self._init_full_group_test)
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "MPI backend does not support creating subgroups on CUDA devices",
         )
         @require_world_size(4)
@@ -841,7 +841,7 @@ class DistributedTest:
                 dist.destroy_process_group(subgroup)
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "MPI backend does not support creating subgroups on CUDA devices",
         )
         @skip_if_no_gpu
@@ -852,7 +852,7 @@ class DistributedTest:
                 dist.new_subgroups(100)
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "MPI backend does not support creating subgroups on CUDA devices",
         )
         @require_world_size(4)
@@ -864,7 +864,7 @@ class DistributedTest:
                 dist.new_subgroups(3)
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "MPI backend does not support creating subgroups on CUDA devices",
         )
         @require_world_size(4)
@@ -890,7 +890,7 @@ class DistributedTest:
                 dist.destroy_process_group(subgroup)
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "MPI backend does not support creating subgroups on CUDA devices",
         )
         @require_world_size(4)
@@ -910,7 +910,7 @@ class DistributedTest:
                 )
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "MPI backend does not support creating subgroups on CUDA devices",
         )
         @skip_if_no_gpu
@@ -926,7 +926,7 @@ class DistributedTest:
                 )
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "MPI backend does not support creating subgroups on CUDA devices",
         )
         @require_world_size(4)
@@ -941,7 +941,7 @@ class DistributedTest:
 
         # NCCL Batch SEND RECV
         @skip_if_no_gpu
-        @unittest.skipIf(BACKEND != "nccl", "NCCL Batch Send Recv Only")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "NCCL Batch Send Recv Only")
         @requires_nccl_version(2700, "Need NCCL 2.7+ for send/recv")
         def test_batch_isend_irecv_nccl(self):
             self._barrier()
@@ -968,7 +968,7 @@ class DistributedTest:
             self._barrier()
 
         @skip_if_no_gpu
-        @unittest.skipIf(BACKEND != "nccl", "NCCL Batch Send Recv Only")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "NCCL Batch Send Recv Only")
         @requires_nccl_version(2700, "Need NCCL 2.7+ for send/recv")
         def test_batch_isend_irecv_self_nccl(self):
             self._barrier()
@@ -993,7 +993,7 @@ class DistributedTest:
 
         @skip_if_no_gpu
         @skip_if_small_worldsize
-        @unittest.skipIf(BACKEND != "nccl", "NCCL Batch Send Recv Only")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "NCCL Batch Send Recv Only")
         @requires_nccl_version(2700, "Need NCCL 2.7+ for send/recv")
         def test_batch_isend_irecv_no_rank_zero_nccl(self):
             self._barrier()
@@ -1069,7 +1069,7 @@ class DistributedTest:
             self._barrier()
 
         # NCCL Batch SEND RECV Tensor Error
-        @unittest.skipIf(BACKEND != "nccl", "NCCL Batch Send Recv Only")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "NCCL Batch Send Recv Only")
         @requires_nccl_version(2700, "Need NCCL 2.7+ for send/recv")
         def test_batch_isend_irecv_tensor_err(self):
             self._barrier()
@@ -1086,7 +1086,7 @@ class DistributedTest:
                     req.wait()
 
         # NCCL Batch SEND RECV Op Error
-        @unittest.skipIf(BACKEND != "nccl", "NCCL Batch Send Recv Only")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "NCCL Batch Send Recv Only")
         @requires_nccl_version(2700, "Need NCCL 2.7+ for send/recv")
         def test_batch_isend_irecv_op_err(self):
             self._barrier()
@@ -1101,7 +1101,7 @@ class DistributedTest:
                     req.wait()
 
         # NCCL Batch SEND RECV p2p_op_list Error
-        @unittest.skipIf(BACKEND != "nccl", "NCCL Batch Send Recv Only")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "NCCL Batch Send Recv Only")
         @requires_nccl_version(2700, "Need NCCL 2.7+ for send/recv")
         def test_batch_isend_irecv_op_list_err(self):
             self._barrier()
@@ -1115,7 +1115,7 @@ class DistributedTest:
                     req.wait()
 
         # NCCL Batch SEND RECV Mixed Backend Error
-        @unittest.skipIf(BACKEND != "nccl", "NCCL Batch Send Recv Only")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "NCCL Batch Send Recv Only")
         @requires_nccl_version(2700, "Need NCCL 2.7+ for send/recv")
         def test_batch_isend_irecv_mixed_backend_err(self):
             self._barrier()
@@ -1136,7 +1136,7 @@ class DistributedTest:
 
         # NCCL SEND RECV
         @skip_if_no_gpu
-        @unittest.skipIf(BACKEND != "nccl", "NCCL Send Recv Only")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "NCCL Send Recv Only")
         @requires_nccl_version(2700, "Need NCCL 2.7+ for send/recv")
         def _test_send_recv_nccl(self, profiler_ctx=None):
             # TODO: now that nccl send/recv is supported, there does not seem to
@@ -1182,20 +1182,20 @@ class DistributedTest:
                             self.assertTrue(event.input_shapes in expected_shapes)
 
         @skip_if_no_gpu
-        @unittest.skipIf(BACKEND != "nccl", "NCCL Send Recv Only")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "NCCL Send Recv Only")
         @requires_nccl_version(2700, "Need NCCL 2.7+ for send/recv")
         def test_send_recv_nccl(self):
             self._test_send_recv_nccl()
 
         @skip_if_no_gpu
-        @unittest.skipIf(BACKEND != "nccl", "NCCL Send Recv Only")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "NCCL Send Recv Only")
         @requires_nccl_version(2700, "Need NCCL 2.7+ for send/recv")
         def test_send_recv_nccl_autograd_profiler(self):
             profiler_ctx = torch.autograd.profiler.profile(record_shapes=True)
             self._test_send_recv_nccl(profiler_ctx)
 
         @skip_if_no_gpu
-        @unittest.skipIf(BACKEND != "nccl", "NCCL Send Recv Only")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "NCCL Send Recv Only")
         @requires_nccl_version(2700, "Need NCCL 2.7+ for send/recv")
         @unittest.skipIf(IS_FBCODE, "Kineto in fbcode causes hang")
         @unittest.skipIf(
@@ -1609,7 +1609,7 @@ class DistributedTest:
             self._test_broadcast_helper(group, group_id, rank)
 
         @unittest.skipIf(
-            BACKEND != "gloo" and BACKEND != "nccl",
+            BACKEND != "gloo" and BACKEND != "nccl" and BACKEND != "ucc",
             "Only Gloo and Nccl backend supports CUDA allReduce",
         )
         @skip_if_no_gpu
@@ -1701,7 +1701,7 @@ class DistributedTest:
                 2 + (10 * (len(group) - 1)),
             )
 
-        @unittest.skipIf(BACKEND != "nccl", "Only Nccl supports CUDA reduce")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl supports CUDA reduce")
         @skip_if_no_gpu
         def test_reduce_sum_cuda(self):
             group, group_id, rank = self._init_global_test()
@@ -1886,7 +1886,7 @@ class DistributedTest:
                 2 + (10 * (len(group) - 1)),
             )
 
-        @unittest.skipIf(BACKEND != "nccl", "Only Nccl supports CUDA reduce")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl supports CUDA reduce")
         @skip_if_no_gpu
         def test_reduce_sum_cuda_twice(self):
             group, group_id, rank = self._init_global_test()
@@ -1906,7 +1906,7 @@ class DistributedTest:
             )
 
         @skip_if_no_gpu
-        @require_backend({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
         def test_all_reduce_result_cuda(self):
             group, group_id, rank = self._init_global_test()
             rank_to_GPU = self._init_multigpu_helper()
@@ -2089,7 +2089,7 @@ class DistributedTest:
             )
 
         @unittest.skipIf(
-            BACKEND != "gloo" and BACKEND != "nccl",
+            BACKEND != "gloo" and BACKEND != "nccl" and BACKEND != "ucc",
             "Only Gloo and NCCL backends will have CUDA allReduce tested",
         )
         @skip_if_no_gpu
@@ -2110,7 +2110,7 @@ class DistributedTest:
             )
 
         @unittest.skipIf(
-            BACKEND != "gloo" and BACKEND != "nccl",
+            BACKEND != "gloo" and BACKEND != "nccl" and BACKEND != "ucc",
             "Only Gloo and NCCL backends will have CUDA allReduce tested",
         )
         @skip_if_no_gpu
@@ -2165,7 +2165,7 @@ class DistributedTest:
                     )
 
         @unittest.skipIf(
-            BACKEND != "gloo" and BACKEND != "nccl",
+            BACKEND != "gloo" and BACKEND != "nccl" and BACKEND != "ucc",
             "Only Gloo and NCCL backends will have CUDA allReduce tested",
         )
         @skip_if_no_gpu
@@ -2701,7 +2701,7 @@ class DistributedTest:
             group, group_id, rank = self._init_global_test()
             self._test_all_gather_helper(group, group_id, rank)
 
-        @unittest.skipIf(BACKEND != "nccl", "Only Nccl supports CUDA all gather")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl supports CUDA all gather")
         @unittest.skipIf(BACKEND == "nccl", "CUDA all gather skipped for NCCL")
         @skip_if_no_gpu
         def test_all_gather_cuda(self):
@@ -2714,7 +2714,7 @@ class DistributedTest:
             group, group_id, rank = self._init_global_test()
             self._test_all_gather_helper(group, group_id, rank, dtype=torch.cfloat)
 
-        @unittest.skipIf(BACKEND != "nccl", "Only Nccl supports CUDA all gather")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl supports CUDA all gather")
         @unittest.skipIf(BACKEND == "nccl", "CUDA all gather skipped for NCCL")
         @skip_if_no_gpu
         def test_all_gather_cuda_complex(self):
@@ -2965,7 +2965,7 @@ class DistributedTest:
             group, group_id, rank = self._init_global_test()
             self._test_all_to_all_single_equal_split_helper(group, group_id, rank)
 
-        @unittest.skipIf(BACKEND != "nccl", "Only Nccl supports CUDA all_to_all_single")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl supports CUDA all_to_all_single")
         @skip_if_no_gpu
         def test_all_to_all_single_equal_split_cuda(self):
             group, group_id, rank = self._init_global_test()
@@ -2983,7 +2983,7 @@ class DistributedTest:
             group, group_id, rank = self._init_global_test()
             self._test_all_to_all_single_unequal_split_helper(group, group_id, rank)
 
-        @unittest.skipIf(BACKEND != "nccl", "Only Nccl supports CUDA all_to_all_single")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl supports CUDA all_to_all_single")
         @skip_if_no_gpu
         def test_all_to_all_single_unequal_split_cuda(self):
             group, group_id, rank = self._init_global_test()
@@ -3001,7 +3001,7 @@ class DistributedTest:
             group, group_id, rank = self._init_global_test()
             self._test_all_to_all_helper(group, group_id, rank)
 
-        @unittest.skipIf(BACKEND != "nccl", "Only NCCL supports CUDA all_to_all")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only NCCL supports CUDA all_to_all")
         @skip_if_rocm
         def test_all_to_all_cuda(self):
             group, group_id, rank = self._init_global_test()
@@ -3014,7 +3014,7 @@ class DistributedTest:
             group, group_id, rank = self._init_group_test()
             self._test_all_to_all_single_equal_split_helper(group, group_id, rank)
 
-        @unittest.skipIf(BACKEND != "nccl", "Only Nccl supports CUDA all_to_all_single")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl supports CUDA all_to_all_single")
         @skip_if_no_gpu
         @skip_if_small_worldsize
         def test_all_to_all_single_equal_split_group_cuda(self):
@@ -3034,7 +3034,7 @@ class DistributedTest:
             group, group_id, rank = self._init_group_test()
             self._test_all_to_all_single_unequal_split_helper(group, group_id, rank)
 
-        @unittest.skipIf(BACKEND != "nccl", "Only Nccl supports CUDA all_to_all_single")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl supports CUDA all_to_all_single")
         @skip_if_no_gpu
         @skip_if_small_worldsize
         def test_all_to_all_single_unequal_split_group_cuda(self):
@@ -3054,7 +3054,7 @@ class DistributedTest:
             group, group_id, rank = self._init_group_test()
             self._test_all_to_all_helper(group, group_id, rank)
 
-        @unittest.skipIf(BACKEND != "nccl", "Only Nccl supports CUDA all_to_all_single")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl supports CUDA all_to_all_single")
         @skip_if_small_worldsize
         @skip_if_rocm
         def test_all_to_all_group_cuda(self):
@@ -3067,7 +3067,7 @@ class DistributedTest:
             group, group_id, rank = self._init_full_group_test()
             self._test_all_to_all_single_equal_split_helper(group, group_id, rank)
 
-        @unittest.skipIf(BACKEND != "nccl", "Only Nccl supports CUDA all_to_all_single")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl supports CUDA all_to_all_single")
         @skip_if_no_gpu
         def test_all_to_all_single_equal_split_full_group_cuda(self):
             group, group_id, rank = self._init_full_group_test()
@@ -3085,7 +3085,7 @@ class DistributedTest:
             group, group_id, rank = self._init_full_group_test()
             self._test_all_to_all_single_unequal_split_helper(group, group_id, rank)
 
-        @unittest.skipIf(BACKEND != "nccl", "Only Nccl supports CUDA all_to_all_single")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl supports CUDA all_to_all_single")
         @skip_if_no_gpu
         def test_all_to_all_single_unequal_split_full_group_cuda(self):
             group, group_id, rank = self._init_full_group_test()
@@ -3103,7 +3103,7 @@ class DistributedTest:
             group, group_id, rank = self._init_full_group_test()
             self._test_all_to_all_helper(group, group_id, rank)
 
-        @unittest.skipIf(BACKEND != "nccl", "Only NCCL supports CUDA all_to_all")
+        @unittest.skipIf(BACKEND != "nccl" and BACKEND != "ucc", "Only NCCL supports CUDA all_to_all")
         @skip_if_rocm
         def test_all_to_all_full_group_cuda(self):
             group, group_id, rank = self._init_full_group_test()
@@ -3306,7 +3306,7 @@ class DistributedTest:
             self._barrier()
 
         @unittest.skipIf(
-            BACKEND != "nccl", "Only Nccl backend supports reduce multigpu"
+            BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl backend supports reduce multigpu"
         )
         @skip_if_no_gpu
         def test_reduce_multigpu(self):
@@ -3367,7 +3367,7 @@ class DistributedTest:
             self._barrier()
 
         @unittest.skipIf(
-            BACKEND != "nccl", "Only Nccl backend supports allgather multigpu"
+            BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl backend supports allgather multigpu"
         )
         @skip_if_no_gpu
         def test_all_gather_multigpu(self):
@@ -3378,7 +3378,7 @@ class DistributedTest:
             self._test_all_gather_multigpu_helper(group, group_id, rank, rank_to_GPU)
 
         @unittest.skipIf(
-            BACKEND != "nccl", "Only Nccl backend supports allgather multigpu"
+            BACKEND != "nccl" and BACKEND != "ucc", "Only Nccl backend supports allgather multigpu"
         )
         @skip_if_no_gpu
         def test_all_gather_multigpu_complex(self):
@@ -3599,7 +3599,7 @@ class DistributedTest:
             self._test_DistributedDataParallelCPU(gradient_as_bucket_view=True)
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         def test_DistributedDataParallel_requires_grad(self):
@@ -3610,7 +3610,7 @@ class DistributedTest:
             self._barrier()
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only NCCL and GLOO backend support DistributedDataParallel",
         )
         @skip_if_lt_x_gpu(int(os.environ["WORLD_SIZE"]))
@@ -3649,7 +3649,7 @@ class DistributedTest:
                     )
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "MPI backend does not support DDP communication hook on CUDA devices",
         )
         @skip_if_lt_x_gpu(int(os.environ["WORLD_SIZE"]))
@@ -3776,7 +3776,7 @@ class DistributedTest:
                 )
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "MPI backend does not support DDP communication hook on CUDA devices",
         )
         @skip_if_lt_x_gpu(int(os.environ["WORLD_SIZE"]))
@@ -3785,7 +3785,7 @@ class DistributedTest:
             self._test_ddp_hook_parity(state=None, hook=default.allreduce_hook)
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "MPI backend does not support DDP communication hook on CUDA devices",
         )
         @skip_if_lt_x_gpu(int(os.environ["WORLD_SIZE"]))
@@ -3798,7 +3798,7 @@ class DistributedTest:
             self._test_ddp_hook_parity(state=process_group, hook=default.allreduce_hook)
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "MPI backend does not support DDP communication hook on CUDA devices",
         )
         @skip_if_lt_x_gpu(int(os.environ["WORLD_SIZE"]))
@@ -3940,7 +3940,7 @@ class DistributedTest:
                 input = input[torch.randperm(global_batch_size)]
 
         @unittest.skipIf(
-            BACKEND != "mpi" and BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "mpi" and BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "get_future is only supported on mpi, nccl and gloo",
         )
         @nccl_skip_if_lt_x_gpu(BACKEND, 2)
@@ -3951,7 +3951,7 @@ class DistributedTest:
             self._test_accumulate_gradients_no_sync()
 
         @unittest.skipIf(
-            BACKEND != "mpi" and BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "mpi" and BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "get_future is only supported on mpi, nccl and gloo",
         )
         @nccl_skip_if_lt_x_gpu(BACKEND, 2)
@@ -3962,7 +3962,7 @@ class DistributedTest:
             self._test_accumulate_gradients_no_sync(gradient_as_bucket_view=True)
 
         @unittest.skipIf(
-            BACKEND != "mpi" and BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "mpi" and BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "get_future is only supported on mpi, nccl and gloo",
         )
         @nccl_skip_if_lt_x_gpu(BACKEND, 2)
@@ -3986,7 +3986,7 @@ class DistributedTest:
             )
 
         @unittest.skipIf(
-            BACKEND != "mpi" and BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "mpi" and BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "get_future is only supported on mpi, nccl and gloo",
         )
         @nccl_skip_if_lt_x_gpu(BACKEND, 2)
@@ -4020,7 +4020,7 @@ class DistributedTest:
             )
 
         @unittest.skipIf(
-            BACKEND != "mpi" and BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "mpi" and BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "get_future is only supported on mpi, nccl and gloo",
         )
         @nccl_skip_if_lt_x_gpu(BACKEND, 2)
@@ -4044,7 +4044,7 @@ class DistributedTest:
             self.assertEqual(res[0], expected)
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_no_gpu
@@ -4138,7 +4138,7 @@ class DistributedTest:
             return ddp_model
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_no_gpu
@@ -4216,7 +4216,7 @@ class DistributedTest:
             self._barrier()
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_no_gpu
@@ -4264,7 +4264,7 @@ class DistributedTest:
             self._barrier()
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_no_gpu
@@ -4310,7 +4310,7 @@ class DistributedTest:
             )
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_no_gpu
@@ -4336,7 +4336,7 @@ class DistributedTest:
             )
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_no_gpu
@@ -4383,7 +4383,7 @@ class DistributedTest:
                 self._barrier()
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_no_gpu
@@ -4431,7 +4431,7 @@ class DistributedTest:
                 self._barrier()
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_no_gpu
@@ -4475,7 +4475,7 @@ class DistributedTest:
             torch.testing.assert_allclose(running_var, all_input_var.var(1))
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_no_gpu
@@ -4686,7 +4686,7 @@ class DistributedTest:
             self.assertEqual(ddp_logging_data.get("dtypes"), "double, float")
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_no_gpu
@@ -4869,7 +4869,7 @@ class DistributedTest:
                 self.assertEqual(tensor, expected)
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only NCCL and GLOO backend support DistributedDataParallel",
         )
         @skip_if_lt_x_gpu(int(os.environ["WORLD_SIZE"]))
@@ -4951,7 +4951,7 @@ class DistributedTest:
             self.assertEqual(len(indices_list), local_num_samples)
             validate_global_samples(local_num_samples)
 
-        @require_backend({"nccl", "gloo"})
+        @require_backend({"nccl", "gloo", "ucc"})
         @require_n_gpus_for_nccl_backend(
             int(os.environ["WORLD_SIZE"]), os.environ["BACKEND"]
         )
@@ -5054,7 +5054,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only NCCL and GLOO backend support DistributedDataParallel",
         )
         def test_ddp_sync_params_and_buffers(self):
@@ -5097,7 +5097,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only NCCL and GLOO backend support DistributedDataParallel",
         )
         def test_ddp_grad_div_uneven_inputs(self):
@@ -5213,15 +5213,15 @@ class DistributedTest:
             events = get_profiling_event("search_unused_parameters", prof)
             self.assertEqual(len(events), 1)
 
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_ddp_profiling_autograd_profiler(self):
             autograd_profiler_ctx = torch.autograd.profiler.profile()
             return self._test_ddp_profiling(profiler_ctx=autograd_profiler_ctx)
 
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(IS_FBCODE, "Kineto in fbcode code causes hang")
         @unittest.skipIf(
@@ -5236,7 +5236,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only NCCL and GLOO backend support DistributedDataParallel",
         )
         def test_ddp_join_model_equivalence(self):
@@ -5390,7 +5390,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only NCCL and GLOO backend support DistributedDataParallel",
         )
         def test_ddp_uneven_inputs_stop_iteration_sync_bn(self):
@@ -5449,7 +5449,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only NCCL and GLOO backend support DistributedDataParallel",
         )
         def test_ddp_uneven_inputs(self):
@@ -5616,7 +5616,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only NCCL and GLOO backend support DistributedDataParallel",
         )
         def test_ddp_uneven_input_join_disable(self):
@@ -5650,7 +5650,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only NCCL and GLOO backend support DistributedDataParallel",
         )
         def test_ddp_uneven_input_exception(self):
@@ -5677,7 +5677,7 @@ class DistributedTest:
                     loss = out.sum()
                     loss.backward()
 
-        @require_backend({"nccl", "gloo"})
+        @require_backend({"nccl", "gloo", "ucc"})
         @require_n_gpus_for_nccl_backend(
             int(os.environ["WORLD_SIZE"]), os.environ["BACKEND"]
         )
@@ -5801,16 +5801,16 @@ class DistributedTest:
                 # isolate failure hangs.
                 torch.cuda.synchronize(device=self.rank)
 
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_ddp_ignore_params_arg(self):
             self._test_ddp_ignore_params_arg(static_graph=False)
             self._test_ddp_ignore_params_arg(static_graph=True)
 
         @with_dist_debug_levels(levels=["OFF", "INFO", "DETAIL"])
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_ddp_unused_params_rebuild_buckets_exception(self):
             class ToyModel(nn.Module):
@@ -5862,8 +5862,8 @@ class DistributedTest:
 
             dist.barrier()
 
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_ddp_shared_grad_acc_unused_params(self):
             # When find_unused_parameters=True, ensure we mark unused parameters
@@ -5894,8 +5894,8 @@ class DistributedTest:
                 loss = out.sum()
                 loss.backward()
 
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_ddp_device(self):
             m = nn.Linear(10, 10).to(self.rank)
@@ -5999,8 +5999,8 @@ class DistributedTest:
             }
             train_iter(inp, type(inp))
 
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_ddp_namedtuple(self):
             batch = 5
@@ -6036,8 +6036,8 @@ class DistributedTest:
             model(inp, type(inp))
 
         @with_dist_debug_levels(levels=["OFF", "INFO", "DETAIL"])
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_ddp_control_flow_same_across_ranks(self):
             # Control flow that is the same across ranks.
@@ -6119,8 +6119,8 @@ class DistributedTest:
 
             dist.barrier()
 
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_invalid_static_graph(self):
             world_size = dist.get_world_size()
@@ -6165,8 +6165,8 @@ class DistributedTest:
             verify_ddp_error_logged(model, "Expected to have finished reduction")
 
         @with_dist_debug_levels(levels=["OFF", "INFO", "DETAIL"])
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_ddp_control_flow_different_across_ranks(self):
             # Control flow that is different across ranks.
@@ -6300,8 +6300,8 @@ class DistributedTest:
             ):
                 dist.scatter_object_list([], scatter_list, src=src_rank)
 
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         @skip_if_rocm
         def test_ddp_model_diff_across_ranks(self):
@@ -6427,7 +6427,7 @@ class DistributedTest:
             dist.barrier()
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_lt_x_gpu(2)
@@ -6437,7 +6437,7 @@ class DistributedTest:
                 self._test_output_unused_in_loss(module_cls, grad_as_bucket_view)
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_lt_x_gpu(2)
@@ -6447,7 +6447,7 @@ class DistributedTest:
                 self._test_output_unused_in_loss(module_cls, grad_as_bucket_view)
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_lt_x_gpu(2)
@@ -6515,8 +6515,8 @@ class DistributedTest:
                 loss.backward()
             return ddp_model
 
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_different_graph_across_ranks(self):
             base_model = self._test_different_graph_across_ranks(
@@ -6646,8 +6646,8 @@ class DistributedTest:
                     )
 
         @with_nccl_blocking_wait
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_rocm
         @skip_if_lt_x_gpu(int(os.environ["WORLD_SIZE"]))
         def test_monitored_barrier_allreduce_hang(self):
@@ -6656,8 +6656,8 @@ class DistributedTest:
             self._test_monitored_barrier_allreduce_hang(wait_all_ranks=False)
 
         @with_nccl_blocking_wait
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_rocm
         @skip_if_lt_x_gpu(int(os.environ["WORLD_SIZE"]))
         def test_monitored_barrier_allreduce_hang_wait_all_ranks(self):
@@ -6720,8 +6720,8 @@ class DistributedTest:
                 with self.assertRaisesRegex(RuntimeError, err_regex):
                     dist.monitored_barrier(timeout=timeout, wait_all_ranks=True)
 
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_ddp_build_param_to_name_mapping(self):
             model = TwoLinLayerNet()
@@ -6784,7 +6784,7 @@ class DistributedTest:
             )
 
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         @skip_if_lt_x_gpu(2)
@@ -6928,22 +6928,22 @@ class DistributedTest:
                         self.assertTrue(False, "Expected error was not raised!")
 
         @with_dist_debug_levels(levels=["OFF", "INFO", "DETAIL"])
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_ddp_multiple_nested_unused_params_error(self):
             self._test_ddp_multiple_nested_unused_params_error(ignore_sparse=False)
 
         @with_dist_debug_levels(levels=["OFF", "INFO", "DETAIL"])
-        @require_backend({"gloo", "nccl"})
-        @require_backends_available({"gloo", "nccl"})
+        @require_backend({"gloo", "nccl", "ucc"})
+        @require_backends_available({"gloo", "nccl", "ucc"})
         @skip_if_lt_x_gpu(2)
         def test_ddp_multiple_nested_unused_params_err_ignore_params(self):
             # Tests unused parameter reporting when DDP is configured to ignore
             # certain parameters.
             self._test_ddp_multiple_nested_unused_params_error(ignore_sparse=True)
 
-        @unittest.skipIf(BACKEND != 'nccl' and BACKEND != 'gloo',
+        @unittest.skipIf(BACKEND != 'nccl' and BACKEND != 'gloo' and BACKEND != 'ucc',
                          "Only Nccl & Gloo backend support DistributedDataParallel")
         @skip_if_lt_x_gpu(2)
         def test_ddp_inference(self):
@@ -6993,7 +6993,7 @@ class DistributedTest:
             self._barrier(timeout=30)
 
 
-        @unittest.skipIf(BACKEND != 'nccl' and BACKEND != 'gloo',
+        @unittest.skipIf(BACKEND != 'nccl' and BACKEND != 'gloo' and BACKEND != 'ucc',
                          "Only Nccl & Gloo backend support DistributedDataParallel")
         @skip_if_lt_x_gpu(2)
         def test_ddp_sync_bn_training_vs_eval(self):
@@ -7042,7 +7042,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         def test_ddp_python_error_logged(self):
@@ -7063,7 +7063,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         def test_ddp_static_graph_nested_types(self):
@@ -7215,7 +7215,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         def test_ddp_bwd_with_retain_graph(self):
@@ -7225,7 +7225,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         def test_ddp_bwd_with_retain_graph_find_unused_params(self):
@@ -7235,7 +7235,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         def test_ddp_bwd_with_retain_graph_static(self):
@@ -7245,7 +7245,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         def test_ddp_bwd_with_retain_graph_static_find_unused_params(self):
@@ -7255,7 +7255,7 @@ class DistributedTest:
 
         @skip_if_lt_x_gpu(2)
         @unittest.skipIf(
-            BACKEND != "nccl" and BACKEND != "gloo",
+            BACKEND != "nccl" and BACKEND != "gloo" and BACKEND != "ucc",
             "Only Nccl & Gloo backend support DistributedDataParallel",
         )
         def test_ddp_bwd_with_retain_graph_static_single_fwd(self):
