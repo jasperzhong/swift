@@ -17,8 +17,8 @@
 #include <memory>
 #include <mutex>
 #include <queue>
-#include <vector>
 #include <thread>
+#include <vector>
 
 // #include <pybind11/chrono.h>
 
@@ -77,26 +77,19 @@ namespace c10d {
   } while (0)
 
 #ifdef USE_CUDA
-#define SAVE_TENSOR(_TENSOR, _DATA)                 \
-  if ((_TENSOR).device().is_cuda()) {               \
-    c10::cuda::CUDACachingAllocator::recordStream(  \
-        (_TENSOR).storage().data_ptr(), (*stream)); \
-  } else {                                          \
-    (_DATA) = {(_TENSOR)};                          \
-  }
+#define SAVE_TENSORS(_TENSORS, _DATA)                       \
+  do {                                                      \
+    if ((_TENSORS)[0].device().is_cuda()) {                 \
+      for (const auto i : c10::irange((_TENSORS).size())) { \
+        c10::cuda::CUDACachingAllocator::recordStream(      \
+            (_TENSORS)[i].storage().data_ptr(), (*stream)); \
+      }                                                     \
+    } else {                                                \
+      (_DATA) = (_TENSORS);                                 \
+    }                                                       \
+  } while (0)
 
-#define SAVE_TENSORS(_TENSORS, _DATA)                     \
-  if ((_TENSORS)[0].device().is_cuda()) {                 \
-    for (const auto i : c10::irange((_TENSORS).size())) { \
-      c10::cuda::CUDACachingAllocator::recordStream(      \
-          (_TENSORS)[i].storage().data_ptr(), (*stream)); \
-    }                                                     \
-  } else {                                                \
-    (_DATA) = (_TENSORS);                                 \
-  }
 #else
-#define SAVE_TENSOR(_TENSOR, _DATA) (_DATA) = {(_TENSOR)};
-
 #define SAVE_TENSORS(_TENSORS, _DATA) (_DATA) = (_TENSORS);
 #endif
 
@@ -136,8 +129,8 @@ class TORCH_API ProcessGroupUCC : public ProcessGroup {
   class AllgatherWorkData : public WorkData {
    public:
     AllgatherWorkData(int size)
-        : recv_lengths(size),
-          recv_offsets(size) {}
+      : recv_lengths(size),
+        recv_offsets(size) {}
     std::vector<uint64_t> recv_lengths;
     std::vector<uint64_t> recv_offsets;
   };
@@ -162,6 +155,8 @@ class TORCH_API ProcessGroupUCC : public ProcessGroup {
     bool isSuccess() const override;
     bool wait(std::chrono::milliseconds timeout = kUnsetTimeout) override;
     void finalize();
+    void finishWorkUCC();
+    void finishWorkUCCError(std::exception_ptr eptr);
     std::unique_ptr<WorkData> data;
     c10::intrusive_ptr<c10::ivalue::Future> getFuture() override;
 #ifdef USE_CUDA
@@ -172,11 +167,8 @@ class TORCH_API ProcessGroupUCC : public ProcessGroup {
     ucc_status_t status_;
     ucc_coll_req_h request_;
     CommBase* comm_;
-  private:
-    // Store a reference to collective's outputs, used by result and to
-    // give a more descriptive message when representing the Work as a string.
-    std::shared_ptr<std::vector<at::Tensor>> outputs_;
 
+   private:
     // The future returned by getFuture.
     c10::intrusive_ptr<at::ivalue::Future> future_;
   };

@@ -138,6 +138,22 @@ bool ProcessGroupUCC::WorkUCC::wait(std::chrono::milliseconds /* unused */) {
   return true;
 }
 
+void ProcessGroupUCC::WorkUCC::finishWorkUCCError(std::exception_ptr eptr) {
+  future_->setError(eptr);
+  finish(eptr);
+}
+
+void ProcessGroupUCC::WorkUCC::finishWorkUCC() {
+  if (future_) {
+    if (!data || data->dst.size() == 0) {
+      future_->markCompleted(c10::IValue(std::vector<at::Tensor>()));
+    } else {
+      future_->markCompleted(c10::IValue(data->dst));
+    }
+  }
+  finish();
+}
+
 void ProcessGroupUCC::WorkUCC::finalize() {
   if (request_ != nullptr) {
     if (isP2POp(opType_)) {
@@ -149,6 +165,7 @@ void ProcessGroupUCC::WorkUCC::finalize() {
     status_ = UCC_OK;
     request_ = nullptr;
   }
+  finishWorkUCC();
 }
 
 c10::intrusive_ptr<c10::ivalue::Future> ProcessGroupUCC::WorkUCC::
@@ -433,7 +450,6 @@ c10::intrusive_ptr<ProcessGroupUCC::WorkUCC> CommPG::enqueue_cuda_collective(
   ucc_ee_ack_event(ee, post_ev);
   auto work = c10::make_intrusive<ProcessGroupUCC::WorkUCC>(
       opType, UCC_INPROGRESS, request, ee, &ucc_comm);
-  work->outputs_ = std::make_shared<std::vector<at::Tensor>>(data->src);
   work->data = std::move(data);
   work->ep = ep;
   cuda_ev->record(stream);
@@ -466,12 +482,16 @@ void CommPG::progress_loop() {
       device_set = true;
     }
 #endif
-    while (work->request_->status > 0) {
-      // operation initialized is in progress or
-      work->comm_->progress();
+    try {
+      while (work->request_->status > 0) {
+        // operation initialized is in progress or
+        work->comm_->progress();
+      }
+      work->finalize();
+      work->data.reset();
+    } catch (...) {
+      work->finishWorkUCCError(std::current_exception());
     }
-    work->finalize();
-    work->data.reset();
     lock.lock();
   }
 }
@@ -510,6 +530,7 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupUCC::collective_post(
     ucc_coll_args_t& coll,
     std::unique_ptr<ProcessGroupUCC::WorkData> data,
     c10::Device dev) {
+  c10::intrusive_ptr<ProcessGroupUCC::WorkUCC> work;
 #ifdef USE_CUDA
   if (dev.is_cuda()) {
         std::unique_ptr<at::cuda::CUDAEvent> cuda_ev;
@@ -524,31 +545,26 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupUCC::collective_post(
         }
     cuda_ev->record(at::cuda::getCurrentCUDAStream(dev.index()));
     cuda_ev->block(*stream);
-    auto work = comm->enqueue_cuda_collective(opType, coll, std::move(data),
+    work = comm->enqueue_cuda_collective(opType, coll, std::move(data),
                                     team, cuda_ee, std::move(cuda_ev), *stream, &ep);
 
-    // Future only needs to be created and marked completed with outputs
     {
       c10::cuda::CUDAMultiStreamGuard streamGuard(*stream);
       std::vector<c10::Device> devList{dev};
       work->future_ = c10::make_intrusive<at::ivalue::Future>(
           c10::ListType::create(c10::TensorType::get()),
           devList);
-      work->future_->markCompleted(at::IValue(*work->outputs_));
     }
 
-    // Add a callback that runs profiling end callbacks. wrapCallback() in CUDA
-    // future blocks the stream this callback runs on the corresponding
-    // cudaEvents_ ensuring appropriate synchronization.
-    if (work->recordFunctionEndCallback_) {
-      work->future_->addCallback(
-          [work](at::ivalue::Future& /* unused */) { work->recordFunctionEndCallback_(); });
-    }
-
-    return work;
-  }
+  } else
 #endif
-  return comm->enqueue_collective(opType, coll, std::move(data), team);
+  {
+    work = comm->enqueue_collective(opType, coll, std::move(data), team);
+    work->future_ = c10::make_intrusive<at::ivalue::Future>(
+          c10::ListType::create(c10::TensorType::get()));
+  }
+
+  return work;
 }
 
 c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupUCC::allgather(
@@ -618,7 +634,7 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupUCC::allreduce(
   coll.dst.info.count = tensor.numel();
   coll.dst.info.datatype = ucc_dtype_map.at(tensor.scalar_type());
   coll.dst.info.mem_type = ucc_mtype_map.at(tensor.device().type());
-  SAVE_TENSORS(tensors, data->src);
+  SAVE_TENSORS(tensors, data->dst);
 
   return collective_post(
       OpType::ALLREDUCE,
@@ -696,8 +712,10 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupUCC::alltoall_base(
     coll.flags = UCC_COLL_ARGS_FLAG_CONTIG_SRC_BUFFER |
                  UCC_COLL_ARGS_FLAG_CONTIG_DST_BUFFER;
   }
-  SAVE_TENSOR(inputTensor, data->src);
-  SAVE_TENSOR(outputTensor, data->dst);
+  std::vector<at::Tensor> inputTensors = {inputTensor};
+  std::vector<at::Tensor> outputTensors = {outputTensor};
+  SAVE_TENSORS(inputTensors, data->src);
+  SAVE_TENSORS(outputTensors, data->dst);
 
   return collective_post(
       OpType::ALLTOALL_BASE,
@@ -732,7 +750,7 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupUCC::broadcast(
   coll.src.info.datatype = ucc_dtype_map.at(tensor.scalar_type());
   coll.src.info.mem_type = ucc_mtype_map.at(tensor.device().type());
   coll.root = opts.rootRank;
-  SAVE_TENSORS(tensors, data->src);
+  SAVE_TENSORS(tensors, data->dst);
 
   return collective_post(
       OpType::BROADCAST,
