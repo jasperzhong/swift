@@ -1,10 +1,87 @@
-from torch.testing._internal.common_utils import run_tests
+from torch.testing._internal.common_utils import run_tests, IS_IN_CI
 
 import torch
 import unittest
+import urllib.request
+import io
+import zipfile
+import pathlib
+import sys
+import textwrap
+import subprocess
+import os
+
+
+from typing import Set
+
+
+PR_BODY = os.getenv("GITHUB_PR_BODY", None)
+
+
+def parse_api_list(api_list: str) -> Set[str]:
+    return set(api_list.strip().split("\n"))
+
+
+def fetch_master_python_apis() -> Set[str]:
+    APIS_URL = "https://gha-artifacts.s3.amazonaws.com/pytorch/pytorch/ci/apis.zip"
+
+    with urllib.request.urlopen(APIS_URL) as f:
+        zip_buf = io.BytesIO(f.read())
+
+    with zipfile.ZipFile(zip_buf) as f:
+        return parse_api_list(f.read("apis.log").decode())
+
+
+def fetch_current_python_apis() -> Set[str]:
+    repo_dir = pathlib.Path(__file__).resolve().parent.parent
+    list_apis_script = repo_dir / "tools" / "linter" / "list_apis.py"
+    cmd = [sys.executable, str(list_apis_script), "--module", "torch", "--public"]
+    print(" ".join(cmd))
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    if proc.returncode != 0:
+        raise RuntimeError(f"Failed to generate APIs from local build: {proc.stderr}")
+
+    return parse_api_list(proc.stdout.decode())
+
 
 class TestPublicBindings(unittest.TestCase):
-    def test_no_new_bindings(self):
+    @unittest.skipIf(not IS_IN_CI or PR_BODY is None, "API bindings are only tested on PRs")
+    def test_no_new_python_bindings(self):
+        """
+        This implements https://github.com/pytorch/pytorch/issues/58617, which
+        will fail if the PR this runs on introduces new public APIs. A public
+        API is considered anything that is not a child of a system module (e.g.
+        'sys', 'typing', etc.) that is a child of the 'torch' module (e.g.
+        'torch.ones', 'torch.jit.script', etc.). Unlike the C bindings there are
+        several thousand Python API bindings, so we rely on a list stored in S3
+        and updated by a job on master in .github/templates/linux_ci_workflow.yml.j2
+
+        If this test is run on master or can't reach S3, it is a no-op.
+        """
+        try:
+            master_public_bindings = fetch_master_python_apis()
+            current_public_bindings = fetch_current_python_apis()
+        except Exception as e:
+            print(f"failed to check public Python APIs: {e}")
+            return
+
+        difference = master_public_bindings.symmetric_difference(current_public_bindings)
+        added = list(sorted(list(current_public_bindings - master_public_bindings)))[:10]
+        removed = list(sorted(list(master_public_bindings - current_public_bindings)))[:10]
+        msg = textwrap.dedent(f"""
+            These new public API(s) were added: {', '.join(added)}
+
+            These new public API(s) were removed: {', '.join(removed)}
+
+            To silence this error, add a release notes section to your PR body:
+
+                ### Release Notes
+                * the new feature""")
+
+        self.assertTrue(difference == set() or "### Release Notes" in PR_BODY, msg)
+
+    def test_no_new_c_bindings(self):
         """
         This test aims to stop the introduction of new JIT bindings into torch._C
         whose names do not start with _. Such bindings are made available as
