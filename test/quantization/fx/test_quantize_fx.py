@@ -3,6 +3,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torch.nn.quantized as nnq
 import torch.nn.quantized._reference as nnqr
+import torch.nn.intrinsic.quantized._reference as nniqr
 import torch.nn.quantized.dynamic as nnqd
 import torch.nn.intrinsic as nni
 import torch.nn.intrinsic.quantized as nniq
@@ -4659,3 +4660,83 @@ class TestQuantizeFxModels(QuantizationTestCase):
         model = models.__dict__[name](pretrained=True).eval().float()
         self._test_model_impl(
             'ddp', 'resnet18', model, eager_quantizable_model)
+
+    @skip_if_no_torchvision
+    def test_reference_resnet18_to_trt(self):
+        from torchvision import models
+        model = models.__dict__["resnet18"](pretrained=False).eval().float()
+
+        model = prepare_fx(model, {"": default_qconfig})
+        import copy
+        model_copy = copy.deepcopy(model)
+        model_reference = convert_fx(model, is_reference=True)
+
+        # convert directly, the default scale and zero_point will be 1 and 0, since we hardcoded these values in fx2trt convert as well
+        # we expect the output to match
+        model = convert_fx(model_copy)
+        data = torch.rand(1, 3, 224, 224)
+        input = (data,)
+        out = model(*input)
+        out_reference = model(*input)
+        print("converted:", model_reference)
+        print(torch.sum(out - out_reference))
+
+        from torch.fx.experimental.fx2trt.fx2trt import TRTInterpreter, InputTensorSpec, TRTModule
+        from typing import Tuple, Dict
+        import tensorrt as trt
+        from torch.quantization.fx.utils import create_getattr_from_value, _parent_name
+        
+        TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+
+        def expand_node(n: torch.fx.Node, model: torch.fx.GraphModule, modules: Dict[str, torch.nn.Module], load_arg, env):
+            if n.op == "call_module" and type(modules[n.target]) in [nnqr.Linear, nnqr.Conv2d, nniqr.ConvReLU2d]:
+                module = modules[n.target]
+                owning_graph = n.graph
+                with owning_graph.inserting_before(n):
+                    env[n.args[0].name] = owning_graph.call_method("dequantize", (n.args[0],), {})
+                    parent, child = _parent_name(n.target)
+                    setattr(modules[parent], child, module.to_float())
+                    output_node = owning_graph.create_node("call_module", n.target, load_arg(n.args), load_arg(n.kwargs))
+                    env[output_node.name] = output_node
+                    scale_node = create_getattr_from_value(modules[""], owning_graph, n.target + "_scale_", module.scale)
+                    env[scale_node.name] = scale_node
+                    zp_node = create_getattr_from_value(modules[""], owning_graph, n.target + "_zero_point_", module.zero_point)
+                    env[zp_node.name] = zp_node
+                    node_args = (output_node, scale_node, zp_node, torch.quint8)
+                    output_node = owning_graph.create_node("call_function", torch.quantize_per_tensor, load_arg(node_args), {})
+                    n.replace_all_uses_with(output_node)
+                    owning_graph.erase_node(n)
+                    model.graph = owning_graph
+                    return output_node
+            
+
+        def expand_reference_module(mod: torch.fx.GraphModule):
+            """ Expand reference quantized module to dequant - float module - quant
+            """
+            modules = dict(mod.named_modules())
+            env = {}
+            def load_arg(a):
+                return torch.fx.map_arg(a, lambda n: env[n.name])
+            
+            for node in mod.graph.nodes:
+                env[node.name] = expand_node(node, mod, modules, load_arg, env)
+            mod.graph.lint()
+            return mod
+
+
+        def lower_mod_to_trt(mod: torch.fx.GraphModule, inputs: Tuple[torch.Tensor]):
+            """
+            Helper function that given a GraphModule `mod` and its `inputs`, build a
+            TRTModule that runs the original `mod` on TensorRT.
+            """
+            mod = expand_reference_module(mod)
+            interp = TRTInterpreter(mod, InputTensorSpec.from_tensors(inputs))
+            engine, input_names, output_names = interp.run(int8_mode=True)
+            serialized_engine = engine.serialize()
+            return TRTModule(engine, input_names, output_names)
+
+        out_ref = model_reference(*input)
+        model_trt = lower_mod_to_trt(model_reference, input)
+        out_trt = model_trt(input[0].cuda())
+        torch.cuda.synchronize()
+        self.assertEqual(out_trt.cpu().float(), out_ref)
