@@ -3,6 +3,7 @@ import tempfile
 
 from torch.testing._internal.common_utils import TestCase, run_tests
 import tools.codegen.gen_backend_stubs
+from tools.codegen.gen import _GLOBAL_PARSE_NATIVE_YAML_CACHE
 
 path = os.path.dirname(os.path.realpath(__file__))
 gen_backend_stubs_path = os.path.join(path, '../tools/codegen/gen_backend_stubs.py')
@@ -10,6 +11,10 @@ gen_backend_stubs_path = os.path.join(path, '../tools/codegen/gen_backend_stubs.
 # gen_backend_stubs.py is an integration point that is called directly by external backends.
 # The tests here are to confirm that badly formed inputs result in reasonable error messages.
 class TestGenBackendStubs(TestCase):
+
+    def setUp(self):
+        # the codegen has a global cache that we need to reset between tests
+        tools.codegen.gen._GLOBAL_PARSE_NATIVE_YAML_CACHE.clear()
 
     def assert_success_from_gen_backend_stubs(self, yaml_str: str) -> str:
         with tempfile.NamedTemporaryFile(mode='w') as fp:
