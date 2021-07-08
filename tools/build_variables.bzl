@@ -339,8 +339,8 @@ libtorch_distributed_base_sources = [
     "torch/csrc/distributed/c10d/Store.cpp",
     "torch/csrc/distributed/c10d/TCPStore.cpp",
     "torch/csrc/distributed/c10d/Utils.cpp",
-    "torch/lib/c10d/torch_ucc.cpp",
-    "torch/lib/c10d/torch_ucc_comm.cpp",
+    "torch/csrc/distributed/c10d/torch_ucc.cpp",
+    "torch/csrc/distributed/c10d/torch_ucc_comm.cpp",
 ]
 
 # These files are only supported on Linux (and others) but not on Windows.
