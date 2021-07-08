@@ -155,10 +155,12 @@ class TORCH_API ProcessGroupUCC : public ProcessGroup {
     bool isSuccess() const override;
     bool wait(std::chrono::milliseconds timeout = kUnsetTimeout) override;
     void finalize();
+    std::unique_ptr<WorkData> data;
+#ifdef USE_UCC_FUTURE
     void finishWorkUCC();
     void finishWorkUCCError(std::exception_ptr eptr);
-    std::unique_ptr<WorkData> data;
     c10::intrusive_ptr<c10::ivalue::Future> getFuture() override;
+#endif
 #ifdef USE_CUDA
     std::unique_ptr<at::cuda::CUDAEvent> fence = nullptr;
     event_pool_t* ep = nullptr;
@@ -168,9 +170,11 @@ class TORCH_API ProcessGroupUCC : public ProcessGroup {
     ucc_coll_req_h request_;
     CommBase* comm_;
 
+#ifdef USE_UCC_FUTURE
    private:
     // The future returned by getFuture.
     c10::intrusive_ptr<at::ivalue::Future> future_;
+#endif
   };
 
   explicit ProcessGroupUCC(

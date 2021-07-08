@@ -10,6 +10,9 @@
 
 #pragma once
 
+#define USE_UCC_FUTURE 1
+#define USE_CUDA 1
+
 #include <c10d/ProcessGroup.hpp>
 #include <c10d/Store.hpp>
 #include <ucc/api/ucc.h>
