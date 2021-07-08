@@ -404,8 +404,8 @@ class _NnapiSerializer(object):
                 self.compute_operand_shape(operand_id, dim, f"args[{arg_idx}].shape[{dim}]")
         return operand_id
 
-    def add_tensor_operand_for_weight(self, tensor):
-        toper = self.torch_tensor_to_operand(tensor, DimOrder.UNKNOWN_CONSTANT)
+    def add_tensor_operand_for_weight(self, tensor, dim_order=DimOrder.UNKNOWN_CONSTANT):
+        toper = self.torch_tensor_to_operand(tensor, dim_order)
         operand_id = len(self.operands)
         self.operands.append(toper)
         tsize = tensor_size(toper.op_type, toper.shape)
@@ -473,7 +473,10 @@ class _NnapiSerializer(object):
         operand_id = self.jitval_operand_map.get(jitval)
         if operand_id is None:
             _, value = self.get_constant_value(jitval, "TensorType")
-            operand_id = self.add_tensor_operand_for_weight(value)
+            dim_order = (
+                DimOrder.CHANNELS_LAST if getattr(value, "nnapi_nhwc", False)
+                else DimOrder.PRESUMED_CONTIGUOUS)
+            operand_id = self.add_tensor_operand_for_weight(value, dim_order)
         return (operand_id, self.operands[operand_id])
 
     def get_tensor_operand_for_weight(self, jitval):
@@ -533,9 +536,16 @@ class _NnapiSerializer(object):
     def compute_operand_shape(self, op_id, dim, expr):
         self.flexible_shape_computation_lines.append(f"{flex_name(op_id, dim)} = {expr}")
 
+    def coerce_to_contiguous(self, in_id, oper):
+        assert oper.dim_order == DimOrder.UNKNOWN_CONSTANT
+        out_oper = oper._replace(dim_order=DimOrder.PRESUMED_CONTIGUOUS)
+        out_id = self.add_anonymous_tensor_operand(out_oper)
+        return out_id, out_oper
+
+
     def transpose_to_nhwc(self, in_id, oper):
-        if oper.shape[2:] != (1, 1):
-            raise Exception("Automatic transpose only supported for H,W == 1,1")
+        if oper.dim_order != DimOrder.UNKNOWN_CONSTANT and oper.shape[2:] != (1, 1):
+            raise Exception("Automatic transpose only supported for constants or H,W == 1,1")
 
         out_oper = oper._replace(dim_order=DimOrder.CHANNELS_LAST)
 
@@ -560,6 +570,19 @@ class _NnapiSerializer(object):
         if orders == (DimOrder.PRESUMED_CONTIGUOUS, DimOrder.CHANNELS_LAST):
             return self.transpose_to_nhwc(in0_id, in0_oper) + (in1_id, in1_oper)
         if orders == (DimOrder.CHANNELS_LAST, DimOrder.PRESUMED_CONTIGUOUS):
+            return (in0_id, in0_oper) + self.transpose_to_nhwc(in1_id, in1_oper)
+
+        # Constants can be treated as contiguous.
+        if orders == (DimOrder.UNKNOWN_CONSTANT, DimOrder.PRESUMED_CONTIGUOUS):
+            return self.coerce_to_contiguous(in0_id, in0_oper) + (in1_id, in1_oper)
+        if orders == (DimOrder.PRESUMED_CONTIGUOUS, DimOrder.UNKNOWN_CONSTANT):
+            return (in0_id, in0_oper) + self.coerce_to_contiguous(in1_id, in1_oper)
+
+        # Constants can be transposed to NHWC.
+        # TODO: Do this outside of the model execution.
+        if orders == (DimOrder.UNKNOWN_CONSTANT, DimOrder.CHANNELS_LAST):
+            return self.transpose_to_nhwc(in0_id, in0_oper) + (in1_id, in1_oper)
+        if orders == (DimOrder.CHANNELS_LAST, DimOrder.UNKNOWN_CONSTANT):
             return (in0_id, in0_oper) + self.transpose_to_nhwc(in1_id, in1_oper)
 
         raise Exception(
@@ -1218,9 +1241,8 @@ class _NnapiSerializer(object):
         assert node.inputsAt(0).type().kind() == "TensorType"
         assert node.inputsAt(1).type().kind() == "TensorType"
 
-        # TODO: Should support constant as either operand.
-        in0_id, in0_oper = self.get_tensor_operand_by_jitval(node.inputsAt(0))
-        in1_id, in1_oper = self.get_tensor_operand_by_jitval(node.inputsAt(1))
+        in0_id, in0_oper = self.get_tensor_operand_or_constant(node.inputsAt(0))
+        in1_id, in1_oper = self.get_tensor_operand_or_constant(node.inputsAt(1))
 
         assert in0_oper.op_type == in1_oper.op_type
         in0_id, in0_oper, in1_id, in1_oper = self.transpose_for_broadcast(
