@@ -1,8 +1,8 @@
 from io import BytesIO
+from sys import version_info
+from unittest import skipIf
 
-from torch.package import (
-    PackageExporter,
-)
+from torch.package import PackageExporter
 from torch.testing._internal.common_utils import run_tests
 
 try:
@@ -33,6 +33,7 @@ class TestDependencyHooks(PackageTestCase):
 
         self.assertEqual(my_externs, set(["module_a"]))
 
+    @skipIf(version_info < (3, 7), "mock uses __getattr__ a 3.7 feature")
     def test_multiple_extern_hooks(self):
         buffer = BytesIO()
 
@@ -53,6 +54,7 @@ class TestDependencyHooks(PackageTestCase):
 
         self.assertEqual(my_externs, set())
 
+    @skipIf(version_info < (3, 7), "mock uses __getattr__ a 3.7 feature")
     def test_multiple_mock_hooks(self):
         buffer = BytesIO()
 
@@ -95,6 +97,7 @@ class TestDependencyHooks(PackageTestCase):
         self.assertEqual(my_externs, set())
         self.assertEqual(my_externs2, set(["module_a"]))
 
+    @skipIf(version_info < (3, 7), "mock uses __getattr__ a 3.7 feature")
     def test_extern_and_mock_hook(self):
         buffer = BytesIO()
 
