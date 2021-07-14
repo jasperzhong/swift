@@ -127,7 +127,10 @@ def _check_sparse_coo_members_individually(
         error_meta = check_tensors(
             actual._indices(),
             expected._indices(),
-            msg=msg or functools.partial(_make_mismatch_msg, identifier="Sparse COO indices"),
+            msg=msg
+            or functools.partial(
+                _make_mismatch_msg, identifier=lambda identifier: f"Sparse COO indices of {identifier.lower()}"
+            ),
             **kwargs_equal,
         )
         if error_meta:
@@ -136,7 +139,10 @@ def _check_sparse_coo_members_individually(
         error_meta = check_tensors(
             actual._values(),
             expected._values(),
-            msg=msg or functools.partial(_make_mismatch_msg, identifier="Sparse COO values"),
+            msg=msg
+            or functools.partial(
+                _make_mismatch_msg, identifier=lambda identifier: f"Sparse COO values of {identifier.lower()}"
+            ),
             **kwargs,
         )
         if error_meta:
@@ -173,7 +179,10 @@ def _check_sparse_csr_members_individually(
         error_meta = check_tensors(
             actual.crow_indices(),
             expected.crow_indices(),
-            msg=msg or functools.partial(_make_mismatch_msg, identifier="Sparse CSR crow_indices"),
+            msg=msg
+            or functools.partial(
+                _make_mismatch_msg, identifier=lambda identifier: f"Sparse CSR crow_indices of {identifier.lower()}"
+            ),
             **kwargs_equal,
         )
         if error_meta:
@@ -182,7 +191,10 @@ def _check_sparse_csr_members_individually(
         error_meta = check_tensors(
             actual.col_indices(),
             expected.col_indices(),
-            msg=msg or functools.partial(_make_mismatch_msg, identifier="Sparse CSR col_indices"),
+            msg=msg
+            or functools.partial(
+                _make_mismatch_msg, identifier=lambda identifier: f"Sparse CSR col_indices of {identifier.lower()}"
+            ),
             **kwargs_equal,
         )
         if error_meta:
@@ -191,7 +203,10 @@ def _check_sparse_csr_members_individually(
         error_meta = check_tensors(
             actual.values(),
             expected.values(),
-            msg=msg or functools.partial(_make_mismatch_msg, identifier="Sparse CSR values"),
+            msg=msg
+            or functools.partial(
+                _make_mismatch_msg, identifier=lambda identifier: f"Sparse CSR values of {identifier.lower()}"
+            ),
             **kwargs,
         )
         if error_meta:
