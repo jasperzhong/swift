@@ -1,3 +1,4 @@
+from torch.functional import Tensor
 import torch
 import numpy as np
 
@@ -22,6 +23,7 @@ from torch.testing import all_types_and_complex_and, integral_types_and
 
 if TEST_SCIPY:
     import scipy.special
+    import scipy.integrate
 
 # TODO: remove this
 def _generate_input(shape, dtype, device, with_extremal):
@@ -2536,17 +2538,17 @@ class TestBinaryUfuncs(TestCase):
             _test_atan2(1, -1, math.pi / -4 , device, dtype)
             _test_atan2(-1, 1, math.pi * 3 / 4 , device, dtype)
 
-    def test_trapz(self, device):
+    def test_trapezoid(self, device):
         def test_dx(sizes, dim, dx, device):
             t = torch.randn(sizes, device=device)
-            actual = torch.trapz(t, dx=dx, dim=dim)
+            actual = torch.trapezoid(t, dx=dx, dim=dim)
             expected = np.trapz(t.cpu().numpy(), dx=dx, axis=dim)
             self.assertEqual(expected.shape, actual.shape)
             self.assertEqual(expected, actual, exact_dtype=False)
 
         def test_x(sizes, dim, x, device):
             t = torch.randn(sizes, device=device)
-            actual = torch.trapz(t, x=torch.tensor(x, device=device), dim=dim)
+            actual = torch.trapezoid(t, x=torch.tensor(x, device=device), dim=dim)
             expected = np.trapz(t.cpu().numpy(), x=x, axis=dim)
             self.assertEqual(expected.shape, actual.shape)
             self.assertEqual(expected, actual.cpu(), exact_dtype=False)
@@ -2566,6 +2568,31 @@ class TestBinaryUfuncs(TestCase):
                 'Dimension out of range'):
             test_x((2, 3), 2, [], device)
             test_dx((2, 3), 2, 1.0, device)
+        with self.assertRaisesRegex(
+                RuntimeError,
+                'There must be one `x` value for each sample point'):
+            test_x((2, 3), 1, [1.0, 2.0], device)
+            test_x((2, 3), 1, [1.0, 2.0, 3.0, 4.0], device)
+
+    @skipIf(not TEST_SCIPY, "Scipy required for the test.")
+    def test_cumulative_trapezoid(self, device):
+
+        def test_x(sizes, dim, x, device):
+            t = torch.randn(sizes, device=device)
+            actual = torch.cumulative_trapezoid(t, x=torch.tensor(x, device=device), dim=dim)
+            expected = scipy.integrate.cumulative_trapezoid(t.cpu().numpy(), x=x, axis=dim)
+            self.assertEqual(expected.shape, actual.shape)
+            self.assertEqual(expected, actual.cpu(), exact_dtype=False)
+
+        test_x((2, 3, 4), 1, [1.0, 2.0, 3.0], device)
+        test_x((10, 2), 0, [2.0, 3.0, 4.0, 7.0, 11.0, 14.0, 22.0, 26.0, 26.1, 30.3], device)
+        test_x((1, 10), 0, [1.0], device)
+        test_x((0, 2), 0, [], device)
+        test_x((0, 2), 1, [1.0, 2.0], device)
+        with self.assertRaisesRegex(
+                IndexError,
+                'Dimension out of range'):
+            test_x((2, 3), 2, [], device)
         with self.assertRaisesRegex(
                 RuntimeError,
                 'There must be one `x` value for each sample point'):
