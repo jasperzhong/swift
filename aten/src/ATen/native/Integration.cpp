@@ -3,9 +3,9 @@
 #include <ATen/WrapDimUtils.h>
 #include <ATen/core/DimVector.h>
 #include <c10/util/Exception.h>
-#include "c10/core/ScalarType.h"
-#include "c10/core/Scalar.h"
-#include "core/TensorBody.h"
+#include <c10/core/ScalarType.h>
+#include <c10/core/Scalar.h>
+#include <core/TensorBody.h>
 
 namespace at {
 namespace native {
