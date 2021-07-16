@@ -36,11 +36,95 @@ Patterns = collections.namedtuple("Patterns", "positive, negative")
 # (c/cc/cpp) file.
 DEFAULT_FILE_PATTERN = re.compile(r"^.*\.c(c|pp)?$")
 
-CLANG_WARNING_PATTERN = re.compile(r"([^:]+):(\d+):\d+:\s+warning:.*\[([^\]]+)\]")
+CLANG_WARNING_PATTERN = re.compile(
+    r"([^:]+):(\d+):\d+:\s+(warning|error):.*\[([^\]]+)\]"
+)
 
 
 # Set from command line arguments in main().
 VERBOSE = False
+
+
+class ProgressMeter:
+    def __init__(
+        self, num_items: int, start_msg: str = "", disable_progress_bar: bool = False
+    ) -> None:
+        self.num_items = num_items
+        self.num_processed = 0
+        self.width = 80
+        self.disable_progress_bar = disable_progress_bar
+
+        # helper escape sequences
+        self._clear_to_end = "\x1b[0K"
+        self._move_to_previous_line = "\x1b[F"
+        self._move_to_start_of_line = "\r"
+        self._move_to_next_line = "\n"
+
+        if self.disable_progress_bar:
+            print(start_msg)
+        else:
+            self._write(start_msg.strip())
+            self._write(
+                self._move_to_next_line
+                + "[>"
+                + (self.width * " ")
+                + "]"
+                + self._move_to_start_of_line
+            )
+            self._flush()
+
+    def _write(self, s: str) -> None:
+        sys.stderr.write(s)
+
+    def _flush(self) -> None:
+        sys.stderr.flush()
+
+    def update(self, msg: str) -> None:
+        if self.disable_progress_bar:
+            return
+
+        # Once we've processed all items, clear the progress bar
+        if self.num_processed == self.num_items - 1:
+            self._write(self._clear_to_end)
+            return
+
+        # NOP if we've already processed all items
+        if self.num_processed > self.num_items:
+            return
+
+        self.num_processed += 1
+
+        self._write(
+            self._move_to_previous_line
+            + self._clear_to_end
+            + msg
+            + self._move_to_next_line
+        )
+
+        progress = int((self.num_processed / self.num_items) * self.width)
+        padding = self.width - progress
+        self._write(
+            self._move_to_start_of_line
+            + self._clear_to_end
+            + f"({self.num_processed} of {self.num_items}) "
+            + f"[{progress*'='}>{padding*' '}]"
+            + self._move_to_start_of_line
+        )
+        self._flush()
+
+    def print(self, msg: str) -> None:
+        if self.disable_progress_bar:
+            print(msg)
+        else:
+            self._write(
+                self._move_to_previous_line
+                + self._clear_to_end
+                + msg
+                + self._move_to_next_line
+                + self._clear_to_end
+                + self._move_to_next_line
+            )
+            self._flush()
 
 
 # Functions for correct handling of "ATen/native/cpu" mapping
@@ -63,17 +147,17 @@ def map_filenames(build_folder: str, fnames: Iterable[str]) -> List[str]:
     return [map_filename(build_folder, fname) for fname in fnames]
 
 
-def run_shell_command(arguments: List[str]) -> str:
+def run_shell_command(args: List[str]) -> Tuple[int, str]:
     """Executes a shell command."""
     if VERBOSE:
-        print(" ".join(arguments))
-    try:
-        output = subprocess.check_output(arguments).decode().strip()
-    except subprocess.CalledProcessError as error:
-        error_output = error.output.decode().strip()
-        raise RuntimeError(f"Error executing {' '.join(arguments)}: {error_output}")
-
-    return output
+        print("Running: ", " ".join(args))
+    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = (
+        result.stdout.decode("utf-8").strip(),
+        result.stderr.decode("utf-8").strip(),
+    )
+    output = f"{stdout}\n{stderr}"
+    return result.returncode, output
 
 
 def split_negative_from_positive_patterns(patterns: Iterable[str]) -> Patterns:
@@ -116,13 +200,13 @@ def filter_files(files: Iterable[str], file_patterns: Patterns) -> Iterable[str]
                 yield file
                 continue
         if VERBOSE:
-            print("{} omitted due to file filters".format(file))
+            print(f"{file} omitted due to file filters")
 
 
 def get_all_files(paths: List[str]) -> List[str]:
     """Returns all files that are tracked by git in the given paths."""
-    output = run_shell_command(["git", "ls-files"] + paths)
-    return output.split("\n")
+    _, output = run_shell_command(["git", "ls-files"] + paths)
+    return output.strip().splitlines()
 
 
 def find_changed_lines(diff: str) -> Dict[str, List[Tuple[int, int]]]:
@@ -164,17 +248,33 @@ build {i}: do_cmd
 """
 
 
-def run_shell_commands_in_parallel(commands: Iterable[List[str]]) -> str:
-    """runs all the commands in parallel with ninja, commands is a List[List[str]]"""
+def run_shell_commands_in_parallel(
+    commands: List[Tuple[List[str], str]], disable_progress_bar: bool
+) -> List[Tuple[int, str, str]]:
+    progress_meter = ProgressMeter(
+        len(commands),
+        f"Processing {len(commands)} clang-tidy jobs",
+        disable_progress_bar=disable_progress_bar,
+    )
 
-    async def run_command(cmd: List[str]) -> str:
+    async def run_command(cmd: List[str], filename: str) -> Tuple[int, str, str]:
         proc = await asyncio.create_subprocess_shell(
             " ".join(shlex.quote(x) for x in cmd),  # type: ignore[attr-defined]
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await proc.communicate()
-        return f">>>\nstdout:\n{stdout.decode()}\nstderr:\n{stderr.decode()}\n<<<"
+        out = await proc.communicate()
+        stdout, stderr = out[0].decode("utf-8").strip(), out[1].decode("utf-8").strip()
+        returncode = proc.returncode if proc.returncode is not None else -1
+
+        if returncode != 0:
+            msg = f"Warning detected in {filename}\n{stdout}"
+            if VERBOSE:
+                msg += f"\n{stderr}"
+            progress_meter.print(msg)
+        progress_meter.update(f"Processed {filename}")
+
+        return returncode, stdout, stderr
 
     async def gather_with_concurrency(n: int, tasks: List[Any]) -> Any:
         semaphore = asyncio.Semaphore(n)
@@ -188,17 +288,17 @@ def run_shell_commands_in_parallel(commands: Iterable[List[str]]) -> str:
         )
 
     async def helper() -> Any:
-        coros = [run_command(cmd) for cmd in commands]
+        coros = [run_command(cmd, filename) for (cmd, filename) in commands]
         return await gather_with_concurrency(multiprocessing.cpu_count(), coros)
 
     loop = asyncio.get_event_loop()
-    results = loop.run_until_complete(helper())
-    return "\n".join(results)
+    results: List[Tuple[int, str, str]] = loop.run_until_complete(helper())
+    return results
 
 
 def run_clang_tidy(
     options: Any, line_filters: List[Dict[str, Any]], files: Iterable[str]
-) -> str:
+) -> Tuple[int, str]:
     """Executes the actual clang-tidy command in the shell."""
     command = [options.clang_tidy_exe, "-p", options.compile_commands_dir]
     if not options.config_file and os.path.exists(".clang-tidy"):
@@ -223,32 +323,26 @@ def run_clang_tidy(
     if line_filters:
         command += ["-line-filter", json.dumps(line_filters)]
 
-    if options.parallel:
-        commands = [
-            list(command) + [map_filename(options.compile_commands_dir, f)]
-            for f in files
-        ]
-        output = run_shell_commands_in_parallel(commands)
-    else:
-        command += map_filenames(options.compile_commands_dir, files)
-        if options.dry_run:
-            command = [re.sub(r"^([{[].*[]}])$", r"'\1'", arg) for arg in command]
-            return " ".join(command)
+    commands = [
+        (list(command) + [map_filename(options.compile_commands_dir, f)], f)
+        for f in files
+    ]
 
-        output = run_shell_command(command)
+    if options.dry_run:
+        return 0, str([c for c, _ in commands])
 
-    if not options.keep_going and "[clang-diagnostic-error]" in output:
-        message = "Found clang-diagnostic-errors in clang-tidy output: {}"
-        raise RuntimeError(message.format(output))
+    result = run_shell_commands_in_parallel(commands, options.disable_progress_bar)
+    returncode = 0 if sum([returncode for (returncode, _, _) in result]) == 0 else -1
+    output = "\n".join([f"{stdout}\n{stderr}" for (_, stdout, stderr) in result])
 
-    return output
+    return returncode, output
 
 
 def extract_warnings(
     output: str, base_dir: str = "."
 ) -> Dict[str, Dict[int, Set[str]]]:
     rc: Dict[str, Dict[int, Set[str]]] = {}
-    for line in output.split("\n"):
+    for line in output.splitlines():
         p = CLANG_WARNING_PATTERN.match(line)
         if p is None:
             continue
@@ -257,7 +351,9 @@ def extract_warnings(
         else:
             path = os.path.abspath(os.path.join(base_dir, p.group(1)))
         line_no = int(p.group(2))
-        warnings = set(p.group(3).split(","))
+
+        # Filter out any options (which start with '-')
+        warnings = set([w for w in p.group(4).split(",") if not w.startswith("-")])
         if path not in rc:
             rc[path] = {}
         if line_no not in rc[path]:
@@ -337,10 +433,8 @@ def run(options: Any) -> int:
         print("No files detected.")
         sys.exit()
 
-    clang_tidy_output = run_clang_tidy(options, line_filters, files)
-    warnings = extract_warnings(
-        clang_tidy_output, base_dir=options.compile_commands_dir
-    )
+    returncode, clang_tidy_output = run_clang_tidy(options, line_filters, files)
+
     if options.suppress_diagnostics:
         warnings = extract_warnings(
             clang_tidy_output, base_dir=options.compile_commands_dir
@@ -352,11 +446,15 @@ def run(options: Any) -> int:
             if os.path.relpath(fname) != mapped_fname:
                 shutil.copyfile(fname, mapped_fname)
 
-    pwd = os.getcwd() + "/"
     if options.dry_run:
         print(clang_tidy_output)
-    for line in clang_tidy_output.splitlines():
-        if line.startswith(pwd):
-            print(line[len(pwd) :])
+    elif returncode != 0:
+        print("[clang-tidy] Warnings detected!")
+        print("Summary:")
+        pwd = os.getcwd() + "/"
+        for line in clang_tidy_output.splitlines():
+            if line.startswith(pwd):
+                print(line[len(pwd) :])
+        print()
 
-    return len(warnings.keys())
+    return returncode
