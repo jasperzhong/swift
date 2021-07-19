@@ -19,7 +19,7 @@
 #include <c10d/ProcessGroupNCCL.hpp>
 #endif
 
-#include <c10d/torch_ucc.hpp>
+#include <cuda/torch_ucc.hpp>
 
 #ifdef USE_C10D_MPI
 #include <c10d/ProcessGroupMPI.hpp>
