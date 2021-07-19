@@ -140,6 +140,7 @@ struct TORCH_API PackedConvWeight : public ConvPackedParamsBase<kSpatialDim> {
       torch::List<int64_t> dilation,
       int64_t groups,
       uint8_t transpose,
+      bool input_qrange_le_128,
       std::vector<int32_t> col_offsets,
       std::vector<int64_t> kernel,
       std::vector<float> w_scale,
@@ -153,6 +154,7 @@ struct TORCH_API PackedConvWeight : public ConvPackedParamsBase<kSpatialDim> {
     dilation_(std::move(dilation)),
     groups_(groups),
     transpose_(transpose),
+    input_qrange_le_128_(input_qrange_le_128),
     col_offsets(std::move(col_offsets)),
     kernel(std::move(kernel)),
     w_scale(std::move(w_scale)),
@@ -167,6 +169,7 @@ struct TORCH_API PackedConvWeight : public ConvPackedParamsBase<kSpatialDim> {
   torch::List<int64_t> dilation_;
   int64_t groups_;
   uint8_t transpose_;
+  uint8_t input_qrange_le_128_;
   std::vector<int32_t> col_offsets;
   std::vector<int64_t> kernel;
   std::vector<float> w_scale;
@@ -193,7 +196,8 @@ struct TORCH_API PackedConvWeight : public ConvPackedParamsBase<kSpatialDim> {
       torch::List<int64_t> output_padding,
       torch::List<int64_t> dilation,
       int64_t groups,
-      bool transpose);
+      bool transpose,
+      bool input_qrange_le_128);
 
   const float* GetBiasData(at::Tensor* bias);
 
@@ -225,6 +229,10 @@ struct TORCH_API PackedConvWeight : public ConvPackedParamsBase<kSpatialDim> {
 
   bool transpose() const override {
     return (bool)transpose_;
+  }
+
+  bool input_qrange_le_128() const override {
+    return (bool)input_qrange_le_128_;
   }
 
  private:

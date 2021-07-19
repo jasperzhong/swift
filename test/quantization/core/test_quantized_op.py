@@ -2431,6 +2431,52 @@ class TestQuantizedOps(TestCase):
                         msg=(f"Error is too high: SNR(dB): {power}, "
                              f"Signal: {signal}, MSE: {mse}"))
 
+    @skipIfNoFBGEMM
+    def test_conv_reduce_range(self):
+        # This test requires both fbgemm and qnnpack to be available
+        supported_qengines = torch.backends.quantized.supported_engines
+        if not (('fbgemm' in supported_qengines) and ('qnnpack' in supported_qengines)):
+            return
+
+        # TODO(before land): test conv1d and conv3d, test functionals
+        # TODO(before land): test serialization
+        # TODO(before land): test backward compatibility
+
+        m = torch.nn.Sequential(
+            torch.quantization.QuantStub(),
+            torch.nn.Conv2d(1, 1, 1),
+        ).eval()
+
+        test_cases = itertools.product(('fbgemm', 'qnnpack'), ('fbgemm', 'qnnpack'))
+        old_engine = torch.backends.quantized.engine
+        for backend_qengine, qconfig_qengine in test_cases:
+            if backend_qengine == 'fbgemm' and qconfig_qengine == 'qnnpack':
+                torch.backends.quantized.engine = backend_qengine
+                m_copy = copy.deepcopy(m)
+                m_copy.qconfig = torch.quantization.get_default_qconfig(qconfig_qengine)
+                mp = torch.quantization.prepare(m_copy)
+                mc = torch.quantization.convert(mp)
+                # TODO(before land): figure out the syntax and enable this
+                # the warning is being printed, it just is not being captured by this test function
+                if False:
+                    with self.assertWarnsOnceRegex(UserWarning, "This module has a potential to saturate, TODO link to issue"):
+                        mc(torch.randn(1, 1, 1, 1))
+                else:
+                    # For now, this just prints a warning to stdout (see TODO above)
+                    mc(torch.randn(1, 1, 1, 1))
+
+            else:
+                torch.backends.quantized.engine = backend_qengine
+                m_copy = copy.deepcopy(m)
+                m_copy.qconfig = torch.quantization.get_default_qconfig(qconfig_qengine)
+                mp = torch.quantization.prepare(m_copy)
+                mc = torch.quantization.convert(mp)
+                # success = no error thrown on line below
+                mc(torch.randn(1, 1, 1, 1))
+
+        torch.backends.quantized.engine = old_engine
+
+
     @override_qengines
     def test_custom_module_multi_head_attention(self):
         class MultiheadAttentionModel(torch.nn.Module):

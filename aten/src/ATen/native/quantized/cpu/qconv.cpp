@@ -282,6 +282,13 @@ at::Tensor PackedConvWeight<kSpatialDim>::apply_impl(
   ConvDimChecks<kSpatialDim>(
       act.ndimension(), stride().size(), padding().size(),
       output_padding().size(), dilation().size(), func_name, transpose());
+  // TODO(before land): figure out if this check needs to be architecture
+  //   specific and fix it, instead of always failing
+  // TODO(before land): create a separate issue to describe the problem
+  //   and the workarounds, and link to it from the error message
+  if (!input_qrange_le_128()) {
+    TORCH_WARN_ONCE("This module has a potential to saturate, TODO link to issue");
+  }
 
   const int N = act.size(0);
   const int C = act.size(1);

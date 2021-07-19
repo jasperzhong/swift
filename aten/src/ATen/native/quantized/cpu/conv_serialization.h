@@ -50,6 +50,7 @@
  *    - groups
  *    - flags (bitmask)
  *      - (1 << 0) transpose (1 = yes)
+ *      - (1 << 1) input_qrange_le_128 (1 = yes)
  *  2. list of optional tensors
  *    0: None (helps with type inference)
  *    1: weight (this must be present)
@@ -91,6 +92,8 @@ ConvParamsSerializationTypeV3 parse_conv_serialized_state(c10::IValue v) {
         // inputs
         if (version_str == "2") {
           version = 2;
+        } else if (version_str == "3") {
+          version = 3;
         }
       } else if (firstElement.isInt()) {
         auto raw_version = firstElement.toInt();
@@ -138,7 +141,11 @@ ConvParamsSerializationTypeV3 parse_conv_serialized_state(c10::IValue v) {
     }
     config_vals.push_back(groups[0].item<int16_t>());
     // transpose does not exist in v1, so we fill in a default value
-    config_vals.push_back(0);
+    int64_t flags_transpose = (0 << 0);
+    // input_qrange_le_128 does not exist in v1, so we default to true
+    int64_t flags_input_qrange_le_128 = (1 << 1);
+    int64_t flags = flags_transpose | flags_input_qrange_le_128;
+    config_vals.push_back(flags);
 
     std::vector<c10::optional<at::Tensor>> tensors;
     tensors.emplace_back();
@@ -169,6 +176,8 @@ ConvParamsSerializationTypeV3 parse_conv_serialized_state(c10::IValue v) {
     for (const auto i : c10::irange(config_a.size(0))) {
       config_vals.emplace_back(config_a[i]);
     }
+    // set default for input_qrange_le_128
+    config_vals[config_vals.size() - 1] = config_vals[config_vals.size() - 1] | (1 << 1);
 
     auto weight = non_optional[1];
     auto bias = optional[0];
@@ -188,7 +197,7 @@ ConvParamsSerializationTypeV3 parse_conv_serialized_state(c10::IValue v) {
   }
 }
 
-#define QCONV_SERIALIZATION_VERSION 2
+#define QCONV_SERIALIZATION_VERSION 3
 
 #if QCONV_SERIALIZATION_VERSION == 2
 using ConvParamsSerializationType = ConvParamsSerializationTypeV2;
@@ -197,7 +206,7 @@ template <uint32_t kSpatialDim>
 ConvParamsSerializationTypeV2 serialize_conv(
     const c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>>& params) {
 
-  std::string version = "2";
+  std::string version = "3";
   std::vector<at::Tensor> non_optional;
   std::vector<c10::optional<at::Tensor>> optional;
 
@@ -215,6 +224,7 @@ ConvParamsSerializationTypeV2 serialize_conv(
                     output_padding.end());
   params_vec.push_back(params->groups());
   params_vec.push_back(params->transpose());
+  params_vec.push_back(params->input_qrange_le_128());
   int64_t vec_size = params_vec.size();
   at::Tensor params_tensor = at::from_blob(
       params_vec.data(), {vec_size},
@@ -251,7 +261,10 @@ ConvParamsSerializationTypeV3 serialize_conv(
   config_vals.insert(config_vals.end(), output_padding.begin(),
                     output_padding.end());
   config_vals.push_back(params->groups());
-  config_vals.push_back(params->transpose());
+  int64_t flags_transpose = (params->transpose() << 0);
+  int64_t flags_input_qrange_le_128 = (params->input_qrange_le_128() << 1);
+  int64_t flags = (flags_transpose | flags_input_qrange_le_128);
+  config_vals.push_back(flags);
 
   at::Tensor weight;
   c10::optional<at::Tensor> bias;
@@ -320,8 +333,9 @@ c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>> deserialize_conv(
       config_vals.size());
 
   bool transpose = flags & (1 << 0);
+  bool input_qrange_le_128 = flags & (1 << 1);
 
-  int64_t other_flags = flags & ~(1 << 0);
+  int64_t other_flags = flags & ~((1 << 0) | (1 << 1));
   TORCH_INTERNAL_ASSERT(other_flags == 0, "Unexpected flags set in ", flags, ".");
 
   auto& ctx = at::globalContext();
@@ -336,7 +350,8 @@ c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>> deserialize_conv(
       output_padding,
       dilation,
       groups,
-      transpose
+      transpose,
+      input_qrange_le_128
     );
   }
 #endif // USE_FBGEMM
@@ -354,7 +369,8 @@ c10::intrusive_ptr<ConvPackedParamsBase<kSpatialDim>> deserialize_conv(
       output_padding,
       dilation,
       groups,
-      transpose
+      transpose,
+      input_qrange_le_128
     );
   }
 #endif // USE_PYTORCH_QNNPACK
