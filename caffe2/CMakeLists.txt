@@ -2003,4 +2003,4 @@ if(BUILD_PYTHON)
 endif()
 
 # link_directories("/opt/ucf/ucc/lib")
-target_link_libraries(torch_cpu PUBLIC ucp ucs /opt/ucf/ucc/lib/libucc.so)
+target_link_libraries(torch_cuda PUBLIC ucp ucs /opt/ucf/ucc/lib/libucc.so)

@@ -104,7 +104,7 @@ struct event_pool_t {
 
 class CommPG;
 
-class TORCH_API ProcessGroupUCC : public ProcessGroup {
+class TORCH_CUDA_CPP_API ProcessGroupUCC : public ProcessGroup {
  public:
   class WorkData {
    public:

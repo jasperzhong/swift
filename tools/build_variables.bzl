@@ -340,8 +340,6 @@ libtorch_distributed_base_sources = [
     "torch/csrc/distributed/c10d/Store.cpp",
     "torch/csrc/distributed/c10d/TCPStore.cpp",
     "torch/csrc/distributed/c10d/Utils.cpp",
-    "torch/csrc/distributed/c10d/torch_ucc.cpp",
-    "torch/csrc/distributed/c10d/torch_ucc_comm.cpp",
 ]
 
 # These files are only supported on Linux (and others) but not on Windows.
@@ -544,6 +542,8 @@ libtorch_cuda_distributed_sources = libtorch_cuda_distributed_base_sources + lib
 
 libtorch_cuda_sources = libtorch_cuda_core_sources + libtorch_cuda_distributed_sources + [
     "torch/csrc/cuda/nccl.cpp",
+    "torch/csrc/cuda/torch_ucc.cpp",
+    "torch/csrc/cuda/torch_ucc_comm.cpp",
 ]
 
 torch_cpp_srcs = [
