@@ -249,6 +249,14 @@ class NativeFunction:
     # a constructor defined for all the fields we specify.  No need
     # to explicitly write it out.
 
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+    def __hash__(self):
+        d = dict(self.__dict__)
+        d.pop("loc")
+        return hash(d.__repr__())
+
     # We parse both the NativeFunction + backend-specific information about it, which it stored in a corresponding BackendIndex.
     @staticmethod
     def from_yaml(
