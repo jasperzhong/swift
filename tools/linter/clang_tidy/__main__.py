@@ -140,6 +140,13 @@ def parse_args() -> argparse.Namespace:
         help="Path to a clang-tidy config file. Defaults to '.clang-tidy'.",
     )
     parser.add_argument(
+        "--export-fixes",
+        action="store_true",
+        help="Export fixes to a yaml file"
+        "If used with --parallel, fixes are output to ctidy-fixes-<filename>.yml."
+        "Otherwise, fixes are output to ctidy-fixes.yml",
+    )
+    parser.add_argument(
         "--print-include-paths",
         action="store_true",
         help="Print the search paths used for include directives",

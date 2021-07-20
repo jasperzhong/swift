@@ -37,6 +37,8 @@ DEFAULT_FILE_PATTERN = re.compile(r"^.*\.c(c|pp)?$")
 CLANG_WARNING_PATTERN = re.compile(
     r"([^:]+):(\d+):\d+:\s+(warning|error):.*\[([^\]]+)\]"
 )
+EXPORT_FIXES_PREFIX = "ctidy-fixes"
+
 # Set from command line arguments in main().
 VERBOSE = False
 QUIET = False
