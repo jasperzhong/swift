@@ -23,6 +23,7 @@ import torch.testing._internal.opinfo_helper as opinfo_helper
 #   excessive test times and maximize signal to noise ratio
 _variant_ops = partial(ops, dtypes=OpDTypes.supported,
                        allowed_dtypes=(torch.float, torch.cfloat))
+from types import LambdaType
 
 # Get names of all the operators which have ref in their entry in OpInfo (testing infra)
 #   except for Unary Ufuncs (separately implemented in test/test_unary_ufuncs.py)
@@ -750,6 +751,11 @@ class TestGradients(TestCase):
             with self.assertRaisesRegex(NotImplementedError, err_msg, msg=hint_msg):
                 self._grad_test_helper(device, dtype, op, op.get_op(), check_forward_ad=True)
 
+# types.LambdaType gave false positives
+def is_lambda(lamb):
+  LAMBDA = lambda:0
+  return isinstance(lamb, type(LAMBDA)) and lamb.__name__ == LAMBDA.__name__
+
 
 # Tests operators for consistency between JIT and eager, also checks
 #   correctness of JIT specific alias schemas and intended
@@ -771,19 +777,36 @@ class TestJit(JitCommonTestCase):
         include_conjugated_inputs = op.test_conjugated_samples and dtype.is_complex
         samples = op.sample_inputs(device, dtype, requires_grad=_requires_grad, include_conjugated_inputs=include_conjugated_inputs)
 
-        for sample in samples:
-            # Acquires variants to test
-            func = op.get_op()
-            method = op.get_method()
-            variants = {
-                # TODO: inplace tests currently fail, fix and add inplace variant
-                'function': func, 'method': method,
-            }
+        # Acquires variants to test
+        func = op.get_op()
+        method = op.get_method()
+        variants = {
+            # TODO: inplace tests currently fail, fix and add inplace variant
+            'function': func, 'method': method,
+        }
 
+        # TODO: find better way to standardize on op registration itself..
+        has_fake_function = op.name in ["resize_", 'resize_as_']
+
+        if has_fake_function:
+            variants = {'method': getattr(torch.Tensor, op.name)}
+            samples = op.sample_inputs(device, dtype, requires_grad=False)
+
+        tested = False
+        for sample in samples:
             # Test traced and scripted consistency
             for func_type, variant in variants.items():
                 if variant is None:
                     continue
+
+                # scripting and check_alias_analysis do not work with lambdas
+                # lambdas are typically used as a way to simulate methods without
+                # functional variants, so rely on the other variant for testing
+                # for now
+                if is_lambda(variant):
+                    continue
+
+                tested = True
 
                 # Create accessor for script function variant
                 name = op.name + '_' if func_type == 'inplace' else op.name
@@ -801,30 +824,35 @@ class TestJit(JitCommonTestCase):
                             return sample.output_process_fn_grad(output)
                         return output
 
+                    def get_sample():
+                        return clone_input_helper(sample.input) if op.name[-1] == '_' else sample.input
+
                     check_against_reference(self,
                                             script_fn,
                                             func,
                                             out_fn,
-                                            (sample.input,) + sample.args,
+                                            (get_sample(),) + sample.args,
                                             sample.kwargs,
                                             no_grad=not _requires_grad, no_gradgrad=not op.supports_gradgrad)
 
                     # Check traced forward, grad, and grad grad
-                    traced_fn = create_traced_fn(self, variant)
-                    check_against_reference(self,
-                                            traced_fn,
-                                            func,
-                                            out_fn,
-                                            (sample.input,) + sample.args,
-                                            sample.kwargs,
-                                            no_grad=not _requires_grad, no_gradgrad=not op.supports_gradgrad)
+                    # TODO: fix tracing here
+                    if not has_fake_function:
+                        traced_fn = create_traced_fn(self, variant)
+                        check_against_reference(self,
+                                                traced_fn,
+                                                func,
+                                                out_fn,
+                                                (get_sample(),) + sample.args,
+                                                sample.kwargs,
+                                                no_grad=not _requires_grad, no_gradgrad=not op.supports_gradgrad)
 
                     # Check alias annotation schema for correctness (make
                     #   sure inputs that aren't supposed to be modified aren't)
                     # Note: only runs in float32 and int64 because schema isn't affected by dtype,
                     #   so running it on all dtypes is would be excessive
                     if dtype in [torch.float32, torch.int32]:
-                        check_alias_annotation(name, (sample.input,) + sample.args, sample.kwargs,
+                        check_alias_annotation(name, (get_sample(),) + sample.args, sample.kwargs,
                                                func_type=func_type, aten_name=op.aten_name)
 
                     # Check autodifferentiation of nodes for traced and scripted graphs, only need to check once per sample
@@ -838,8 +866,10 @@ class TestJit(JitCommonTestCase):
                             nonfusible_nodes = op.autodiff_nonfusible_nodes
                             fusible_nodes = op.autodiff_fusible_nodes
 
-                        self.assertAutodiffNode(traced_fn.last_graph, op.assert_autodiffed, nonfusible_nodes, fusible_nodes)
+                        if not has_fake_function:
+                            self.assertAutodiffNode(traced_fn.last_graph, op.assert_autodiffed, nonfusible_nodes, fusible_nodes)
                         self.assertAutodiffNode(script_fn.last_graph, op.assert_autodiffed, nonfusible_nodes, fusible_nodes)
+        assert tested, "JIT Test does not execute any logic"
 
     # alias testing is only done with torch.float for the same reason
     _alias_ops = partial(ops, dtypes=OpDTypes.supported,
