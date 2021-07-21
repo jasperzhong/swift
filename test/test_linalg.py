@@ -2123,7 +2123,7 @@ class TestLinalg(TestCase):
         assert out_evecs.tolist() == [1, 2, 3]
         #
         # check that we complain if we pass an out vector of the wrong dtype
-        wrong_out = torch.empty((0, 0), dtype=int)
+        wrong_out = torch.empty((0, 0), dtype=int, device=device)
         with self.assertRaisesRegex(RuntimeError, r"Expected .* but got .*"):
             torch.eig(t, eigenvectors=True, out=(wrong_out, out_evecs))
         with self.assertRaisesRegex(RuntimeError, r"Expected .* but got .*"):
