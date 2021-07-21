@@ -518,6 +518,7 @@ class OpInfo(object):
 
                  # the following metadata relates to complex support and is checked in test_ops.py
                  test_conjugated_samples=True,
+                 assert_jit_shape_analysis = False,  # assert that jit shape analysis fully propagates shape
                  ):
 
         dtypes_args = (dtypes, dtypesIfCPU, dtypesIfCUDA, dtypesIfROCM)
@@ -613,6 +614,8 @@ class OpInfo(object):
         self.aliases = ()
         if aliases is not None:
             self.aliases = tuple(AliasInfo(a) for a in aliases)  # type: ignore[assignment]
+
+        self.assert_jit_shape_analysis = assert_jit_shape_analysis
 
         self.test_conjugated_samples = test_conjugated_samples
 
@@ -6106,6 +6109,7 @@ op_db: List[OpInfo] = [
            dtypesIfROCM=floating_types_and(torch.half, torch.bfloat16),
            backward_dtypesIfCUDA=floating_and_complex_types_and(torch.float16),
            assert_autodiffed=True,
+           assert_jit_shape_analysis=True,
            sample_inputs_func=sample_inputs_matmul,
            skips=(
                # FIXME: bfloat16 backward support likely depends on CUDA11+
