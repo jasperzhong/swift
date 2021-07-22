@@ -6,8 +6,17 @@ from typing import Callable, Dict
 from torch.fx.node import Target, Node
 from torch.nn.modules.batchnorm import BatchNorm2d
 from torch.nn.modules.conv import Conv2d
+from torch.fx.experimental.refinement_types import Equality
+import itertools
+
+
+try:
+    from unification import Var  # type: ignore[import]
+except ImportError:
+    pass
 
 _INFERENCE_RULES: Dict[Target, Callable] = {}
+_REFINEMENT_RULES: Dict[Target, Callable] = {}
 
 
 def expand_to_tensor_dim(t, n):
@@ -68,6 +77,14 @@ def register_inference_rule(call_target):
         if call_target in _INFERENCE_RULES:
             raise RuntimeError('Inference rule already registered for {call_target}!')
         _INFERENCE_RULES[call_target] = fn
+        return fn
+    return register
+
+def register_refinement_rule(call_target):
+    def register(fn):
+        if call_target in _REFINEMENT_RULES:
+            raise RuntimeError('Refinement rule already registered for {call_target}!')
+        _REFINEMENT_RULES[call_target] = fn
         return fn
     return register
 
@@ -213,11 +230,11 @@ def calculate_out_dimension(d_in, module_instance, index):
     """
     padding = (module_instance.padding, module_instance.padding) \
         if isinstance(module_instance.padding, int) else module_instance.padding
-    kernel_size = (module_instance.kernel_size, module_instance.kernel_size)\
+    kernel_size = (module_instance.kernel_size, module_instance.kernel_size) \
         if isinstance(module_instance.kernel_size, int) else module_instance.kernel_size
     stride = (module_instance.stride, module_instance.stride) \
         if isinstance(module_instance.stride, int) else module_instance.stride
-    dilation = (module_instance.dilation, module_instance.dilation)\
+    dilation = (module_instance.dilation, module_instance.dilation) \
         if isinstance(module_instance.dilation, int) else module_instance.dilation
 
     if d_in == Dyn:
@@ -500,3 +517,154 @@ class GraphTypeChecker:
 
         else:
             raise NotImplementedError("Method not yet implemented")
+
+
+@register_refinement_rule(Conv2d)
+@register_refinement_rule(torch.nn.Linear)
+def first_one(n: Node):
+    res = []
+    assert isinstance(n.args[0], Node)
+    arg_type = n.args[0].type
+    if isinstance(arg_type, TensorType) and isinstance(n.type, TensorType):
+        res = [Equality(arg_type.__args__[0], n.type.__args__[0])]
+    return res
+
+# todo needs review for addition. Is this constraint correct?
+@register_refinement_rule(BatchNorm2d)
+@register_refinement_rule(torch.nn.ReLU)
+@register_refinement_rule(torch.nn.AdaptiveAvgPool2d)
+def all_eq(n: Node):
+    res = []
+    assert isinstance(n.args[0], Node)
+    arg_type = n.args[0].type
+    if isinstance(arg_type, TensorType) and isinstance(n.type, TensorType):
+        args1 = arg_type.__args__
+        args2 = n.type.__args__
+        res = [Equality(args1[i], args2[i]) for i in range(len(args1))]
+    return res
+
+@register_refinement_rule(torch.add)
+@register_refinement_rule(operator.add)
+def add_eq(n: Node):
+    res = []
+    if isinstance(n.args[0], Node) and isinstance(n.args[1], Node):
+        arg_type1 = n.args[0].type
+        arg_type2 = n.args[1].type
+        if isinstance(arg_type1, TensorType) and isinstance(arg_type2, TensorType) and isinstance(n.type, TensorType):
+            args1 = arg_type1.__args__
+            args2 = arg_type2.__args__
+            args3 = n.type.__args__
+            r = []
+            for x, y, z in zip(args1, args2, args3):
+                if x == y:
+                    r.append(Equality(x, z))
+            res = r
+    return res
+
+@register_refinement_rule(torch.nn.MaxPool2d)
+def first_two(n: Node):
+    res = []
+    assert isinstance(n.args[0], Node)
+    arg_type = n.args[0].type
+    if isinstance(arg_type, TensorType) and isinstance(n.type, TensorType):
+        args1 = arg_type.__args__
+        args2 = n.type.__args__
+        res = [Equality(args1[0], args2[0]), Equality(args1[1], args2[1])]
+    return res
+
+@register_refinement_rule(torch.flatten)
+def flatten_refinement_rule(n: Node):
+    assert isinstance(n.args[0], Node)
+
+    eq_const = []
+
+    start_dim = 1
+    end_dim = -1
+
+    if len(n.args) > 1:
+        assert isinstance(n.args[1], int)
+        start_dim = n.args[1]
+
+    if len(n.args) > 2:
+        assert isinstance(n.args[2], int)
+        end_dim = n.args[2]
+
+    if isinstance(n.type, TensorType) and isinstance(n.args[0].type, TensorType):
+        l = len(n.type.__args__)
+        start_dim = l if start_dim == -1 else start_dim
+        end_dim = l + end_dim if end_dim < 0 else end_dim
+
+        for t1, t2 in zip(n.type.__args__[0:start_dim], n.args[0].type.__args__[0:start_dim]):
+            eq_const.append(Equality(t1, t2))
+
+        for t1, t2 in zip(n.type.__args__[start_dim:end_dim], n.args[0].type.__args__[start_dim:end_dim]):
+            eq_const.append(Equality(t1, t2))
+    return eq_const
+
+class Refine:
+    """
+    Symbolic shape inference.
+    Generates constraints over type variables.
+    Currently all constraints are equality constraints.
+    """
+    def __init__(self, traced):
+        self.constraints = []
+        self.traced = traced
+        self.symbol_iter = itertools.count(start=0, step=1)
+
+    def refine(self):
+        """
+        Generates constraints for
+        every node in the graph based on
+        the operation.
+        """
+        graph = self.traced.graph
+        for n in graph.nodes:
+            self.refine_node(n)
+        return True
+
+    def replace_dyn_with_fresh_var(self, typ):
+        """
+        Replace all unknown types with fresh type variables.
+        """
+        if typ == Dyn:
+            new_symbol = Var(next(self.symbol_iter))
+            return new_symbol
+        elif isinstance(typ, TensorType):
+            new_args = [self.replace_dyn_with_fresh_var(a) for a in typ.__args__]
+            return TensorType(tuple(new_args))
+        else:
+            return typ
+
+    def refine_node(self, n: Node):
+        """
+        Returns a list of equality constraints for
+        call_module and call_function nodes.
+        Models the relation between input and output dimensions
+        using constraints in case they are both tensors.
+        All operations used in resnet50 are defined.
+        """
+        if n.type is None:
+            n.type = Dyn
+
+        n.type = self.replace_dyn_with_fresh_var(n.type)
+
+        if n.op == 'call_function':
+            if n.target in _REFINEMENT_RULES:
+                self.constraints += _REFINEMENT_RULES[n.target](n)
+            else:
+                pass
+
+        if n.op == 'call_module':
+            module_instance = self.traced.get_submodule(n.target)
+            if type(module_instance) in _REFINEMENT_RULES:
+                self.constraints += _REFINEMENT_RULES[type(module_instance)](n)
+            else:
+                pass
+
+        if n.op == 'output':
+            assert isinstance(n.args[0], Node)
+            n.type = n.args[0].type
+
+        else:
+            pass
