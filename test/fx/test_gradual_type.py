@@ -115,12 +115,14 @@ class TypeCheckerTest(unittest.TestCase):
         tc = GraphTypeChecker({}, symbolic_traced)
         tc.type_check()
         expected_ph_types = [TensorType((1, 2, 3, Dyn)),
-                             TensorType((1, 2, 3, 4)),
+                             TensorType((2, 3, 4)),
                              TensorType((1, 2, 3, Dyn)),
                              TensorType((1, 2, 3, Dyn))]
         expected_iter = iter(expected_ph_types)
 
         for n in symbolic_traced.graph.nodes:
+            if n.op == 'call_function':
+                assert n.meta['broadcast']
             assert n.type == next(expected_iter)
 
     def test_type_check_add_with_scalar(self):

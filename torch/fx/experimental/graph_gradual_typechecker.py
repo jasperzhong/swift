@@ -107,11 +107,24 @@ def add_inference_rule(n: Node):
         return n.type
 
     (new_t1, new_t2) = broadcast_types(t1, t2)
-    n.args[0].type = new_t1
-    n.args[1].type = new_t2
+
+    if new_t1 != t1 or new_t2 != t2:
+        n.meta['broadcast'] = True
+        n.meta[str(n.args[0])] = new_t1
+        n.meta[str(n.args[0])] = new_t2
+
+    # Todo: maybe figure out that broadcasting definitely did not happen?
+    else:
+        n.meta['broadcast'] = False
+
+    new_t1 = t1 if not n.meta['broadcast'] else new_t1
+    new_t2 = t2 if not n.meta['broadcast'] else new_t2
 
     if is_consistent(new_t1, new_t2):
-        # we return the more precise type
+        # we return the less precise type because
+        # broadcasting may have happened
+        # for operands with shape [1,2,Dyn] and [1,2,1]
+        # we have to assign the node [1,2,Dyn]
         if is_more_precise(new_t1, new_t2):
             n.type = new_t2
         else:
