@@ -1401,6 +1401,10 @@ struct to_ir {
     auto* comprehension_block = n->addBlock();
     pushFrame(comprehension_block);
     WithInsertPoint guard(comprehension_block);
+
+    std::stringstream ss;
+    std::stringstream err;
+
     auto emit_body = [&]() {
       auto k = emitExpr(dc.key());
       auto v = emitExpr(dc.value());
@@ -1410,11 +1414,13 @@ struct to_ir {
       if (type_hint) {
         DictTypePtr dict_type_hint = type_hint->expect<DictType>();
 
-        std::stringstream ss;
-        std::stringstream err;
-
+        // Special-case annotations that are a subset of NumberType
+        // for backwards compatibility, e.g. `x: Dict[int, T]` should
+        // be a valid lhs for an rhs key of type `number`
         bool is_key_subtype =
-            k->type()->isSubtypeOfExt(dict_type_hint->getKeyType(), &ss);
+            k->type()->isSubtypeOfExt(dict_type_hint->getKeyType(), &ss) ||
+            (k->type() == NumberType::get() &&
+             dict_type_hint->getKeyType()->isSubtypeOfExt(k->type(), &ss));
 
         if (!is_key_subtype) {
           err << "Dict type annotation `" << dict_type_hint->repr_str()
@@ -1425,8 +1431,14 @@ struct to_ir {
         }
 
         ss.str(std::string());
+
+        // Special-case annotations that are a subset of NumberType
+        // for backwards compatibility, e.g. `x: Dict[T, int]` should
+        // be a valid lhs for an rhs value of type `number`
         bool is_value_subtype =
-            v->type()->isSubtypeOfExt(dict_type_hint->getValueType(), &ss);
+            v->type()->isSubtypeOfExt(dict_type_hint->getValueType(), &ss) ||
+            (v->type() == NumberType::get() &&
+             dict_type_hint->getValueType()->isSubtypeOfExt(v->type(), &ss));
 
         if (!is_value_subtype) {
           err << "Dict type annotation `" << dict_type_hint->repr_str()
@@ -3859,8 +3871,9 @@ struct to_ir {
         }
         AT_ASSERT(key_type != nullptr && value_type != nullptr);
 
+        std::stringstream ss;
         for (size_t i = 0; i < keys.size(); ++i) {
-          std::stringstream ss;
+          ss.str("");
           if (!keys[i]->type()->isSubtypeOfExt(key_type, &ss)) {
             throw ErrorReport(key_trees[i])
                 << "Dict keys must contain "
@@ -3899,11 +3912,12 @@ struct to_ir {
                 type_hint->expect<DictType>()->getValueType();
             for (size_t i = 0; i < types.size(); ++i) {
               TORCH_CHECK(
-                  types[i]->isSubtypeOf(value_type_hint),
+                  types[i]->isSubtypeOf(value_type_hint) ||
+                      types[i] == NumberType::get(),
                   "Type "
-                  "hint for dict was",
+                  "hint for dict was ",
                   type_hint->repr_str(),
-                  "but the value ",
+                  " but the value ",
                   "at index ",
                   i,
                   " has type ",
