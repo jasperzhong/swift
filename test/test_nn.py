@@ -14095,6 +14095,37 @@ class TestNNDeviceType(NNTestCase):
             helper(4, 8, 9, 14, 5, 8, contig)
             helper(4, 8, 11, 11, 1, 1, contig)
 
+    @onlyCPU
+    @dtypes(torch.float, torch.double)
+    def test_max_pool3d_ndhwc(self, device, dtype):
+        def helper(n, c, d, h, w, kernel_size, contig):
+            input = torch.randint(1, 10, (n, c, d, h, w), device=device, dtype=dtype)
+            input = input.contiguous(memory_format=torch.channels_last_3d)
+            if not contig:
+                input = input[:, ::2, :, :, :]
+            input.requires_grad_(True)
+            pool = torch.nn.MaxPool3d(kernel_size=kernel_size, return_indices=True).to(device)
+
+            ref_input = input.detach().clone().contiguous().requires_grad_(True)
+            ref_pool = torch.nn.MaxPool3d(kernel_size=kernel_size, return_indices=True).to(device)
+
+            out, ind = pool(input)
+            out.sum().backward()
+            ref_out, ref_ind = ref_pool(ref_input)
+            ref_out.sum().backward()
+
+            self.assertTrue(out.is_contiguous(memory_format=torch.channels_last_3d))
+            self.assertTrue(ref_out.is_contiguous())
+            self.assertTrue(ind.is_contiguous(memory_format=torch.channels_last_3d))
+            self.assertTrue(ref_ind.is_contiguous())
+            self.assertEqual(out, ref_out)
+            self.assertEqual(ind, ref_ind)
+            self.assertEqual(input.grad, ref_input.grad)
+
+        for contig in [True, False]:
+            helper(4, 8, 10, 10, 10, (3, 2, 3), contig)
+            helper(4, 8, 18, 9, 14, (2, 3, 2), contig)
+
     def test_embedding_dense_grad(self, device):
         embd = nn.Embedding(20, 20).to(device)
         weight = embd.weight
