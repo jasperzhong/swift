@@ -118,6 +118,26 @@ TORCH_META_FUNC(argmin)
 
 } // namespace meta
 
+namespace meta {
+
+TORCH_META_FUNC(minmax)
+(const Tensor& self, c10::optional<c10::IntArrayRef> dims_opt, bool keepdim) {
+
+}
+
+} // namespace meta
+
+namespace native {
+
+TORCH_IMPL_FUNC(minmax_out)
+(const Tensor& self,
+ c10::optional<c10::IntArrayRef> dims_opt,
+ bool keepdim,
+ const Tensor& min,
+ const Tensor& max) {}
+
+} // namespace native
+
 namespace native {
 
 DEFINE_DISPATCH(sum_stub);
@@ -1855,4 +1875,5 @@ Tensor value_selecting_reduction_backward(const Tensor& grad, int64_t dim, const
   return at::zeros(sizes, grad.options()).scatter_(dim, indices, grad);
 }
 
-}} // namespace at::native
+} // namespace native
+} // namespace at

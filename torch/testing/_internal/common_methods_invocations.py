@@ -1865,12 +1865,12 @@ def sample_inputs_amax_amin(op_info, device, dtype, requires_grad, **kwargs):
     # Ordered as (shape, positional args, kwargs)
     test_cases: Tuple[tuple, tuple, dict] = (  # type: ignore[assignment]
         ((S, S, S), (), {}),
-        ((S, S, S), (1,), {}),
-        ((S, S, S), ((1, 2,),), {}),
-        ((S, S, S), (1,), {'keepdim': True}),
-        ((), (0,), {}),
+        ((S, S, S), (), {'dim': 1}),
+        ((S, S, S), (), {'dim': (1, 2,)}),
+        ((S, S, S), (), {'dim': 1, 'keepdim': True}),
+        ((), (), {'dim': 0}),
         ((), (), {}),
-        ((), (0,), {'keepdim': True}),
+        ((), (), {'dim': 0, 'keepdim': True}),
     )
     return tuple(SampleInput((make_tensor(size, device, dtype,
                                           low=None, high=None,
@@ -6372,6 +6372,10 @@ op_db: List[OpInfo] = [
            dtypes=all_types_and(torch.float16, torch.bfloat16, torch.bool),
            supports_forward_ad=True,
            sample_inputs_func=sample_inputs_max_min_binary,),
+    OpInfo('minmax',
+           ref=lambda x, dim=None, keepdim=False: (np.amin(x, axis=dim, keepdims=keepdim), np.amax(x, axis=dim, keepdims=keepdim)),
+           dtypes=all_types_and_complex_and(torch.bool, torch.float16, torch.bfloat16),
+           sample_inputs_func=sample_inputs_amax_amin,),
     OpInfo('nn.functional.hardswish',
            aten_name="hardswish",
            supports_autograd=True,
