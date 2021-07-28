@@ -185,7 +185,9 @@ NoneStatus canBeNone(Value* v) {
   if (v->node()->mustBeNone()) {
     return ALWAYS;
   }
-  if (v->type()->kind() == OptionalType::Kind) {
+  if (v->type()->kind() == OptionalType::Kind ||
+      (v->type()->kind() == UnionType::Kind &&
+       v->type()->expect<UnionType>()->canHoldType(NoneType::get()))) {
     return MAYBE;
   }
   return NEVER;
@@ -547,6 +549,7 @@ struct Environment {
     if (!retval && required) {
       throwVarNotFoundError(ident, range);
     }
+
     return retval;
   }
 
@@ -1010,57 +1013,61 @@ struct to_ir {
   }
 
   void emitReturn(const Return& stmt) {
-    TypePtr result_type = def_stack_.back().declared_return_type_;
-    Value* result = emitExpr(stmt.expr(), result_type);
+    TypePtr declared_return_type =
+        def_stack_.back().declared_return_type_; // nullptr if not annotated
+    auto actual_return = emitExpr(stmt.expr(), declared_return_type);
+
     // result type is annotated, every return must convert to that type
-    if (result_type) {
+    if (declared_return_type) {
       // this guard skips implicit conversion from None -> Tensor for the return
       // type. otherwise forgetting a return a function returning a tensor will
       // cause a None to be converted to a tensor.
-      if (!(result_type->isSubtypeOf(TensorType::get()) &&
-            result->type()->isSubtypeOf(NoneType::get()))) {
-        result = tryConvertToType(
+      if (!(actual_return->type()->isSubtypeOf(TensorType::get()) &&
+            actual_return->type()->isSubtypeOf(NoneType::get()))) {
+        actual_return = tryConvertToType(
             stmt.range(),
             *graph,
-            result_type,
-            result,
+            declared_return_type,
+            actual_return,
             /*allow_conversions=*/true);
       }
-
-      if (!result->type()->isSubtypeOf(result_type)) {
+      if (!actual_return->type()->isSubtypeOf(declared_return_type)) {
         throw ErrorReport(stmt.range())
             << "Return value was annotated as having type "
-            << result_type->repr_str() << " but is actually of type "
-            << result->type()->repr_str();
+            << declared_return_type->repr_str() << " but is actually of type "
+            << actual_return->type()->repr_str();
       }
     } else {
-      result_type = def_stack_.back().merged_return_type_;
-      if (!result_type) {
-        result_type = result->type();
+      declared_return_type = def_stack_.back().merged_return_type_;
+      if (!declared_return_type) {
+        declared_return_type = actual_return->type();
       }
-      auto merged_result_type = unifyTypes(result_type, result->type());
-      if (!merged_result_type) {
+      auto merged_return_type =
+          unifyTypes(declared_return_type, actual_return->type());
+      if (!merged_return_type) {
         throw ErrorReport(stmt.range())
             << "Previous return statement returned a value of type "
-            << result_type->repr_str()
+            << declared_return_type->repr_str()
             << " but this return statement returns a value of type "
-            << result->type()->repr_str();
+            << actual_return->type()->repr_str();
       }
-      result_type = merged_result_type.value();
+      declared_return_type = merged_return_type.value();
     }
-    AT_ASSERT(result_type);
+    AT_ASSERT(declared_return_type);
 
-    def_stack_.back().merged_return_type_ = result_type;
+    def_stack_.back().merged_return_type_ = declared_return_type;
 
     // If the annotated return type is Any and the result type is not Any,
     // cast the result to Any to facilitate type unification between return
     // statements on different code paths (e.g. different branches of an if,
     // body and containing scope of a loop).
-    if (result_type == AnyType::get() && result->type() != AnyType::get()) {
-      result = graph->insertUncheckedCast(result, result_type);
+    if (declared_return_type == AnyType::get() &&
+        actual_return->type() != AnyType::get()) {
+      actual_return =
+          graph->insertUncheckedCast(actual_return, declared_return_type);
     }
 
-    graph->insertNode(graph->create(prim::ReturnStmt, {result}, 0));
+    graph->insertNode(graph->create(prim::ReturnStmt, {actual_return}, 0));
     exit_blocks.insert(environment_stack->block());
   }
 
@@ -1340,7 +1347,7 @@ struct to_ir {
       auto unified = unifyTypes(
           lt->getElementType(),
           out->type(),
-          /*default_to_any=*/true,
+          /*default_to_union=*/true,
           element_type_hint);
 
       if (lt->getElementType() != AnyType::get() &&
@@ -1458,7 +1465,7 @@ struct to_ir {
       c10::optional<TypePtr> unified = unifyTypes(
           dt->getValueType(),
           v->type(),
-          /*default_to_any=*/true,
+          /*default_to_union=*/true,
           value_type_hint);
 
       // Warn the user if we inferred the type of the values to be `Any`
@@ -1826,8 +1833,16 @@ struct to_ir {
         if (actual_type->kind() == AnyType::Kind) {
           return true;
         }
-        if (auto op = actual_type->cast<OptionalType>()) {
-          return op->getElementType()->kind() == kind;
+        if (const auto optional_type = actual_type->cast<OptionalType>()) {
+          return optional_type->getElementType()->kind() == kind;
+        }
+        if (const auto union_type = actual_type->cast<UnionType>()) {
+          return std::any_of(
+              union_type->containedTypes().begin(),
+              union_type->containedTypes().end(),
+              [&](const TypePtr contained) {
+                return contained->kind() == kind;
+              });
         }
         return false;
       }
@@ -2979,7 +2994,9 @@ struct to_ir {
         // after annotation so that variables assigned to this None will still
         // get the right type. To do this, we make a None constant that
         // has the type Optional[T]
-        if (type->kind() == OptionalType::Kind &&
+        if ((type->kind() == OptionalType::Kind ||
+             (type->kind() == UnionType::Kind &&
+              type->expect<UnionType>()->canHoldType(NoneType::get()))) &&
             expr->type()->isSubtypeOf(NoneType::get())) {
           Node* none = graph->createNone();
           none->output()->setType(type);
@@ -3435,8 +3452,9 @@ struct to_ir {
       size_t n_binders,
       const TypePtr& type_hint = nullptr) {
     switch (tree.kind()) {
-      case TK_VAR:
+      case TK_VAR: {
         return environment_stack->getSugaredVar(Var(tree).name());
+      }
       case '.': {
         auto select = Select(tree);
         auto sv = emitSugaredExpr(select.value(), 1);
@@ -3710,7 +3728,7 @@ struct to_ir {
           type_hint ? type_hint->expect<ListType>()->getElementType() : nullptr;
 
       c10::optional<TypePtr> unified = unifyTypeList(
-          types, nowhere, /*default_to_any=*/true, element_type_hint);
+          types, nowhere, /*default_to_union=*/true, element_type_hint);
 
       if (!type_hint && *unified == AnyType::get()) {
         TORCH_WARN(
@@ -3881,7 +3899,7 @@ struct to_ir {
           c10::optional<TypePtr> unified = unifyTypeList(
               types,
               /*why_not=*/nowhere,
-              /*default_to_any=*/true,
+              /*default_to_union=*/true,
               value_type_hint);
 
           if (!type_hint && *unified == AnyType::get()) {
