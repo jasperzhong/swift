@@ -1,3 +1,4 @@
+import io
 import os
 import sys
 
@@ -320,6 +321,37 @@ class TestUnion(JitTestCase):
 
         self.assertEqual(fn2(), 10)
 
+    def test_union_optional_of_union_is_flattened(self):
+        @torch.jit.script
+        def fn(flag: int) -> Union[str, int, None]:
+            y: Union[int, str, None] = "foo"
+            if flag == 0:
+                x: Optional[Union[int, str]] = y
+            elif flag == 1:
+                x: Optional[Union[int, str]] = 1
+            else:
+                x: Optional[Union[int, str]] = None
+            return x
+
+        # Can't use `checkScript` because it will flag the fact that
+        # the original code has `Optional[Union[int, str]]` but the
+        # saved/loaded code has `Union[int, NoneType, str]` (even
+        # though this is exactly what we want)
+        self.assertEqual(fn(0), "foo")
+        self.assertEqual(fn(1), 1)
+        self.assertEqual(fn(2), None)
+
+        buffer = io.BytesIO()
+        torch.jit.save(fn, buffer)
+        buffer = io.BytesIO(buffer.getvalue())
+        l = torch.jit.load(buffer)
+
+        s = l.code
+
+        FileCheck().check("Union[int, NoneType, str]")     \
+                   .check("Union[int, NoneType, str]")     \
+                   .run(s)
+
     def test_union_subclasses_larger_union(self):
         def fn() -> Union[int, str, torch.Tensor]:
             x: Union[int, str] = "foo"
@@ -604,3 +636,22 @@ class TestUnion(JitTestCase):
             return x
 
         self.checkScript(fn, ())
+
+    def test_union_serialization_preserves_type_annotations(self):
+        # This function will fail after being torch.jit.save'd and
+        # torch.jit.load'd if the type annotations aren't preserved
+        # for Union during serialization. We need the `Union[str, int]`
+        # annotation to make sure that `y` is typed as a Union instead
+        # of as a str in one branch and an int in the other
+        def fn(x: int) -> str:
+            if x % 2:
+                y: Union[str, int] = "bar"
+            else:
+                y: Union[str, int] = x
+            if isinstance(y, str):
+                return y
+            else:
+                return "baz"
+
+        self.checkScript(fn, (1,))
+        self.checkScript(fn, (8,))
