@@ -592,3 +592,15 @@ class TestUnion(JitTestCase):
 
         self.checkScript(fn, (1,))
         self.checkScript(fn, ([1, 2, 3],))
+
+    def test_union_memory_aliasing(self):
+        def fn():
+            x : List[torch.Tensor] = []
+            z : List[Optional[List[torch.Tensor]]] = []
+            z.append(x)
+            x_alias = z[0]
+            if torch.jit.isinstance(x_alias, List[torch.Tensor]):
+                x_alias.append(torch.tensor(3))
+            return x
+
+        self.checkScript(fn, ())

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <aten/src/ATen/core/jit_type.h>
 #include <c10/util/ArrayRef.h>
 #include <c10/util/Optional.h>
 #include <c10/util/flat_hash_map.h>
@@ -19,6 +20,9 @@ namespace jit {
 struct Element;
 struct Value;
 class MemoryDAG;
+
+using TypePtr = std::shared_ptr<c10::Type>;
+using AliasTypeSet = std::vector<TypePtr>;
 
 /**
  * Helper to build up the points-to graph.
