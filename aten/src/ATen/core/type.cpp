@@ -927,6 +927,7 @@ void standardizeVectorForUnion(std::vector<TypePtr>* to_flatten) {
                         "passed a `nullptr`");
   std::vector<TypePtr> to_fill;
   standardizeVectorForUnion(*to_flatten, &to_fill);
+  *to_flatten = to_fill;
 }
 
 UnionType::UnionType(std::vector<TypePtr> reference, TypeKind kind) : Type(kind) {
@@ -1189,11 +1190,16 @@ c10::optional<TypePtr> UnionType::subtractTypeSet(std::vector<TypePtr>& to_subtr
 
 OptionalType::OptionalType(TypePtr contained)
                            : UnionType({contained, NoneType::get()}, TypeKind::OptionalType) {
+  bool is_numbertype = false;
+  if (auto as_union = contained->cast<UnionType>()) {
+    is_numbertype = as_union->containedTypes().size() == 3 &&
+                    as_union->canHoldType(NumberType::get());
+  }
   if (UnionType::containedTypes().size() == 2) {
     contained_ = UnionType::containedTypes()[0]->kind()!= NoneType::Kind
                  ? UnionType::containedTypes()[0]
                  : UnionType::containedTypes()[1];
-  } else if (contained == NumberType::get()) {
+  } else if (contained == NumberType::get() || is_numbertype) {
     contained_ = NumberType::get();
     types_.clear();
     types_.push_back(NumberType::get());

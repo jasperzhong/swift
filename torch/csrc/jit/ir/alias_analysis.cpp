@@ -48,6 +48,7 @@ class MutableTypePtrHelper {
       case TypeKind::DictType:
       case TypeKind::ClassType:
       case TypeKind::TensorType:
+      case TypeKind::UnionType:
         // TODO: lookup cached contained types. this is kind of tricky
         // because a List[Optional[T]] should still be
         // List[Optional[Unshaped(T)]], however the getMutableType(Optional[T])
@@ -1084,7 +1085,8 @@ void AliasDb::makePointerTo(const Value* from, const Value* to) {
     for (auto kind : {from->type()->kind(), to->type()->kind()}) {
       expected_kind = expected_kind ||
           (kind == TypeKind::OptionalType || kind == TypeKind::FutureType ||
-           kind == TypeKind::TupleType) // immutable type containers
+           kind == TypeKind::TupleType ||
+           kind == TypeKind::UnionType) // immutable type containers
           || kind == TypeKind::AnyType;
     }
     TORCH_INTERNAL_ASSERT(

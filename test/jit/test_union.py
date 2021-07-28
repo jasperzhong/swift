@@ -379,3 +379,216 @@ class TestUnion(JitTestCase):
                 return x
 
         self.checkModule(M(1), ("foo",))
+
+    def test_union_type_refinement(self):
+        def fn(x: Union[int, str]) -> str:
+            if isinstance(x, str):
+                z = x + "bar"
+                return x
+            else:
+                return "baz"
+
+        self.checkScript(fn, ("foo",))
+        self.checkScript(fn, (1,))
+
+    def test_union_type_refinement_union_rhs(self):
+        def fn(x: int) -> str:
+            if torch.jit.isinstance(x, Union[int, str]):
+                return "bar"
+            else:
+                return "baz"
+
+        self.checkScript(fn, (1,))
+
+    def test_union_type_refinement_tuple_rhs(self):
+        def fn(x: Union[int, float, List[str]]) -> str:
+            if isinstance(x, (int, float)):
+                if isinstance(x, int):
+                    return str(x)
+                else:
+                    return "foo"
+            else:
+                if len(x):
+                    return x[0]
+                else:
+                    return "bar"
+
+        self.checkScript(fn, (1,))
+        self.checkScript(fn, (1.0,))
+        self.checkScript(fn, (["a", "b", "c"],))
+
+    def test_union_type_refinement_tuple_rhs_noncontained_type(self):
+        def fn(x: Union[int, List[str]]) -> str:
+            if isinstance(x, (int, float)):
+                y = x + x
+                return str(y)
+            else:
+                if len(x):
+                    return x[0]
+                else:
+                    return "bar"
+
+        self.checkScript(fn, (1,))
+        self.checkScript(fn, (["a", "b", "c"],))
+
+    def test_union_type_refinement_tuple_rhs_union(self):
+        @torch.jit.script
+        def fn(x: int) -> str:
+            if torch.jit.isinstance(x, (Union[int, str], float)):
+                y = x + x
+                return str(y)
+            else:
+                return "foo"
+
+        # TODO: There's currently an unrelated bug in
+        # `torch.jit.isinstance` that makes it fail for tuple literals.
+        # Posted here: https://github.com/pytorch/pytorch/issues/60095
+        # Change `assertEqual` to `checkScript` when the bug is fixed
+        self.assertEqual(fn(1), "2")
+
+    def test_union_type_refinement_statically_false(self):
+        @torch.jit.script
+        def fn(x: int) -> str:
+            if torch.jit.isinstance(x, (Union[str, float], List[str], str)):
+                z = x + "foo"
+                return z
+            else:
+                return "bar"
+
+        s = fn.graph
+
+        # Check that we don't have any branching statements
+        FileCheck().check_not("block0()")    \
+            .check_not("block1()")           \
+            .run(s)
+
+    def test_union_type_refinement_statically_true(self):
+        @torch.jit.script
+        def fn(x: Union[List[int], int]) -> Union[List[int], int]:
+            if not torch.jit.isinstance(x, (int, List[int])):
+                return x
+            else:
+                l = [1, 2, 3]
+                y: Union[List[int], int] = l
+                return y
+
+        s = fn.graph
+
+        # Check that we don't have any branching statements
+        FileCheck().check_not("block0()")    \
+            .check_not("block1()")           \
+            .run(s)
+
+    def test_union_type_refinement_partial_static_refinement_tuple_rhs(self):
+        def fn(x: Union[List[int], int]) -> int:
+            if torch.jit.isinstance(x, (int, float, str)):
+                # We should know that `x` is an `int` here
+                z = x + 1
+                return z
+            else:
+                return 100
+
+        self.checkScript(fn, ([1, 2, 3],))
+        self.checkScript(fn, (1,))
+
+    def test_union_type_refinement_partial_static_refinement_union_rhs(self):
+        def fn(x: Union[List[int], int]) -> int:
+            if torch.jit.isinstance(x, Union[int, float, str]):
+                # We should know that `x` is an `int` here
+                z = x + 1
+                return z
+            else:
+                return 100
+
+        self.checkScript(fn, ([1, 2, 3],))
+        self.checkScript(fn, (1,))
+
+    def test_union_type_refinement_internal_declaration(self):
+        def fn(flag: bool) -> str:
+            x: Union[int, str, None] = None
+            if (flag):
+                y = "foo"
+            else:
+                y = 1
+            if isinstance(x, str):
+                return x
+            else:
+                return "bar"
+
+        self.checkScript(fn, (True,))
+        self.checkScript(fn, (False,))
+
+    def test_union_branching_with_union_return_and_homogenous_types(self):
+        def fn(x: int) -> Union[int, str]:
+            if x % 2:
+                return "foo"
+            else:
+                return "bar"
+
+        self.checkScript(fn, (1,))
+        self.checkScript(fn, (8,))
+
+    def test_union_branching_does_not_autoinfer_undeclared_union(self):
+        def fn(x: int) -> str:
+            if x % 2:
+                y = "foo"
+            else:
+                y = x
+            if isinstance(y, str):
+                return y
+            else:
+                return "bar"
+
+        with self.assertRaisesRegex(RuntimeError, "y is set to type str"
+                                    " in the true branch and type int "
+                                    "in the false branch"):
+            torch.jit.script(fn)
+
+    def test_union_branching_does_not_widen_existing_inferred_type(self):
+        def fn(x: int) -> str:
+            y = "foo"
+            if x % 2:
+                y = "bar"
+            else:
+                y = x
+            if isinstance(y, str):
+                return y
+            else:
+                return "baz"
+
+        with self.assertRaisesRegex(RuntimeError, "previously has type "
+                                    "str but is now being assigned to a"
+                                    " value of type int"):
+            torch.jit.script(fn)
+
+    def test_union_schema_matching_on_internal_type(self):
+        def fn(x: Union[List[int], Dict[str, int]]) -> int:
+            if torch.jit.isinstance(x, List[int]):
+                return x[0]
+            else:
+                return list(x.values())[0]
+
+        self.checkScript(fn, ([1, 2, 3],))
+        self.checkScript(fn, ({"foo": 1, "bar": 2, "baz": 3},))
+
+    def test_union_subtractive_refinement(self):
+        def fn(x: Union[List[int], int]) -> int:
+            if not isinstance(x, int):
+                x.append(1)
+                return x[0]
+            else:
+                return x
+
+        self.checkScript(fn, (1,))
+        self.checkScript(fn, ([1, 2, 3],))
+
+    def test_union_subtractive_refinement_with_container(self):
+        def fn(x: Union[List[int], int]) -> int:
+            if not torch.jit.isinstance(x, List[int]):
+                return x
+            else:
+                x.append(1)
+                return x[0]
+
+        self.checkScript(fn, (1,))
+        self.checkScript(fn, ([1, 2, 3],))
