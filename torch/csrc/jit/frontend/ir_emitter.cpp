@@ -387,7 +387,7 @@ struct Environment {
       std::stringstream why_not;
       if (!as_simple_value->type()->isSubtypeOfExt(parent_type, &why_not)) {
         auto error = ErrorReport(loc);
-        error << "Variable '" << name << "' previously has type "
+        error << "Variable '" << name << "' previously had type "
               << simple_parent->type()->repr_str()
               << " but is now being assigned to a value of type "
               << as_simple_value->type()->repr_str();

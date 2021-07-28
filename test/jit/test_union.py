@@ -588,7 +588,7 @@ class TestUnion(JitTestCase):
             else:
                 return "baz"
 
-        with self.assertRaisesRegex(RuntimeError, "previously has type "
+        with self.assertRaisesRegex(RuntimeError, "previously had type "
                                     "str but is now being assigned to a"
                                     " value of type int"):
             torch.jit.script(fn)

@@ -136,9 +136,9 @@ Element* MemoryDAGBuilder::makeFreshValue(const Value* v) {
 // `e` (`MemoryLocations` is just a typedef'd c10::SparseBitVector).
 const MemoryLocations& MemoryDAG::getMemoryLocations(const Element* e) const {
   // Note on cache invalidation: all mutation should occur through
-  // MemoryDAGBuilder. Thus, once we consume the builder to create an immutable
-  // MemoryDAG, we can cache here without worrying that we might potentially get
-  // invalidated.
+  // MemoryDAGBuilder. Thus, once we consume the builder to create an
+  // immutable MemoryDAG, we can cache here without worrying that we
+  // might potentially get invalidated.
   if (e->cachedMemoryLocations_) {
     return *e->cachedMemoryLocations_;
   }

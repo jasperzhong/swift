@@ -132,8 +132,8 @@ class MutableTypePtrHelper {
 bool isMutableTypeImpl(
     const TypePtr& type,
     std::unordered_map<TypePtr, AliasTypeSet>* mutable_type_cache) {
-  // check common cases to avoid recursively constructing type in
-  // mapTypeToAliasTypeSetPtrImpl
+  // Check common cases to avoid recursively constructing type in
+  // `mapTypeToAliasTypeSetPtrImpl`
   auto kind = type->kind();
   if (kind == TypeKind::TensorType || kind == TypeKind::ListType ||
       kind == TypeKind::ClassType || kind == TypeKind::DictType) {
@@ -145,7 +145,7 @@ bool isMutableTypeImpl(
 
 } // namespace
 
-// static isMutableType does not use cache of type -> mutable type equivalent
+// Static `isMutableType` does not use cache of type -> mutable type equivalent
 bool AliasDb::isMutableType(const TypePtr& type) {
   return isMutableTypeImpl(type, nullptr);
 }
@@ -154,7 +154,7 @@ bool AliasDb::isMutableType(const Value* v) {
   return isMutableType(v->type());
 }
 
-// makes use of type -> mutable cache
+// Make use of type -> mutable cache
 bool AliasDb::isMutableTypeInternal(const TypePtr& type) const {
   return isMutableTypeImpl(type, &mapped_mutable_types_);
 }
@@ -171,9 +171,9 @@ c10::optional<AliasTypeSet> AliasDb::mapTypeToAliasTypeSetPtr(
 
 AliasDb::~AliasDb() = default;
 
-// Structure used during analysis to keeps track of all writes at a high level.
-// When analysis is completed this will be used to construct a more efficient
-// WriteIndex.
+// Structure used during analysis to keep track of all writes at a high
+// level. When the analysis is completed, this will be used to construct
+// a more efficient WriteIndex
 struct AliasDb::WriteRegistry {
   void registerWrite(const Value* v, Node* n) {
     writes_[n].emplace_back(v);
@@ -211,7 +211,7 @@ AliasDb::AliasDb(std::shared_ptr<Graph> graph, bool isFrozen)
   writeIndex_ = TWriteIndex();
   auto& writeIndex = *writeIndex_; // to make operator[] less ugly
 
-  // build the write index
+  // Build the write index
   for (const auto& write : writeRegistry_->writes_) {
     Node* node = write.first;
     const std::vector<const Value*> writtenValues = write.second;
@@ -248,7 +248,7 @@ AliasDb::AliasDb(std::shared_ptr<Graph> graph, bool isFrozen)
   // out of sync (since we have no way of registering new writes)
   writeRegistry_ = nullptr;
 
-  // initialize the write cache
+  // Initialize the write cache
   buildWrittenToLocationsIndex();
   GRAPH_DEBUG(toString());
 }
@@ -365,10 +365,10 @@ MemoryLocations AliasDb::getReads(Node* n) const {
 
 std::string AliasDb::getElementName(const Element* e) const {
   if (e->values.empty()) {
-    // not the most efficient way, but given the fact there are
+    // Not the most efficient way, but given the fact there are
     // not too many types and even fewer of them will end up in
-    // wildcardIndex_, we should be fine with a linear search
-    // each time we hit a wildcard leaf
+    // `wildcardIndex_`, we should be fine with a linear search
+    // each time we hit a Wildcard leaf
     for (const auto& ent : wildcardIndex_) {
       if (ent.second == e) {
         return std::string("WILDCARD for type ") + ent.first->str();
@@ -892,8 +892,7 @@ void AliasDb::analyzeLoop(Node* node) {
   TORCH_INTERNAL_ASSERT(blockOutputs.size() == node->outputs().size());
 
   // Run alias analysis on the loop body, iterating until the block output
-  // alias info converges.
-  // Copy node input aliases to block input
+  // alias info converges. Copy node input aliases to block input
   mapAliases(blockInputs, loopCarriedInputs);
 
   // Populate block output alias info by analyzing the body
@@ -1049,7 +1048,7 @@ bool AliasDb::functionalNonEscapingListUse(const Use& use) const {
   return false;
 }
 
-// List or dict or tuple: construct: create an aliasing element for the actual
+// List or dict or tuple construct: create an aliasing element for the actual
 // container, then mark all inputs as wildcards, since they've gone inside the
 // container. Then, add the wildcard sets of appropriate type to the contained
 // elements of the container.
@@ -1126,10 +1125,11 @@ void AliasDb::makePointerTo(const Value* from, const Value* to) {
     return;
   }
 
-  // the contained types of immutable type containers (optional, tuple, future)
-  // are unified, so these types can be mutable or immutable
-  // and point to a type which is mutable or immutable.
-  // Any is mutable but can point to an immutable type through refinement
+  // The contained types of immutable type containers (`Optional`,
+  // `Tuple`, `Future`, and `Union`) are unified, so these types can be
+  // mutable or immutable and point to a type which is mutable or
+  // immutable. `Any` is mutable but can point to an immutable type
+  // through refinement
   if (isMutableTypeInternal(from) != isMutableTypeInternal(to)) {
     bool expected_kind = false;
     for (auto kind : {from->type()->kind(), to->type()->kind()}) {
@@ -1151,24 +1151,24 @@ void AliasDb::makePointerTo(const Value* from, const Value* to) {
     return;
   }
 
-  // At this point, we are dealing with two mutable types.
-  auto fromEl = getOrCreateElement(from);
-  auto toEl = getOrCreateElement(to);
+  // At this point, we are dealing with two mutable types
+  auto from_el = getOrCreateElement(from);
+  auto to_el = getOrCreateElement(to);
 
-  memoryDAGBuilder_->makePointerTo(fromEl, toEl);
+  memoryDAGBuilder_->makePointerTo(from_el, to_el);
 }
 
 void AliasDb::addToContainedElements(
-    const Value* elem,
+    const Value* inner,
     const Value* container) {
-  if (!isMutableTypeInternal(elem)) {
+  if (!isMutableTypeInternal(inner)) {
     return;
   }
 
-  auto elemEl = getOrCreateElement(elem);
-  auto contEl = getOrCreateElement(container);
+  auto inner_el = getOrCreateElement(inner);
+  auto cont_el = getOrCreateElement(container);
 
-  memoryDAGBuilder_->addToContainedElements(elemEl, contEl);
+  memoryDAGBuilder_->addToContainedElements(inner_el, cont_el);
 }
 
 bool AliasDb::mayAlias(const Value* a, const Value* b) const {
@@ -1771,8 +1771,8 @@ c10::optional<Element*> AliasDb::setWildcard(const Value* v) {
   if (!maybe_wildcardElement) {
     return c10::nullopt;
   }
-  // Ensure that we create a corresponding element for `v` still, as it is an
-  // invariant that all mutable values have an element.
+  // Ensure that we create a corresponding Element for `v` still, as it is an
+  // invariant that all mutable values have an Element
   getOrCreateElement(v);
   wildcards_.insert(v);
   return *maybe_wildcardElement;
