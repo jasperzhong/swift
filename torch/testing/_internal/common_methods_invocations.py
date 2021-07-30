@@ -2188,6 +2188,29 @@ def sample_inputs_hardswish(self, device, dtype, requires_grad):
                requires_grad=requires_grad, low=-5, high=5)) for _ in range(1, N)]
     return tensors
 
+def sample_inputs_linear(self, device, dtype, requires_grad):
+    features_options = [[3, 4], [128, 128]]
+    batch_options = [
+        [],  # no batch
+        [64],
+        [5, 7],
+    ]
+    create_tensor = partial(make_tensor, device=device, dtype=dtype,
+                            requires_grad=requires_grad, low=-2, high=2)
+
+    sample_inputs = []
+    for has_bias, (in_feat, out_feat), batch_shape in \
+            itertools.product([True, False], features_options, batch_options):
+        input_tensor = create_tensor(batch_shape + [in_feat])
+        weight = create_tensor([out_feat, in_feat])
+        if not has_bias:
+            sample_inputs.append(SampleInput(input_tensor, args=(weight,)))
+            continue
+
+        bias = create_tensor([out_feat])
+        sample_inputs.append(SampleInput(input_tensor, args=(weight, bias)))
+    return sample_inputs
+
 def sample_inputs_interpolate(mode, self, device, dtype, requires_grad):
     N, C = 2, 3
     D = 4
@@ -6509,6 +6532,13 @@ op_db: List[OpInfo] = [
            supports_out=False,
            supports_forward_ad=True,
            autodiff_nonfusible_nodes=["aten::leaky_relu"]),
+    OpInfo('nn.functional.linear',
+           aten_name='linear',
+           supports_autograd=True,
+           sample_inputs_func=sample_inputs_linear,
+           dtypesIfCPU=all_types_and_complex_and(torch.half, torch.bfloat16),
+           dtypesIfCUDA=floating_and_complex_types_and(torch.half, torch.bfloat16),
+           supports_out=False),
     UnaryUfuncInfo(
         'nn.functional.logsigmoid',
         aten_name="log_sigmoid",
