@@ -18,7 +18,7 @@ from torch._C._jit_tree_views import (
     DictComp,
 )
 from torch._utils_internal import get_source_lines_and_file
-from torch.jit._monkeytype_config import monkeytype_trace, get_qualified_name
+from torch.jit._monkeytype_config import monkeytype_trace, get_qualified_name, get_type
 from torch._jit_internal import make_source_context, should_drop, is_static_fn, FunctionModifiers  # noqa: F401
 import torch.jit.annotations
 
@@ -304,6 +304,9 @@ def get_jit_def(fn, def_name, self_name=None, is_classmethod=False):
     if monkeytype_trace:
         qualname = get_qualified_name(fn)
         pdt_arg_types = type_trace_db.get_args_types(qualname)
+        for arg, type in pdt_arg_types.items():
+            # Get TorchScript compatible type format
+            pdt_arg_types[arg] = get_type(type)
 
     return build_def(ctx, fn_def, type_line, def_name, self_name=self_name, pdt_arg_types=pdt_arg_types)
 
@@ -381,11 +384,10 @@ def build_param_list(ctx, py_args, self_name, pdt_arg_types=None):
                 raise NotSupportedError(ctx_range, _vararg_kwarg_err)
 
     # List of Tuple of args and type as inferred by profile directed typing
-    arg_and_types = [(arg, next(iter(pdt_arg_types[arg.arg])) if pdt_arg_types and bool(pdt_arg_types[arg.arg]) else None)
+    arg_and_types = [(arg, pdt_arg_types[arg.arg] if pdt_arg_types and bool(pdt_arg_types[arg.arg]) else None)
                      for arg in py_args.args]
-    arg_and_types_kwonlyargs = [(arg, next(iter(pdt_arg_types[arg.arg])) if pdt_arg_types and bool(pdt_arg_types[arg.arg])
+    arg_and_types_kwonlyargs = [(arg, pdt_arg_types[arg.arg] if pdt_arg_types and bool(pdt_arg_types[arg.arg])
                                 else None) for arg in py_args.kwonlyargs]
-
     result = [build_param(ctx, arg, self_name, kwarg_only=False, pdt_arg_type=arg_type)
               for arg, arg_type in arg_and_types]
     result += [build_param(ctx, arg, self_name, kwarg_only=True, pdt_arg_type=arg_type)
