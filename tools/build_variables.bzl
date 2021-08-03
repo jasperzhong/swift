@@ -872,6 +872,7 @@ aten_native_source_codegen_list = [
     "aten/src/ATen/native/cpu/FunctionOfAMatrixUtilsKernel.cpp",
     "aten/src/ATen/native/cpu/GridSamplerKernel.cpp",
     "aten/src/ATen/native/cpu/HistogramKernel.cpp",
+    "aten/src/ATen/native/cpu/Im2colKernel.cpp",
     "aten/src/ATen/native/cpu/IndexKernel.cpp",
     "aten/src/ATen/native/cpu/LerpKernel.cpp",
     "aten/src/ATen/native/cpu/LinearAlgebraKernel.cpp",

@@ -16532,6 +16532,52 @@ class TestNNDeviceType(NNTestCase):
         for dim in [0, 1, 2, 3]:
             self._test_bfloat16_ops(torch.nn.Softmax(dim=dim), device, inp_dims=(16, 33, 15, 16), prec=1e-2)
 
+    @onlyCPU
+    @dtypes(torch.float, torch.double)
+    def test_conv_thnn_nhwc(self, device, dtype):
+        def helper(layer, n, c, h, w, out_channels, kernel_size, dilation, groups, bias):
+            input = torch.randint(-3, 3, (n, c, h, w), dtype=dtype, device=device)\
+                .to(memory_format=torch.channels_last)
+            input.requires_grad_()
+            conv = layer(c, out_channels, kernel_size, dilation=dilation, groups=groups, bias=bias)\
+                .to(device='cpu', dtype=dtype, memory_format=torch.channels_last)
+            for p in conv.parameters():
+                p.data = torch.randint_like(p, -3, 3)
+
+            ref_input = input.detach().clone().contiguous().requires_grad_()
+            ref_conv = layer(c, out_channels, kernel_size, dilation=dilation, groups=groups, bias=bias)
+            # load_state_dict will restore the stride & memory_layout on ref_conv.weight.
+            ref_conv.load_state_dict(conv.state_dict())
+            ref_conv = ref_conv.to(device='cpu', dtype=dtype, memory_format=torch.contiguous_format)
+
+            out = conv(input)
+            ref_out = ref_conv(ref_input)
+
+            grad = torch.randint_like(out, -3, 3)
+            ref_grad = grad.detach().clone().contiguous()
+
+            out.backward(grad)
+            ref_out.backward(ref_grad)
+
+            self.assertTrue(out.is_contiguous(memory_format=torch.channels_last))
+            self.assertTrue(ref_out.is_contiguous())
+            self.assertEqual(out, ref_out, exact_dtype=False)
+            self.assertEqual(conv.weight.grad, ref_conv.weight.grad, exact_dtype=False)
+            if bias:
+                self.assertEqual(conv.bias.grad, ref_conv.bias.grad, exact_dtype=False)
+            self.assertEqual(input.grad, ref_input.grad, exact_dtype=False)
+
+        # non-dilated conv goes to thnn_conv2d
+        # dilated conv goes to slow_conv_dilated2d
+        # transposed conv goes to slow_conv_transpose2d
+        with torch.backends.mkldnn.flags(enabled=False):
+            for layer in [nn.Conv2d, nn.ConvTranspose2d]:
+                for with_bias in [True, False]:
+                    helper(layer, 2, 8, 4, 4, out_channels=4, kernel_size=3, dilation=1, groups=1, bias=with_bias)
+                    helper(layer, 2, 8, 4, 4, out_channels=8, kernel_size=3, dilation=1, groups=8, bias=with_bias)
+                    helper(layer, 1, 16, 56, 56, out_channels=16, kernel_size=1, dilation=1, groups=1, bias=with_bias)
+                    helper(layer, 1, 16, 56, 56, out_channels=16, kernel_size=1, dilation=1, groups=16, bias=with_bias)
+
     @onlyCUDA
     @skipCUDAIfRocm
     @skipCUDAIfCudnnVersionLessThan(7603)
