@@ -3987,11 +3987,12 @@ def sample_inputs_meshgrid(
         ]
 
         sample_inputs = []
-        for shapes in test_cases:
+        for shapes, indexing in itertools.product(test_cases, {'ij'}):
             input, args = make_inputs(
                 [make_tensor(shape, device, dtype, requires_grad=requires_grad)
                  for shape in shapes])
-            sample_inputs.append(SampleInput(input=input, args=args))
+            sample_inputs.append(SampleInput(input=input, args=args,
+                                             kwargs=dict(indexing=indexing)))
         return sample_inputs
 
     return sample_inputs
@@ -6594,9 +6595,7 @@ op_db: List[OpInfo] = [
                SkipInfo('TestGradients', 'test_forward_mode_AD'))),
     OpInfo('meshgrid',
            variant_test_name='variadic_tensors',
-           # Our implementation corresponds to "ij" indexing for
-           # numpy.meshgrid, but its default value is "xy".
-           ref=lambda *tensors: np.meshgrid(*tensors, indexing='ij'),
+           ref=np.meshgrid,
            dtypes=all_types_and_complex_and(torch.bfloat16, torch.bool, torch.float16),
            sample_inputs_func=sample_inputs_meshgrid('variadic'),
            skips=[

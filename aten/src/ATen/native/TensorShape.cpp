@@ -2133,8 +2133,22 @@ std::vector<Tensor> unbind(const Tensor& self, Dimname dim) {
 }
 
 std::vector<Tensor> meshgrid(TensorList tensors) {
+  return native::meshgrid(tensors, /*indexing=*/c10::nullopt);
+}
+
+std::vector<Tensor> meshgrid(TensorList tensors,
+                             c10::optional<c10::string_view> indexing) {
   int64_t size = tensors.size();
   TORCH_CHECK(size > 0, "meshgrid expects a non-empty TensorList");
+
+  if (!indexing.has_value()) {
+    TORCH_WARN_ONCE("In an upcoming release, it will be required to pass the "
+                    "indexing argument to torch.meshgrid.");
+    indexing = "ij";
+  } else {
+    TORCH_CHECK(*indexing == "ij", "Unsupported indexing: ", *indexing);
+  }
+
   std::vector<int64_t> shape(size);
   for(const auto i: c10::irange(size)){
     switch (tensors[i].dim()) {
