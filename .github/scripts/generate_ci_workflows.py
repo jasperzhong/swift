@@ -273,6 +273,24 @@ LINUX_WORKFLOWS = [
     ),
     CIWorkflow(
         arch="linux",
+        build_environment="pytorch-linux-bionic-cuda11.1-cudnn8-pypy7.3.5-gcc9",
+        docker_image_base=f"{DOCKER_REGISTRY}/pytorch/pytorch-linux-bionic-cuda11.1-cudnn8-pypy7.3.5-gcc9",
+        test_runner_type=LINUX_CUDA_TEST_RUNNER,
+        # enable_jit_legacy_test=1,
+        # enable_multigpu_test=1,
+        # enable_nogpu_no_avx_test=1,
+        # enable_nogpu_no_avx2_test=1,
+        # enable_slow_test=1,
+        num_test_shards=2,
+        on_pull_request=True,
+        # ciflow_config=CIFlowConfig(
+        #     enabled=True,
+        #     trigger_action_only=True,
+        #     labels=set(['ciflow/slow']),
+        # ),
+    ),
+    CIWorkflow(
+        arch="linux",
         build_environment="libtorch-linux-xenial-cuda10.2-cudnn7-py3.6-gcc7",
         docker_image_base=f"{DOCKER_REGISTRY}/pytorch/pytorch-linux-xenial-cuda10.2-cudnn7-py3-gcc7",
         test_runner_type=LINUX_CUDA_TEST_RUNNER,
@@ -395,6 +413,8 @@ LINUX_WORKFLOWS = [
 ]
 
 
+LINUX_WORKFLOWS = [x for x in LINUX_WORKFLOWS if "pypy" in x.build_environment]
+
 BAZEL_WORKFLOWS = [
     CIWorkflow(
         arch="linux",
@@ -417,8 +437,8 @@ if __name__ == "__main__":
     )
     template_and_workflows = [
         (jinja_env.get_template("linux_ci_workflow.yml.j2"), LINUX_WORKFLOWS),
-        (jinja_env.get_template("windows_ci_workflow.yml.j2"), WINDOWS_WORKFLOWS),
-        (jinja_env.get_template("bazel_ci_workflow.yml.j2"), BAZEL_WORKFLOWS),
+        # (jinja_env.get_template("windows_ci_workflow.yml.j2"), WINDOWS_WORKFLOWS),
+        # (jinja_env.get_template("bazel_ci_workflow.yml.j2"), BAZEL_WORKFLOWS),
     ]
     for template, workflows in template_and_workflows:
         for workflow in workflows:
