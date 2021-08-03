@@ -13,6 +13,8 @@ namespace jit {
 
 using ::c10::IValue;
 
+using namespace std;
+
 // Protocol 2 is the highest that can be decoded by Python 2
 // See https://docs.python.org/3/library/pickle.html#data-stream-format
 constexpr static uint8_t PROTOCOL_VERSION = 2;
@@ -346,10 +348,68 @@ void Pickler::pushGlobal(
 
 void Pickler::pushTensor(const IValue& ivalue) {
   if (tensor_table_ == nullptr) {
-    pushLiteralTensor(ivalue);
+    auto& tensor = ivalue.toTensor();
+    if (tensor.is_sparse()) {
+      pushLiteralSparseTensor(ivalue);
+    } else {
+      pushLiteralTensor(ivalue);
+    }
   } else {
     pushTensorReference(ivalue);
   }
+}
+
+void Pickler::pushTensorData(const at::Tensor& tensor) {
+  // storage
+  pushStorageOfTensor(tensor);
+  // offset
+  pushInt(tensor.storage_offset());
+  // size
+  push<PickleOpCode>(PickleOpCode::MARK);
+  for (auto size : tensor.sizes()) {
+    pushInt(size);
+  }
+  push<PickleOpCode>(PickleOpCode::TUPLE);
+  // stride
+  push<PickleOpCode>(PickleOpCode::MARK);
+  for (auto stride : tensor.strides()) {
+    pushInt(stride);
+  }
+  push<PickleOpCode>(PickleOpCode::TUPLE);
+  // values requires_grad
+  pushIValue(tensor.requires_grad());
+}
+
+using namespace std;
+
+void Pickler::pushLiteralSparseTensor(const IValue& ivalue) {
+  auto& tensor = ivalue.toTensor();
+  // The arguments to this function are:
+  // indices_storage, indices_offset, indices_size, indices_stride,
+  // requires_grad, backward_hooks, values_storage, values_offset, indices_size,
+  // indices_stride, requires_grad, backward_hooks, def
+  pushGlobal("torch._utils", "_rebuild_sparse_coo_tensor");
+  // size
+  push<PickleOpCode>(PickleOpCode::MARK);
+  push<PickleOpCode>(PickleOpCode::MARK);
+  for (auto size : tensor.sizes()) {
+    pushInt(size);
+  }
+  push<PickleOpCode>(PickleOpCode::TUPLE);
+  // requires_grad
+  pushIValue(tensor.requires_grad());
+  // indices
+  pushTensorData(tensor._indices());
+  // values
+  pushTensorData(tensor._values());
+  // backward_hooks
+  pushGlobal("collections", "OrderedDict");
+  push<PickleOpCode>(PickleOpCode::EMPTY_TUPLE);
+  // Construct the collections.OrderedDict for the backward_hooks
+  push<PickleOpCode>(PickleOpCode::REDUCE);
+  push<PickleOpCode>(PickleOpCode::TUPLE);
+  // Call torch._utils._rebuild_tensor_v2
+  push<PickleOpCode>(PickleOpCode::REDUCE);
 }
 
 void Pickler::pushLiteralTensor(const IValue& ivalue) {
@@ -361,6 +421,7 @@ void Pickler::pushLiteralTensor(const IValue& ivalue) {
   // The format here is the same one used by `torch.save()`. The code for the
   // format can be found in `torch/serialization.py`.
   auto& tensor = ivalue.toTensor();
+
   bool quantized = tensor.is_quantized();
   // The arguments to this function are:
   //    storage, storage_offset, size, stride, requires_grad, backward_hooks
