@@ -2,10 +2,10 @@ import torch
 from typing import Any
 
 def set_saved_tensors_default_hooks(pack_hook, unpack_hook):
-    torch._C._autograd._register_default_hooks(pack_hook, unpack_hook)
+    torch._C._autograd._register_saved_tensors_default_hooks(pack_hook, unpack_hook)
 
 def reset_saved_tensors_default_hooks():
-    torch._C._autograd._reset_default_hooks()
+    torch._C._autograd._reset_saved_tensors_default_hooks()
 
 class save_on_cpu(object):
     """"Context-manager under which tensors saved by the forward pass will be
@@ -69,7 +69,7 @@ class save_on_cpu(object):
         self.unpack_hook = unpack_from_cpu
 
     def __enter__(self):
-        torch._C._autograd._register_default_hooks(self.pack_hook, self.unpack_hook)
+        torch._C._autograd._register_saved_tensors_default_hooks(self.pack_hook, self.unpack_hook)
 
     def __exit__(self, *args: Any):
-        torch._C._autograd._reset_default_hooks()
+        torch._C._autograd._reset_saved_tensors_default_hooks()
