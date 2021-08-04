@@ -2908,10 +2908,8 @@ def baddbmm(g, self, batch1, batch2, beta, alpha):
 
 
 @parse_args('v', 's')
-def meshgrid(g, tensor_list, indexing: Optional[str] = None):
-    if indexing is None:
-        indexing = 'ij'
-    elif indexing not in {'ij', 'xy'}:
+def meshgrid(g, tensor_list, indexing: str):
+    if indexing not in {'ij', 'xy'}:
         raise ValueError(f'Unsupported indexing: {indexing}')
 
     tensors = [view(g, t, g.op("Constant", value_t=torch.LongTensor([-1]))) for t in sym_help._unpack_list(tensor_list)]

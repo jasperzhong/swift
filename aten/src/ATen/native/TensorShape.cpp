@@ -2141,22 +2141,21 @@ std::vector<Tensor> meshgrid(TensorList tensors,
                                                                 tensors.end());
   bool swap_first_and_second_tensors;
 
-  if (!indexing.has_value()) {
-    TORCH_WARN_ONCE("In an upcoming release, it will be required to pass the "
-                    "indexing argument to torch.meshgrid.");
-    indexing = "ij";
-    swap_first_and_second_tensors = false;
-  } else {
-    if (*indexing == "xy") {
-      // We can only swap if there are multiple tensors.
-      swap_first_and_second_tensors = size >= 2;
-      if (swap_first_and_second_tensors) {
-        std::swap(tensor_refs[0], tensor_refs[1]);
-      }
-    } else {
-      TORCH_CHECK(*indexing == "ij", "Unsupported indexing: ", *indexing);
-      swap_first_and_second_tensors = false;
+  TORCH_CHECK(indexing.has_value(),
+              "torch.meshgrid requires the \"indexing\" parameter. The default "
+              "value was \"ij\", so pass indexing='ij' to keep the existing "
+              "behavior. In a future release of PyTorch the default will "
+              "become \"xy\".");
+
+  if (*indexing == "xy") {
+    // We can only swap if there are multiple tensors.
+    swap_first_and_second_tensors = size >= 2;
+    if (swap_first_and_second_tensors) {
+      std::swap(tensor_refs[0], tensor_refs[1]);
     }
+  } else {
+    TORCH_CHECK(*indexing == "ij", "Unsupported indexing: ", *indexing);
+    swap_first_and_second_tensors = false;
   }
 
   std::vector<int64_t> shape(size);
