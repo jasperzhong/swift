@@ -63,7 +63,7 @@ void OptimizeGraph(
   ConstantPropagation(graph);
   RemoveTensorMutation(graph);
   ConstantPropagation(graph);
-  EliminateDeadCode(graph);
+  eliminateDeadCode(graph);
   FuseInferenceOpsForSparseNN(graph);
   UseVariadicCat(graph);
 

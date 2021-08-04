@@ -265,12 +265,12 @@ void initJITBindings(PyObject* module) {
       .def(
           "_jit_pass_dce",
           [](std::shared_ptr<Graph>& g) {
-            return EliminateDeadCode(g->block()); // overload resolution
+            return eliminateDeadCode(g->block()); // overload resolution
           })
       .def(
           "_jit_pass_dce_allow_deleting_nodes_with_side_effects",
           [](std::shared_ptr<Graph>& g) {
-            return EliminateDeadCode(
+            return eliminateDeadCode(
                 g->block(),
                 true,
                 DCESideEffectPolicy::
@@ -408,7 +408,7 @@ void initJITBindings(PyObject* module) {
           py::arg("g"),
           py::arg("value_name_pairs") =
               std::vector<std::pair<std::string, std::string>>())
-      .def("_jit_pass_constant_pooling", ConstantPooling)
+      .def("_jit_pass_constant_pooling", constantPooling)
       // RemoveInplaceOps is used by CoreML so it must be removed with care.
       .def(
           "_jit_pass_remove_inplace_ops",
@@ -458,7 +458,7 @@ void initJITBindings(PyObject* module) {
       .def(
           "_jit_pass_canonicalize",
           [](const std::shared_ptr<Graph>& g) { return Canonicalize(g); })
-      .def("_jit_pass_lint", LintGraph)
+      .def("_jit_pass_lint", lintGraph)
       .def(
           "_jit_pass_complete_shape_analysis",
           [](const std::shared_ptr<Graph>& graph,
@@ -517,7 +517,7 @@ void initJITBindings(PyObject* module) {
       .def(
           "_jit_pass_constant_propagation_immutable_types",
           [](std::shared_ptr<Graph>& g) {
-            return ConstantPropagationImmutableTypes(g);
+            return constantPropagationImmutableTypes(g);
           })
       .def(
           "_jit_pass_constant_propagation",

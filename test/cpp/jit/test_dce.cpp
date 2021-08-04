@@ -44,7 +44,7 @@ graph():
   return (%tot)
 )IR";
   parseIR(input, graph.get());
-  EliminateDeadCode(graph);
+  eliminateDeadCode(graph);
   // Check that dead code elimin
   testing::FileCheck().run(input, *graph);
 }
