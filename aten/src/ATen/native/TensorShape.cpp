@@ -2132,10 +2132,6 @@ std::vector<Tensor> unbind(const Tensor& self, Dimname dim) {
   return at::unbind(self, dimname_to_position(self, dim));
 }
 
-std::vector<Tensor> meshgrid(TensorList tensors) {
-  return native::meshgrid(tensors, /*indexing=*/c10::nullopt);
-}
-
 std::vector<Tensor> meshgrid(TensorList tensors,
                              c10::optional<c10::string_view> indexing) {
   int64_t size = tensors.size();
