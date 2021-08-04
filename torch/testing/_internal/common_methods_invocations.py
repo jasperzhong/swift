@@ -3987,7 +3987,7 @@ def sample_inputs_meshgrid(
         ]
 
         sample_inputs = []
-        for shapes, indexing in itertools.product(test_cases, {'ij'}):
+        for shapes, indexing in itertools.product(test_cases, {'ij', 'xy'}):
             input, args = make_inputs(
                 [make_tensor(shape, device, dtype, requires_grad=requires_grad)
                  for shape in shapes])

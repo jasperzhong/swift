@@ -2141,36 +2141,56 @@ std::vector<Tensor> meshgrid(TensorList tensors,
   int64_t size = tensors.size();
   TORCH_CHECK(size > 0, "meshgrid expects a non-empty TensorList");
 
+  std::vector<std::reference_wrapper<const Tensor>> tensor_refs(tensors.begin(),
+                                                                tensors.end());
+  bool swap_first_and_second_tensors;
+
   if (!indexing.has_value()) {
     TORCH_WARN_ONCE("In an upcoming release, it will be required to pass the "
                     "indexing argument to torch.meshgrid.");
     indexing = "ij";
+    swap_first_and_second_tensors = false;
   } else {
-    TORCH_CHECK(*indexing == "ij", "Unsupported indexing: ", *indexing);
+    if (*indexing == "xy") {
+      // We can only swap if there are multiple tensors.
+      swap_first_and_second_tensors = size >= 2;
+      if (swap_first_and_second_tensors) {
+        std::swap(tensor_refs[0], tensor_refs[1]);
+      }
+    } else {
+      TORCH_CHECK(*indexing == "ij", "Unsupported indexing: ", *indexing);
+      swap_first_and_second_tensors = false;
+    }
   }
 
   std::vector<int64_t> shape(size);
   for(const auto i: c10::irange(size)){
-    switch (tensors[i].dim()) {
+    switch (tensor_refs[i].get().dim()) {
     case 0:
       shape[i] = 1;
       break;
     case 1:
-      shape[i] = tensors[i].size(0);
+      shape[i] = tensor_refs[i].get().size(0);
       break;
     default:
-      AT_ERROR("Expected scalar or 1D tensor in the tensor list but got: ", tensors[i]);
+      AT_ERROR("Expected scalar or 1D tensor in the tensor list but got: ",
+               tensor_refs[i]);
     }
   }
   for(const auto i: c10::irange(size - 1)){
-      TORCH_CHECK(tensors[i].dtype() == tensors[i+1].dtype(), "meshgrid expects all tensors to have the same dtype");
-      TORCH_CHECK(tensors[i].device() == tensors[i+1].device(), "meshgrid expects all tensors to have the same device");
+    TORCH_CHECK(tensor_refs[i].get().dtype() == tensor_refs[i+1].get().dtype(),
+                "meshgrid expects all tensors to have the same dtype");
+    TORCH_CHECK(tensor_refs[i].get().device() == tensor_refs[i+1].get().device(),
+                "meshgrid expects all tensors to have the same device");
   }
   std::vector<Tensor> grids;
   for(const auto i: c10::irange(size)){
     std::vector<int64_t> view_shape(size, 1);
     view_shape[i] = -1;
-    grids.push_back(tensors[i].view(view_shape).expand(shape));
+    grids.push_back(tensor_refs[i].get().view(view_shape).expand(shape));
+  }
+  if (swap_first_and_second_tensors) {
+    std::swap(grids[0], grids[1]);
   }
   return grids;
 }

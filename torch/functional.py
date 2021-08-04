@@ -365,7 +365,11 @@ else:
                 treated as tensors of size :math:`(1,)` automatically
 
             indexing: (str, optional): the indexing mode requested.
-                Only "ij" is currently supported.
+                Only "ij" and "xy" are currently supported. If "xy" is
+                selected, the first dimension corresponds to the
+                cardinality of the second input and the second
+                dimension corresponds to the cardinality of the first
+                input.
 
         Returns:
             seq (sequence of Tensors): If the input has :math:`k` tensors of size
