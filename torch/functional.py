@@ -328,10 +328,10 @@ def einsum(*args):
 if TYPE_CHECKING:
     # The JIT doesn't understand Union, so only add type annotation for mypy
     def meshgrid(*tensors: Union[Tensor, List[Tensor]],
-                 indexing: Optional[str] = None) -> Tuple[Tensor, ...]:
+                 indexing: str = 'xy') -> Tuple[Tensor, ...]:
         return _meshgrid(*tensors, indexing=indexing)
 else:
-    def meshgrid(*tensors, indexing: Optional[str] = None) -> Tuple[Tensor, ...]:
+    def meshgrid(*tensors, indexing: str = 'xy') -> Tuple[Tensor, ...]:
         r"""Creates grids of coordinates specified by the input tensors.
 
         Take :math:`N` tensors :math:`T_0, T_1, \ldots, T_N`, each of
@@ -397,7 +397,7 @@ else:
         return _meshgrid(*tensors, indexing=indexing)
 
 
-def _meshgrid(*tensors, indexing: Optional[str]):
+def _meshgrid(*tensors, indexing: str):
     if has_torch_function(tensors):
         return handle_torch_function(meshgrid, tensors, *tensors, indexing=indexing)
     if len(tensors) == 1 and isinstance(tensors[0], (list, tuple)):
