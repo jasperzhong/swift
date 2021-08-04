@@ -366,8 +366,15 @@ else:
             tensors (list of Tensor): list of scalars or 1 dimensional tensors. Scalars will be
                 treated as tensors of size :math:`(1,)` automatically
 
-            indexing: (str, optional): the indexing mode requested.
-                Only "ij" is currently supported.
+            indexing: (str, optional): the indexing mode, either "xy" or "ij".
+
+                If "xy" is selected, the first dimension corresponds
+                to the cardinality of the second input and the second
+                dimension corresponds to the cardinality of the first
+                input.
+
+                If "ij" is selected, the dimensions are in the same
+                order as the cardinality of the inputs.
 
         Returns:
             seq (sequence of Tensors): If the input has :math:`k` tensors of size
