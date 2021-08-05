@@ -1,6 +1,7 @@
 #include <torch/csrc/utils/pybind.h>
 #include <torch/csrc/utils/python_arg_parser.h>
 
+#include <ATen/PythonMode.h>
 #include <torch/csrc/jit/api/module.h>
 #include <torch/csrc/jit/backends/backend_init.h>
 #include <torch/csrc/jit/codegen/cuda/interface.h>
@@ -152,6 +153,12 @@ void initJITBindings(PyObject* module) {
       m, "IODescriptor"); // NOLINT(bugprone-unused-raii)
 
   m.def("_jit_init", loadPythonClasses)
+      .def(
+          "_python_mode_set_torch_dispatch",
+          at::impl::PythonMode::set_torch_dispatch_with_tensor)
+      .def(
+          "_python_mode_reset_torch_dispatch",
+          at::impl::PythonMode::reset_torch_dispatch)
       .def(
           "_jit_debug_fuser_num_cached_kernel_specs",
           torch::jit::fuser::debugNumCachedKernelSpecs)

@@ -19,6 +19,7 @@ ThreadLocalState::ThreadLocalState(bool keep_grad_mode)
   if (keep_grad_mode_) {
     grad_mode_enabled_ = GradMode::is_enabled();
   }
+  torch_dispatch_override_ = impl::PythonMode::get_torch_dispatch();
 #endif
   bumped_record_all_functions_ = at::checkRecordAllFunctions();
 }
@@ -29,6 +30,9 @@ void ThreadLocalState::setThreadLocalState(
 #if !defined(CAFFE2_IS_XPLAT_BUILD) && !defined(C10_MOBILE)
   if (state.keep_grad_mode_) {
     GradMode::set_enabled(state.grad_mode_enabled_);
+  }
+  if (state.torch_dispatch_override_.has_value()) {
+    impl::PythonMode::set_torch_dispatch(state.torch_dispatch_override_.value());
   }
 #endif
 
