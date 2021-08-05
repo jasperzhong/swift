@@ -9,6 +9,9 @@ from torch.testing import \
 from torch.testing._internal.common_utils import \
     (TestCase, is_iterable_of_tensors, run_tests, IS_SANDCASTLE, clone_input_helper, make_tensor,
      gradcheck, gradgradcheck, IS_IN_CI, suppress_warnings)
+from torch.testing._internal.composite_implicit_autograd_compliance import (
+    _check_CompositeImplicitAutograd_compliance,
+)
 from torch.testing._internal.common_methods_invocations import \
     (op_db, _NOTHING, UnaryUfuncInfo, SpectralFuncInfo)
 from torch.testing._internal.common_device_type import \
@@ -495,6 +498,17 @@ class TestCommon(TestCase):
         if len(inplace_ops) > 0:
             inplace_samples = list(filter(lambda sample: not sample.broadcasts_input, samples))
             _test_inplace_preserve_storage(inplace_samples, inplace_variants)
+
+    @ops(op_db, allowed_dtypes=(torch.float,))
+    def test_CompositeImplicitAutograd_compliance(self, device, dtype, op):
+        if device != 'cpu':
+            return
+        samples = op.sample_inputs(device, dtype, requires_grad=False)
+
+        for sample in samples:
+            args = [sample.input] + list(sample.args)
+            kwargs = sample.kwargs
+            _check_CompositeImplicitAutograd_compliance(op, args, kwargs)
 
 
 # gradcheck requires double precision
