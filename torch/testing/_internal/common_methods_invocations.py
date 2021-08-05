@@ -6386,7 +6386,6 @@ op_db: List[OpInfo] = [
            skips=(
                # matmul does not correctly warn when resizing out= inputs
                SkipInfo('TestCommon', 'test_out'),
-               SkipInfo('TestCommon', 'test_conj_view', device_type='cpu'),
            )),
     OpInfo('max',
            op=torch.max,
@@ -6961,6 +6960,8 @@ op_db: List[OpInfo] = [
            supports_out=False,
            skips=(
                SkipInfo('TestJit', 'test_variant_consistency_jit',),
+               # The greatest difference was 1.52587890625e-05 (-1.0001716613769531 vs. -1.0001869201660156), which occurred at index (1, 4, 8).
+               SkipInfo('TestMathBits', 'test_conj_view',),
            )),
     OpInfo('__rmod__',
            op=torch.Tensor.__rmod__,

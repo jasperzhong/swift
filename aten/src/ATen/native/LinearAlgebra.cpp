@@ -959,7 +959,6 @@ Tensor outer(const Tensor& self, const Tensor& vec2) {
 static void addmm_impl_cpu_(
     Tensor &result, const Tensor &self, Tensor m1, Tensor m2, const Scalar& beta, const Scalar& alpha) {
   TORCH_INTERNAL_ASSERT(self.dim() == 2 && m1.dim() == 2 && m2.dim() == 2);
-
   // Array access is faster than .size(n) and .stride(n)
   const auto self_sizes = self.sizes();
   auto m1_strides = m1.strides();
@@ -992,18 +991,18 @@ static void addmm_impl_cpu_(
   if (result_strides[0] == 1 &&
       (result_sizes[1] == 1 || result_strides[1] >= std::max(int64_t{1}, result_sizes[0]))) {
     transpose_c = false;
-    c = result;
+    c = result.resolve_conj();
   } else if (result_strides[1] == 1 &&
              (result_sizes[0] == 1 || result_strides[0] >= std::max(int64_t{1}, result_sizes[1]))) {
     std::swap(m1, m2);
     std::swap(m1_sizes, m2_sizes);
     std::swap(m1_strides, m2_strides);
     transpose_c = true;
-    c = result;
+    c = result.resolve_conj();
   } else {
     transpose_c = false;
     // make c FORTRAN contiguous
-    c = result.transpose(0, 1).contiguous().transpose_(0, 1);
+    c = result.resolve_conj().transpose(0, 1).contiguous().transpose_(0, 1);
   }
 
   const int64_t m = result_sizes[transpose_c ? 1 : 0];
@@ -1017,14 +1016,19 @@ static void addmm_impl_cpu_(
   if (m1_strides[transpose_c ? 1 : 0] == 1 &&
       m1_strides[transpose_c ? 0 : 1] >= std::max(int64_t{1}, m)) {
     transpose_a = false;
-    a = m1;
+    a = m1.resolve_conj();
   } else if (m1_strides[transpose_c ? 0 : 1] == 1 &&
              m1_strides[transpose_c ? 1 : 0] >= std::max(int64_t{1}, k)) {
     transpose_a = true;
     a = m1;
   } else {
     transpose_a = !transpose_c;
-    a = m1.clone(at::MemoryFormat::Contiguous);
+    if (m1.is_conj() && transpose_a) {
+      a = m1.conj().clone(at::MemoryFormat::Contiguous);
+      a._set_conj(true);
+    } else {
+      a = m1.clone(at::MemoryFormat::Contiguous);
+    }
   }
 
   // Cast m2 as matrix b
@@ -1034,27 +1038,36 @@ static void addmm_impl_cpu_(
   if (m2_strides[transpose_c ? 1 : 0] == 1 &&
       m2_strides[transpose_c ? 0 : 1] >= std::max(int64_t{1}, k)) {
     transpose_b = false;
-    b = m2;
+    b = m2.resolve_conj();
   } else if (m2_strides[transpose_c ? 0 : 1] == 1 &&
              m2_strides[transpose_c ? 1 : 0] >= std::max(int64_t{1}, n)) {
     transpose_b = true;
     b = m2;
   } else {
     transpose_b = !transpose_c;
-    b = m2.clone(at::MemoryFormat::Contiguous);
+    // TODO: restore conjugation here if transpose_b=True
+    if (m2.is_conj() && transpose_b) {
+      b = m2.conj().clone(at::MemoryFormat::Contiguous);
+      b._set_conj(true);
+    } else {
+      b = m2.clone(at::MemoryFormat::Contiguous);
+    }
   }
 
   const int64_t lda = a.strides()[(transpose_a == transpose_c) ? 1 : 0];
   const int64_t ldb = b.strides()[(transpose_b == transpose_c) ? 1 : 0];
   const int64_t ldc = c.strides()[transpose_c ? 0 : 1];
 
+  // Always ensure the conjugation for c is resolved since there's no way to specify c's conjugation in the gemm call
+  TORCH_CHECK(!c.is_conj());
+
   // Apply BLAS routine
   AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(kHalf, kBFloat16,
       result.scalar_type(), "addmm_impl_cpu_",
       [&]{
         at::native::cpublas::gemm(
-            transpose_a ? cpublas::Transpose : cpublas::NoTranspose,
-            transpose_b ? cpublas::Transpose : cpublas::NoTranspose,
+            transpose_a ? a.is_conj() ? cpublas::ConjTranspose : cpublas::Transpose : cpublas::NoTranspose,
+            transpose_b ? b.is_conj() ? cpublas::ConjTranspose : cpublas::Transpose : cpublas::NoTranspose,
             m, n, k,
             alpha.to<scalar_t>(),
             a.data_ptr<scalar_t>(), lda,
