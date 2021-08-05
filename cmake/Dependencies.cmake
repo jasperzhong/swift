@@ -246,6 +246,7 @@ if(NOT MKL_FOUND)
   find_path(POCKETFFT_INCLUDE_DIR NAMES pocketfft_hdronly.h
             PATHS /usr/local/include
             PATHS $ENV{POCKETFFT_HOME}
+            PATH "${PROJECT_SOURCE_DIR}/third_party/pocketfft"
            )
   if(POCKETFFT_INCLUDE_DIR)
     set(AT_POCKETFFT_ENABLED 1)
