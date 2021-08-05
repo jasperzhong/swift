@@ -405,15 +405,24 @@ def _inflate_expr(
 def _get_bundled_inputs_attributes_and_methods(script_module: torch.jit.ScriptModule) -> Tuple[List[str], List[str]]:
     methods: List[str] = []
     attributes: List[str] = []
+    num_bundled_inputs: int = 0
 
     # Has bundled inputs for forward
     if hasattr(script_module, 'get_all_bundled_inputs'):
         methods.append('get_all_bundled_inputs')
         methods.append('get_num_bundled_inputs')
         methods.append('run_on_bundled_input')
-        # Check inflate helper functions for each function, argument and bundled input
         num_bundled_inputs = script_module.get_num_bundled_inputs()
-        for function_name in script_module.get_bundled_inputs_functions_and_info():
+
+    if hasattr(script_module, 'get_bundled_inputs_functions_and_info'):
+        methods.append('get_bundled_inputs_functions_and_info')
+        all_info = script_module.get_bundled_inputs_functions_and_info()
+        for function_name in all_info:
+            methods.append("get_all_bundled_inputs_for_" + function_name)
+            methods.append("_generate_bundled_inputs_for_" + function_name)
+            attributes.append("_bundled_inputs_deflated_" + function_name)
+
+            # Check inflate helper functions for each function, argument and bundled input
             func = getattr(script_module, function_name, None)
             for arg_idx in range(len(func.schema.arguments) - 1):
                 for input_idx in range(num_bundled_inputs):
@@ -425,14 +434,6 @@ def _get_bundled_inputs_attributes_and_methods(script_module: torch.jit.ScriptMo
                     # if the arg has an InflatableArg with fmt_fn, add the helper function name
                     if hasattr(script_module, helper_fn_name):
                         methods.append(helper_fn_name)
-
-    if hasattr(script_module, 'get_bundled_inputs_functions_and_info'):
-        methods.append('get_bundled_inputs_functions_and_info')
-        all_info = script_module.get_bundled_inputs_functions_and_info()
-        for function_name in all_info:
-            methods.append("get_all_bundled_inputs_for_" + function_name)
-            methods.append("_generate_bundled_inputs_for_" + function_name)
-            attributes.append("_bundled_inputs_deflated_" + function_name)
 
     return (methods, attributes)
 
