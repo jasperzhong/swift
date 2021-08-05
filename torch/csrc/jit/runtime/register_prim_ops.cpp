@@ -4,6 +4,7 @@
 #include <torch/csrc/jit/runtime/operator.h>
 #include <torch/csrc/jit/runtime/register_ops_utils.h>
 #include <torch/csrc/jit/runtime/slice_indices_adjust.h>
+#include <torch/csrc/jit/runtime/vararg_functions.h>
 #include <torch/library.h>
 
 #include <algorithm>
@@ -233,7 +234,7 @@ RegisterOperators reg(
          aliasAnalysisSpecialCase()),
      OperatorGenerator(
          TORCH_SELECTIVE_SCHEMA("prim::unchecked_cast(t x) -> t"),
-         noop,
+         [](Stack* stack) { uncheckedCast(*stack); },
          aliasAnalysisSpecialCase()),
      OperatorGenerator(
          TORCH_SELECTIVE_SCHEMA("aten::IntImplicit(Tensor a) -> int"),
@@ -459,7 +460,7 @@ RegisterOperators reg(
          aliasAnalysisFromSchema()),
      OperatorGenerator(
          TORCH_SELECTIVE_SCHEMA("prim::RaiseException(str msg) -> ()"),
-         [](Stack* stack) { throw JITException(pop(stack).toStringRef()); },
+         [](Stack* stack) { raiseException(*stack); },
          aliasAnalysisFromSchema()),
      OperatorGenerator(
          TORCH_SELECTIVE_SCHEMA("aten::Size(int[] sizes) -> int[]"),
@@ -505,16 +506,7 @@ RegisterOperators reg(
          // note the compiler knows to type TupleIndex more accurately than it
          // is listed here.
          TORCH_SELECTIVE_SCHEMA("prim::TupleIndex(Any tup, int i) -> Any"),
-         [](Stack* stack) {
-           int64_t index = pop(stack).toInt();
-           auto tuple = pop(stack).toTuple();
-           auto norm_index = normalizeIndex(index, tuple->elements().size());
-           if (norm_index < 0 ||
-               norm_index > static_cast<int64_t>(tuple->elements().size())) {
-             throw std::out_of_range("Tuple list index out of range");
-           }
-           stack->emplace_back(tuple->elements()[norm_index]);
-         },
+         [](Stack* stack) { tupleIndex(*stack); },
          aliasAnalysisSpecialCase()),
      OperatorGenerator(
          TORCH_SELECTIVE_SCHEMA("aten::ne.int_list(int[] a, int[] b) -> bool"),
@@ -731,7 +723,7 @@ RegisterOperators reg(
          aliasAnalysisFromSchema()),
      OperatorGenerator(
          TORCH_SELECTIVE_SCHEMA("prim::Uninitialized() -> Any"),
-         [](Stack* stack) { push(stack, IValue::uninitialized()); },
+         [](Stack* stack) { tupleUninitialized(*stack); },
          aliasAnalysisSpecialCase()),
      OperatorGenerator(
          TORCH_SELECTIVE_SCHEMA("prim::Print(...) -> ()"),

@@ -1,4 +1,5 @@
 #include <torch/csrc/jit/mobile/interpreter.h>
+#include <torch/csrc/jit/runtime/instruction.h>
 
 #include <ATen/core/function.h>
 #include <ATen/core/jit_type.h>
@@ -209,6 +210,22 @@ bool InterpreterState::run(Stack& stack) {
         case CREATE_OBJECT: {
           auto type = code_->types_[inst.X]->expect<c10::ClassType>();
           createObject(stack, type);
+          ++pc;
+        } break;
+        case RAISE_EXCEPTION: {
+          raiseException(stack);
+          ++pc;
+        } break;
+        case TUPLE_UNINITIALIZED: {
+          tupleUninitialized(stack);
+          ++pc;
+        } break;
+        case TUPLE_INDEX: {
+          raiseException(stack);
+          ++pc;
+        } break;
+        case UNCHECK_CAST: {
+          uncheckedCast(stack);
           ++pc;
         } break;
         case ISINSTANCE: {
