@@ -2015,35 +2015,7 @@ Tensor mexp(const Tensor& a, bool compute_highest_degree_approx = false) {
       .view(a.sizes());
   }
 }
-
-// Based on:
-//
-// Mathias, Roy.
-// A Chain Rule for Matrix Functions and Applications.
-// SIAM J. Matrix Anal. Appl. 17 (1996): 610-620.
-//
-template <typename func_t>
-Tensor backward_analytic_function_of_a_matrix(
-    const Tensor& self, const Tensor& grad,
-    const func_t& function_of_a_matrix
-  ) {
-  auto self_transposed = self.transpose(-2, -1).conj();
-  auto self_transposed_sizes = self_transposed.sizes().vec();
-  self_transposed_sizes[self.dim() - 2] <<= 1;
-  self_transposed_sizes[self.dim() - 1] <<= 1;
-
-  auto n = self_transposed.size(-1);
-  auto meta_grad = at::zeros(self_transposed_sizes, grad.options());
-  meta_grad.narrow(-2, 0, n).narrow(-1, 0, n).copy_(self_transposed);
-  meta_grad.narrow(-2, n, n).narrow(-1, n, n).copy_(self_transposed);
-  meta_grad.narrow(-2, 0, n).narrow(-1, n, n).copy_(grad);
-
-  auto grad_input = function_of_a_matrix(meta_grad)
-    .narrow(-2, 0, n).narrow(-1, n, n);
-  return grad_input;
-}
-
-};
+} // end anon namespace
 
 // Computes the matrix exponential for a given batch of squared matrices.
 // The implementaion is based on:
@@ -2073,16 +2045,6 @@ Tensor linalg_matrix_exp(const Tensor& a) {
 // Alias
 Tensor matrix_exp(const Tensor& a) {
   return at::linalg_matrix_exp(a);
-}
-
-Tensor linalg_matrix_exp_backward(const Tensor& self, const Tensor& grad) {
-  NoTF32Guard disable_tf32;
-  return backward_analytic_function_of_a_matrix(
-    self, grad,
-    [](const Tensor& a) {
-      return a.matrix_exp();
-    }
-  );
 }
 
 Tensor frobenius_norm(const Tensor& self) {
