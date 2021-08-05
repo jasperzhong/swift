@@ -8,7 +8,6 @@ from torch.fx.graph import Node
 from .utils import (
     WEIGHT_INDEX_DICT,
     get_new_attr_name_with_prefix,
-    maybe_get_next_module,
     _parent_name,
 )
 from ..observer import (
@@ -248,6 +247,31 @@ def is_equalization_observer(observer: nn.Module) -> bool:
     return (isinstance(observer, _InputEqualizationObserver) or
             isinstance(observer, _WeightEqualizationObserver))
 
+
+def is_skippable_node(node: Node, modules) -> bool:
+    """ Checks if the node is skippable (it is a relu, batch norm, reshape,
+    avg_pool, or max_pool node).
+    """
+    if node.op == 'call_module':
+        return type(modules[str(node.target)]) in \
+            [nn.ReLU, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d,
+             nn.AvgPool1d, nn.AvgPool2d, nn.AvgPool3d,
+             nn.AdaptiveAvgPool1d, nn.AdaptiveAvgPool2d, nn.AdaptiveAvgPool3d,
+             nn.MaxPool1d, nn.MaxPool2d, nn.MaxPool3d,
+             nn.AdaptiveMaxPool1d, nn.AdaptiveMaxPool2d, nn.AdaptiveMaxPool3d]
+
+    elif node.op == 'call_function':
+        return node.target in \
+            [F.relu, F.batch_norm, F.avg_pool1d, F.avg_pool2d, F.avg_pool3d,
+             F.adaptive_avg_pool1d, F.adaptive_avg_pool2d, F.adaptive_avg_pool3d,
+             F.max_pool1d, F.max_pool2d, F.max_pool3d,
+             F.adaptive_max_pool1d, F.adaptive_max_pool2d, F.adaptive_max_pool3d]
+
+    elif node.op == 'call_method':
+        skippable_methods = ['view', 'contiguous', 'reshape']
+        return any(method in str(node.target) for method in skippable_methods)
+    return False
+
 def get_op_node_and_weight_eq_obs(
     input_eq_obs_node: Node,
     model: GraphModule,
@@ -298,6 +322,80 @@ def maybe_get_weight_eq_obs_node(op_node: Node, modules: Dict[str, nn.Module]) -
             return node_arg
     return None
 
+def maybe_get_following_observer(
+    node: Node,
+    modules: Dict[str, nn.Module],
+    target_observer_type: Any = object,
+) -> Optional[Node]:
+    """ Loops through the graph forwards and finds the next observer node with
+    the given type. We will skip nodes such as relu and pooling.
+
+    For example if we had the following part of the graph:
+        linear1 -> relu -> inp_quant_obs -> pool -> inp_eq_obs -> linear2
+    If we are looking for the quantization observer, we want to start from the
+    given node (linear1) and traverse forwards skipping the relu layer, and
+    returning the quantization observer.
+    If we are looking for the equalization observer, we want to start from the
+    given node (inp_quant_obs) and traverse forwards skipping the pooling layer,
+    and returning the equalization observer.
+    """
+
+    temp_node = node
+    while len(temp_node.users) > 0:
+        possible_node = None
+        for user in temp_node.users:
+            if user.op == 'call_module' and isinstance(modules[str(user.target)], target_observer_type):
+                # If the node has the observer type specified, return the obsever node
+                return user
+            if user.op in {'call_module', 'call_function', 'call_method'}:
+                possible_node = user
+                break
+
+        if possible_node is None or not is_skippable_node(possible_node, modules):
+            return None
+        temp_node = possible_node
+
+    return None
+
+def maybe_get_prev_node(node, modules):
+    """ Loops through the graph backwards and finds the previous op node. We
+    will skip nodes such as relu and pooling.
+
+    For example if we had the following part of the graph:
+        linear1 -> relu -> inp_quant_obs -> pool -> inp_eq_obs (node) -> linear2
+    We want to start from the given node (inp_eq_obs) and traverse backwards
+    skipping the pooling layer, finding the quantization observer, skipping the
+    relu layer, and finally finding the linear1 op node.
+
+    Note that if there are multiple paths in the graph, this will just follow
+    through one path and find the first previous node and quantization observer.
+
+    Returns:
+        - The previous op node if it exists
+        - The previous quantization observer node that appears before the
+        previous op node if it exists
+    """
+
+    inp_quant_obs_node = None
+    prev_node = None
+
+    temp_node = node
+    while len(temp_node.args) > 0:
+        temp_node = temp_node.args[0]
+
+        if is_skippable_node(temp_node, modules):
+            # If the node is skippable then we can just continue
+            continue
+        elif temp_node.op == 'call_module' and isinstance(modules[str(temp_node.target)], ObserverBase):
+            # If the node is an observer, then this is the quantization
+            # observer node that we need to rescale
+            inp_quant_obs_node = temp_node
+        else:
+            # If the node is not skippable, then it must be an op node
+            return temp_node, inp_quant_obs_node
+
+    return prev_node, inp_quant_obs_node
+
 def maybe_get_next_input_eq_obs(node: Node, modules: Dict[str, nn.Module]) -> Optional[_InputEqualizationObserver]:
     """ Gets the following input equalization observer if it exists.
 
@@ -318,22 +416,12 @@ def maybe_get_next_input_eq_obs(node: Node, modules: Dict[str, nn.Module]) -> Op
 
     assert(node_supports_equalization(node, modules))
 
-    # Locate the following nn.ReLU or F.relu node if it exists
-    maybe_relu_node = maybe_get_next_module(node, modules, nn.ReLU)
-    if maybe_relu_node is None:
-        maybe_relu_node = maybe_get_next_module(node, modules, target_functional_type=F.relu)
-
     # Locate the following output observer if it exists.
-    # We will skip the relu node if it exists.
-    maybe_obs_node = (
-        maybe_get_next_module(node, modules, ObserverBase)
-        if maybe_relu_node is None
-        else maybe_get_next_module(maybe_relu_node, modules, ObserverBase)
-    )
+    maybe_obs_node = maybe_get_following_observer(node, modules, ObserverBase)
     if maybe_obs_node is None:
         return None
 
-    maybe_eq_obs_node = maybe_get_next_module(maybe_obs_node, modules, _InputEqualizationObserver)
+    maybe_eq_obs_node = maybe_get_following_observer(maybe_obs_node, modules, _InputEqualizationObserver)
     if maybe_eq_obs_node is None:
         return None
 
@@ -354,16 +442,17 @@ def maybe_get_next_equalization_scale(node: Node, modules: Dict[str, nn.Module])
         return next_inp_eq_obs.equalization_scale
     return None
 
-def scale_input_observer(node: Node, modules: Dict[str, nn.Module]) -> None:
+def scale_input_observer(
+    node: Node,
+    input_quant_obs_node: Node,
+    modules: Dict[str, nn.Module]
+) -> None:
     """ Scales the following input quantization observer's min/max values by
     updating the values with the scaled min/max values calculated by the input
     equalization observer
     """
     input_eq_obs = modules[str(node.target)]
     assert(isinstance(input_eq_obs, _InputEqualizationObserver))
-
-    input_quant_obs_node = node.args[0]
-    assert(isinstance(input_quant_obs_node, Node))
 
     input_quant_obs = modules[str(input_quant_obs_node.target)]
     if not isinstance(input_quant_obs, ObserverBase):
@@ -410,7 +499,14 @@ def scale_weight_node(
 
     # Multiply the weights row wise by the next equalization scale
     # Reshape the equalization scale so that we can multiply it to the weight along axis=0
-    next_equalization_scale_reshaped = reshape_scale(next_equalization_scale, 0, weight)
+    try:
+        next_equalization_scale_reshaped = reshape_scale(next_equalization_scale, 0, scaled_weight)
+    except RuntimeError:
+        raise ValueError(
+            "Input-weight equalization is unable to support general reshapes within models. " +
+            f"Tried to reshape equalization scale with shape {next_equalization_scale.shape} " +
+            f"to be multiplied row-wise to the weight tensor with shape {scaled_weight.shape}."
+        )
     scaled_weight = torch.mul(scaled_weight, next_equalization_scale_reshaped)
 
     op_module.weight = nn.Parameter(scaled_weight)
@@ -475,7 +571,12 @@ def scale_weight_functional(
 
     # Multiply the weights row wise by the next equalization scale
     # Reshape the equalization scale so that we can multiply it to the weight along axis=1
-    next_equalization_scale_reshaped = reshape_scale(next_equalization_scale, 0, scaled_weight)
+    try:
+        next_equalization_scale_reshaped = reshape_scale(next_equalization_scale, 0, scaled_weight)
+    except RuntimeError:
+        raise ValueError(
+            "Input-weight equalization is unable to support general reshapes within models."
+        )
     scaled_weight = torch.mul(scaled_weight, next_equalization_scale_reshaped)
 
     setattr(modules[weight_parent_name], weight_name, scaled_weight)
@@ -620,21 +721,31 @@ def convert_eq_obs(
     """
     for node in model.graph.nodes:
         if node.op == 'call_module' and isinstance(modules[node.target], _InputEqualizationObserver):
-            inp_quant_obs_node = node.args[0]
-            prev_node = inp_quant_obs_node.args[0]
+            # Get the previous op node and input quantization observer
+            prev_node, inp_quant_obs_node = maybe_get_prev_node(node, modules)
 
             # If the previous node is a layer that needs to be equalized, then
             # we will remove the current node because we do not need to add any
-            # equalization nodes between two layers that need to be equalized
+            # equalization nodes between two layers that need to be equalized.
+            equalization_qconfig_map: Dict[str, Any] = model._equalization_qconfig_map  # type: ignore[assignment]
+            if (
+                equalization_qconfig_map.get(prev_node.name, None) is not None
+            ):
+                remove_node(model, node, node.args[0])
+                continue
 
-            # Before: linear1/relu (prev_node) -> output_quant_obs1 (inp_quant_obs_node) -> input_eq_obs2 (node) -> linear2
-            # After: linear1/relu (prev_node) -> output_quant_obs1 (inp_quant_obs_node) -> linear2
-            if node_supports_equalization(prev_node, modules) or "relu" in prev_node.name:
-                remove_node(model, node, inp_quant_obs_node)
+            # It should not happen where we have an equalization observer but no
+            # quantization observer before the equalization observer
+            if inp_quant_obs_node is None or prev_node is None:
+                warnings.warn(
+                    "Could not find quantization observer or previous op node" +
+                    f"for equalization observer {node}. Removing equalization observer."
+                )
+                remove_node(model, node, node.args[0])
                 continue
 
             # Update the following input quantization observer's min/max values
-            scale_input_observer(node, modules)
+            scale_input_observer(node, inp_quant_obs_node, modules)
 
             # Remove the InputEqualization node and add a mul operator before
             # the quantization observer node that appears before the equalization node
@@ -650,12 +761,12 @@ def convert_eq_obs(
 
             # Create a node multiplying the input with the equalization scale
             with model.graph.inserting_after(eq_scale_node):
-                inputs = (prev_node, eq_scale_node)
+                inputs = (inp_quant_obs_node.args[0], eq_scale_node)
                 mul_node = model.graph.create_node("call_function", torch.mul, inputs)
 
             # Set the mul nod to be the input_quant_obs_node's input instead of
             # the previous node
-            inp_quant_obs_node.replace_input_with(prev_node, mul_node)
+            inp_quant_obs_node.replace_input_with(inp_quant_obs_node.args[0], mul_node)
             remove_node(model, node, inp_quant_obs_node)
 
         elif weight_eq_obs_dict.get(node.name, None) is not None:
