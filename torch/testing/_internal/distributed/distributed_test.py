@@ -2650,23 +2650,19 @@ class DistributedTest:
                 dist.scatter(output)
             self.assertEqual(output, one * rank)
 
-        @sandcastle_skip_if(BACKEND == "nccl", "Nccl does not support scatter")
         def test_scatter(self):
             group, group_id, rank = self._init_global_test()
             self._test_scatter_helper(group, group_id, rank)
 
-        @sandcastle_skip_if(BACKEND == "nccl", "Nccl does not support scatter")
         def test_scatter_complex(self):
             group, group_id, rank = self._init_global_test()
             self._test_scatter_helper(group, group_id, rank, dtype=torch.cfloat)
 
-        @sandcastle_skip_if(BACKEND == "nccl", "Nccl does not support scatter")
         @skip_if_small_worldsize
         def test_scatter_group(self):
             group, group_id, rank = self._init_group_test()
             self._test_scatter_helper(group, group_id, rank)
 
-        @sandcastle_skip_if(BACKEND == "nccl", "Nccl does not support scatter")
         def test_scatter_full_group(self):
             group, group_id, rank = self._init_full_group_test()
             self._test_scatter_helper(group, group_id, rank)
@@ -6707,8 +6703,7 @@ class DistributedTest:
 
             dist.barrier()
 
-        @require_backend({"gloo"})
-        @sandcastle_skip_if(BACKEND == "nccl", "NCCL does not support scatter")
+        @require_backend({"gloo", "nccl"})
         def test_scatter_object_list(self):
             src_rank = 0
             scatter_list = (

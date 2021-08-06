@@ -1915,10 +1915,62 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::gather(
 }
 
 c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::scatter(
-    std::vector<at::Tensor>& /* unused */,
-    std::vector<std::vector<at::Tensor>>& /* unused */,
-    const ScatterOptions& /* unused */) {
-  TORCH_CHECK(false, "ProcessGroupNCCL does not support scatter");
+    std::vector<at::Tensor>& outputTensors,
+    std::vector<std::vector<at::Tensor>>& inputTensors,
+    const ScatterOptions& opts) {
+
+
+
+  check_gpu_tensors(outputTensors);
+
+  // @lint-ignore CLANGTIDY
+  auto tensor = outputTensors.back();
+  RECORD_PARAM_COMMS(
+      rank_,                    // rank
+      "scatter",         // colName
+      tensor.numel() *          // inSize
+        this->getSize(),        // outSize
+      tensor.numel(),           // dType
+      tensor.scalar_type(),
+      std::vector<int64_t>(),   // inSplitSizes
+      std::vector<int64_t>());  // outSplitSizes
+
+  auto inputFlattened =
+      flatten_for_scatter_gather(inputTensors, outputTensors, size_);
+  check_gpu_tensors(inputFlattened);
+
+
+
+  return collective(
+      inputFlattened,
+      outputTensors,
+      [&](at::Tensor& input,
+          at::Tensor& output,
+          ncclComm_t comm,
+          at::cuda::CUDAStream& stream) {
+        c10::cuda::CUDACachingAllocator::recordStream(
+            output.storage().data_ptr(), stream);
+        const auto root = opts.rootRank * inputTensors.size();  //inputTensor or outputTensor?
+        torch::cuda::nccl::scatter(input, output, comm, stream, root);
+        return ncclSuccess;
+      },
+      [&](std::vector<at::cuda::CUDAStream>& ncclStreams) {
+        // Copy the input tensors to the flattened inputs.
+        for (const auto i : c10::irange(inputTensors.size())) {
+          at::cuda::CUDAStreamGuard guard(ncclStreams[i]);
+          for (size_t j = 0; j < inputTensors[0].size(); ++j) {
+            // See [Sync Streams].
+            c10::cuda::CUDACachingAllocator::recordStream(
+                inputTensors[i][j].storage().data_ptr(), ncclStreams[i]);
+
+            inputFlattened[i][j].copy_(inputTensors[i][j], true);
+          }
+        }
+      },
+      [&](std::vector<at::cuda::CUDAStream>& ncclStreams) {},
+ 
+      OpType::SCATTER,
+      "nccl:scatter");
 }
 
 c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::recvAnysource(

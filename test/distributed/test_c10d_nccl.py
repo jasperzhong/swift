@@ -672,6 +672,205 @@ class ProcessGroupNCCLTest(TestCase):
             pg.gather(output_ts3, tensors, opts)
 
     @requires_nccl()
+    def test_scatter_ops(self):
+        store = c10d.FileStore(self.file.name, self.world_size)
+        pg = c10d.ProcessGroupNCCL(store, self.rank, self.world_size)
+
+        def scatter(output_t, input_t, rootRank):
+            opts = c10d.ScatterOptions()
+            opts.rootRank = rootRank
+            if rootRank == self.rank:
+                work = pg.scatter(output_t, input_t, opts)
+            else:
+                work = pg.scatter(output_t, None, opts)
+            work.wait()
+
+        # init input
+        input_ts = [[] for _ in range(self.num_gpus)]
+        for idx, ls in enumerate(input_ts):
+            for _ in range(self.world_size * self.num_gpus):
+                ls.append(torch.tensor([idx]).cuda(idx))
+
+        # init output
+        output_ts = []
+        for i in range(self.num_gpus):
+            output_ts.append(torch.tensor([0]).cuda(i))
+
+        # init golden output
+        golden_ts = []
+        for i in range(self.num_gpus):
+            golden_ts.append(torch.tensor([self.rank]).cuda(i))
+
+        scatter(output_ts, input_ts, self.rank)
+
+        # Verification
+        self.assertEqual(output_ts, golden_ts)
+
+        # init input
+        input_ts2 = [[] for _ in range(self.num_gpus)]
+        for idx, ls in enumerate(input_ts2):
+            for _ in range(self.world_size * self.num_gpus):
+                ls.append(torch.tensor([idx, idx + 1]).cuda(idx))
+
+        # init output
+        output_ts2 = []
+        for i in range(self.num_gpus):
+            output_ts2.append(torch.tensor([0, 0]).cuda(i))
+
+        # init golden output
+        golden_ts2 = []
+        for i in range(self.num_gpus):
+            golden_ts2.append(torch.tensor([self.rank, self.rank + 1]).cuda(i))
+
+        scatter(output_ts2, input_ts2, self.rank)
+
+        # Verification
+        self.assertEqual(output_ts2, golden_ts2)
+
+    @requires_nccl()
+    def test_scatter_stress_nccl(self):
+        store = c10d.FileStore(self.file.name, self.world_size)
+        pg = c10d.ProcessGroupNCCL(store, self.rank, self.world_size)
+
+        def scatter(output_t, input_t, rootRank):
+            opts = c10d.ScatterOptions()
+            opts.rootRank = rootRank
+            if rootRank == self.rank:
+                work = pg.scatter(output_t, input_t, opts)
+            else:
+                work = pg.scatter(output_t, None, opts)
+            work.wait()
+
+        stress_length = 1000
+
+        # init input
+        input_ts = []
+        for i in range(stress_length):
+            input_ts.append([[] for _ in range(self.num_gpus)])
+            for idx, ls in enumerate(input_ts[i]):
+                for _ in range(self.world_size * self.num_gpus):
+                    ls.append(torch.tensor([idx + i]).cuda(idx))
+
+        # init output
+        output_ts = []
+        for i in range(stress_length):
+            output_ts.append([])
+            for j in range(self.num_gpus):
+                output_ts[i].append(torch.tensor([0]).cuda(j))
+
+        # init golden output
+        golden_ts = []
+        for i in range(stress_length):
+            golden_ts.append([])
+            for j in range(self.num_gpus):
+                golden_ts[i].append(torch.tensor([self.rank + i]).cuda(j))
+
+        for i in range(stress_length):
+            scatter(output_ts[i], input_ts[i], self.rank)
+
+        # Verification
+        for i in range(stress_length):
+            self.assertEqual(output_ts[i], golden_ts[i])
+
+    @requires_nccl()
+    def test_scatter_checks(self):
+        store = c10d.FileStore(self.file.name, self.world_size)
+        pg = c10d.ProcessGroupNCCL(store, self.rank, self.world_size)
+
+        # init input
+        input_ts = [[] for _ in range(self.num_gpus)]
+        for idx, ls in enumerate(input_ts):
+            for _ in range(self.world_size * self.num_gpus):
+                ls.append(torch.tensor([idx]).cuda(idx))
+
+        # init output
+        output_ts = []
+        for i in range(self.num_gpus):
+            output_ts.append(torch.tensor([self.rank]).cuda(i))
+
+        with self.assertRaisesRegex(RuntimeError, "invalid argument"):
+            opts = c10d.ScatterOptions()
+            opts.rootRank = -1
+            pg.scatter(output_ts, input_ts, opts)
+
+        with self.assertRaisesRegex(TypeError, "incompatible function arguments"):
+            pg.scatter(output_ts, input_ts, 0)
+
+        with self.assertRaisesRegex(RuntimeError, "invalid argument"):
+            opts = c10d.ScatterOptions()
+            opts.rootRank = self.world_size
+            pg.scatter(output_ts, input_ts, opts)
+
+        with self.assertRaisesRegex(
+            RuntimeError, "Tensor list operands to scatter/gather must have the same length"
+        ):
+            opts = c10d.ScatterOptions()
+            opts.rootRank = 0
+            pg.scatter(output_ts, [], opts)
+
+        with self.assertRaisesRegex(
+            RuntimeError, "All tensor operands to scatter/gather must have the same number of elements"
+        ):
+            # init input
+            input_ts2 = [[] for _ in range(self.num_gpus)]
+            for idx, ls in enumerate(input_ts2):
+                for _ in range(self.world_size * self.num_gpus):
+                    ls.append(torch.tensor([0, 0]).cuda(idx))
+
+            opts = c10d.ScatterOptions()
+            opts.rootRank = 0
+            pg.scatter(output_ts, input_ts2, opts)
+
+        with self.assertRaisesRegex(
+            RuntimeError, "Tensor list input to scatter/gather must match number of collective participants"
+        ):
+            # init input
+            input_ts3 = [[] for _ in range(self.num_gpus)]
+            for idx, ls in enumerate(input_ts3):
+                for _ in range(self.world_size * self.num_gpus):
+                    ls.append(torch.tensor([0]).cuda(idx))
+                    ls.append(torch.tensor([0]).cuda(idx))
+
+            opts = c10d.ScatterOptions()
+            opts.rootRank = 0
+            pg.scatter(output_ts, input_ts3, opts)
+
+        with self.assertRaisesRegex(
+            RuntimeError, "Tensor list must be nonempty"
+        ):
+            opts = c10d.ScatterOptions()
+            opts.rootRank = 0
+            pg.scatter([], input_ts, opts)
+
+
+        with self.assertRaisesRegex(
+            RuntimeError, "All tensor operands to scatter/gather must have the same number of elements"
+        ):
+            # init output
+            output_ts2 = []
+            for i in range(self.num_gpus):
+                output_ts2.append(torch.tensor([self.rank, self.rank]).cuda(i))
+
+            opts = c10d.ScatterOptions()
+            opts.rootRank = 0
+            pg.scatter(output_ts2, input_ts, opts)
+
+        with self.assertRaisesRegex(
+            RuntimeError, "Tensor list mustn't be larger than the number of available GPUs"
+        ):
+            # init output
+            output_ts3 = []
+            for i in range(self.num_gpus):
+                output_ts3.append(torch.tensor([self.rank]).cuda(i))
+                output_ts3.append(torch.tensor([self.rank]).cuda(i))
+
+            opts = c10d.ScatterOptions()
+            opts.rootRank = 0
+            pg.scatter(output_ts3, input_ts, opts)
+
+
+
+    @requires_nccl()
     @sandcastle_skip_if(torch.cuda.device_count() < 2, "NCCL test requires 2+ GPUs")
     def test_reduce_scatter_base_basics(self):
         store = c10d.FileStore(self.file.name, self.world_size)
