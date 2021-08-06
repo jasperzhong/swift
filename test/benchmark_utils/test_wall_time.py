@@ -1,5 +1,6 @@
 import random
 import re
+import textwrap
 import timeit
 import typing
 
@@ -33,8 +34,16 @@ class MockWorker(base_worker.WorkerBase):
         return self._state.normalvariate(mean, std_over_mean * mean)
 
     def run(self, snippet: str) -> None:
-        pattern = r"^_timeit_task_result = _timeit_task_inner_f\(([0-9]+)\)$"
-        match = re.match(pattern, snippet)
+        pattern = r"""
+            _timeit_task_result = CompiledTimerModule\.measure_wall_time\(
+                n_iter=([0-9]+),
+                n_warmup_iter=1,
+                cuda_sync=False,
+                timer=timeit.default_timer,
+            \)
+        """
+        pattern = f"^{textwrap.dedent(pattern).strip()}$"
+        match = re.search(pattern, snippet, re.MULTILINE)
         if match:
             number = int(match.groups()[0])
 
