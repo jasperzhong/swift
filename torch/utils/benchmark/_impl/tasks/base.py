@@ -160,8 +160,16 @@ def run_in_worker(scoped: bool = True) -> typing.Callable[..., typing.Any]:
             src = "\n".join([
                 "def _run_in_worker_f():",
                 textwrap.indent("\n".join(body), " " * 4),
-                "",
-                "_run_in_worker_result = _run_in_worker_f()",
+                textwrap.dedent("""
+                try:
+                    # Clear prior value if it exists.
+                    del _run_in_worker_result
+
+                except NameError:
+                    pass
+
+                _run_in_worker_result = _run_in_worker_f()
+                """)
             ])
 
             # `worker.load` is not free, so for void functions we skip it.
