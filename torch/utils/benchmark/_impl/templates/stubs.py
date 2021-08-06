@@ -28,3 +28,7 @@ class CompiledTemplate(Protocol):
         timer: typing.Callable[[], float],
     ) -> float:
         ...
+
+    @staticmethod
+    def collect_callgrind(n_iter: int, n_warmup_iter: int) -> None:
+        ...
