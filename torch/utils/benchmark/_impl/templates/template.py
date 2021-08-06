@@ -6,6 +6,7 @@ This template will replace:
     `STMT_TEMPLATE_LOCATION`
 sections with user provided statements.
 """
+import timeit
 import typing
 
 import torch
@@ -27,7 +28,7 @@ class PythonTemplate:
         n_iter: int,
         n_warmup_iter: int,
         cuda_sync: bool,
-        timer: typing.Callable[[], float],
+        timer: typing.Callable[[], float] = timeit.default_timer,
     ) -> float:
         # SETUP_TEMPLATE_LOCATION
 

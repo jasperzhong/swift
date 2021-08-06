@@ -1,3 +1,4 @@
+import marshal
 import random
 import re
 import textwrap
@@ -35,17 +36,19 @@ class MockWorker(base_worker.WorkerBase):
 
     def run(self, snippet: str) -> None:
         pattern = r"""
-            _timeit_task_result = CompiledTimerModule\.measure_wall_time\(
-                n_iter=([0-9]+),
-                n_warmup_iter=1,
-                cuda_sync=False,
-                timer=timeit.default_timer,
-            \)
+            def _run_in_worker_f\(\):
+                # Deserialize args
+                import marshal
+                n_iter = marshal\.loads\(bytes.fromhex\('(.+)'\)\)  # ([0-9]+)
         """
-        pattern = f"^{textwrap.dedent(pattern).strip()}$"
+        pattern = textwrap.dedent(pattern).strip()
         match = re.search(pattern, snippet, re.MULTILINE)
         if match:
-            number = int(match.groups()[0])
+            number = marshal.loads(bytes.fromhex(match.groups()[0]))
+            assert number == int(match.groups()[1]), f"{number} != {match.groups()[1]}"
+
+            assert "jit_template.get().measure_wall_time(" in snippet
+            assert snippet.endswith("_run_in_worker_result = _run_in_worker_f()")
 
             self._last_measurement = sum([
                 # First timer invocation
@@ -70,7 +73,7 @@ class MockWorker(base_worker.WorkerBase):
         raise NotImplementedError(f"store: {name} = {value}")
 
     def load(self, name: str) -> typing.Any:
-        if name == "_timeit_task_result":
+        if name == "_run_in_worker_result":
             assert self._last_measurement is not None
             return self._last_measurement
 
