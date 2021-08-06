@@ -1,19 +1,28 @@
 from torch.utils.data.datapipes.iter.callable import (
     CollateIterDataPipe as Collate,
-    MapIterDataPipe as Map,
+)
+from torch.utils.data.datapipes.iter.callable import MapIterDataPipe as Map
+from torch.utils.data.datapipes.iter.callable import (
     TransformsIterDataPipe as Transforms,
 )
 from torch.utils.data.datapipes.iter.combinatorics import (
     SamplerIterDataPipe as Sampler,
+)
+from torch.utils.data.datapipes.iter.combinatorics import (
     ShuffleIterDataPipe as Shuffle,
 )
 from torch.utils.data.datapipes.iter.combining import (
     ConcatIterDataPipe as Concat,
-    ZipIterDataPipe as Zip,
+)
+from torch.utils.data.datapipes.iter.combining import ZipIterDataPipe as Zip
+from torch.utils.data.datapipes.iter.dataframes import (
+    DFIterDataPipe as DFIterDataPipe,
+)
+from torch.utils.data.datapipes.iter.grouping import BatchIterDataPipe as Batch
+from torch.utils.data.datapipes.iter.grouping import (
+    BucketBatchIterDataPipe as BucketBatch,
 )
 from torch.utils.data.datapipes.iter.grouping import (
-    BatchIterDataPipe as Batch,
-    BucketBatchIterDataPipe as BucketBatch,
     GroupByKeyIterDataPipe as GroupByKey,
 )
 from torch.utils.data.datapipes.iter.httpreader import (
@@ -48,6 +57,7 @@ __all__ = ['Batch',
            'BucketBatch',
            'Collate',
            'Concat',
+           'DFIterDataPipe',
            'Filter',
            'GroupByKey',
            'HttpReader',
