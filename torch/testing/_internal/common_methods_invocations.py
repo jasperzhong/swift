@@ -1407,6 +1407,29 @@ def sample_inputs_baddbmm(op_info, device, dtype, requires_grad, **kwargs):
                                              broadcasts_input=broadcasts_input))
     return tuple(sample_inputs)
 
+def sample_attn(self, device, dtype, requires_grad=False, **kwargs):
+    samples = []
+    shapes = [(2, 2), (3, 3), (2, 3), (10, 10), (100, 100)]
+    for shape in shapes:
+        q_tensor = make_tensor(shape, device, dtype, low=None, high=None,
+                               requires_grad=requires_grad)
+        k_tensor = make_tensor(shape, device, dtype, low=None, high=None,
+                               requires_grad=requires_grad)
+        v_tensor = make_tensor(shape, device, dtype, low=None, high=None,
+                               requires_grad=requires_grad)
+        samples.append(SampleInput(q_tensor, args=(k_tensor, v_tensor)))
+    diff_shapes = [(3, 2, 5, 2, 5, 6), (6, 3, 7, 3, 7, 8)]
+    for q_1, q_2, k_1, k_2, v_1, v_2 in diff_shapes:  # q_2 == k_2 and k_1 == v_1
+        q_tensor = make_tensor((q_1, q_2), device, dtype, low=None, high=None,
+                               requires_grad=requires_grad)
+        k_tensor = make_tensor((k_1, k_2), device, dtype, low=None, high=None,
+                               requires_grad=requires_grad)
+        v_tensor = make_tensor((v_1, v_2), device, dtype, low=None, high=None,
+                               requires_grad=requires_grad)
+        samples.append(SampleInput(q_tensor, args=(k_tensor, v_tensor)))
+    return samples
+
+
 def sample_inputs_addr(op_info, device, dtype, requires_grad, **kwargs):
     input1 = SampleInput(
         make_tensor((S, M), device, dtype, low=None, high=None, requires_grad=requires_grad),
@@ -4917,6 +4940,14 @@ op_db: List[OpInfo] = [
            sample_inputs_func=partial(sample_inputs_binary_pwise, alpha=2),
            supports_inplace_autograd=False,
            supports_forward_ad=True),
+    OpInfo('attn',
+           dtypes=floating_types_and(torch.bfloat16),
+           dtypesIfCUDA=floating_types_and(torch.float16, *[torch.bfloat16] if CUDA11OrLater else []),
+           backward_dtypes=(torch.bfloat16, torch.float32, torch.float64),
+           backward_dtypesIfCUDA=floating_types_and(torch.float16,
+                                                    *[torch.bfloat16] if (SM60OrLater or CUDA11OrLater) else []),
+           supports_out=False,
+           sample_inputs_func=sample_attn),
     OpInfo('mul',
            aliases=('multiply',),
            dtypes=all_types_and_complex_and(torch.float16, torch.bfloat16, torch.bool),
