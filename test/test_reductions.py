@@ -57,8 +57,8 @@ class TestReductions(TestCase):
 
     def test_var_unbiased(self, device):
         tensor = torch.randn(100, device=device)
-        self.assertEqual(tensor.var(0), tensor.var(0, unbiased=True))
-        self.assertEqual(tensor.var(), tensor.var(unbiased=True))
+        self.assertEqual(tensor.var(0, correction=1), tensor.var(0, unbiased=True))
+        self.assertEqual(tensor.var(correction=1), tensor.var(unbiased=True))
         self.assertEqual(tensor.var(unbiased=False), tensor.var(0, unbiased=False))
 
         tensor = torch.tensor([1.0, 2.0], device=device)
@@ -70,14 +70,14 @@ class TestReductions(TestCase):
         self.assertEqual(tensor.var(unbiased=False), 2.0 / 3.0)
 
         tensor = torch.randn(100, device=device)
-        self.assertEqual(tensor.std(0), tensor.std(0, unbiased=True))
-        self.assertEqual(tensor.std(), tensor.std(unbiased=True))
+        self.assertEqual(tensor.std(0, correction=1), tensor.std(0, unbiased=True))
+        self.assertEqual(tensor.std(correction=1), tensor.std(unbiased=True))
         self.assertEqual(tensor.std(unbiased=False), tensor.std(0, unbiased=False))
 
     def test_var_stability(self, device):
         tensor = torch.tensor([2281.5, 2281.25], device=device)
-        self.assertEqual(tensor.var(dim=0), 0.03125)
-        self.assertEqual(tensor.var(), 0.03125)
+        self.assertEqual(tensor.var(dim=0, correction=1), 0.03125)
+        self.assertEqual(tensor.var(correction=1), 0.03125)
 
     def test_sum_dim_reduction_uint8_overflow(self, device):
         example = [[-1, 2, 1], [5, 3, 6]]
@@ -92,13 +92,18 @@ class TestReductions(TestCase):
     def test_dim_reduction_less_than_64(self, device):
         sizes = [1] * 65
         x = torch.randn(sizes, device=device)
-        ops = [torch.mean, torch.sum, torch.nansum, torch.std, torch.logsumexp, torch.std, torch.var,
-               torch.amin, torch.amax, torch.norm]
+        ops = [torch.mean, torch.sum, torch.nansum, torch.logsumexp, torch.amin, torch.amax, torch.norm]
         for op in ops:
             with self.assertRaisesRegex(RuntimeError, "only tensors with up to 64 dims are supported"):
                 op(x, 64)
             with self.assertRaisesRegex(RuntimeError, "only tensors with up to 64 dims are supported"):
                 op(x, -1)
+
+        for op in [torch.std, torch.var, torch.var_mean, torch.std_mean]:
+            with self.assertRaisesRegex(RuntimeError, "only tensors with up to 64 dims are supported"):
+                op(x, dim=64, correction=0)
+            with self.assertRaisesRegex(RuntimeError, "only tensors with up to 64 dims are supported"):
+                op(x, dim=-1, correction=0)
 
     @skipIfNoSciPy
     def test_logsumexp(self, device):
@@ -776,14 +781,14 @@ class TestReductions(TestCase):
         tensor = torch.FloatTensor([2281.5, 2281.25]).to(device)
 
         # Stability for inner dim
-        self.assertEqual(tensor.var(0), 0.03125)
+        self.assertEqual(tensor.var(0, correction=1), 0.03125)
 
         # General stability
-        self.assertEqual(tensor.var(), 0.03125)
+        self.assertEqual(tensor.var(correction=1), 0.03125)
 
         # Stability for outer dimensions
         tensor = tensor.unsqueeze(1)
-        self.assertEqual(tensor.var(0), 0.03125)
+        self.assertEqual(tensor.var(0, correction=1), 0.03125)
 
     @onlyCPU
     @dtypes(torch.bool, torch.double)
@@ -1330,7 +1335,7 @@ class TestReductions(TestCase):
     # TODO: part of this test covers torch.norm, with should be covered by test_linalg
     @onlyOnCPUAndCUDA
     def test_repeated_dim(self, device):
-        ops = [torch.mean, torch.sum, torch.nansum, torch.std, torch.logsumexp, torch.std, torch.var,
+        ops = [torch.mean, torch.sum, torch.nansum, torch.logsumexp,
                torch.amin, torch.amax, torch.norm]
         x = torch.randn(3, 3, 3, 3, device=device)
 
@@ -1342,21 +1347,26 @@ class TestReductions(TestCase):
                 with self.assertRaisesRegex(RuntimeError, e_msg):
                     op(x, dim=dim)
 
+        for op in [torch.std, torch.var, torch.var_mean, torch.std_mean]:
+            for dim in [(0, 0), (0, -4)]:
+                with self.assertRaisesRegex(RuntimeError, error_msg):
+                    op(x, dim=dim, correction=0)
+
     # TODO: update this test to comapre against NumPy
     @onlyCUDA
     def test_var(self, device):
         cpu_tensor = torch.randn(2, 3, 3)
         device_tensor = cpu_tensor.to(device)
-        self.assertEqual(device_tensor.var(), cpu_tensor.var())
-        self.assertEqual(device_tensor.var(1), cpu_tensor.var(1))
-        self.assertEqual(device_tensor.var(2), cpu_tensor.var(2))
-        self.assertEqual(device_tensor.std(), cpu_tensor.std())
-        self.assertEqual(device_tensor.std(1), cpu_tensor.std(1))
-        self.assertEqual(device_tensor.var(2), cpu_tensor.var(2))
+        self.assertEqual(device_tensor.var(correction=0), cpu_tensor.var(correction=0))
+        self.assertEqual(device_tensor.var(1, correction=0), cpu_tensor.var(1, correction=0))
+        self.assertEqual(device_tensor.var(2, correction=0), cpu_tensor.var(2, correction=0))
+        self.assertEqual(device_tensor.std(correction=0), cpu_tensor.std(correction=0))
+        self.assertEqual(device_tensor.std(1, correction=0), cpu_tensor.std(1, correction=0))
+        self.assertEqual(device_tensor.var(2, correction=0), cpu_tensor.var(2, correction=0))
 
         cpu_tensor = torch.randn(100)
         device_tensor = cpu_tensor.to(device)
-        self.assertEqual(device_tensor.var(), cpu_tensor.var())
+        self.assertEqual(device_tensor.var(correction=0), cpu_tensor.var(correction=0))
 
     # TODO: update this test to compare against NumPy
     @onlyCUDA
@@ -1365,7 +1375,7 @@ class TestReductions(TestCase):
         cpu_tensor = torch.randn(2 * 32 * 1024 + 1, 2, 67)
         device_tensor = cpu_tensor.to(device)
 
-        self.assertEqual(cpu_tensor.var(2), device_tensor.var(2))
+        self.assertEqual(cpu_tensor.var(2, correction=0), device_tensor.var(2, correction=0))
 
     # TODO: update this to compare against NumPy instead of CPU
     @onlyCUDA
@@ -1579,16 +1589,29 @@ class TestReductions(TestCase):
         self.assertEqual(x[:, :2].amax().item(), 5)
         self.assertEqual(x[:, :2].argmax().item(), 2)
 
-        dim_red_fns = [
-            "mean", "median", "nanmedian", "mode", "norm", "prod",
-            "std", "sum", "var", "max", "min", "amax", "amin"]
 
         def normfn_attr(t, dim, keepdim=False, out=None):
             attr = torch.norm
             return attr(t, 2, dim, keepdim, out=out)
 
-        for fn_name in dim_red_fns:
-            fn_attr = getattr(torch, fn_name) if fn_name != "norm" else normfn_attr
+        def varfn_attr(x, dim=None, keepdim=False, out=None):
+            if out is not None:
+                return torch.var(x, dim, correction=1, keepdim=keepdim, out=out)
+            else:
+                return torch.var(x, dim, correction=1, keepdim=keepdim)
+
+        def stdfn_attr(x, dim=None, keepdim=False, out=None):
+            if out is not None:
+                return torch.std(x, dim, correction=1, keepdim=keepdim, out=out)
+            else:
+                return torch.std(x, dim, correction=1, keepdim=keepdim)
+
+        dim_red_fns = [
+            "mean", "median", "nanmedian", "mode", normfn_attr, "prod",
+            stdfn_attr, "sum", varfn_attr, "max", "min", "amax", "amin"]
+
+        for reduction_fn in dim_red_fns:
+            fn_attr = getattr(torch, reduction_fn) if isinstance(reduction_fn, str) else reduction_fn
 
             def fn(x, dim, keepdim=False, out=None):
                 ans = fn_attr(x, dim, keepdim=keepdim, out=out)
@@ -1621,23 +1644,23 @@ class TestReductions(TestCase):
             test_multidim(x, singleton_dim)
 
             # check reducing with output kwargs
-            if fn_name in ['median', 'nanmedian', 'mode', 'max', 'min']:
+            if reduction_fn in ['median', 'nanmedian', 'mode', 'max', 'min']:
                 y = torch.randn(5, 3, device=device)
                 values = torch.randn(5, 3, device=device)
                 indices = torch.zeros(5, 3, device=device).long() - 1
                 fn_tuple(y, 1, keepdim=False, out=(values[:, 1], indices[:, 1]))
                 values_expected, indices_expected = fn_tuple(y, 1, keepdim=False)
                 self.assertEqual(values[:, 1], values_expected,
-                                 msg='{} values with out= kwarg'.format(fn_name))
+                                 msg='{} values with out= kwarg'.format(reduction_fn))
                 self.assertEqual(indices[:, 1], indices_expected,
-                                 msg='{} indices with out= kwarg'.format(fn_name))
+                                 msg='{} indices with out= kwarg'.format(reduction_fn))
                 continue
 
             x = torch.randn(5, 3, device=device)
             y = torch.randn(5, 3, device=device)
             fn(y, 1, keepdim=False, out=x[:, 1])
             expected = fn(y, 1, keepdim=False)
-            self.assertEqual(x[:, 1], expected, msg='{} with out= kwarg'.format(fn_name))
+            self.assertEqual(x[:, 1], expected)
 
     @onlyCUDA
     @largeTensorTest('10GB')
@@ -2131,7 +2154,7 @@ class TestReductions(TestCase):
                 # dim
                 (None, 0, 1),
                 # correction
-                (None, 0, 10, 30),
+                (0, 10, 30),
                 # keepdim
                 (False, True),
             ),
@@ -2143,10 +2166,6 @@ class TestReductions(TestCase):
 
         for dim, correction, keepdim in test_args:
             numpy_kwargs = dict(axis=dim, ddof=correction, keepdims=keepdim)
-            if correction is None:
-                # NumPy default is not compatible with torch.std (gh-50010)
-                numpy_kwargs['ddof'] = 1
-
             numpy_res = np.asarray(np.var(array, **numpy_kwargs))
             torch_res = torch.var(tensor, dim=dim, correction=correction, keepdim=keepdim)
 
@@ -2165,7 +2184,7 @@ class TestReductions(TestCase):
                 # dim
                 (None, 0, 1),
                 # correction
-                (None, 0, 10, 30),
+                (0, 10, 30),
                 # keepdim
                 (False, True),
             ),
@@ -2177,10 +2196,6 @@ class TestReductions(TestCase):
 
         for dim, correction, keepdim in test_args:
             numpy_kwargs = dict(axis=dim, ddof=correction, keepdims=keepdim)
-            if correction is None:
-                # NumPy default is incompatible with torch.std (gh-50010)
-                numpy_kwargs['ddof'] = 1
-
             numpy_res = np.asarray(np.std(array, **numpy_kwargs))
             torch_res = torch.std(tensor, dim=dim, correction=correction, keepdim=keepdim)
 
@@ -2199,7 +2214,7 @@ class TestReductions(TestCase):
                 # dim
                 (None, 0, 1),
                 # correction
-                (None, 0, 10, 30),
+                (0, 10, 30),
                 # keepdim
                 (False, True),
             ),
@@ -2230,7 +2245,7 @@ class TestReductions(TestCase):
                 # dim
                 (None, 0, 1),
                 # correction
-                (None, 0, 10, 30),
+                (0, 10, 30),
                 # keepdim
                 (False, True),
             ),
@@ -2252,6 +2267,17 @@ class TestReductions(TestCase):
 
             self.assertEqual(var1, var2)
             self.assertEqual(mean1, mean2)
+
+    def test_std_var_errors_on_no_correction(self, device):
+        x = torch.rand((10,), device=device)
+
+        for op in [torch.std, torch.var, torch.var_mean, torch.std_mean]:
+            with self.assertRaisesRegex(RuntimeError, "correction parameter must be given"):
+                op(x)
+            with self.assertRaisesRegex(RuntimeError, "correction parameter must be given"):
+                op(x, dim=-1)
+            with self.assertRaisesRegex(RuntimeError, "correction parameter must be given"):
+                op(x, keepdim=True)
 
     def test_amin_amax_some_dims(self, device):
         sizes = (4, 6, 7, 5, 3)
@@ -2648,8 +2674,8 @@ class TestReductions(TestCase):
             ('sum', torch.sum, 0., np.sum),
             ('norm', torch.norm, 0., np.linalg.norm),
             ('mean', torch.mean, nan, np.mean),
-            ('var', torch.var, nan, np.var),
-            ('std', torch.std, nan, np.std),
+            ('var', partial(torch.var, correction=1), nan, np.var),
+            ('std', partial(torch.std, correction=1), nan, np.std),
             ('logsumexp', torch.logsumexp, -inf, logsumexp),
         ]
 
