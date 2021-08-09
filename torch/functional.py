@@ -331,9 +331,33 @@ if TYPE_CHECKING:
         return _meshgrid(*tensors)
 else:
     def meshgrid(*tensors):
-        r"""Take :math:`N` tensors, each of which can be either scalar or 1-dimensional
-        vector, and create :math:`N` N-dimensional grids, where the :math:`i` :sup:`th` grid is defined by
-        expanding the :math:`i` :sup:`th` input over dimensions defined by other inputs.
+        r"""Creates grids of coordinates specified by the input tensors.
+
+        Take :math:`N` tensors :math:`T_0, T_1, \ldots, T_N`, each of
+        which can be a scalar* or a vector. Produces :math:`N`
+        N-dimensional tensors, each of shape :math:`(|T_0|, |T_1|
+        \ldots |T_n|)`. Each tensor output :math:`G_i` is :math:`T_i`
+        in the :math:`i` :sup:`th` dimension, expanded over the other
+        dimensions.
+
+        This operation is conceptually similar to the cartesian
+        product, except the output is collected across multiple
+        tensors, rather than a tensor of vectors.
+
+        * Note that input scalars are treated equivalently to vectors
+          of a single element.
+
+        .. warning::
+
+            This behaves differently from `numpy.meshgrid`.
+            `numpy.meshgrid` supports an indexing argument, defaulting
+            to "xy", that changes how the output dimensions correspond
+            to the input tensors. `numpy.meshgrid` will behave
+            identically to `torch.meshgrid` if `indexing='ij'` is
+            passed.
+
+            https://github.com/pytorch/pytorch/issues/50276 tracks
+            this issue with the goal of migrating to NumPy's behavior.
 
         Args:
             tensors (list of Tensor): list of scalars or 1 dimensional tensors. Scalars will be
@@ -357,6 +381,10 @@ else:
             tensor([[4, 5, 6],
                     [4, 5, 6],
                     [4, 5, 6]])
+            >>> torch.equal(torch.cat(tuple(torch.dstack([grid_x, grid_y]))),
+            ...             torch.cartesian_prod(x, y))
+            True
+
         """
         return _meshgrid(*tensors)
 
