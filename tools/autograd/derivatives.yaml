@@ -1285,10 +1285,10 @@
   self: unsqueeze_to(grad, dim, self.sizes())
   result: auto_linear
 
-- name: std.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> Tensor
+- name: std.correction(Tensor self, int[1]? dim=None, *, int? correction=None, bool keepdim=False) -> Tensor
   self: std_backward(result, grad, self, dim, correction, keepdim)
 
-- name: std_mean.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> (Tensor, Tensor)
+- name: std_mean.correction(Tensor self, int[1]? dim=None, *, int? correction=None, bool keepdim=False) -> (Tensor, Tensor)
   self: var_std_mean_backward(grads, self, result0, result1, dim, correction, keepdim, true)
 
 - name: sub.Tensor(Tensor self, Tensor other, *, Scalar alpha=1) -> Tensor
@@ -1454,10 +1454,10 @@
   self: grad.squeeze(dim)
   result: auto_linear
 
-- name: var.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> Tensor
+- name: var.correction(Tensor self, int[1]? dim=None, *, int? correction=None, bool keepdim=False) -> Tensor
   self: var_backward(grad, self, dim, correction, keepdim)
 
-- name: var_mean.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> (Tensor, Tensor)
+- name: var_mean.correction(Tensor self, int[1]? dim=None, *, int? correction=None, bool keepdim=False) -> (Tensor, Tensor)
   self: var_std_mean_backward(grads, self, result0, result1, dim, correction, keepdim, false)
 
 - name: view(Tensor(a) self, int[] size) -> Tensor(a)
