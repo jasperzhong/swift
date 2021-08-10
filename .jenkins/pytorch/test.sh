@@ -314,10 +314,12 @@ test_distributed() {
 test_rpc() {
   if [[ "$BUILD_ENVIRONMENT" != *rocm* ]]; then
     echo "Testing RPC C++ tests"
+    echo "$LD_LIBRARY_PATH"
     # NB: the ending test_rpc must match the current function name for the current
     # test reporting process (in print_test_stats.py) to function as expected.
     TEST_REPORTS_DIR=test/test-reports/cpp-rpc/test_rpc
     mkdir -p $TEST_REPORTS_DIR
+    LD_LIBRARY_PATH="$TORCH_LIB_DIR"
     "$TORCH_BIN_DIR"/test_cpp_rpc --gtest_output=xml:$TEST_REPORTS_DIR/test_cpp_rpc.xml
   fi
 }
@@ -503,15 +505,15 @@ elif [[ "${BUILD_ENVIRONMENT}" == *-bazel-* ]]; then
 else
   install_torchvision
   install_monkeytype
-  test_python
-  test_aten
-  test_vec256
-  test_libtorch
-  test_custom_script_ops
-  test_custom_backend
-  test_torch_function_benchmark
-  test_distributed
-  test_benchmarks
+  # test_python
+  # test_aten
+  # test_vec256
+  # test_libtorch
+  # test_custom_script_ops
+  # test_custom_backend
+  # test_torch_function_benchmark
+  # test_distributed
+  # test_benchmarks
   test_rpc
   if [[ "${BUILD_ENVIRONMENT}" == *linux-xenial-py3.6-gcc7-test* || "${BUILD_ENVIRONMENT}" == *linux-xenial-py3.6-gcc5.4-test* ]]; then
     test_python_gloo_with_tls
