@@ -352,6 +352,40 @@ void Pickler::pushTensor(const IValue& ivalue) {
   }
 }
 
+void Pickler::pushLiteralSparseTensor(const at::Tensor& tensor) {
+  // The arguments to this function are:
+  // size, requires_grad, pinned memory, data_type, device,
+  // indices, values, backward_hooks
+  pushGlobal("torch._utils", "_rebuild_sparse_coo_tensor");
+  // size
+  push<PickleOpCode>(PickleOpCode::MARK);
+  push<PickleOpCode>(PickleOpCode::MARK);
+  for (auto size : tensor.sizes()) {
+    pushInt(size);
+  }
+  push<PickleOpCode>(PickleOpCode::TUPLE);
+  // requires_grad
+  pushIValue(tensor.requires_grad());
+  // pinned memory
+  pushBool(tensor.options().pinned_memory());
+  // data type
+  pushInt(static_cast<uint16_t>(tensor.scalar_type()));
+  // device
+  pushString(tensor.device().str());
+  // indices
+  pushTensor(tensor._indices());
+  // values
+  pushTensor(tensor._values());
+  // backward_hooks
+  pushGlobal("collections", "OrderedDict");
+  push<PickleOpCode>(PickleOpCode::EMPTY_TUPLE);
+  // Construct the collections.OrderedDict for the backward_hooks
+  push<PickleOpCode>(PickleOpCode::REDUCE);
+  push<PickleOpCode>(PickleOpCode::TUPLE);
+  // Call torch._utils._rebuild_sparse_coo_tensor
+  push<PickleOpCode>(PickleOpCode::REDUCE);
+}
+
 void Pickler::pushLiteralTensor(const IValue& ivalue) {
   // In contrast to tensor references, literal tensors are included in the
   // pickle program binary blob. They are written to the file after the STOP
@@ -361,6 +395,12 @@ void Pickler::pushLiteralTensor(const IValue& ivalue) {
   // The format here is the same one used by `torch.save()`. The code for the
   // format can be found in `torch/serialization.py`.
   auto& tensor = ivalue.toTensor();
+
+  if (tensor.is_sparse()) {
+    pushLiteralSparseTensor(tensor);
+    return;
+  }
+
   bool quantized = tensor.is_quantized();
   // The arguments to this function are:
   //    storage, storage_offset, size, stride, requires_grad, backward_hooks

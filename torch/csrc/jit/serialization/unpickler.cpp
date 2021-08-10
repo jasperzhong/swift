@@ -550,6 +550,10 @@ void Unpickler::readGlobal(
     // Unpickle a tensor
     bool quantized = class_name == "_rebuild_qtensor";
     rebuildTensor(quantized);
+  } else if (
+      module_name == "torch._utils" &&
+      class_name == "_rebuild_sparse_coo_tensor") {
+    rebuildSparseCooTensor();
   } else if (module_name == "builtins" && class_name == "complex") {
     globals_.emplace_back([this] {
       auto elems = pop(stack_).toTuple()->elements();
@@ -645,6 +649,35 @@ void Unpickler::readGlobal(
     }
   }
   stack_.emplace_back(int64_t(globals_.size() - 1));
+}
+
+void Unpickler::rebuildSparseCooTensor() {
+  globals_.emplace_back([this] {
+    auto tup = pop(stack_).toTuple();
+    const auto& elements = tup->elements();
+    size_t idx = 0;
+    std::vector<int64_t> size = tupleToIntList(elements.at(idx++));
+    bool requires_grad = elements.at(idx++).toBool();
+    bool pinned_memory = elements.at(idx++).toBool();
+    c10::ScalarType data_type =
+        static_cast<c10::ScalarType>(elements.at(idx++).toInt());
+    c10::Device device(elements.at(idx++).toStringRef());
+    auto options = c10::TensorOptions()
+                       .dtype(data_type)
+                       .layout(c10::Layout::Sparse)
+                       .device(device)
+                       .pinned_memory(pinned_memory)
+                       .requires_grad(requires_grad);
+    // rebuild indices
+    auto& indices_tensor = elements.at(idx++).toTensor();
+    // rebuild values
+    auto& values_tensor = elements.at(idx++).toTensor();
+    // rebuild result tensor
+    at::Tensor result = at::_sparse_coo_tensor_unsafe(
+        indices_tensor, values_tensor, size, options);
+    result = autograd::make_variable(result, requires_grad);
+    stack_.emplace_back(std::move(result));
+  });
 }
 
 void Unpickler::rebuildTensor(bool quantized) {
