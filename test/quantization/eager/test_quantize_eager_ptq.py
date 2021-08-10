@@ -42,6 +42,7 @@ from torch.testing._internal.common_quantization import (
     EmbeddingBagModule,
     EmbeddingModule,
     EmbeddingWithLinear,
+    SparseNNModel
 )
 
 # annotated models
@@ -769,6 +770,51 @@ class TestPostTrainingStatic(QuantizationTestCase):
 
 @skipIfNoFBGEMM
 class TestPostTrainingDynamic(QuantizationTestCase):
+    def test_versioning(self):
+        r""" Check if versioning works correctly for quantize_dynamic
+        """
+        model = SparseNNModel().eval()
+        # Defaults to version=1
+        q_model = quantize_dynamic(model, dtype=torch.qint8)
+        # Check that linear layers are quantized with per-channel quant for weights
+        self.checkDynamicQuantizedLinear(q_model.dense_top.dense_mlp[0], torch.qint8, torch.per_channel_affine)
+        self.checkDynamicQuantizedLinear(q_model.dense_top.top_mlp[0], torch.qint8, torch.per_channel_affine)
+        self.checkDynamicQuantizedLinear(q_model.dense_top.top_mlp[1], torch.qint8, torch.per_channel_affine)
+
+        # Check that embeddingbag is quantized
+        self.assertEqual(type(q_model.model_sparse.emb_bag), torch.nn.quantized.EmbeddingBag)
+        # Also check that version=0 functions as before
+        q_model = quantize_dynamic(model, dtype=torch.qint8, version=0)
+
+        self.checkDynamicQuantizedLinear(q_model.dense_top.dense_mlp[0], torch.qint8, torch.per_tensor_affine)
+        self.checkDynamicQuantizedLinear(q_model.dense_top.top_mlp[0], torch.qint8, torch.per_tensor_affine)
+        self.checkDynamicQuantizedLinear(q_model.dense_top.top_mlp[1], torch.qint8, torch.per_tensor_affine)
+        self.assertEqual(type(q_model.model_sparse.emb_bag), torch.nn.EmbeddingBag)
+
+
+    def test_versioning_serialization(self):
+        r""" Check if versioning works correctly for quantize_dynamic
+        """
+        model = SparseNNModel().eval()
+        q_model = quantize_dynamic(model, dtype=torch.qint8, version=0)
+        state_dict_linear_v0 = q_model.dense_top.state_dict()
+        state_dict_emb_v0 = q_model.model_sparse.state_dict()
+        q_model = quantize_dynamic(model, dtype=torch.qint8)
+        # First load state dict only for linear layers
+        q_model.dense_top.load_state_dict(state_dict_linear_v0)
+         # Also check that version=0 functions as before
+
+        self.checkDynamicQuantizedLinear(q_model.dense_top.dense_mlp[0], torch.qint8, torch.per_tensor_affine)
+        self.checkDynamicQuantizedLinear(q_model.dense_top.top_mlp[0], torch.qint8, torch.per_tensor_affine)
+        self.checkDynamicQuantizedLinear(q_model.dense_top.top_mlp[1], torch.qint8, torch.per_tensor_affine)
+
+        self.assertEqual(type(q_model.model_sparse.emb_bag), torch.nn.quantized.EmbeddingBag)
+        try:
+            q_model.model_sparse.load_state_dict(state_dict_emb_v0)
+        except RuntimeError as e:
+            print(str(e))
+
+
     def test_single_layer(self):
         r"""Dynamic Quantize SingleLayerLinearDynamicModel which has one Linear module,
         make sure it is swapped to nnqd.Linear which is the quantized version of

@@ -122,6 +122,8 @@ DEFAULT_DYNAMIC_QUANT_MODULE_MAPPINGS : Dict[Callable, Any] = {
     nn.GRU: nnqd.GRU,
     nn.LSTMCell: nnqd.LSTMCell,
     nn.RNNCell: nnqd.RNNCell,
+    nn.EmbeddingBag: nnq.EmbeddingBag,
+
 }
 
 # Allowlist for propagating the qconfig

@@ -71,14 +71,13 @@ class QConfigDynamic(namedtuple('QConfigDynamic', ['activation', 'weight'])):
         return super(QConfigDynamic, cls).__new__(cls, activation, weight)
 
 default_dynamic_qconfig = QConfigDynamic(activation=default_dynamic_quant_observer,
-                                         weight=default_weight_observer)
-float16_dynamic_qconfig = QConfigDynamic(activation=PlaceholderObserver.with_args(dtype=torch.float32),
+                                             weight=default_weight_observer)
+float16_dynamic_qconfig = QConfigDynamic(activation=PlaceholderObserver.with_args(dtype=torch.float16),
                                          weight=PlaceholderObserver.with_args(dtype=torch.float16))
 float16_static_qconfig = QConfigDynamic(activation=PlaceholderObserver.with_args(dtype=torch.float16),
                                         weight=PlaceholderObserver.with_args(dtype=torch.float16))
 per_channel_dynamic_qconfig = QConfigDynamic(activation=default_dynamic_quant_observer,
                                              weight=default_per_channel_weight_observer)
-
 # TODO: this is weight only quant, change this to QConfigWeightOnly
 # or remove the QConfigDynamic later
 float_qparams_weight_only_qconfig = QConfigDynamic(
@@ -92,6 +91,31 @@ default_weight_only_qconfig = QConfig(activation=torch.nn.Identity,
                                       weight=default_weight_fake_quant)
 default_activation_only_qconfig = QConfig(activation=default_fake_quant,
                                           weight=torch.nn.Identity)
+
+def get_default_dynamic_qconfig(dtype, version=1):
+    if dtype not in [torch.qint8, torch.quint8, torch.float16]:
+        raise ValueError('dtype needs to be torch.qint8,uint8 or float16')
+    if version not in [0, 1]:
+        raise ValueError('Version needs to be 0 or 1')
+
+
+    if version == 0:
+        if dtype == torch.qint8:
+            return default_dynamic_qconfig
+        if dtype == torch.quint8:
+            return float_qparams_weight_only_qconfig
+        if dtype == torch.float16:
+            return float16_dynamic_qconfig
+
+    if version == 1:
+        if dtype == torch.qint8:
+            return per_channel_dynamic_qconfig
+        if dtype == torch.quint8:
+            return float_qparams_weight_only_qconfig
+        if dtype == torch.float16:
+            return float16_dynamic_qconfig
+
+
 
 def get_default_qconfig(backend='fbgemm'):
     if backend == 'fbgemm':
