@@ -506,15 +506,16 @@ from .random import *  # noqa: F403
 from ..storage import _StorageBase
 
 
-if not hasattr(torch._C, 'CudaDoubleStorageBase'):
+if not hasattr(torch._C, 'CudaByteStorageBase'):
     # Define dummy base classes
     for t in ['Double', 'Float', 'Long', 'Int', 'Short', 'Char', 'Byte', 'Half', 'Bool', 'BFloat16',
               'ComplexDouble', 'ComplexFloat']:
-        storage_name = 'Cuda{0}StorageBase'.format(t)
         tensor_name = 'Cuda{0}TensorBase'.format(t)
 
-        torch._C.__dict__[storage_name] = _dummy_type(storage_name)
         torch._C.__dict__[tensor_name] = _dummy_type(tensor_name)
+
+    storage_name = 'CudaByteStorageBase'
+    torch._C.__dict__[storage_name] = _dummy_type(storage_name)
 
     torch._C.__dict__['_CudaStreamBase'] = _dummy_type('CudaStreamBase')
     torch._C.__dict__['_CudaEventBase'] = _dummy_type('CudaEventBase')
@@ -541,52 +542,101 @@ class _CudaBase(object):
 
     __new__ = _lazy_new
 
+from torch.storage import _StorageOverrides, TypedStorage
 
-class DoubleStorage(_CudaBase, torch._C.CudaDoubleStorageBase, _StorageBase):
-    pass
-
-
-class FloatStorage(_CudaBase, torch._C.CudaFloatStorageBase, _StorageBase):
-    pass
-
-
-class LongStorage(_CudaBase, torch._C.CudaLongStorageBase, _StorageBase):
-    pass
-
-
-class IntStorage(_CudaBase, torch._C.CudaIntStorageBase, _StorageBase):
-    pass
-
-
-class ShortStorage(_CudaBase, torch._C.CudaShortStorageBase, _StorageBase):
-    pass
-
-
-class CharStorage(_CudaBase, torch._C.CudaCharStorageBase, _StorageBase):
-    pass
-
+# TODO: All these <type>Storages are duplicates of those in torch/__init__.py
+#       Is it possible to avoid duplication?
 
 class ByteStorage(_CudaBase, torch._C.CudaByteStorageBase, _StorageBase):
     pass
 
+class DoubleStorage(TypedStorage):
+    @property
+    def dtype(self):
+        return torch.double
 
-class HalfStorage(_CudaBase, torch._C.CudaHalfStorageBase, _StorageBase):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
+class FloatStorage(TypedStorage):
+    @property
+    def dtype(self):
+        return torch.float
 
-class BoolStorage(_CudaBase, torch._C.CudaBoolStorageBase, _StorageBase):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
+class HalfStorage(TypedStorage):
+    @property
+    def dtype(self):
+        return torch.half
 
-class BFloat16Storage(_CudaBase, torch._C.CudaBFloat16StorageBase, _StorageBase):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-class ComplexDoubleStorage(_CudaBase, torch._C.CudaComplexDoubleStorageBase, _StorageBase):
-    pass
+class LongStorage(TypedStorage):
+    @property
+    def dtype(self):
+        return torch.long
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-class ComplexFloatStorage(_CudaBase, torch._C.CudaComplexFloatStorageBase, _StorageBase):
-    pass
+class IntStorage(TypedStorage):
+    @property
+    def dtype(self):
+        return torch.int
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+class ShortStorage(TypedStorage):
+    @property
+    def dtype(self):
+        return torch.short
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+class CharStorage(TypedStorage):
+    @property
+    def dtype(self):
+        return torch.int8
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+class BoolStorage(TypedStorage):
+    @property
+    def dtype(self):
+        return torch.bool
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+class BFloat16Storage(TypedStorage):
+    @property
+    def dtype(self):
+        return torch.bfloat16
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+class ComplexDoubleStorage(TypedStorage):
+    @property
+    def dtype(self):
+        return torch.cdouble
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+class ComplexFloatStorage(TypedStorage):
+    @property
+    def dtype(self):
+        return torch.cfloat
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 torch._storage_classes.add(DoubleStorage)
 torch._storage_classes.add(FloatStorage)
