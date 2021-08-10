@@ -8468,6 +8468,16 @@ reduction_op_db: List[ReductionOpInfo] = [
         supports_out=False,
         supports_forward_ad=True,
         dtypes=all_types_and_complex_and(torch.bool, torch.float16, torch.bfloat16),
+        skips=(
+            # FIXME: sum does not support passing keepdim without passing dim
+            SkipInfo('TestReductions', 'test_dim_default_keepdim'),
+            # FIXME: sum reduces all dimensions when dim=[]
+            SkipInfo('TestReductions', 'test_dim_empty'),
+            SkipInfo('TestReductions', 'test_dim_empty_keepdim'),
+            # FIXME: sum does not support passing None to dim
+            SkipInfo('TestReductions', 'test_dim_none'),
+            SkipInfo('TestReductions', 'test_dim_none_keepdim'),
+        ),
     ),
 ]
 
