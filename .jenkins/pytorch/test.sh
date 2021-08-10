@@ -11,6 +11,7 @@ COMPACT_JOB_NAME="${BUILD_ENVIRONMENT}"
 CUSTOM_TEST_ARTIFACT_BUILD_DIR=$(realpath "${CUSTOM_TEST_ARTIFACT_BUILD_DIR:-${PWD}/../}")
 
 TORCH_INSTALL_DIR=$(python -c "import site; print(site.getsitepackages()[0])")/torch
+TORCH_BIN_DIR="$TORCH_INSTALL_DIR"/bin
 TORCH_LIB_DIR="$TORCH_INSTALL_DIR"/lib
 TORCH_TEST_DIR="$TORCH_INSTALL_DIR"/test
 
@@ -289,24 +290,28 @@ test_vulkan() {
 test_distributed() {
   if [[ "$BUILD_ENVIRONMENT" == *cuda* ]]; then
     echo "Testing distributed C++ tests"
+    ln -sf "$TORCH_LIB_DIR"/libtorch* "$TORCH_TEST_DIR"
+    # ln -sf "$TORCH_LIB_DIR"/libc10* "$TORCH_TEST_DIR"
+    # ln -sf "$TORCH_LIB_DIR"/libtbb* "$TORCH_TEST_DIR"
+
     # NB: the ending test_distributed must match the current function name for the current
     # test reporting process (in print_test_stats.py) to function as expected.
     TEST_REPORTS_DIR=test/test-reports/cpp-distributed/test_distributed
     mkdir -p $TEST_REPORTS_DIR
-    build/bin/FileStoreTest --gtest_output=xml:$TEST_REPORTS_DIR/FileStoreTest.xml
-    build/bin/HashStoreTest --gtest_output=xml:$TEST_REPORTS_DIR/HashStoreTest.xml
-    build/bin/TCPStoreTest --gtest_output=xml:$TEST_REPORTS_DIR/TCPStoreTest.xml
+    "$TORCH_TEST_DIR"/FileStoreTest --gtest_output=xml:$TEST_REPORTS_DIR/FileStoreTest.xml
+    "$TORCH_TEST_DIR"/HashStoreTest --gtest_output=xml:$TEST_REPORTS_DIR/HashStoreTest.xml
+    "$TORCH_TEST_DIR"/TCPStoreTest --gtest_output=xml:$TEST_REPORTS_DIR/TCPStoreTest.xml
 
     MPIEXEC=$(command -v mpiexec)
     # TODO: this is disabled on GitHub Actions until this issue is resolved
     # https://github.com/pytorch/pytorch/issues/60756
     if [[ -n "$MPIEXEC" ]] && [[ -z "$GITHUB_ACTIONS" ]]; then
-      MPICMD="${MPIEXEC} -np 2 build/bin/ProcessGroupMPITest"
+      MPICMD="${MPIEXEC} -np 2 $TORCH_TEST_DIR/ProcessGroupMPITest"
       eval "$MPICMD"
     fi
-    build/bin/ProcessGroupGlooTest --gtest_output=xml:$TEST_REPORTS_DIR/ProcessGroupGlooTest.xml
-    build/bin/ProcessGroupNCCLTest --gtest_output=xml:$TEST_REPORTS_DIR/ProcessGroupNCCLTest.xml
-    build/bin/ProcessGroupNCCLErrorsTest --gtest_output=xml:$TEST_REPORTS_DIR/ProcessGroupNCCLErrorsTest.xml
+    "$TORCH_TEST_DIR"/ProcessGroupGlooTest --gtest_output=xml:$TEST_REPORTS_DIR/ProcessGroupGlooTest.xml
+    "$TORCH_TEST_DIR"/ProcessGroupNCCLTest --gtest_output=xml:$TEST_REPORTS_DIR/ProcessGroupNCCLTest.xml
+    "$TORCH_TEST_DIR"/ProcessGroupNCCLErrorsTest --gtest_output=xml:$TEST_REPORTS_DIR/ProcessGroupNCCLErrorsTest.xml
   fi
 }
 
@@ -460,7 +465,17 @@ test_vec256() {
 
 test_torch_deploy() {
   python torch/csrc/deploy/example/generate_examples.py
-  build/bin/test_deploy
+  ls -l "$TORCH_BIN_DIR"
+  ls -l "$TORCH_LIB_DIR"
+  ls -l build/bin
+  ls -l build/lib
+  ln -sf "$TORCH_LIB_DIR"/libtorch* "$TORCH_BIN_DIR"
+  ln -sf "$TORCH_LIB_DIR"/libshm* "$TORCH_BIN_DIR"
+  ln -sf "$TORCH_LIB_DIR"/libc10* "$TORCH_BIN_DIR"
+  # ln -sf "$TORCH_LIB_DIR"/libcaffe2* "$TEST_BASE_DIR"
+  # ln -sf "$TORCH_LIB_DIR"/libmkldnn* "$TEST_BASE_DIR"
+  # ln -sf "$TORCH_LIB_DIR"/libnccl* "$TEST_BASE_DIR"
+  "$TORCH_BIN_DIR"/test_deploy
   assert_git_not_dirty
 }
 
@@ -502,13 +517,13 @@ elif [[ "${BUILD_ENVIRONMENT}" == *-bazel-* ]]; then
 else
   install_torchvision
   install_monkeytype
-  test_python
-  test_aten
-  test_vec256
-  test_libtorch
-  test_custom_script_ops
-  test_custom_backend
-  test_torch_function_benchmark
+  # test_python
+  # test_aten
+  # test_vec256
+  # test_libtorch
+  # test_custom_script_ops
+  # test_custom_backend
+  # test_torch_function_benchmark
   test_distributed
   test_benchmarks
   test_rpc
