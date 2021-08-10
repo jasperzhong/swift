@@ -941,6 +941,16 @@ interleave2(const Vectorized<T>& a, const Vectorized<T>& b) {
                         Vectorized<T>::loadu(static_cast<void*>(buffer2)));
 }
 
+// transpose operation of a 8*8 block
+template <typename T>
+inline void transpose_kernel_8x8(const T* src, int64_t ld_src, T* dst, int64_t ld_dst) {
+  for (int64_t i = 0; i < 8; i++) {
+    for (int64_t j = 0; j < 8; j++) {
+      dst[j * ld_dst + i] = src[i * ld_src + j];
+    }
+  }
+}
+
 template <typename src_T, typename dst_T>
 inline void convert(const src_T *src, dst_T *dst, int64_t n) {
 #ifndef _MSC_VER
