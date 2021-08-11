@@ -3806,4 +3806,250 @@ Tensor _det_lu_based_helper_backward_helper(
   }
 }
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ solve_triangular ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+namespace {
+void checkSameDtype(const Tensor& t1,
+                    const Tensor& t2,
+                    const char* const f_name,
+                    const char* const t1_name,
+                    const char* const t2_name) {
+  TORCH_CHECK(t1.scalar_type() == t2.scalar_type(),
+              f_name, ": Expected ", t1_name, " and ", t2_name, " to have the same dtype. ",
+              "Got ", t1_name, ".dtype = ", t1.scalar_type(),
+              " and ", t2_name, ".dtype = ", t2.scalar_type());
+}
+
+void checkIsMatrix(const Tensor& t,
+                   const char* const f_name,
+                   const char* const t_name) {
+  TORCH_CHECK(t.dim() >= 2, f_name, ": Expected ", t_name,
+                            " to be a tensor of at least 2 dimensions.");
+}
+
+void checkIsSquareMatrix(const Tensor& t,
+                         const char* const f_name,
+                         const char* const t_name) {
+  checkIsMatrix(t, f_name, t_name);
+  TORCH_CHECK(t.size(-1) == t.size(-2),
+              f_name, ": Expected ", t_name,
+              " to be a square matrix or batch of square matrices. "
+              "Got matrices of size (", t.size(-2), ", ", t.size(-1), ").");
+}
+
+void checkInputsSolver(const Tensor& A,
+                       const Tensor& B,
+                       const Tensor& out,
+                       const char* const f_name) {
+  checkSameDtype(A, B, f_name, "A", "B");
+  checkSameDtype(A, out, f_name, "A", "out");
+  checkIsSquareMatrix(A, f_name, "A");
+  checkIsMatrix(B, f_name, "B");
+  TORCH_CHECK(A.size(-1) == B.size(-2),
+              f_name, ": Incompatible shapes. Each matrix in A is of shape (",
+              A.size(-2), ", ", A.size(-1),
+              ") but each matrix in B is of shape (",
+              B.size(-2), ", ", B.size(-1), ")");
+}
+
+bool is_fortran_compatible_column_major_order(const Tensor& t) {
+  const auto t_strides = t.strides();
+  const auto ndim = t.dim();
+  const auto rows = t.sizes()[ndim - 2];
+  return (t_strides[ndim - 2] == 1) && (t_strides[ndim - 1] >= std::max<int64_t>(1, rows));
+}
+
+bool is_fortran_compatible_row_major_order(const Tensor& t) {
+  const auto t_strides = t.strides();
+  const auto ndim = t.dim();
+  const auto cols = t.sizes()[ndim - 1];
+  return (t_strides[ndim - 1] == 1) && (t_strides[ndim - 2] >= std::max<int64_t>(1, cols));
+}
+
+bool is_fortran_ready(const Tensor& t) {
+  return t.is_non_overlapping_and_dense() ||
+         is_fortran_compatible_row_major_order(t) ||
+         is_fortran_compatible_column_major_order(t);
+}
+
+} // end of anonymous namespace
+
+/*
+Solves the matrix equation AX = B for A triangular.
+'upper' controls the portion of input matrix to consider in computations,
+'unitriangular' if true then we assume diag(A) to be ones
+'left' If true solves AX = B, if false solves XA = B
+'out' The tensor with the result. If A == out, A will be modified in place
+*/
+Tensor& solve_triangular_out(
+    const Tensor& A,
+    const Tensor& B,
+    bool upper,
+    bool unitriangular,
+    bool left,
+    Tensor& out) {
+  checkInputsSolver(A, B, out, "solve_triangular");
+  Tensor A_broad, B_broad;
+  std::tie(B_broad, A_broad) = _linalg_broadcast_batch_dims(B, A, "solve_triangular", /*check_errors*/ false);
+
+  // poorman's reimplementation of resize_output because it does not support fortran_contig checks
+  if (resize_output_check(out, B_broad.sizes())) {
+    out.resize_(B_broad.transpose(-2, -1).sizes(), MemoryFormat::Contiguous);
+    out.transpose_(-2, -1);  // make 'out' have Fortran contiguous memory layout
+  }
+
+  // We'll write F-contig / F-transpose for FORTRAN contiguous / FORTRAN transpose etc
+  // At this point, A, B have been broadcasted, infos is correct.
+  // out may still be empty
+  //
+  // On CPU, if A is contiguous or F-contig it is possible to avoid copying A in every case
+  //
+  // 1) If left == False, we transpose A & B and we will transpose the solution.
+  // 2) If A has the conj bit = true and is not transposed:
+  //    Create a (F-contig) conjugate copy of B and return the conjugate view of the solution. Take this chance of doing it in out directly.
+  // 3) Set the bit to conjugate_transpose / trans / NoTrans as expected by lapack / magma / etc
+  // 4) At this stage, if the following holds:
+  //    - B is F-contig
+  //    - B is not conjugated and
+  //    - B = out
+  //    we don't copy
+  //
+  // TODO Move CPU to BLAS (+ benchmark) as BLAS does have left/right solvers. This would make
+  // the whole implementation simpler, more orthogonal and potentially faster in some cases
+
+  // On CUDA, as it does implement natively left/right solvers, we can always avoid all
+  // the copies if B == out and A & B are either contiguous or F-contig
+  //
+  // 1) Make B F-contig non conj (and remember "applying"* the opposite operations to the returned tensor) *See the Remark below
+  //    This gives a system of the form op1(A)op2(X) = B or op2(X)op1(A) = B where
+  //    opi in {Normal, Conj, Trans, ConjTrans}
+  //    We know how to solve all cases but op1 = Conj.
+  // 2) If op1 = Conj, we set left = !left and op1 = ConjTrans.
+  //
+  // Remark: There is a subtle point here. Note that following the algorithm above, X has to
+  //         be conjugated iff B was conjugated. This is particularly neat, as it is not possible
+  //         to "unset" the conj bit in PyTorch---doing a.conj().conj() incurs in one copy.
+
+  // To sumarise:
+  // If B == out and the results are in CUDA, we can call a solver without copying memory
+  // Otherwise, we can do it with at most one copy
+
+  // TODO account in the code calling LAPACK etc
+  const bool fortran_ready_A = is_fortran_ready(A_broad);
+  const auto trans_char = [](const bool contig, const bool conj) {
+    return conj ? 'C' : contig ? 'N' : 'T';
+  };
+
+  bool transpose_out = false;
+  char transpose = 'N';
+  const bool B_same_out = B_broad.is_same(out);
+  if ((A.device().type() == at::kCUDA ||
+       // The following case will be removed when CPU supports the left argument
+       (A.device().type() == at::kCPU &&
+        left &&
+        !(A_broad.stride(-2) == 1 &&
+         A_broad.is_conj() != B_broad.is_conj()))) &&
+      B_same_out &&
+      fortran_ready_A &&
+      is_fortran_compatible_column_major_order(B_broad)) {
+    TORCH_WARN("FAST");
+
+    // Implemenet case of zero copies
+
+    // 1) If B is conj, we transform the equation AX = conj(B) <=> conj(A)conj(X) = B
+    //    Since X will be written in B, we just need to conjugate A (or anotate it as conjugated)
+
+    bool A_f_contig = A_broad.stride(-2) == 1;
+    bool A_conj = A_broad.is_conj() != B_broad.is_conj();
+    // In this case we need to make a copy :(
+    // Note that it is not a common case though, as A will often be A^H if conjugated
+    if (A_conj && A_f_contig) {
+      // We could conjugate the equation, but we would need to return B conjugated
+      // At the moment the support for ellision of conjs is not great in PyTorch, so chances
+      // are that conj will be materialised later on. As such, we
+      // Tranpose the equation
+      left = !left;
+      upper = !upper;
+      A_f_contig = false;
+      out.copy_(out.transpose(-2, -1));
+      transpose_out = !transpose_out;
+    }
+    transpose = trans_char(A_f_contig, A_conj);
+  } else {
+    TORCH_WARN("COPY");
+    // CPU does not support left, so we transpose the equation
+    if (A.device().type() == at::kCPU && !left) {
+      left = !left;
+      upper = !upper;
+      A_broad.transpose_(-2 ,-1);
+      B_broad.transpose_(-2 ,-1);
+      transpose_out = !transpose_out;
+    }
+    if (fortran_ready_A) {
+      // Implement case not copying A: Just one copy of B into out
+
+      // Here A may be F-contig / F-contig conj / F-trans / F-trans conj
+      // The only one that LAPACK doesn't know how to handle is F-contig conj
+
+      const bool A_f_contig = A_broad.stride(-2) == 1;
+      bool A_conj = A_broad.is_conj();
+      // Conjugate the equation while copying B into out
+      if (A_conj && A_f_contig) {
+        // FIXME why are the following two operations not equivalent?
+        // Doing this vs conj() + copy saves a copy whenever B is already conjugated
+        //at::native::conj_physical_out(B_broad, out);
+        if (!B_same_out) {
+          out.copy_(B_broad.conj());
+          out._set_conj(true);  // We simulate a conj_()
+        } else {
+          out = cloneBatchedColumnMajor(B_broad);
+        }
+        A_conj = false;
+      } else {
+        if (!B_same_out) {
+          out.copy_(B_broad);
+        } else {
+          out.copy_(cloneBatchedColumnMajor(B_broad));
+        }
+      }
+      // Now A and out are fortran contig and ready to be sent to the backend
+      transpose = trans_char(A_f_contig, A_conj);
+    } else { // We copy both
+      A_broad = cloneBatchedColumnMajor(A_broad);
+      if (!B_same_out) {
+        out.copy_(B_broad);
+      } else {
+        out.copy_(cloneBatchedColumnMajor(B_broad));
+      }
+    }
+  }
+  if (transpose == 'T' || transpose == 'C') {
+    upper = !upper;
+  }
+
+  // TODO Modify triangular_solve to accept a char rather than two bools
+  triangular_solve_stub(
+    A.device().type(), A_broad, out,
+    /*upper=*/upper,
+    /*transpose=*/transpose == 'T',
+    /*conjugate transpose=*/transpose == 'C',
+    /*unitriangular=*/unitriangular,
+    /*left=*/left);
+
+  if (transpose_out) {
+    out.transpose_(-2, -1);
+  }
+
+  return out;
+}
+
+Tensor solve_triangular(
+    const Tensor& A,
+    const Tensor& B,
+    bool upper,
+    bool unitriangular,
+    bool left) {
+  Tensor out = at::empty({0}, A.options());
+  return solve_triangular_out(A, B, upper, unitriangular, left, out);
+}
+
 }}  // namespace at::native

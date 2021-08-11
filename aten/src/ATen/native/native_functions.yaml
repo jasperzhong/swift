@@ -6653,6 +6653,15 @@
   dispatch:
     CPU, CUDA: triangular_solve
 
+- func: solve_triangular.out(Tensor self, Tensor B, bool upper=True, bool unitriangular=False, bool left=True, *, Tensor(a!) out) -> Tensor(a!)
+  dispatch:
+    CPU, CUDA: solve_triangular_out
+
+- func: solve_triangular(Tensor self, Tensor B, bool upper=True, bool unitriangular=False, bool left=True) -> Tensor
+  variants: method, function
+  dispatch:
+    CPU, CUDA: solve_triangular
+
 - func: symeig.e(Tensor self, bool eigenvectors=False, bool upper=True, *, Tensor(a!) e, Tensor(b!) V) -> (Tensor(a!) eigenvalues, Tensor(b!) eigenvectors)
   dispatch:
     CompositeExplicitAutograd: symeig_out

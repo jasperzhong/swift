@@ -10,7 +10,7 @@ from math import inf, nan, isnan
 import random
 from random import randrange
 from itertools import product
-from functools import reduce
+from functools import reduce, partial
 
 from torch.testing._internal.common_utils import \
     (TestCase, run_tests, TEST_SCIPY, IS_MACOS, IS_WINDOWS, slowTest,
@@ -4753,6 +4753,58 @@ class TestLinalg(TestCase):
         check(x, [-1], regex=r'not within the valid range \[0, 52\)', exception=ValueError)
         check(x, [52], regex=r'not within the valid range \[0, 52\)', exception=ValueError)
 
+    @onlyCUDA  # TODO DELETE
+    @skipCUDAIfNoMagma
+    @skipCPUIfNoLapack
+    @dtypes(torch.float32)
+    @precisionOverride({torch.float32: 1e-2, torch.complex64: 1e-2,
+                        torch.float64: 1e-8, torch.complex128: 1e-8})
+    def test_solve_triangular(self, device, dtype):
+        make_arg = partial(make_tensor, dtype=dtype, device=device)
+        ks = (3, 1, 0)
+        ns = (5, 0)
+        bs = (1, 2, 0)
+
+        def gen_inputs():
+            for b, n, k in product(bs, ns, ks):
+                for tr_a, (conj_a, tr_b, conj_b) in product((True, False), product((False, True), repeat=3)):
+                    if (conj_a or conj_b) and not dtype.is_complex:
+                        continue
+
+                    if b == 1:
+                        A = make_arg((n, n))
+                        B = make_arg((n, k)) if not tr_b else make_arg((k, n))
+                    else:
+                        A = make_arg((b, n, n))
+                        B = make_arg((b, n, k)) if not tr_b else make_arg((b, k, n))
+                    A.triu_()
+                    if tr_a:
+                        A = A.transpose(-2, -1)
+                    if tr_b:
+                        B = B.transpose(-2, -1)
+                    if conj_a:
+                        A = A.conj()
+                    if conj_b:
+                        B = B.conj()
+                    print(A.shape, B.shape)
+                    print(tr_a, conj_a, tr_b, conj_b)
+                    yield A, B, not tr_a
+
+        for A, B, upper in gen_inputs():
+            X = torch.solve_triangular(A, B, upper=upper)
+            self.assertEqual(A @ X, B)
+            B_clone = B.clone()
+            torch.solve_triangular(A, B, upper=upper, out=B)
+            print(A@B)
+            print(A@X)
+            print(B_clone)
+            p_pre = B.data_ptr()
+            self.assertEqual(X, B)
+            p_post = B.data_ptr()
+            if not B.is_complex():
+                self.assertEqual(p_pre, p_post)
+
+
     def triangular_solve_test_helper(self, A_dims, b_dims, upper, unitriangular,
                                      device, dtype):
         triangle_function = torch.triu if upper else torch.tril
@@ -4899,17 +4951,6 @@ class TestLinalg(TestCase):
             run_test((2, 1, 3, 4, 4), (4, 6), device, upper, transpose, unitriangular)  # broadcasting b
             run_test((4, 4), (2, 1, 3, 4, 2), device, upper, transpose, unitriangular)  # broadcasting A
             run_test((1, 3, 1, 4, 4), (2, 1, 3, 4, 5), device, upper, transpose, unitriangular)  # broadcasting A & b
-
-    @onlyCPU
-    @skipCPUIfNoLapack
-    @dtypes(torch.float32, torch.float64, torch.complex64, torch.complex128)
-    def test_triangular_solve_singular(self, device, dtype):
-        b = torch.rand(3, 1, dtype=dtype, device=device)
-        A = torch.eye(3, 3, dtype=dtype, device=device)
-        A[-1, -1] = 0  # Now A is singular
-        err_str = r"triangular_solve: U\(3,3\) is zero, singular U\."
-        with self.assertRaisesRegex(RuntimeError, err_str):
-            torch.triangular_solve(b, A)
 
     @skipCUDAIfNoMagma
     @skipCPUIfNoLapack
