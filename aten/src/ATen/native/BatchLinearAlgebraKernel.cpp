@@ -794,11 +794,9 @@ This is an in-place routine, content of 'B' is overwritten.
 'transpose' if true then op(A) = A^T,
 'unitriangular' if true then the diagonal elements of A are assumed to be 1
 and the actual diagonal values are not used.
-'infos' is an int Tensor containing error codes for each matrix in the batched input.
-For more information see LAPACK's documentation for TRTRS routine.
 */
 template<typename scalar_t>
-void apply_triangular_solve(Tensor& A, Tensor& B, Tensor& infos, bool upper, bool transpose, bool conjugate_transpose, bool unitriangular) {
+void apply_triangular_solve(Tensor& A, Tensor& B, bool left, bool upper, bool transpose, bool conjugate_transpose, bool unitriangular) {
 #if !AT_BUILD_WITH_LAPACK()
   TORCH_CHECK(
       false,
@@ -809,6 +807,7 @@ void apply_triangular_solve(Tensor& A, Tensor& B, Tensor& infos, bool upper, boo
   char trans = transpose ? 'T' : 'N';
   trans = conjugate_transpose ? 'C' : trans;
   char diag = unitriangular ? 'U' : 'N';
+  char side = left ? 'L' : 'R';
 
   auto A_data = A.data_ptr<scalar_t>();
   auto B_data = B.data_ptr<scalar_t>();
@@ -818,26 +817,22 @@ void apply_triangular_solve(Tensor& A, Tensor& B, Tensor& infos, bool upper, boo
   auto n = A.size(-2);
   auto nrhs = B.size(-1);
   auto lda = std::max<int64_t>(1, n);
-  auto infos_data = infos.data_ptr<int>();
 
   for (const auto i : c10::irange(batch_size)) {
     scalar_t* A_working_ptr = &A_data[i * A_mat_stride];
     scalar_t* B_working_ptr = &B_data[i * B_mat_stride];
-    int* info_working_ptr = &infos_data[i];
-    lapackTriangularSolve<scalar_t>(uplo, trans, diag, n, nrhs, A_working_ptr, lda, B_working_ptr, lda, info_working_ptr);
+    lapackTriangularSolve<scalar_t>(side, uplo, trans, diag, n, nrhs, A_working_ptr, lda, B_working_ptr, lda);
     // The current behaviour for linear algebra functions to raise an error if something goes wrong
     // or input doesn't satisfy some requirement
     // therefore return early since further computations will be wasted anyway
-    if (*info_working_ptr != 0) {
-      return;
-    }
   }
 #endif
 }
 
-void triangular_solve_kernel(Tensor& A, Tensor& B, Tensor& infos, bool upper, bool transpose, bool conjugate_transpose, bool unitriangular) {
+void triangular_solve_kernel(Tensor& A, Tensor& B, bool upper, bool transpose, bool conjugate_transpose, bool unitriangular, bool left) {
+  // right solvers are not implemented in LAPACK. The caller always calls with left=True
   AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(A.scalar_type(), "triangular_solve_cpu", [&]{
-    apply_triangular_solve<scalar_t>(A, B, infos, upper, transpose, conjugate_transpose, unitriangular);
+    apply_triangular_solve<scalar_t>(A, B, left, upper, transpose, conjugate_transpose, unitriangular);
   });
 }
 

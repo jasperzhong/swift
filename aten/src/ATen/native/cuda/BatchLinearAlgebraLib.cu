@@ -101,12 +101,12 @@ void lu_solve_batched_cublas(const Tensor& b, const Tensor& lu, const Tensor& pi
 }
 
 template <typename scalar_t>
-static void apply_triangular_solve(Tensor& A, Tensor& B, bool upper, bool transpose, bool conjugate_transpose, bool unitriangular) {
+static void apply_triangular_solve(Tensor& A, Tensor& B, bool upper, bool transpose, bool conjugate_transpose, bool unitriangular, bool left) {
   cublasFillMode_t uplo = upper ? CUBLAS_FILL_MODE_UPPER : CUBLAS_FILL_MODE_LOWER;
   cublasOperation_t trans = transpose ? CUBLAS_OP_T : CUBLAS_OP_N;
   trans = conjugate_transpose ? CUBLAS_OP_C : trans;
   cublasDiagType_t diag = unitriangular ? CUBLAS_DIAG_UNIT : CUBLAS_DIAG_NON_UNIT;
-  cublasSideMode_t side = CUBLAS_SIDE_LEFT;
+  cublasSideMode_t side = left ? CUBLAS_SIDE_LEFT : CUBLAS_SIDE_RIGHT;
 
   auto A_data = A.data_ptr<scalar_t>();
   auto B_data = B.data_ptr<scalar_t>();
@@ -128,20 +128,19 @@ static void apply_triangular_solve(Tensor& A, Tensor& B, bool upper, bool transp
   }
 }
 
-void triangular_solve_cublas(Tensor& A, Tensor& B, Tensor& infos, bool upper, bool transpose, bool conjugate_transpose, bool unitriangular) {
-  (void)infos; // unused
+void triangular_solve_cublas(Tensor& A, Tensor& B, bool upper, bool transpose, bool conjugate_transpose, bool unitriangular, bool left) {
   AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(A.scalar_type(), "triangular_solve_cuda", [&]{
-    apply_triangular_solve<scalar_t>(A, B, upper, transpose, conjugate_transpose, unitriangular);
+    apply_triangular_solve<scalar_t>(A, B, upper, transpose, conjugate_transpose, unitriangular, left);
   });
 }
 
 template <typename scalar_t>
-static void apply_triangular_solve_batched(Tensor& A, Tensor& B, bool upper, bool transpose, bool conjugate_transpose, bool unitriangular) {
+static void apply_triangular_solve_batched(Tensor& A, Tensor& B, bool upper, bool transpose, bool conjugate_transpose, bool unitriangular, bool left) {
   cublasFillMode_t uplo = upper ? CUBLAS_FILL_MODE_UPPER : CUBLAS_FILL_MODE_LOWER;
   cublasOperation_t trans = transpose ? CUBLAS_OP_T : CUBLAS_OP_N;
   trans = conjugate_transpose ? CUBLAS_OP_C : trans;
   cublasDiagType_t diag = unitriangular ? CUBLAS_DIAG_UNIT : CUBLAS_DIAG_NON_UNIT;
-  cublasSideMode_t side = CUBLAS_SIDE_LEFT;
+  cublasSideMode_t side = left ? CUBLAS_SIDE_LEFT : CUBLAS_SIDE_RIGHT;
 
   auto A_data = A.data_ptr<scalar_t>();
   auto B_data = B.data_ptr<scalar_t>();
@@ -165,10 +164,9 @@ static void apply_triangular_solve_batched(Tensor& A, Tensor& B, bool upper, boo
   at::cuda::blas::trsmBatched(handle, side, uplo, trans, diag, n, nrhs, &alpha, A_ptr_array_data, lda, B_ptr_array_data, lda, batch_size);
 }
 
-void triangular_solve_batched_cublas(Tensor& A, Tensor& B, Tensor& infos, bool upper, bool transpose, bool conjugate_transpose, bool unitriangular) {
-  (void)infos; // unused
+void triangular_solve_batched_cublas(Tensor& A, Tensor& B, bool upper, bool transpose, bool conjugate_transpose, bool unitriangular, bool left) {
   AT_DISPATCH_FLOATING_AND_COMPLEX_TYPES(A.scalar_type(), "triangular_solve_cuda", [&]{
-    apply_triangular_solve_batched<scalar_t>(A, B, upper, transpose, conjugate_transpose, unitriangular);
+    apply_triangular_solve_batched<scalar_t>(A, B, upper, transpose, conjugate_transpose, unitriangular, left);
   });
 }
 
