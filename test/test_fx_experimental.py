@@ -875,7 +875,7 @@ terrible spacing
 
             traced = symbolic_trace(WrapperMod())
             normalized = NormalizeOperators(traced).transform()
-            x, y = torch.randn(3, 4), torch.randn(3, 4)
+            x, y = torch.rand(3, 4), torch.rand(3, 4)
             torch.testing.assert_allclose(traced(x, y), normalized(x, y))
             self.assertFalse(
                 any(n.target in ops_to_test for n in normalized.graph.nodes)
@@ -890,7 +890,7 @@ terrible spacing
 
             traced = symbolic_trace(WrapperMod())
             normalized = NormalizeOperators(traced).transform()
-            x = torch.randn(3, 4)
+            x = torch.rand(3, 4)
             torch.testing.assert_allclose(traced(x), normalized(x))
             self.assertFalse(
                 any(n.target in ops_to_test for n in normalized.graph.nodes)
