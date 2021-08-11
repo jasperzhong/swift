@@ -1827,6 +1827,19 @@ def hardsigmoid(input: Tensor, inplace: bool = False) -> Tensor:
         return torch._C._nn.hardsigmoid_(input)
     return torch._C._nn.hardsigmoid(input)
 
+def bias(input: Tensor, bias_values: Tensor) -> Tensor:
+    r""" Adds a tensor of normally distributed bias values to the last dimension
+    of the incoming data :math:`y = x + b`
+
+    Shape:
+        - Input: :math:`(*, H_{n})` where :math:`*` means any number of
+          dimensions including none and :math:`H_{n} = \text{num\_features}`.
+        - bias_values: :math:`(num\_features)`
+        - Output: Same as input
+    """
+    if has_torch_function_variadic(input, bias_values):
+        return handle_torch_function(bias, (input, bias_values), input, bias_values)
+    return torch._C._nn.bias(input, bias_values)
 
 def linear(input: Tensor, weight: Tensor, bias: Optional[Tensor] = None) -> Tensor:
     r"""
