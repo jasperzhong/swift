@@ -3657,10 +3657,6 @@ def foo(x):
                 return a + 2
             torch.jit.script(invalid4)
 
-    def test_is_optional(self):
-        ann = Union[List[int], List[float]]
-        torch._jit_internal.is_optional(ann)
-
     def test_interpreter_fuzz(self):
         import builtins
         # This test generates random tree-like programs to fuzz test
@@ -6096,7 +6092,7 @@ a")
         g = torch.jit.last_executed_optimized_graph()
         first_input = next(g.inputs())
         # check if input is disconnected
-        self.assertEqual(first_input.type().kind(), 'OptionalType')
+        self.assertEqual(first_input.type().kind(), 'UnionType')
         self.assertEqual(first_input.uses(), [])
         t = torch.ones(1)
         res = fn(t, 1)
@@ -6140,7 +6136,7 @@ a")
         g = torch.jit.last_executed_optimized_graph()
         first_input = next(g.inputs())
         # check if input is disconnected
-        self.assertEqual(first_input.type().kind(), 'OptionalType')
+        self.assertEqual(first_input.type().kind(), 'UnionType')
         self.assertEqual(first_input.uses(), [])
         l = [2, 3]
         res = fn(l, 1)

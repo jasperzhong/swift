@@ -30,7 +30,6 @@ namespace c10 {
   _(GeneratorType)          \
   _(QuantizerType)          \
   _(BoolType)               \
-  _(OptionalType)           \
   _(VarType)                \
   _(DeviceObjType)          \
   _(StreamObjType)          \
@@ -45,7 +44,8 @@ namespace c10 {
   _(AnyListType)            \
   _(AnyTupleType)           \
   _(AnyClassType)           \
-  _(UnionType)
+  _(UnionType)              \
+  _(Pybind11_OptionalType)
 
 enum class TypeKind {
 #define DEFINE_TYPE(T) T,
@@ -137,6 +137,11 @@ struct TORCH_API Type : std::enable_shared_from_this<Type> {
     return false;
   }
 
+  // `OptionalType` has been deprecated and replaced by `UnionType`.
+  // This is a convenience method so that we don't have to replace
+  // all `== OptionalType::Kind` checks with a cast and another method
+  bool isOptional() const;
+
   // Dynamically cast this object to the subclass indicated by the
   // template variable, returning nullptr if the cast is invalid.
   template <typename T>
@@ -195,8 +200,10 @@ struct TORCH_API Type : std::enable_shared_from_this<Type> {
   virtual bool hasFreeVariables() const {
     return false;
   }
-  // list of types this type contains, e.g. for a List then element type of a
-  // list for a tuple, the types of the tuple elements
+  // A list of the syntactic types that appear in the type constructor.
+  // For example, `List[T]` -> {`T`} and `Dict[T1, T2]` -> {`T1`, `T2`}.
+  // Now that `Optional` has been deprecated, `containedTypes` should
+  // always refer to the set of types that appear in the variable.
   virtual at::ArrayRef<TypePtr> containedTypes() const {
     return {};
   }

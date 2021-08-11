@@ -24,7 +24,7 @@ TEST(JitTypeTest, IsComplete) {
 
 TEST(JitTypeTest, UnifyTypes) {
   auto bool_tensor = TensorType::get()->withScalarType(at::kBool);
-  auto opt_bool_tensor = OptionalType::create(bool_tensor);
+  auto opt_bool_tensor = UnionType::createOptionalOf(bool_tensor);
   auto unified_opt_bool = unifyTypes(bool_tensor, opt_bool_tensor);
   TORCH_INTERNAL_ASSERT(opt_bool_tensor->isSubtypeOf(*unified_opt_bool));
 
@@ -32,10 +32,11 @@ TEST(JitTypeTest, UnifyTypes) {
   TORCH_INTERNAL_ASSERT(!tensor->isSubtypeOf(opt_bool_tensor));
   auto unified = unifyTypes(opt_bool_tensor, tensor);
   TORCH_INTERNAL_ASSERT(unified);
-  auto elem = (*unified)->expectRef<OptionalType>().getElementType();
+  auto elem =
+      (*unified)->expectRef<UnionType>().getContainedElementIfOptional();
   TORCH_INTERNAL_ASSERT(elem->isSubtypeOf(TensorType::get()));
 
-  auto opt_tuple_none_int = OptionalType::create(
+  auto opt_tuple_none_int = UnionType::createOptionalOf(
       TupleType::create({NoneType::get(), IntType::get()}));
   auto tuple_int_none = TupleType::create({IntType::get(), NoneType::get()});
   auto out = unifyTypes(opt_tuple_none_int, tuple_int_none);
@@ -52,7 +53,7 @@ TEST(JitTypeTest, UnifyTypes) {
   auto fut_out = unifyTypes(fut_1, fut_2);
   TORCH_INTERNAL_ASSERT(fut_out);
   TORCH_INTERNAL_ASSERT((*fut_out)->isSubtypeOf(
-      FutureType::create(OptionalType::create(IntType::get()))));
+      FutureType::create(UnionType::createOptionalOf(IntType::get()))));
 
   auto dict_1 = DictType::create(IntType::get(), NoneType::get());
   auto dict_2 = DictType::create(IntType::get(), IntType::get());

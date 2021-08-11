@@ -54,7 +54,12 @@ class TypeParser {
       expect("]");
       return UnionType::create(types);
     } else if (token == "Optional") {
-      return CreateSingleElementType<OptionalType>();
+      std::vector<TypePtr> types;
+      expect("[");
+      types.emplace_back(parse());
+      types.emplace_back(NoneType::get());
+      expect("]");
+      return UnionType::create(types);
     } else if (token == "Future") {
       return CreateSingleElementType<FutureType>();
     } else if (token == "Dict") {
