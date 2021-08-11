@@ -1328,7 +1328,7 @@ class TestList(JitTestCase):
             x = torch._C.ListType(None)
 
     def test_list_unification_hint(self):
-        with self.assertRaisesRegex(RuntimeError, "Expected a List type hint"):
+        with self.assertRaisesRegex(RuntimeError, "Expected an annotation of type List"):
             @torch.jit.script
             def x():
                 b : int = [2, 3]

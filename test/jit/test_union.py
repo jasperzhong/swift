@@ -655,3 +655,92 @@ class TestUnion(JitTestCase):
 
         self.checkScript(fn, (1,))
         self.checkScript(fn, (8,))
+
+    def test_union_with_listliteral(self):
+        def fn():
+            x: Union[List[torch.Tensor], int] = [torch.tensor(3)]
+            if torch.jit.isinstance(x, List[torch.Tensor]):
+                x.append(torch.tensor(3))
+            return x
+
+        self.checkScript(fn, ())
+
+    def test_union_with_list_comprehension(self):
+        self.maxDiff = None
+        def fn():
+            l: List[Tensor] = [torch.tensor([2, 3])]
+            x: Union[List[torch.Tensor], int] = [t for t in l]
+            if torch.jit.isinstance(x, List[torch.Tensor]):
+                x.append(torch.tensor(3))
+            return x
+
+        self.checkScript(fn, ())
+
+    def test_union_with_empty_listliteral_can_infer_list_type(self):
+        def fn():
+            x: Union[List[torch.Tensor], int] = []
+            if torch.jit.isinstance(x, List[torch.Tensor]):
+                x.append(torch.tensor(3))
+            return x
+
+        self.checkScript(fn, ())
+
+    def test_union_with_empty_listliteral_throws_when_type_cannot_be_inferred(self):
+        def fn():
+            x: Union[List[torch.Tensor], List[str], int] = []
+            if torch.jit.isinstance(x, List[torch.Tensor]):
+                x.append(torch.tensor(3))
+            return x
+
+        with self.assertRaisesRegex(RuntimeError, "there are multiple"
+                                    " possible List type candidates "
+                                    "in the Union annotation"):
+            torch.jit.script(fn)
+
+    def test_union_with_dictliteral(self):
+        def fn():
+            x: Union[Dict[str, torch.Tensor], int] = {"foo": torch.tensor(3)}
+            if torch.jit.isinstance(x, Dict[str, torch.Tensor]):
+                x["bar"] = torch.tensor(3)
+            return x
+
+        self.checkScript(fn, ())
+
+    def test_union_with_dict_comprehension(self):
+        def fn():
+            l1: List[str] = ["foo", "bar", "baz"]
+            l2: List[torch.Tensor] = [torch.tensor(3)] * 3
+            x: Union[Dict[str, torch.Tensor], int] = {k: v for k, v in zip(l1, l2)}
+            if torch.jit.isinstance(x, Dict[str, torch.Tensor]):
+                x["bar"] = torch.tensor(3)
+            return x
+
+        self.checkScript(fn, ())
+
+    def test_union_with_dict_keyword(self):
+        def fn():
+            t: torch.Tensor = torch.tensor(3)
+            x: Union[Dict[str, int], float] = dict(foo=t)
+            if torch.jit.isinstance(x, Dict[str, torch.Tensor]):
+                x["bar"] = torch.tensor(3)
+            return x
+
+    def test_union_with_empty_dictliteral_can_infer_dict_type(self):
+        def fn():
+            x: Union[Dict[str, torch.Tensor], int] = {}
+            if torch.jit.isinstance(x, Dict[str, torch.Tensor]):
+                x["foo"] = torch.tensor(3)
+            return x
+
+        self.checkScript(fn, ())
+
+    def test_union_with_empty_dictliteral_throws_when_type_cannot_be_inferred(self):
+        def fn():
+            x: Union[Dict[str, torch.Tensor], Dict[int, torch.Tensor], int] = {}
+            if torch.jit.isinstance(x, Dict[str, torch.Tensor]):
+                x["foo"] = torch.tensor(3)
+            return x
+
+        with self.assertRaisesRegex(RuntimeError, "there are multiple "
+                                    "possible Dict type candidates"):
+            torch.jit.script(fn)

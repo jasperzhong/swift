@@ -326,7 +326,7 @@ IValue toIValue(py::handle obj, const TypePtr& type, c10::optional<int32_t> N) {
     case TypeKind::AnyClassType:
     case TypeKind::AnyEnumType:
       break;
-    case TypeKind::EnumType:
+    case TypeKind::EnumType: {
       EnumTypePtr enum_type = type->expect<EnumType>();
       py::object py_obj = py::reinterpret_borrow<py::object>(obj);
       std::string name = py::cast<std::string>(obj.attr("name"));
