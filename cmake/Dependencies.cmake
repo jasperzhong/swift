@@ -1872,6 +1872,15 @@ set_target_properties(fmt-header-only PROPERTIES INTERFACE_COMPILE_FEATURES "")
 list(APPEND Caffe2_DEPENDENCY_LIBS fmt::fmt-header-only)
 set(BUILD_SHARED_LIBS ${TEMP_BUILD_SHARED_LIBS} CACHE BOOL "Build shared libs" FORCE)
 
+if(USE_BREAKPAD)
+  message(STATUS "using")
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../third_party/breakpad)
+
+else()
+  message(STATUS "not using")
+endif()
+message(FATAL "stopped")
+
 # ---[ Kineto
 if(USE_KINETO AND INTERN_BUILD_MOBILE)
   message(STATUS "Not using libkineto in a mobile build.")
