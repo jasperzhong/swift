@@ -93,10 +93,6 @@ class MutableTypePtrHelper {
         }
         return mutable_types;
       }
-      case TypeKind::OptionalType: {
-        auto inner = type->castRaw<OptionalType>()->getElementType();
-        return mapTypeToAliasTypeSet(inner);
-      }
       case TypeKind::AnyType:
         return {AliasTypeSet{type}};
       case TypeKind::FutureType: {
@@ -1134,8 +1130,7 @@ void AliasDb::makePointerTo(const Value* from, const Value* to) {
     bool expected_kind = false;
     for (auto kind : {from->type()->kind(), to->type()->kind()}) {
       expected_kind = expected_kind ||
-          (kind == TypeKind::OptionalType || kind == TypeKind::FutureType ||
-           kind == TypeKind::TupleType ||
+          (kind == TypeKind::FutureType || kind == TypeKind::TupleType ||
            kind == TypeKind::UnionType) // immutable type containers
           || kind == TypeKind::AnyType;
     }

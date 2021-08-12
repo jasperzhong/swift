@@ -30,7 +30,6 @@ namespace c10 {
   _(GeneratorType)          \
   _(QuantizerType)          \
   _(BoolType)               \
-  _(OptionalType)           \
   _(VarType)                \
   _(DeviceObjType)          \
   _(StreamObjType)          \
@@ -58,6 +57,9 @@ TORCH_API const char* typeKindToString(TypeKind kind);
 struct Type;
 using TypePtr = std::shared_ptr<Type>;
 using ConstTypePtr = std::shared_ptr<const Type>;
+
+struct UnionType;
+using UnionTypePtr = std::shared_ptr<UnionType>;
 
 // Use this to customize how a Type is printed using `annotation_str()`. If
 // c10::nullopt is returned, `annotation_str()` falls through to its default
@@ -137,6 +139,11 @@ struct TORCH_API Type : std::enable_shared_from_this<Type> {
     return false;
   }
 
+  // `OptionalType` has been deprecated and replaced by `UnionType`.
+  // This is a convenience method so that we don't have to replace
+  // all `== OptionalType::Kind` checks with a cast and another method
+  c10::optional<UnionTypePtr> isOptional() const;
+
   // Dynamically cast this object to the subclass indicated by the
   // template variable, returning nullptr if the cast is invalid.
   template <typename T>
@@ -195,8 +202,10 @@ struct TORCH_API Type : std::enable_shared_from_this<Type> {
   virtual bool hasFreeVariables() const {
     return false;
   }
-  // list of types this type contains, e.g. for a List then element type of a
-  // list for a tuple, the types of the tuple elements
+  // A list of the syntactic types that appear in the type constructor.
+  // For example, `List[T]` -> {`T`} and `Dict[T1, T2]` -> {`T1`, `T2`}.
+  // Now that `Optional` has been deprecated, `containedTypes` should
+  // always refer to the set of types that appear in the variable.
   virtual at::ArrayRef<TypePtr> containedTypes() const {
     return {};
   }
