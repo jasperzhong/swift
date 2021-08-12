@@ -23,7 +23,7 @@ from torch.autograd.function import once_differentiable
 from torch.autograd.profiler import (profile, record_function, emit_nvtx)
 from torch.autograd.profiler_util import (_format_time, EventList, FunctionEvent, FunctionEventAvg)
 import torch.autograd.functional as autogradF
-from torch.utils.checkpoint import checkpoint
+from torch.utils.checkpoint import checkpoint, Checkpoint
 from torch.testing._internal.common_cuda import TEST_CUDA
 from torch.testing._internal.common_utils import (TestCase, run_tests, skipIfNoLapack,
                                                   suppress_warnings, slowTest,
@@ -4496,6 +4496,32 @@ for shape in [(1,), ()]:
         mean_combined = torch.stack(feat_combined).mean()
         mean_combined.backward()
 
+    @slowTest
+    def test_checkpointing_with_hooks(self):
+        num_inp = 2000
+        nz_inp = 10
+        nz_out = 10
+        nz_bottleneck = 1000
+
+        # small proxy network for some complex reasoning we want to do per input
+        module = Checkpoint(nn.Sequential(
+            nn.Linear(nz_inp, nz_bottleneck),
+            nn.ReLU(),
+            nn.Linear(nz_bottleneck, nz_inp)
+        ))
+
+        feat_combined = []
+        for r in range(num_inp):
+            data_r = torch.empty(1, nz_inp)
+            data_r.uniform_()
+            data_r.requires_grad = True
+            feat_r = checkpoint(module, data_r)
+            feat_combined.append(feat_r)
+
+        # compute mean as a proxy for some joint reasoning
+        mean_combined = torch.stack(feat_combined).mean()
+        mean_combined.backward()
+
     def test_checkpoint_valid_reset_on_error(self):
         a = torch.randn(2, 2, requires_grad=True)
 
@@ -4505,6 +4531,57 @@ for shape in [(1,), ()]:
 
         c = checkpoint(torch.exp, a).sum()
         c.backward()
+
+    def test_checkpointing_with_hooks_correct_grad(self):
+        a = torch.randn(2, 2, requires_grad=True)
+
+        b = torch.exp(a).sum()
+        b.backward()
+        b_grad = a.grad
+
+        a.grad = None
+        c = Checkpoint(torch.exp)(a).sum()
+        c.backward()
+        c_grad = a.grad
+
+        a.grad = None
+        d = Checkpoint(torch.exp)(a).sum()
+        d_grad, = torch.autograd.grad(d, (a,))
+
+        self.assertEqual(b_grad, c_grad)
+        self.assertEqual(b_grad, d_grad)
+
+    def test_checkpointing_with_hooks_dataparallel(self):
+        a = torch.randn(20, 20, requires_grad=True)
+
+        b = torch.exp(a).sum()
+        b.backward()
+        b_grad = a.grad
+
+        a.grad = None
+        c = torch.nn.DataParallel(Checkpoint(torch.exp))(a).sum()
+        c.backward()
+        c_grad = a.grad
+
+        self.assertEqual(b_grad, c_grad)
+
+    def test_checkpointing_with_hooks_parameter_used_in_an_out(self):
+        w = torch.randn(10, 10, requires_grad=True)
+        count = 0
+
+        def hook(grad):
+            nonlocal count
+            count += 1
+
+        w.register_hook(hook)
+        x = torch.rand(10, 10, requires_grad=True)
+        h = w * x  # Using w outisde the checkpoint
+        out = Checkpoint(lambda x: w * x)(h)  # Using w inside the checkpoint
+
+        warnings.simplefilter('always')
+        out.sum().backward()
+        # should only call hook once
+        self.assertEqual(count, 1)
 
     def test_callback_adds_callback(self):
         called = [0]
