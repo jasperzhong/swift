@@ -456,9 +456,30 @@ def compute_meta_function_declaration(g: NativeFunctionsGroup) -> Optional[str]:
         parent_class = g.out.structured_inherits
         if parent_class is None:
             parent_class = "at::impl::MetaBase"
+        meta_return = "void"
+        precomputed = g.out.precomputed if g.structured else None
+
+        if precomputed:
+            # Generate a string containing declarations of all precomputed elements.
+            precomputed_elements_with_cpp_types = (
+                structured.argument_type(elem, binds=elem.name) for replace_list in precomputed.replace.values() for elem in replace_list
+            )
+            precomputed_elements = ";\n".join(
+                f"{elem.cpp_type(strip_ref=True)} {elem.name}" for elem in precomputed_elements_with_cpp_types
+            )
+            # Meta should return an instance of the struct containing the precomputed elements.
+            meta_return = "precompute_out"
+            precomputed_decl = f"""
+                struct TORCH_API precompute_out {{
+                    {precomputed_elements};
+            }};"""
+        else:
+            precomputed_decl = ""
+
         return f"""\
 struct TORCH_API structured_{name} : public {parent_class} {{
-    void meta({args_str});
+    {precomputed_decl}
+    {meta_return} meta({args_str});
 }};
 """
 
