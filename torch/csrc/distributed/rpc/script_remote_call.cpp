@@ -50,7 +50,7 @@ std::unique_ptr<ScriptRemoteCall> ScriptRemoteCall::fromIValues(
   }
 }
 
-c10::intrusive_ptr<OutgoingMessage> ScriptRemoteCall::toMessageImpl() && {
+c10::intrusive_ptr<OutgoingMessage> ScriptRemoteCall::toMessageImpl(const std::string& meta) && {
   std::vector<IValue> ivalues;
   ScriptCall::toIValues(ivalues);
   ivalues.emplace_back(retRRefId_.toIValue());
@@ -63,7 +63,8 @@ c10::intrusive_ptr<OutgoingMessage> ScriptRemoteCall::toMessageImpl() && {
   return c10::make_intrusive<OutgoingMessage>(
       std::move(payload),
       std::move(tensor_table),
-      MessageType::SCRIPT_REMOTE_CALL);
+      MessageType::SCRIPT_REMOTE_CALL,
+      meta);
 }
 
 std::unique_ptr<ScriptRemoteCall> ScriptRemoteCall::fromMessage(

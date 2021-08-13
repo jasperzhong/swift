@@ -481,6 +481,10 @@ for method_name, method in inspect.getmembers(PyRRef):
     setattr(RRef, method_name, new_method)
 
 
+def processMeta(func, args, kwargs):
+    return func, args, kwargs, "meta"
+
+
 @_require_initialized
 def remote(to, func, args=None, kwargs=None, timeout=UNSET_RPC_TIMEOUT):
     r"""
@@ -583,6 +587,7 @@ def remote(to, func, args=None, kwargs=None, timeout=UNSET_RPC_TIMEOUT):
         >>> rpc.init_rpc("worker1", rank=1, world_size=2)
         >>> rpc.shutdown()
     """
+    func, args, kwargs, meta = processMeta(func, args, kwargs)
     qualified_name = torch.jit._builtins._find_builtin(func)
     dst_worker_info = _to_worker_info(to)
     should_profile = torch.autograd._profiler_enabled()
@@ -601,11 +606,12 @@ def remote(to, func, args=None, kwargs=None, timeout=UNSET_RPC_TIMEOUT):
                 func = wrapped
 
         if qualified_name is not None:
-            rref = _invoke_remote_builtin(dst_worker_info, qualified_name, timeout, *args, **kwargs)
+            rref = _invoke_remote_builtin(dst_worker_info, qualified_name, meta, timeout, *args, **kwargs)
         elif isinstance(func, torch.jit.ScriptFunction):
             rref = _invoke_remote_torchscript(
                 dst_worker_info.name,
                 torch._jit_internal._qualified_name(func),
+                meta,
                 timeout,
                 is_async_exec,
                 *args,
@@ -619,6 +625,7 @@ def remote(to, func, args=None, kwargs=None, timeout=UNSET_RPC_TIMEOUT):
                 dst_worker_info,
                 pickled_python_udf,
                 tensors,
+                meta,
                 timeout,
                 is_async_exec
             )
@@ -632,6 +639,8 @@ def remote(to, func, args=None, kwargs=None, timeout=UNSET_RPC_TIMEOUT):
     return rref
 
 def _invoke_rpc(to, func, rpc_type, args=None, kwargs=None, rpc_timeout=UNSET_RPC_TIMEOUT):
+    func, args, kwargs, meta = processMeta(func, args, kwargs)
+
     if not callable(func):
         raise TypeError("function should be callable.")
 
@@ -657,6 +666,7 @@ def _invoke_rpc(to, func, rpc_type, args=None, kwargs=None, rpc_timeout=UNSET_RP
             fut = _invoke_rpc_builtin(
                 dst_worker_info,
                 qualified_name,
+                meta,
                 rpc_timeout,
                 *args,
                 **kwargs
@@ -667,6 +677,7 @@ def _invoke_rpc(to, func, rpc_type, args=None, kwargs=None, rpc_timeout=UNSET_RP
                 torch._jit_internal._qualified_name(func),
                 args,
                 kwargs,
+                meta,
                 rpc_timeout,
                 is_async_exec
             )
@@ -678,6 +689,7 @@ def _invoke_rpc(to, func, rpc_type, args=None, kwargs=None, rpc_timeout=UNSET_RP
                 dst_worker_info,
                 pickled_python_udf,
                 tensors,
+                meta,
                 rpc_timeout,
                 is_async_exec
             )

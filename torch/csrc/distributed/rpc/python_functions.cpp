@@ -113,6 +113,7 @@ std::shared_ptr<Operator> matchBuiltinOp(
 c10::intrusive_ptr<JitFuture> sendPythonRemoteCall(
     const WorkerInfo& dst,
     SerializedPyObj serializedPyObj,
+    const string& meta,
     const IValue& rrefId,
     const IValue& forkId,
     const float rpcTimeoutSeconds,
@@ -126,7 +127,7 @@ c10::intrusive_ptr<JitFuture> sendPythonRemoteCall(
   return torch::distributed::autograd::sendMessageWithAutograd(
       *agent,
       dst,
-      std::move(*pythonRemoteCall).toMessage(),
+      std::move(*pythonRemoteCall).toMessage(meta),
       true /*forceGradRecording*/,
       rpcTimeoutSeconds);
 }
@@ -179,6 +180,7 @@ c10::intrusive_ptr<JitFuture> pyRpcBuiltin(
     const std::string& opName,
     const py::args& args,
     const py::kwargs& kwargs,
+    const std::string& meta,
     const float rpcTimeoutSeconds) {
   DCHECK(PyGILState_Check());
   Stack stack;
@@ -190,7 +192,7 @@ c10::intrusive_ptr<JitFuture> pyRpcBuiltin(
   return toPyJitFuture(sendMessageWithAutograd(
       *agent,
       dst,
-      std::move(*scriptCall).toMessage(),
+      std::move(*scriptCall).toMessage(meta),
       false,
       rpcTimeoutSeconds));
 }
@@ -199,6 +201,7 @@ c10::intrusive_ptr<JitFuture> pyRpcPythonUdf(
     const WorkerInfo& dst,
     std::string& pickledPythonUDF,
     std::vector<torch::Tensor>& tensors,
+    const std::string& meta,
     const float rpcTimeoutSeconds,
     const bool isAsyncExecution) {
   DCHECK(!PyGILState_Check());
@@ -211,7 +214,7 @@ c10::intrusive_ptr<JitFuture> pyRpcPythonUdf(
   return toPyJitFuture(sendMessageWithAutograd(
       *agent,
       dst,
-      std::move(*pythonCall).toMessage(),
+      std::move(*pythonCall).toMessage(meta),
       true /*forceGradRecording*/,
       rpcTimeoutSeconds));
 }
@@ -221,6 +224,7 @@ c10::intrusive_ptr<JitFuture> pyRpcTorchscript(
     const std::string& qualifiedNameStr,
     const py::tuple& argsTuple,
     const py::dict& kwargsDict,
+    const std::string& meta,
     const float rpcTimeoutSeconds,
     const bool isAsyncExecution) {
   // No need to catch exception here, if function can not be found,
@@ -249,6 +253,7 @@ c10::intrusive_ptr<JitFuture> pyRpcTorchscript(
       qualifiedName,
       functionSchema,
       stack,
+      meta,
       rpcTimeoutSeconds,
       isAsyncExecution);
   return fut;
@@ -257,6 +262,7 @@ c10::intrusive_ptr<JitFuture> pyRpcTorchscript(
 PyRRef pyRemoteBuiltin(
     const WorkerInfo& dst,
     const std::string& opName,
+    const std::string& meta,
     const float rpcTimeoutSeconds,
     const py::args& args,
     const py::kwargs& kwargs) {
@@ -279,7 +285,7 @@ PyRRef pyRemoteBuiltin(
     auto jitFuture = sendMessageWithAutograd(
         *agent,
         dst,
-        std::move(*scriptRemoteCall).toMessage(),
+        std::move(*scriptRemoteCall).toMessage(meta),
         /*forceGradRecord */ false,
         /* timeout */ rpcTimeoutSeconds);
 
@@ -300,7 +306,7 @@ PyRRef pyRemoteBuiltin(
     auto jitFuture = sendMessageWithAutograd(
         *agent,
         dst,
-        std::move(*scriptRemoteCall).toMessage(),
+        std::move(*scriptRemoteCall).toMessage(meta),
         /* forceGradRecord */ false,
         /* timeout */ rpcTimeoutSeconds);
 
@@ -319,6 +325,7 @@ PyRRef pyRemotePythonUdf(
     const WorkerInfo& dst,
     std::string& pickledPythonUDF,
     std::vector<torch::Tensor>& tensors,
+    const std::string& meta,
     const float rpcTimeoutSeconds,
     const bool isAsyncExecution) {
   DCHECK(!PyGILState_Check());
@@ -331,6 +338,7 @@ PyRRef pyRemotePythonUdf(
     auto jitFuture = sendPythonRemoteCall(
         dst,
         std::move(serializedPyObj),
+        meta,
         userRRef->rrefId().toIValue(),
         userRRef->forkId().toIValue(),
         rpcTimeoutSeconds,
@@ -351,6 +359,7 @@ PyRRef pyRemotePythonUdf(
     auto jitFuture = sendPythonRemoteCall(
         dst,
         std::move(serializedPyObj),
+        meta,
         ownerRRef->rrefId().toIValue(),
         ownerRRef->rrefId().toIValue(),
         rpcTimeoutSeconds,
@@ -373,6 +382,7 @@ PyRRef pyRemotePythonUdf(
 PyRRef pyRemoteTorchscript(
     const std::string& dstWorkerName,
     const std::string& qualifiedNameStr,
+    const std::string& meta,
     const float rpcTimeoutSeconds,
     const bool isAsyncExecution,
     const py::args& args,
@@ -396,6 +406,7 @@ PyRRef pyRemoteTorchscript(
       qualifiedName,
       functionSchema,
       stack,
+      meta,
       rpcTimeoutSeconds,
       isAsyncExecution);
   return PyRRef(rrefPtr);

@@ -19,6 +19,7 @@ c10::intrusive_ptr<JitFuture> rpcTorchscript(
     const c10::QualifiedName& qualifiedName,
     const c10::FunctionSchema& functionSchema,
     std::vector<c10::IValue>& stack,
+    const std::string& meta,
     const float rpcTimeoutSeconds,
     const bool isAsyncExecution) {
   // This dummy tensor holds an at::RecordFunction when profiling is enabled.
@@ -46,7 +47,7 @@ c10::intrusive_ptr<JitFuture> rpcTorchscript(
   auto jitFuture = autograd::sendMessageWithAutograd(
       *rpcAgentPtr,
       rpcAgentPtr->getWorkerInfo(dstWorkerName),
-      std::move(*scriptCall).toMessage(),
+      std::move(*scriptCall).toMessage(meta),
       true /*forceGradRecording*/,
       rpcTimeoutSeconds);
 
@@ -86,6 +87,7 @@ c10::intrusive_ptr<RRef> remoteTorchscript(
     const c10::QualifiedName& qualifiedName,
     const c10::FunctionSchema& functionSchema,
     std::vector<c10::IValue>& stack,
+    const std::string& meta,
     const float rpcTimeoutSeconds,
     const bool isAsyncExecution) {
   auto rpcAgentPtr = RpcAgent::getCurrentRpcAgent();
@@ -115,7 +117,7 @@ c10::intrusive_ptr<RRef> remoteTorchscript(
     auto jitFuture = torch::distributed::autograd::sendMessageWithAutograd(
         *rpcAgentPtr,
         dstWorkerInfo,
-        std::move(*scriptRemoteCall).toMessage(),
+        std::move(*scriptRemoteCall).toMessage(meta),
         true /*forceGradRecording*/,
         rpcTimeoutSeconds /* timeout */);
 
@@ -142,7 +144,7 @@ c10::intrusive_ptr<RRef> remoteTorchscript(
     auto jitFuture = torch::distributed::autograd::sendMessageWithAutograd(
         *rpcAgentPtr,
         dstWorkerInfo,
-        std::move(*scriptRemoteCall).toMessage(),
+        std::move(*scriptRemoteCall).toMessage(meta),
         true /*forceGradRecording*/,
         rpcTimeoutSeconds /* timeout */);
 

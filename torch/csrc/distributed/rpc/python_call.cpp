@@ -10,7 +10,7 @@ PythonCall::PythonCall(SerializedPyObj&& serializedPyObj, bool isAsyncExecution)
     : serializedPyObj_(std::move(serializedPyObj)),
       isAsyncExecution_(isAsyncExecution) {}
 
-c10::intrusive_ptr<OutgoingMessage> PythonCall::toMessageImpl() && {
+c10::intrusive_ptr<OutgoingMessage> PythonCall::toMessageImpl(const std::string& meta) && {
   std::vector<char> payload;
   payload.reserve(serializedPyObj_.payload_.length() + 1);
   payload.push_back(isAsyncExecution_ ? 1 : 0);
@@ -22,7 +22,8 @@ c10::intrusive_ptr<OutgoingMessage> PythonCall::toMessageImpl() && {
   return c10::make_intrusive<OutgoingMessage>(
       std::move(payload),
       std::move(serializedPyObj_.tensors_),
-      MessageType::PYTHON_CALL);
+      MessageType::PYTHON_CALL,
+      meta);
 }
 
 std::unique_ptr<PythonCall> PythonCall::fromMessage(const Message& message) {
@@ -39,7 +40,7 @@ std::unique_ptr<PythonCall> PythonCall::fromMessage(const Message& message) {
   std::vector<Tensor> tensors = message.tensors();
   SerializedPyObj serializedPyObj(std::move(payload), std::move(tensors));
   return std::make_unique<PythonCall>(
-      std::move(serializedPyObj), isAsyncExecution);
+      std::move(serializedPyObj), isAsyncExecution); // TODO: this is bad!
 }
 
 const SerializedPyObj& PythonCall::serializedPyObj() const {
