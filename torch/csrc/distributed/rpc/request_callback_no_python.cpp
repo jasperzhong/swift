@@ -104,16 +104,16 @@ c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::processMessage(
 
           return retFuture;
         },
-        c10::getCustomClassType<c10::intrusive_ptr<Message>>());
+        c10::getCustomClassType<c10::intrusive_ptr<OutgoingMessage>>());
 
     auto retFutureWithMessageId = retFuture->then(
         [id = request.id()](JitFuture& future) {
-          c10::intrusive_ptr<Message> message =
-              future.value().toCustomClass<Message>();
+          c10::intrusive_ptr<OutgoingMessage> message =
+              future.value().toCustomClass<OutgoingMessage>();
           message->setId(id);
           return withStorages(message);
         },
-        c10::getCustomClassType<c10::intrusive_ptr<Message>>());
+        c10::getCustomClassType<c10::intrusive_ptr<OutgoingMessage>>());
 
     return retFutureWithMessageId;
   } catch (std::exception& e) {
@@ -148,7 +148,7 @@ c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::processScriptCall(
       [](JitFuture& future) {
         return withStorages(ScriptResp(future.value()).toMessage());
       },
-      c10::getCustomClassType<c10::intrusive_ptr<Message>>());
+      c10::getCustomClassType<c10::intrusive_ptr<OutgoingMessage>>());
 }
 
 c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::processPythonCall(
@@ -198,7 +198,7 @@ c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::assignOwnerRRef(
         }
         return withStorages(RemoteRet(rrefId, forkId).toMessage());
       },
-      c10::getCustomClassType<c10::intrusive_ptr<Message>>());
+      c10::getCustomClassType<c10::intrusive_ptr<OutgoingMessage>>());
 }
 
 c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::processScriptRemoteCall(
@@ -244,7 +244,7 @@ c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::
       [](JitFuture& future) {
         return withStorages(ScriptRRefFetchRet({future.value()}).toMessage());
       },
-      c10::getCustomClassType<c10::intrusive_ptr<Message>>());
+      c10::getCustomClassType<c10::intrusive_ptr<OutgoingMessage>>());
 }
 
 c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::
@@ -343,12 +343,12 @@ c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::
         } else {
           auto msg = getMessageWithAutograd(
               fromWorkerId,
-              wrappedRpcResponseFuture.value().toCustomClass<Message>(),
+              wrappedRpcResponseFuture.value().toCustomClass<OutgoingMessage>(),
               MessageType::FORWARD_AUTOGRAD_RESP);
           return withStorages(std::move(msg));
         }
       },
-      c10::getCustomClassType<c10::intrusive_ptr<Message>>());
+      c10::getCustomClassType<c10::intrusive_ptr<OutgoingMessage>>());
 
   return responseFuture;
 }
@@ -385,7 +385,7 @@ c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::
           return withStorages(PropagateGradientsResp().toMessage());
         }
       },
-      c10::getCustomClassType<c10::intrusive_ptr<Message>>());
+      c10::getCustomClassType<c10::intrusive_ptr<OutgoingMessage>>());
 }
 
 c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::
@@ -473,13 +473,13 @@ c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::
                 profiledEvents, profilingConfig, event_lists);
             auto rpcWithProfilingResp = std::make_unique<RpcWithProfilingResp>(
                 MessageType::RUN_WITH_PROFILING_RESP,
-                wrappedRpcResponseFuture.value().toCustomClass<Message>(),
+                wrappedRpcResponseFuture.value().toCustomClass<OutgoingMessage>(),
                 profiledEvents,
                 profilingKeyId);
             return withStorages(std::move(*rpcWithProfilingResp).toMessage());
           }
         }),
-        c10::getCustomClassType<c10::intrusive_ptr<Message>>());
+        c10::getCustomClassType<c10::intrusive_ptr<OutgoingMessage>>());
 
     return responseFuture;
     // Exiting the scope will disable the profiler on this thread with the
@@ -552,7 +552,7 @@ c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::processRpc(
   }
 }
 
-c10::intrusive_ptr<Message> RequestCallbackNoPython::handleError(
+c10::intrusive_ptr<OutgoingMessage> RequestCallbackNoPython::handleError(
     const std::exception& e,
     const MessageType messageType,
     int64_t messageId) const {
@@ -605,9 +605,9 @@ c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::asFuture(
 }
 
 c10::intrusive_ptr<JitFuture> RequestCallbackNoPython::asFuture(
-    c10::intrusive_ptr<Message> message) const {
+    c10::intrusive_ptr<OutgoingMessage> message) const {
   auto future = c10::make_intrusive<JitFuture>(
-      at::getCustomClassType<c10::intrusive_ptr<Message>>(),
+      at::getCustomClassType<c10::intrusive_ptr<OutgoingMessage>>(),
       RpcAgent::getCurrentRpcAgent()->getDevices());
   std::vector<c10::weak_intrusive_ptr<c10::StorageImpl>> storages =
       message->getStorages();
