@@ -89,7 +89,7 @@ def auto_quantize(func, qtype, quant_loss=None):
 
     Currently it only supports:
         . FP16 and BFP16 quantization method
-        . all_gather, all_to_all collective ops
+        . all_gather, all_to_all, and all_to_all_single collective ops
 
     Note: BFP16 only supports 2D tensors.
 
@@ -125,6 +125,16 @@ def auto_quantize(func, qtype, quant_loss=None):
             for i, t in enumerate(_dequantize_tensor_list(out_tensors, qtype, quant_loss=quant_loss)):
                 tensors[i] = t
 
+        elif (func == dist.all_to_all_single):
+            tensors = args[0]
+            out_splits = kwargs.get('out_splits', None)
+            in_splits = kwargs.get('in_splits', None)
+            # Quantizing the input/output tensor
+            input_tensors = _quantize_tensor(args[1], qtype)
+            out_tensors = _quantize_tensor(tensors, qtype)
+            dist.all_to_all_single(out_tensors, input_tensors, out_splits, in_splits, group=group)
+            for i, t in enumerate(_dequantize_tensor(out_tensors, qtype, quant_loss=quant_loss)):
+                tensors[i] = t
         else:
             raise RuntimeError(
                 f"The collective op {func} is not supported yet"
