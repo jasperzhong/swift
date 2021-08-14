@@ -28,4 +28,4 @@ namespace at {
  AT_FORALL_SCALAR_TYPES_WITH_COMPLEX_EXCEPT_COMPLEX_HALF(DEFINE_ITEM)
  #undef DEFINE_ITEM
 
- } //namespace at
+} //namespace at

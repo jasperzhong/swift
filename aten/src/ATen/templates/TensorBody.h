@@ -37,6 +37,8 @@ struct Generator;
 struct Type;
 class DeprecatedTypeProperties;
 class Tensor;
+class Alias;
+struct ViewMeta;
 } // namespace at
 namespace at {
 namespace indexing {
@@ -364,9 +366,7 @@ class TORCH_API Tensor {
   const Storage& storage() const {
     return impl_->storage();
   }
-  bool is_alias_of(const at::Tensor& other) const{
-    return impl_->storage().is_alias_of(other.storage());
-  }
+  bool is_alias_of(const at::Tensor& other) const;
 
   Tensor toType(ScalarType t) const {
     return to(options().dtype(t), /*non_blocking*/ false, /*copy*/ false);
@@ -979,6 +979,13 @@ public:
   /// `Variable` is not a view, throw a `std::runtime_error`.
   const Tensor& _base() const;
 
+  /// If the tensor is part of the functionalization pass, syncs the tensor with any mutations
+  // that happened to its alias.
+  void sync_() const;
+
+  /// Returns true if this tensor is opted into the functionalization pass, and has view metadata.
+  bool has_view_meta() const;
+
   // Miscellaneous
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -990,6 +997,7 @@ protected:
   void enforce_invariants();
   c10::intrusive_ptr<TensorImpl, UndefinedTensorImpl> impl_;
 };
+
 
 // For "multiple ... operators specified" warnings, closing brace of class
 // declaration must be included between pragma push & pop
@@ -1157,4 +1165,103 @@ inline c10::MaybeOwned<Tensor> Tensor::expect_contiguous(MemoryFormat memory_for
     return c10::MaybeOwned<Tensor>::owned(__dispatch_contiguous(memory_format));
   }
 }
+
+struct ViewMeta {
+  // The names of all existing view operators.
+  enum class Type {
+  // noOp and invalid are special.
+    noOp,
+    invalid,
+    real,
+    imag,
+    as_strided,
+    tensor_split_sections,
+    tensor_split_indices,
+    tensor_split_tensor_indices_or_sections,
+    contiguous,
+    expand,
+    flatten_using_ints,
+    flatten_named_out_dim,
+    flatten_using_names,
+    flatten_DimnameList,
+    permute,
+    numpy_T,
+    reshape,
+    _reshape_alias,
+    select_Dimname,
+    select_int,
+    slice_Tensor,
+    split_Tensor,
+    split_with_sizes,
+    squeeze,
+    squeeze_dim,
+    squeeze_dimname,
+    t,
+    view_as,
+    _indices,
+    values,
+    unbind_int,
+    unbind_Dimname,
+    swapaxes,
+    swapdims,
+    unfold,
+    alias,
+    view_as_real,
+    view_as_complex,
+    _conj,
+    _neg_view,
+    chunk,
+    diagonal,
+    diagonal_Dimname,
+    expand_as,
+    narrow,
+    narrow_Tensor,
+    movedim_intlist,
+    movedim_int,
+    reshape_as,
+    detach,
+    transpose_int,
+    transpose_Dimname,
+    unsqueeze,
+    _values,
+    indices,
+    view,
+    view_dtype,
+  };
+
+  ViewMeta() = default;
+  ViewMeta(Type view_type, std::vector<int64_t> size, std::vector<int64_t> source_size):
+      view_type(view_type),
+      size(std::move(size)),
+      source_size(std::move(source_size)) {}
+  bool operator==(const ViewMeta& ref) const {
+    return view_type == ref.view_type && size == ref.size && source_size == ref.source_size;
+  }
+
+  Type view_type = Type::invalid;
+  std::vector<int64_t> size;
+  std::vector<int64_t> source_size;
+};
+const char* ViewMetaTypetoString(ViewMeta::Type);
+std::ostream& operator<<(std::ostream&, ViewMeta::Type);
+
+
+class Alias {
+  public:
+    struct Update {
+        const at::Tensor new_val;
+        std::vector<ViewMeta> view_metas;
+    };
+    explicit Alias(const at::Tensor& base);
+    const at::Tensor& base() const;
+    size_t generation() const { return generation_; }
+    void add_update(const at::Tensor& updated_val, std::vector<ViewMeta> metas);
+    void apply_update(const Update& update);
+    void SyncUpdateOperations();
+  private:
+    at::Tensor base_;
+    std::vector<Update> updates_;
+    size_t generation_ = 0;
+};
+
 } // namespace at

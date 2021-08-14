@@ -45,6 +45,8 @@ class Scalar;
 struct IValue;
 struct Storage;
 class OperatorHandle;
+class ViewMeta;
+class Alias;
 } // namespace c10
 
 namespace torch {
@@ -2307,6 +2309,8 @@ struct C10_API TensorImpl : public c10::intrusive_ptr_target {
   void set_owns_pyobj(bool b) {
     owns_pyobj_ = b;
   }
+
+  virtual void replace_(const TensorImpl* other_impl);
 
  protected:
   // Policy for adjusting the behavior of is_contiguous(). Allows

@@ -33,6 +33,7 @@ from tools.codegen.context import (method_with_native_function,
                                    with_native_function_and_indices,
                                    with_native_function)
 import tools.codegen.dest as dest
+from tools.codegen.gen_functionalization_type import Functionalize
 
 T = TypeVar('T')
 
@@ -1058,6 +1059,13 @@ def main() -> None:
     def key_func(fn: NativeFunction) -> str:
         return fn.func.name.unambiguous_name()
 
+    def key_func_grouped(g: Union[NativeFunction, NativeFunctionsGroup]) -> str:
+        if isinstance(g, NativeFunction):
+            f = g
+        else:
+            f = g.functional
+        return key_func(f)
+
     cpu_fm.write_sharded(
         'Operators.cpp',
         native_functions,
@@ -1113,6 +1121,17 @@ def main() -> None:
     cpu_fm.write('RegistrationDeclarations.h', lambda: {
         'registration_declarations': [compute_registration_declarations(f, backend_indices) for f in native_functions],
     })
+
+    cpu_fm.write_sharded(
+        'RegisterFunctionalization.cpp',
+        grouped_native_functions,
+        key_fn=key_func_grouped,
+        env_callable=lambda g: {
+            'func_definitions': Functionalize(Target.DEFINITION)(g),
+            'func_registrations': Functionalize(Target.REGISTRATION)(g)},
+        num_shards=4,
+        sharded_keys={'func_definitions', 'func_registrations'}
+    )
 
     if options.output_dependencies:
         cpu_fm.write_outputs(options.output_dependencies)

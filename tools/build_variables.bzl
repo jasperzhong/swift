@@ -759,6 +759,7 @@ aten_cpu_source_non_codegen_list = [
     "aten/src/ATen/Context.cpp",
     "aten/src/ATen/DLConvertor.cpp",
     "aten/src/ATen/ExpandUtils.cpp",
+    "aten/src/ATen/FunctionalTensorImplBase.cpp",
     "aten/src/ATen/MemoryOverlap.cpp",
     "aten/src/ATen/MapAllocator.cpp",
     "aten/src/ATen/NamedTensorUtils.cpp",
