@@ -7837,9 +7837,10 @@ Keyword args:
 
 """.format(**factory_like_common_args))
 
-add_docstr(torch.randint,
-           """
-randint(low=0, high, size, \\*, generator=None, out=None, \
+add_docstr(
+    torch.randint,
+    r"""
+randint(low=0, high, size, *, generator=None, out=None, \
 dtype=None, layout=torch.strided, device=None, requires_grad=False) -> Tensor
 
 Returns a tensor filled with random integers generated uniformly
