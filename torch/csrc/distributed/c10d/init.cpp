@@ -31,8 +31,10 @@
 #include <c10d/frontend.hpp>
 #include <c10d/logger.hpp>
 #include <c10d/reducer.hpp>
+
 #include <torch/csrc/Exceptions.h>
 #include <torch/csrc/distributed/c10d/python_comm_hook.h>
+#include <torch/csrc/distributed/c10d/quantization/quantization.h>
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/csrc/utils/object_ptr.h>
 #include <torch/csrc/utils/pybind.h>
@@ -1643,6 +1645,25 @@ static PyMethodDef methods[] = { // NOLINT
 PyMethodDef* python_functions() {
   return methods;
 }
+
+namespace quantization {
+TORCH_LIBRARY(q, m) {
+    m.def("Bfloat16QuantizedToFloat(Tensor input) -> Tensor");
+    m.def("FloatToBfloat16Quantized(Tensor input) -> Tensor");
+}
+
+TORCH_LIBRARY_IMPL(q, CPU, m) {
+    m.impl("Bfloat16QuantizedToFloat", _bfloat16_to_float_cpu);
+    m.impl("FloatToBfloat16Quantized", _float_to_bfloat16_cpu);
+}
+
+#define DISPATCH_TO_CUDA(name, function) \
+    m.impl(name, torch::dispatch(c10::DispatchKey::CUDA, TORCH_FN(function)))
+TORCH_LIBRARY_IMPL(q, CUDA, m) {
+    DISPATCH_TO_CUDA("FloatToBfloat16Quantized", _float_to_bfloat16_gpu);
+    DISPATCH_TO_CUDA("Bfloat16QuantizedToFloat", _bfloat16_to_float_gpu);
+}
+} // namespace quantization
 
 } // namespace c10d
 } // namespace distributed
