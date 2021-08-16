@@ -297,6 +297,7 @@ Pointwise Ops
     bitwise_left_shift
     bitwise_right_shift
     ceil
+    choose_qparams_optimized
     clamp
     clip
     conj_physical

@@ -11333,6 +11333,35 @@ Example::
         quantization_scheme=torch.per_tensor_affine, scale=1.5, zero_point=3)
 """)
 
+add_docstr(torch.choose_qparams_optimized,
+           r"""
+choose_qparams_optimized(input, numel, n_bins, ratio, bit_width) -> (Tensor, Tensor)
+
+Helper function to find the best min/max for a tensor to calculate qparams.
+It uses a greedy approach to nudge the min and max and calculate the l2 norm
+and tries to minimize the quant error by doing `torch.norm(x-fake_quant(x,s,z))`
+Returns the optimized xmax and xmin value of the tensor.
+
+Arguments:
+    input (Tensor): float tensor for which we need to compute min/max.
+    numel (int): number of elements in the input tensor.
+    n_bins (int): number of bins used to compute the optimized params.
+    ratio (float): ratio used to compute the increment of min val, based on the
+    formula `n_bins * (1.0 - ratio)`.
+    bit_width (int): bit width of the target quantization range.
+
+Returns:
+    Tensor: optimized max val of the tensor.
+    Tensor: optimized min val of the tensor.
+
+Example::
+
+    >>> x = torch.randn(2, 2)
+    >>> torch.choose_qparams_optimized(x, 4, 200, 0.016, 255)
+    (tensor([1.5765]), tensor([-0.9451]))
+
+""")
+
 
 add_docstr(torch.Generator,
            r"""
