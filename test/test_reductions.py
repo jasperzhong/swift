@@ -3015,6 +3015,7 @@ class TestReductions(TestCase):
             self.assertEqual(torch.ones((2, 1, 4), device=device, dtype=out_dtype), xb.all(1, keepdim=True))
             self.assertEqual(torch.ones((), device=device, dtype=out_dtype), xb.all())
 
+
 instantiate_device_type_tests(TestReductions, globals())
 
 if __name__ == '__main__':
