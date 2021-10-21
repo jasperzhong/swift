@@ -10,6 +10,7 @@ import abc
 import functools
 import json
 import os
+import signal
 import socket
 import time
 import traceback
@@ -26,7 +27,6 @@ from torch.distributed.elastic.events import Event, EventSource, record
 from torch.distributed.elastic.metrics import prof, put_metric
 from torch.distributed.elastic.multiprocessing import ProcessFailure, Std
 from torch.distributed.elastic.utils.logging import get_logger
-
 
 _TERMINAL_STATE_SYNC_ID = "torchelastic/agent/terminal_state"
 
@@ -470,6 +470,13 @@ class SimpleElasticAgent(ElasticAgent):
         raise NotImplementedError()
 
     @abc.abstractmethod
+    def _send_signal(self, sig):
+        """
+        Send signal to workers
+        """
+        raise NotImplementedError() 
+
+    @abc.abstractmethod
     def _stop_workers(self, worker_group: WorkerGroup) -> None:
         r"""
         Stops all workers in the given worker group. Implementors
@@ -555,7 +562,7 @@ class SimpleElasticAgent(ElasticAgent):
             f"  global_world_sizes={[worker.world_size for worker in workers]}\n"
         )
 
-    def _handler_failure(self, worker_group):
+    def _handle_failure(self, worker_group):
         spec = worker_group.spec
 
         master_addr, master_port = self._get_master_addr_port(self._store)
@@ -583,6 +590,9 @@ class SimpleElasticAgent(ElasticAgent):
             f"  role_world_sizes={[worker.role_world_size for worker in workers]}\n"
             f"  global_world_sizes={[worker.world_size for worker in workers]}\n"
         )
+
+        # inform workers about the failure
+        self._send_signal(signal.SIGUSR1)
 
 
     def _get_ranks(
@@ -898,7 +908,7 @@ class SimpleElasticAgent(ElasticAgent):
                     # self._store = store
                     # self._worker_group.store = store 
                     # log.info(f"group_rank:{group_rank} group_world_size:{group_world_size}")
-                    self._handler_failure(self._worker_group)
+                    self._handle_failure(self._worker_group)
                     # self._restart_workers(self._worker_group)
             else:
                 raise Exception(f"[{role}] Worker group in {state.name} state")

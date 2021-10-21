@@ -226,3 +226,8 @@ class LocalElasticAgent(SimpleElasticAgent):
                 )
         else:
             return RunResult(state=WorkerState.HEALTHY)
+
+    @prof
+    def _send_signal(self, sig):
+        log.info("the agent informs all workers about the failure")
+        self._pcontext.send_signal(sig)

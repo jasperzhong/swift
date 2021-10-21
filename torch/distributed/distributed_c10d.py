@@ -1,6 +1,7 @@
 import contextlib
 import logging
 import os
+import signal
 import pickle
 import io
 import torch
@@ -71,7 +72,7 @@ def supports_complex(reduceOp: ReduceOp) -> bool:
     return reduceOp not in denyList
 
 
-def failure_handler():
+def failure_handler(signum, frame):
     default_pg = _get_default_group()
     rank = default_pg.rank()
     size = default_pg.size()
@@ -83,11 +84,11 @@ def failure_handler():
 
     destroy_process_group()
     # TODO: use config
-    time.sleep(15)
     print("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
     print("success to re-init")
     # TODO: many logics ....
+    _set_re_init(True)
 
 
 class Backend(object):
@@ -205,6 +206,24 @@ _default_pg_init_method = None
 _group_count = 0
 
 STORE_BASED_BARRIER_PREFIX = "store_based_barrier_key"
+
+_re_init = False
+
+
+def _is_re_init():
+    global _re_init
+    return _re_init
+
+
+def _set_re_init(value):
+    global _re_init
+    _re_init = value
+
+
+def _check_re_init():
+    while not _is_re_init():
+        time.sleep(0.1)
+    _set_re_init(False)
 
 
 def _store_based_barrier(rank, store, timeout):
@@ -588,6 +607,8 @@ def init_process_group(backend,
         if get_backend(default_pg) in [Backend.GLOO, Backend.NCCL]:
             default_pg._set_sequence_number_for_group()
 
+    signal.signal(signal.SIGUSR1, failure_handler)
+
 
 def _new_process_group_helper(world_size,
                               rank,
@@ -883,7 +904,7 @@ def send(tensor,
             default_pg.send([tensor], dst, tag).wait()
         except RuntimeError as e:
             logger.error(e)
-            failure_handler()
+            _check_re_init()
     else:
         group_dst_rank = _get_group_rank(group, dst)
         group.send([tensor], group_dst_rank, tag).wait()

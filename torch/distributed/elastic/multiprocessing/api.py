@@ -246,6 +246,16 @@ class PContext(abc.ABC):
         """
         raise NotImplementedError()
 
+    @abc.abstractmethod
+    def _send_signal(self, sig):
+        """
+        Send signal to all processes 
+        """
+        raise NotImplementedError
+
+    def send_signal(self, sig):
+        self._send_signal(sig)
+
     def close(self) -> None:
         self._close()
         if self._stdout_tail:
@@ -504,6 +514,9 @@ class SubprocessHandler:
         if self._stderr:
             self._stderr.close()
 
+    def send_signal(self, sig):
+        self.proc.send_signal(sig)
+
 
 def _pr_set_pdeathsig() -> None:
     """
@@ -522,8 +535,7 @@ class SubprocessContext(PContext):
     """
 
     def __init__(
-        self,
-        name: str,
+        self, name: str,
         entrypoint: str,
         args: Dict[int, Tuple],
         envs: Dict[int, Dict[str, str]],
@@ -620,3 +632,8 @@ class SubprocessContext(PContext):
         if self.subprocess_handlers:
             for handler in self.subprocess_handlers.values():
                 handler.close()
+
+    def _send_signal(self, sig) -> None:
+        if self.subprocess_handlers:
+            for handler in self.subprocess_handlers.values():
+                handler.send_signal(sig)
