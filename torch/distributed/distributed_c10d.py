@@ -71,6 +71,25 @@ def supports_complex(reduceOp: ReduceOp) -> bool:
     return reduceOp not in denyList
 
 
+def failure_handler():
+    default_pg = _get_default_group()
+    rank = default_pg.rank()
+    size = default_pg.size()
+    store = _get_default_store()
+
+    # clear workers
+    store_key = "{}:{}".format(STORE_BASED_BARRIER_PREFIX, _group_count)
+    store.set(store_key, "0")
+
+    destroy_process_group()
+    # TODO: use config
+    time.sleep(15)
+    print("start to re-init")
+    init_process_group("nccl", world_size=size, rank=rank, store=store)
+    print("success to re-init")
+    # TODO: many logics ....
+
+
 class Backend(object):
     """
     An enum-like class of available backends: GLOO, NCCL, MPI, and other registered
@@ -128,6 +147,7 @@ class Backend(object):
         """
         setattr(Backend, name.upper(), func)
 
+
 # `_backend`, `dist_backend`, and `reduce_op` are here to maintain backward
 # compatibility with pre-c10d distributed package.
 # TODO: remove them when users are ready to take a hard dependency on PyTorch 1.
@@ -153,6 +173,7 @@ class _reduce_op(object):
         warnings.warn("torch.distributed.reduce_op is deprecated, please use "
                       "torch.distributed.ReduceOp instead")
         return object.__getattribute__(self, key)
+
 
 reduce_op = _reduce_op()
 
@@ -184,6 +205,7 @@ _default_pg_init_method = None
 _group_count = 0
 
 STORE_BASED_BARRIER_PREFIX = "store_based_barrier_key"
+
 
 def _store_based_barrier(rank, store, timeout):
     """
@@ -226,6 +248,7 @@ def _store_based_barrier(rank, store, timeout):
     logger.info(
         f"Rank {rank}: Completed store-based barrier for {world_size} nodes."
     )
+
 
 def _rank_not_in_group(group: ProcessGroup):
     """
@@ -308,6 +331,7 @@ def _check_op(op):
                            "to be of type ``torch.distributed.isend`` or "
                            "``torch.distributed.irecv``.")
 
+
 def _check_p2p_op_list(p2p_op_list):
     """
     Helper to check that the ``p2p_op_list`` is a list of P2POp instances and
@@ -317,7 +341,6 @@ def _check_p2p_op_list(p2p_op_list):
        not all(isinstance(p2p_op, P2POp) for p2p_op in p2p_op_list):
         raise RuntimeError("Invalid ``p2p_op_list``. Each op is expected to "
                            "to be of type ``torch.distributed.P2POp``.")
-
 
     backend = get_backend(p2p_op_list[0].group)
     if not all(backend == get_backend(p2p_op.group) for p2p_op in p2p_op_list):
@@ -384,6 +407,7 @@ def _get_default_store():
     default_pg = _get_default_group()
     _, default_store = _pg_map[default_pg]
     return default_store
+
 
 def _update_default_pg(pg):
     GroupMember.WORLD = group.WORLD = pg
@@ -545,7 +569,8 @@ def init_process_group(backend,
             timeout=timeout)
         _update_default_pg(default_pg)
 
-    _pg_group_ranks[GroupMember.WORLD] = {i: i for i in range(GroupMember.WORLD.size())}  # type: ignore[attr-defined, index]
+    _pg_group_ranks[GroupMember.WORLD] = {i: i for i in range(
+        GroupMember.WORLD.size())}  # type: ignore[attr-defined, index]
     _backend = _pg_map[GroupMember.WORLD][0]  # type: ignore[index]
     _default_pg_init_method = init_method
 
@@ -562,6 +587,7 @@ def init_process_group(backend,
         # Set sequence numbers for gloo and nccl process groups.
         if get_backend(default_pg) in [Backend.GLOO, Backend.NCCL]:
             default_pg._set_sequence_number_for_group()
+
 
 def _new_process_group_helper(world_size,
                               rank,
@@ -853,7 +879,11 @@ def send(tensor,
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
-        default_pg.send([tensor], dst, tag).wait()
+        try:
+            default_pg.send([tensor], dst, tag).wait()
+        except RuntimeError as e:
+            logger.error(e)
+            failure_handler()
     else:
         group_dst_rank = _get_group_rank(group, dst)
         group.send([tensor], group_dst_rank, tag).wait()
@@ -923,6 +953,7 @@ class P2POp(object):
             the default process group will be used.
         tag (int, optional): Tag to match send with recv.
     """
+
     def __init__(self, op, tensor, peer, group=None, tag=0):
         self.op = op
         self.tensor = tensor
@@ -1547,7 +1578,7 @@ def all_gather_object(object_list, obj, group=None):
     )
     # Output tensors are nonoverlapping views of coalesced_output_tensor
     output_tensors = [
-        coalesced_output_tensor[max_object_size * i : max_object_size * (i + 1)]
+        coalesced_output_tensor[max_object_size * i: max_object_size * (i + 1)]
         for i in range(group_size)
     ]
     all_gather(output_tensors, input_tensor, group=group)
@@ -1642,7 +1673,7 @@ def gather_object(obj, object_gather_list=None, dst=0, group=None):
         )
         # Output tensors are nonoverlapping views of coalesced_output_tensor
         output_tensors = [
-            coalesced_output_tensor[max_object_size * i : max_object_size * (i + 1)]
+            coalesced_output_tensor[max_object_size * i: max_object_size * (i + 1)]
             for i in range(group_size)
         ]
     # All ranks call gather with equal-sized tensors.
@@ -1749,7 +1780,7 @@ def broadcast_object_list(object_list, src=0, group=None):
     offset = 0
     if my_rank != src:
         for i, obj_size in enumerate(object_sizes_tensor):
-            obj_view = object_tensor[offset : offset + obj_size]
+            obj_view = object_tensor[offset: offset + obj_size]
             obj_view = obj_view.type(torch.uint8)  # type: ignore[call-overload]
             if obj_view.device != torch.device("cpu"):
                 obj_view = obj_view.cpu()
@@ -1927,6 +1958,7 @@ def all_gather(tensor_list,
     else:
         work.wait()
 
+
 def _all_gather_base(output_tensor,
                      input_tensor,
                      group=None,
@@ -2059,6 +2091,7 @@ def all_gather_coalesced(output_tensor_lists,
         return work
     else:
         work.wait()
+
 
 def _validate_output_list_for_rank(my_rank, dst, gather_list):
     if dst == my_rank:
@@ -2404,6 +2437,7 @@ def all_to_all_single(output,
     else:
         work.wait()
 
+
 def all_to_all(output_tensor_list,
                input_tensor_list,
                group=None,
@@ -2497,11 +2531,9 @@ def all_to_all(output_tensor_list,
         work.wait()
 
 
-
 def barrier(group=GroupMember.WORLD,
             async_op=False,
             device_ids=None):
-
     """
     Synchronizes all processes.
 
@@ -2543,6 +2575,7 @@ def barrier(group=GroupMember.WORLD,
         return work
     else:
         work.wait()
+
 
 def monitored_barrier(group=GroupMember.WORLD, timeout=None, wait_all_ranks=False):
     """
@@ -2668,7 +2701,6 @@ def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=N
     Returns:
         A handle of distributed group that can be given to collective calls.
     """
-
 
     global _pg_group_ranks
 

@@ -555,6 +555,36 @@ class SimpleElasticAgent(ElasticAgent):
             f"  global_world_sizes={[worker.world_size for worker in workers]}\n"
         )
 
+    def _handler_failure(self, worker_group):
+        spec = worker_group.spec
+
+        master_addr, master_port = self._get_master_addr_port(self._store)
+        store, group_rank, group_world_size = spec.rdzv_handler.next_rendezvous()
+        self._store = store
+
+        workers = self._assign_worker_ranks(store, group_rank, group_world_size, spec)
+        worker_group.store = store
+
+        if group_rank == 0:
+            self._set_master_addr_port(store, master_addr, master_port)
+        master_addr, master_port = self._get_master_addr_port(store)
+        restart_count = spec.max_restarts - self._remaining_restarts
+
+        log.info(
+            f"[{spec.role}] Rendezvous complete for workers. Result:\n"
+            f"  restart_count={restart_count}\n"
+            f"  master_addr={master_addr}\n"
+            f"  master_port={master_port}\n"
+            f"  group_rank={group_rank}\n"
+            f"  group_world_size={group_world_size}\n"
+            f"  local_ranks={[worker.local_rank for worker in workers]}\n"
+            f"  role_ranks={[worker.role_rank for worker in workers]}\n"
+            f"  global_ranks={[worker.global_rank for worker in workers]}\n"
+            f"  role_world_sizes={[worker.role_world_size for worker in workers]}\n"
+            f"  global_world_sizes={[worker.world_size for worker in workers]}\n"
+        )
+
+
     def _get_ranks(
         self,
         role_infos: List[_RoleInstanceInfo],
@@ -686,9 +716,9 @@ class SimpleElasticAgent(ElasticAgent):
         """
 
         role = worker_group.spec.role
-        log.info(f"[{role}] Stopping worker group")
-        self._stop_workers(worker_group)
-        worker_group.state = WorkerState.STOPPED
+        # log.info(f"[{role}] Stopping worker group")
+        # self._stop_workers(worker_group)
+        # worker_group.state = WorkerState.STOPPED
         self._initialize_workers(worker_group)
 
     # pyre-fixme[56]: Pyre was not able to infer the type of the decorator
@@ -864,7 +894,12 @@ class SimpleElasticAgent(ElasticAgent):
                         f"new nodes from group_rank={group_rank}; "
                         f"will restart worker group"
                     )
-                    self._restart_workers(self._worker_group)
+                    # store, group_rank, group_world_size = rdzv_handler.next_rendezvous()
+                    # self._store = store
+                    # self._worker_group.store = store 
+                    # log.info(f"group_rank:{group_rank} group_world_size:{group_world_size}")
+                    self._handler_failure(self._worker_group)
+                    # self._restart_workers(self._worker_group)
             else:
                 raise Exception(f"[{role}] Worker group in {state.name} state")
 

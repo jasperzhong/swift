@@ -5,21 +5,27 @@
 #
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
+import inspect
+import os
+import signal
 import sys
+import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Union, cast, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
 import torch.distributed.elastic.rendezvous.registry as rdzv_registry
 from torch.distributed.elastic import events, metrics
-from torch.distributed.elastic.agent.server.api import WorkerSpec, WorkerState  # type: ignore[import]
-from torch.distributed.elastic.agent.server.local_elastic_agent import LocalElasticAgent  # type: ignore[import]
+from torch.distributed.elastic.agent.server.api import (  # type: ignore[import]
+    WorkerSpec, WorkerState)
+from torch.distributed.elastic.agent.server.local_elastic_agent import \
+    LocalElasticAgent  # type: ignore[import]
 from torch.distributed.elastic.multiprocessing import Std
 from torch.distributed.elastic.multiprocessing.errors import ChildFailedError
 from torch.distributed.elastic.rendezvous import RendezvousParameters
-from torch.distributed.elastic.rendezvous.utils import parse_rendezvous_endpoint
+from torch.distributed.elastic.rendezvous.utils import \
+    parse_rendezvous_endpoint
 from torch.distributed.elastic.utils.logging import get_logger
-
 
 logger = get_logger()
 
@@ -170,8 +176,33 @@ def _get_addr_and_port(
     return (master_addr, master_port)
 
 
+def handler(signum, frame):
+    print(f"agent has received signal {signum}")
+    # terminate all workers
+    f_stack = inspect.stack()
+    agent = None
+    for f_info in f_stack:
+        func_name = f_info[3]
+        if func_name == "launch_agent":
+            frame = f_info[0]
+            f_locals = frame.f_locals
+            agent = f_locals['agent']
+    assert agent is not None
+    # TODO: add exit_barrier
+    agent._stop_workers(agent._worker_group)
+    agent._worker_group.spec.rdzv_handler._stop_heartbeats()
+
+    # TODO: use config
+    time.sleep(15)
+    # DEBUG
+    print(sys.argv)
+    os.execv("/proc/self/exe", [sys.executable] + sys.argv)
+
+
 # pyre-fixme[56]: Pyre was not able to infer the type of the decorator
 # torch.distributed.elastic.multiprocessing.errors.record.
+
+
 def launch_agent(
     config: LaunchConfig,
     entrypoint: Union[Callable, str, None],
@@ -181,6 +212,9 @@ def launch_agent(
         run_id = str(uuid.uuid4().int)
         logger.warning(f"config has no run_id, generate a new one: {run_id}")
         config.run_id = run_id
+
+    # agent will restart after being terminated
+    signal.signal(signal.SIGTERM, handler)
 
     entrypoint_name = _get_entrypoint_name(entrypoint, args)
 
