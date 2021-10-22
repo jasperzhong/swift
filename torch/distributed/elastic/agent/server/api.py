@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
 #
@@ -12,6 +11,7 @@ import json
 import os
 import signal
 import socket
+import threading
 import time
 import traceback
 import warnings
@@ -474,7 +474,14 @@ class SimpleElasticAgent(ElasticAgent):
         """
         Send signal to workers
         """
-        raise NotImplementedError() 
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def _send_data(self, data):
+        """
+        Send data to workers 
+        """
+        raise NotImplementedError()
 
     @abc.abstractmethod
     def _stop_workers(self, worker_group: WorkerGroup) -> None:
@@ -562,7 +569,7 @@ class SimpleElasticAgent(ElasticAgent):
             f"  global_world_sizes={[worker.world_size for worker in workers]}\n"
         )
 
-    def _handle_failure(self, worker_group):
+    def _re_rendezvous(self, worker_group):
         spec = worker_group.spec
 
         master_addr, master_port = self._get_master_addr_port(self._store)
@@ -590,10 +597,6 @@ class SimpleElasticAgent(ElasticAgent):
             f"  role_world_sizes={[worker.role_world_size for worker in workers]}\n"
             f"  global_world_sizes={[worker.world_size for worker in workers]}\n"
         )
-
-        # inform workers about the failure
-        self._send_signal(signal.SIGUSR1)
-
 
     def _get_ranks(
         self,
@@ -849,6 +852,22 @@ class SimpleElasticAgent(ElasticAgent):
 
         put_metric(f"workers.{spec.role}.flakiness", int(flakiness))
 
+    def _poll_dead_nodes(self):
+        spec = self._worker_group.spec
+        rdzv_handler = spec.rdzv_handler
+        while True:
+            dead_nodes_rank = rdzv_handler.get_dead_nodes_rank()
+            if dead_nodes_rank:
+                # inform the workers about the failure
+                self._send_signal(signal.SIGUSR1)
+                # TODO: send the rank to the workers
+                data_in_str = [str(ele) for ele in dead_nodes_rank]
+                data_in_bytes = ' '.join(data_in_str).encode()
+                self._send_data(data_in_bytes)
+
+                rdzv_handler.clear_dead_nodes_rank()
+            time.sleep(0.1)
+
     def _invoke_run(self, role: str = DEFAULT_ROLE) -> RunResult:
         # NOTE: currently only works for a single role
 
@@ -862,6 +881,9 @@ class SimpleElasticAgent(ElasticAgent):
         self._initialize_workers(self._worker_group)
         monitor_interval = spec.monitor_interval
         rdzv_handler = spec.rdzv_handler
+
+        detect_failure_thread = threading.Thread(target=self._poll_dead_nodes)
+        detect_failure_thread.start() 
 
         while True:
             assert self._worker_group.state != WorkerState.INIT
@@ -906,12 +928,14 @@ class SimpleElasticAgent(ElasticAgent):
                     )
                     # store, group_rank, group_world_size = rdzv_handler.next_rendezvous()
                     # self._store = store
-                    # self._worker_group.store = store 
+                    # self._worker_group.store = store
                     # log.info(f"group_rank:{group_rank} group_world_size:{group_world_size}")
-                    self._handle_failure(self._worker_group)
+                    self._re_rendezvous(self._worker_group)
                     # self._restart_workers(self._worker_group)
             else:
                 raise Exception(f"[{role}] Worker group in {state.name} state")
+
+        detect_failure_thread.join()
 
     def _exit_barrier(self):
         """

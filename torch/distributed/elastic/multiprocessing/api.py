@@ -256,6 +256,16 @@ class PContext(abc.ABC):
     def send_signal(self, sig):
         self._send_signal(sig)
 
+    @abc.abstractmethod
+    def _send_data(self, data):
+        """
+        Send data to all processes 
+        """
+        raise NotImplementedError
+
+    def send_data(self, data):
+        self._send_data(data)
+
     def close(self) -> None:
         self._close()
         if self._stdout_tail:
@@ -502,6 +512,7 @@ class SubprocessHandler:
             args=args,
             env=env,
             preexec_fn=preexec_fn,
+            stdin=subprocess.PIPE,
             stdout=self._stdout,
             stderr=self._stderr,
         )
@@ -516,6 +527,9 @@ class SubprocessHandler:
 
     def send_signal(self, sig):
         self.proc.send_signal(sig)
+
+    def send_data(self, data):
+        self.proc.communicate(data)
 
 
 def _pr_set_pdeathsig() -> None:
@@ -637,3 +651,8 @@ class SubprocessContext(PContext):
         if self.subprocess_handlers:
             for handler in self.subprocess_handlers.values():
                 handler.send_signal(sig)
+    
+    def _send_data(self, data) -> None:
+        if self.subprocess_handlers:
+            for handler in self.subprocess_handlers.values():
+                handler.send_data(data)

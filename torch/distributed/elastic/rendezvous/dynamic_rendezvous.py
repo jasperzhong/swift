@@ -342,6 +342,7 @@ class _BackendRendezvousStateHolder(_RendezvousStateHolder):
         self._dirty = False
         self._last_sync_time = -1
         self._dead_nodes = []
+        self._dead_nodes_rank = []
 
     @property
     def state(self) -> _RendezvousState:
@@ -421,6 +422,8 @@ class _BackendRendezvousStateHolder(_RendezvousStateHolder):
             del self._state.last_heartbeats[dead_node]
 
             try:
+                rank = self._state.participants[dead_node]
+                self._dead_nodes_rank.append(rank)
                 del self._state.participants[dead_node]
             except KeyError:
                 pass
@@ -1050,6 +1053,12 @@ class DynamicRendezvousHandler(RendezvousHandler):
 
     def _get_deadline(self, timeout: timedelta) -> float:
         return time.monotonic() + timeout.total_seconds()
+
+    def get_dead_nodes_rank(self):
+        return self._state_holder._dead_nodes_rank
+
+    def clear_dead_nodes_rank(self):
+        self._state_holder._dead_nodes_rank = []
 
 
 def _get_timeout(params: RendezvousParameters, key: str) -> Optional[timedelta]:

@@ -231,3 +231,9 @@ class LocalElasticAgent(SimpleElasticAgent):
     def _send_signal(self, sig):
         log.info("the agent informs all workers about the failure")
         self._pcontext.send_signal(sig)
+
+    @prof
+    def _send_data(self, data):
+        log.info("the agent sends data to all workers")
+        self._pcontext.send_data(data)
+

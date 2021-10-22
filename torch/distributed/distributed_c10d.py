@@ -73,6 +73,10 @@ def supports_complex(reduceOp: ReduceOp) -> bool:
 
 
 def failure_handler(signum, frame):
+    data_in_str = input()
+    data_in_str = data_in_str.split()
+    data = [int(ele) for ele in data_in_str] 
+    print("dead nodes' ranks:", data)
     default_pg = _get_default_group()
     rank = default_pg.rank()
     size = default_pg.size()
