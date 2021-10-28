@@ -97,6 +97,10 @@ class TimeStamp(metaclass=_Singleton):
         """
         if group is None:
             group = _get_default_group()
+
+        if get_world_size(group) == 1:
+            return
+ 
         tensor = torch.LongTensor(2)
         for k, v in self._map.items():
             key_hash = int.from_bytes(base64.b64encode(k.encode("utf-8")), byteorder='little')
