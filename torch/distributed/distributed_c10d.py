@@ -96,10 +96,12 @@ class TimeStamp(metaclass=_Singleton):
     def get(self, key):
         return self._map[key]
 
-    def sync(self, op=ReduceOp.MAX, group=_get_default_group()):
+    def sync(self, op=ReduceOp.MAX, group=None):
         """
         all-reduce
         """
+        if group is None:
+            group = _get_default_group()
         tensor = torch.LongTensor(2)
         for k, v in self._map.items():
             key_hash = hash(k) % (2**63)
