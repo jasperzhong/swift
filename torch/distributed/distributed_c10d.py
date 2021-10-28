@@ -91,25 +91,32 @@ class TimeStamp(metaclass=_Singleton):
     def get(self, key):
         return self._map[key]
 
-    def sync(self, op=ReduceOp.MAX, group=None):
+    def sync(self):
         """
         all-reduce
         """
-        if group is None:
-            group = _get_default_group()
-
-        if get_world_size(group) == 1:
-            return
- 
         tensor = torch.LongTensor(2)
+        tensor_list = [torch.LongTensor(2) for _ in range(get_world_size())]
         for k, v in self._map.items():
             key_hash = int.from_bytes(base64.b64encode(k.encode("utf-8")), byteorder='little')
             tensor[0] = key_hash
             tensor[1] = v
-            all_reduce(tensor, op=op, group=group)
-            if tensor[0] != key_hash:
-                raise RuntimeError("timestamp key not matched!")
-            self._map[k] = int(tensor[1])
+            all_gather(tensor_list, tensor)
+
+            values = []
+            for t in tensor_list:
+                if t[0] != key_hash:
+                    raise RuntimeError("timestamp key not matched!")
+                values.append(int(t[1]))
+
+            consensus_value = self._make_consensus(values)
+            self._map[k] = consensus_value
+
+    def _make_consensus(self, values):
+        max_v = max(values)
+        if max_v - 1 in values:
+            return max_v - 1
+        return max_v
 
 
 def _failure_handler(signum, frame):
@@ -117,30 +124,24 @@ def _failure_handler(signum, frame):
     data_in_str = input()
     data_in_str = data_in_str.split()
     dead_ranks = [int(ele) for ele in data_in_str]
-    logger.info("dead nodes' ranks: {}".format(dead_ranks))
+    print("dead nodes' ranks: {}".format(dead_ranks))
 
     default_pg = _get_default_group()
     rank = default_pg.rank()
     size = default_pg.size()
     store = _get_default_store()
-
-    healthy_ranks = [i for i in range(size) if i not in dead_ranks]
-    healthy_group = new_group(healthy_ranks)
-    logger.info("healthy ranks start to make consensus on timestamp")
-    _timestamp.sync(op=ReduceOp.MIN, group=healthy_group)
-
     # clear workers
     store_key = "{}:{}".format(STORE_BASED_BARRIER_PREFIX, _group_count)
     store.set(store_key, "0")
 
     destroy_process_group()
     # TODO: use config
-    logger.info("start to re-init")
+    print("start to re-init")
     init_process_group("gloo", world_size=size, rank=rank, store=store)
 
-    logger.info("all ranks start to make consensus on timestamp")
-    _timestamp.sync(op=ReduceOp.MAX, group=_get_default_group())
-    logger.info("success to re-init")
+    print("all ranks start to make consensus on timestamp")
+    _timestamp.sync()
+    print("success to re-init")
     # TODO: many logics ....
     _set_re_init(True)
 

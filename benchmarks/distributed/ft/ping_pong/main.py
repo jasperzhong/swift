@@ -29,6 +29,7 @@ def main():
     ts = torch.distributed.TimeStamp(i=0)
     ts.sync()
     i = ts.get("i")
+    print("start from i={}".format(i))
     while True:
         src_rank = i % world_size
         dst_rank = (i + 1) % world_size
