@@ -89,7 +89,7 @@ def failure_handler(signum, frame):
     destroy_process_group()
     # TODO: use config
     print("start to re-init")
-    init_process_group("nccl", world_size=size, rank=rank, store=store)
+    init_process_group("gloo", world_size=size, rank=rank, store=store)
     print("success to re-init")
     # TODO: many logics ....
     _set_re_init(True)
@@ -907,7 +907,7 @@ def send(tensor,
         try:
             default_pg.send([tensor], dst, tag).wait()
         except RuntimeError as e:
-            logger.error(e)
+            logger.error("send error:" + str(e))
             _check_re_init()
     else:
         group_dst_rank = _get_group_rank(group, dst)
@@ -952,11 +952,15 @@ def recv(tensor,
         else:
             return _get_global_rank(pg, src_rank)
     else:
-        if group is None or group is GroupMember.WORLD:
-            pg.recv([tensor], src, tag).wait()
-        else:
-            group_src_rank = _get_group_rank(pg, src)
-            pg.recv([tensor], group_src_rank, tag).wait()
+        try:
+            if group is None or group is GroupMember.WORLD:
+                pg.recv([tensor], src, tag).wait()
+            else:
+                group_src_rank = _get_group_rank(pg, src)
+                pg.recv([tensor], group_src_rank, tag).wait()
+        except RuntimeError as e:
+            logger.error("recv error:" + str(e))
+            _check_re_init()
         return src
 
 
@@ -1151,7 +1155,11 @@ def broadcast(tensor,
     if async_op:
         return work
     else:
-        work.wait()
+        try:
+            work.wait()
+        except RuntimeError as e:
+            logger.error("broadcast error:" + str(e))
+            _check_re_init()
 
 
 def all_reduce_multigpu(tensor_list,
@@ -1280,7 +1288,11 @@ def all_reduce(tensor,
     if async_op:
         return work
     else:
-        work.wait()
+        try:
+            work.wait()
+        except RuntimeError as e:
+            logger.error("all_reduce error:" + str(e))
+            _check_re_init()
 
 
 def all_reduce_coalesced(tensors,

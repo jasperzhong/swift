@@ -18,12 +18,12 @@ def main():
     master_port = int(os.environ['MASTER_PORT'])
     init_method = "tcp://{}:{}".format(args.master_ip, master_port)
     torch.distributed.init_process_group(
-        'nccl', init_method=init_method,
+        'gloo', init_method=init_method,
         world_size=world_size, rank=rank,
-        timeout=timedelta(seconds=10)
+        timeout=timedelta(seconds=5)
     )
 
-    x = torch.randn((1000)).cuda()
+    x = torch.randn((100000))
 
     i = 0
     while True:
@@ -34,6 +34,8 @@ def main():
         elif torch.distributed.get_rank() == dst_rank:
             torch.distributed.recv(x, src_rank)
         i += 1
+        if i % 1000 == 0:
+            print(i)
 
 
 if __name__ == '__main__':
