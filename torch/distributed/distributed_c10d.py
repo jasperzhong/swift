@@ -71,16 +71,62 @@ def supports_complex(reduceOp: ReduceOp) -> bool:
                 ReduceOp.BAND, ReduceOp.BOR, ReduceOp.BXOR]
     return reduceOp not in denyList
 
+class _Singleton(type):
+    def __call__(cls, *args, **kwargs):
+        global _timestamp
+        if _timestamp is None:
+            _timestamp = super(_Singleton, cls).__call__(*args, **kwargs)
+        return _timestamp
 
-def failure_handler(signum, frame):
+
+class TimeStamp(metaclass=_Singleton):
+    def __init__(self, *args, **kwargs):
+        self._map = {}
+        for k, v in kwargs.items():
+            if not isinstance(v, int):
+                raise ValueError("the value of {} must be integer!".format(k))
+            self._map[k] = v
+        self._map = dict(sorted(self._map.items()))
+
+    def update(self, key, value):
+        if key not in self._map:
+            raise ValueError("key ({}) not found!".format(key))
+        self._map[key] = value
+
+    def get(self, key):
+        return self._map[key]
+
+    def sync(self, op=ReduceOp.MAX, group=_get_default_group()):
+        """
+        all-reduce
+        """
+        tensor = torch.LongTensor(2)
+        for k, v in self._map.items():
+            key_hash = hash(k) % (2**63)
+            tensor[0] = key_hash
+            tensor[1] = v
+            all_reduce(tensor, op=op, group=group)
+            if tensor[0] != key_hash:
+                raise RuntimeError("timestamp key not matched!")
+            self._map[k] = int(tensor[1])
+
+
+def _failure_handler(signum, frame):
+    global _timestamp
     data_in_str = input()
     data_in_str = data_in_str.split()
-    data = [int(ele) for ele in data_in_str] 
-    print("dead nodes' ranks:", data)
+    dead_ranks = [int(ele) for ele in data_in_str]
+    logger.info("dead nodes' ranks: {}".format(dead_ranks))
+
     default_pg = _get_default_group()
     rank = default_pg.rank()
     size = default_pg.size()
     store = _get_default_store()
+
+    healthy_ranks = [i for i in range(size) if i not in dead_ranks]
+    healthy_group = new_group(healthy_ranks)
+    logger.info("healthy ranks start to make consensus on timestamp")
+    _timestamp.sync(op=ReduceOp.MIN, group=healthy_group)
 
     # clear workers
     store_key = "{}:{}".format(STORE_BASED_BARRIER_PREFIX, _group_count)
@@ -88,9 +134,12 @@ def failure_handler(signum, frame):
 
     destroy_process_group()
     # TODO: use config
-    print("start to re-init")
+    logger.info("start to re-init")
     init_process_group("gloo", world_size=size, rank=rank, store=store)
-    print("success to re-init")
+
+    logger.info("all ranks start to make consensus on timestamp")
+    _timestamp.sync(op=ReduceOp.MAX, group=_get_default_group())
+    logger.info("success to re-init")
     # TODO: many logics ....
     _set_re_init(True)
 
@@ -212,6 +261,8 @@ _group_count = 0
 STORE_BASED_BARRIER_PREFIX = "store_based_barrier_key"
 
 _re_init = False
+
+_timestamp = None
 
 
 def _is_re_init():
@@ -611,7 +662,7 @@ def init_process_group(backend,
         if get_backend(default_pg) in [Backend.GLOO, Backend.NCCL]:
             default_pg._set_sequence_number_for_group()
 
-    signal.signal(signal.SIGUSR1, failure_handler)
+    signal.signal(signal.SIGUSR1, _failure_handler)
 
 
 def _new_process_group_helper(world_size,
@@ -909,6 +960,7 @@ def send(tensor,
         except RuntimeError as e:
             logger.error("send error:" + str(e))
             _check_re_init()
+            return False
     else:
         group_dst_rank = _get_group_rank(group, dst)
         group.send([tensor], group_dst_rank, tag).wait()
@@ -958,10 +1010,11 @@ def recv(tensor,
             else:
                 group_src_rank = _get_group_rank(pg, src)
                 pg.recv([tensor], group_src_rank, tag).wait()
+            return src
         except RuntimeError as e:
             logger.error("recv error:" + str(e))
             _check_re_init()
-        return src
+            return False
 
 
 class P2POp(object):
@@ -1293,6 +1346,7 @@ def all_reduce(tensor,
         except RuntimeError as e:
             logger.error("all_reduce error:" + str(e))
             _check_re_init()
+            return False
 
 
 def all_reduce_coalesced(tensors,

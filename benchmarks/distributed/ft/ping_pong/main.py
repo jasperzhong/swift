@@ -26,14 +26,20 @@ def main():
     x = torch.randn((100000))
 
     i = 0
+    ts = torch.distributed.TimeStamp(i=0)
+    ts.sync()
+    i = ts.get("i")
     while True:
         src_rank = i % world_size
         dst_rank = (i + 1) % world_size
         if torch.distributed.get_rank() == src_rank:
-            torch.distributed.send(x, dst_rank)
+            rc = torch.distributed.send(x, dst_rank)
         elif torch.distributed.get_rank() == dst_rank:
-            torch.distributed.recv(x, src_rank)
+            rc = torch.distributed.recv(x, src_rank)
+        if rc is False:
+            continue
         i += 1
+        ts.update("i", i)
         if i % 1000 == 0:
             print(i)
 
