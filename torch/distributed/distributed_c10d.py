@@ -1,36 +1,31 @@
+import base64
 import contextlib
+import io
 import logging
 import os
-import signal
 import pickle
-import io
-import torch
-import warnings
+import signal
 import time
-from torch._six import string_classes
+import warnings
 from datetime import timedelta
 from typing import Dict, Optional, Tuple, Union
+
+import torch
+from torch._C._distributed_c10d import (AllreduceCoalescedOptions,
+                                        AllreduceOptions, AllToAllOptions,
+                                        BarrierOptions, BroadcastOptions,
+                                        GatherOptions, PrefixStore,
+                                        ProcessGroup, ReduceOp, ReduceOptions,
+                                        ReduceScatterOptions, ScatterOptions,
+                                        Store)
+from torch._six import string_classes
+
+from .constants import default_pg_timeout
+from .rendezvous import register_rendezvous_handler, rendezvous  # noqa: F401
 
 # This module is wildcard imported from torch.distributed.
 # TODO: specify __all__
 
-from .constants import default_pg_timeout
-from .rendezvous import rendezvous, register_rendezvous_handler  # noqa: F401
-from torch._C._distributed_c10d import (
-    AllreduceCoalescedOptions,
-    AllreduceOptions,
-    AllToAllOptions,
-    BarrierOptions,
-    BroadcastOptions,
-    GatherOptions,
-    PrefixStore,
-    ProcessGroup,
-    ReduceOp,
-    ReduceOptions,
-    ReduceScatterOptions,
-    ScatterOptions,
-    Store,
-)
 
 
 _MPI_AVAILABLE = True
@@ -104,7 +99,7 @@ class TimeStamp(metaclass=_Singleton):
             group = _get_default_group()
         tensor = torch.LongTensor(2)
         for k, v in self._map.items():
-            key_hash = hash(k) % (2**63)
+            key_hash = int.from_bytes(base64.b64encode(k.encode("utf-8")), byteorder='little')
             tensor[0] = key_hash
             tensor[1] = v
             all_reduce(tensor, op=op, group=group)
