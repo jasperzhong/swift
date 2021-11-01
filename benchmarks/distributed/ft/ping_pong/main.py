@@ -18,7 +18,7 @@ def main():
     master_port = int(os.environ['MASTER_PORT'])
     init_method = "tcp://{}:{}".format(args.master_ip, master_port)
     torch.distributed.init_process_group(
-        'gloo', init_method=init_method,
+        'nccl', init_method=init_method,
         world_size=world_size, rank=rank,
         timeout=timedelta(seconds=5)
     )

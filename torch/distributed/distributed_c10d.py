@@ -137,7 +137,7 @@ def _failure_handler(signum, frame):
     destroy_process_group()
     # TODO: use config
     print("start to re-init")
-    init_process_group("gloo", world_size=size, rank=rank, store=store)
+    init_process_group(get_backend(), world_size=size, rank=rank, store=store)
 
     print("all ranks start to make consensus on timestamp")
     if _timestamp:
