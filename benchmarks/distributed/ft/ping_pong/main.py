@@ -23,7 +23,7 @@ def main():
         timeout=timedelta(seconds=5)
     )
 
-    x = torch.randn((100000))
+    x = torch.randn((100000)).cuda()
 
     i = 0
     ts = torch.distributed.TimeStamp(i=0)
