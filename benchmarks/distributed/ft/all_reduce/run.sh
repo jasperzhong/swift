@@ -2,7 +2,9 @@
 
 NNODES=2
 NPROC_PER_NODE=1
-MASTER_IP=172.30.2.12
+MASTER_IP=10.28.1.16
+
+export GLOO_SOCKET_IFNAME=eth2
 
 cmd="python3 -m torch.distributed.run \
 	--nnodes=$NNODES --nproc_per_node=$NPROC_PER_NODE \
@@ -11,4 +13,4 @@ cmd="python3 -m torch.distributed.run \
 	main.py \
 	--master_ip=$MASTER_IP"
 
-LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec $cmd 
+LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec $cmd

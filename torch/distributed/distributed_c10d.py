@@ -140,7 +140,8 @@ def _failure_handler(signum, frame):
     init_process_group("gloo", world_size=size, rank=rank, store=store)
 
     print("all ranks start to make consensus on timestamp")
-    _timestamp.sync()
+    if _timestamp:
+        _timestamp.sync()
     print("success to re-init")
     # TODO: many logics ....
     _set_re_init(True)
