@@ -10,6 +10,7 @@ parser.add_argument("--master_ip", type=str, default=None)
 
 @torch.distributed.run
 def train(ts):
+    print("start from i={}".format(ts.i))
     x = torch.randn((1000)).cuda()
 
     while True:
@@ -35,7 +36,6 @@ def main():
     )
 
     ts = torch.distributed.TimeStamp(i=0)
-    ts.sync()
     train(ts)
 
 

@@ -132,6 +132,7 @@ def _failure_handler():
     # TODO: use config
     print("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
+    print("success to re-init")
 
     # TODO: many logics ....
 
