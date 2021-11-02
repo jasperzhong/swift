@@ -95,8 +95,8 @@ class TimeStamp(_AttrDict):
                 raise ValueError("the value of {} must be integer!".format(k))
 
     def sync(self):
-        tensor = torch.LongTensor(2)
-        tensor_list = [torch.LongTensor(2) for _ in range(get_world_size())]
+        tensor = torch.LongTensor(2).cuda()
+        tensor_list = [torch.LongTensor(2).cuda() for _ in range(get_world_size())]
         for k, v in self.items():
             key_hash = int.from_bytes(base64.b64encode(k.encode("utf-8")), byteorder='little')
             tensor[0] = key_hash
@@ -107,7 +107,7 @@ class TimeStamp(_AttrDict):
             for t in tensor_list:
                 if t[0] != key_hash:
                     raise RuntimeError("timestamp key not matched!")
-                values.append(int(t[1]))
+                values.append(int(t[1].item()))
 
             consensus_value = self._make_consensus(values)
             self[k] = consensus_value
