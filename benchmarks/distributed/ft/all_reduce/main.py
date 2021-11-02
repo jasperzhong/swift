@@ -8,6 +8,12 @@ import torch
 parser = argparse.ArgumentParser("all_reduce")
 parser.add_argument("--master_ip", type=str, default=None)
 
+@torch.distributed.run
+def train():
+    x = torch.randn((1000)).cuda()
+
+    while True:
+        torch.distributed.all_reduce(x)
 
 def main():
     args = parser.parse_args()
@@ -24,10 +30,8 @@ def main():
         timeout=timedelta(seconds=5)
     )
 
-    x = torch.randn((1000)).cuda()
+    train()
 
-    while True:
-        torch.distributed.all_reduce(x)
 
 
 if __name__ == '__main__':

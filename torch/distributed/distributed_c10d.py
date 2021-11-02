@@ -1,5 +1,6 @@
 import base64
 import contextlib
+import functools
 import io
 import logging
 import os
@@ -64,6 +65,18 @@ def supports_complex(reduceOp: ReduceOp) -> bool:
     denyList = [ReduceOp.MAX, ReduceOp.MIN, ReduceOp.PRODUCT,
                 ReduceOp.BAND, ReduceOp.BOR, ReduceOp.BXOR]
     return reduceOp not in denyList
+
+
+def run(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except SwiftInternalError as e:
+            logger.error("catch an error:" + str(e))
+            _failure_handler()
+    return wrapper
+
 
 class _Singleton(type):
     def __call__(cls, *args, **kwargs):
@@ -131,14 +144,13 @@ def _failure_handler():
     destroy_process_group()
     # TODO: use config
     print("start to re-init")
-    init_process_group(get_backend(), world_size=size, rank=rank, store=store)
+    init_process_group("nccl", world_size=size, rank=rank, store=store)
 
     print("all ranks start to make consensus on timestamp")
     if _timestamp:
         _timestamp.sync()
     print("success to re-init")
     # TODO: many logics ....
-    _set_re_init(True)
 
 
 class Backend(object):
@@ -950,12 +962,7 @@ def send(tensor,
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
-        try:
-            default_pg.send([tensor], dst, tag).wait()
-        except RuntimeError as e:
-            logger.error("send error:" + str(e))
-            _check_re_init()
-            return False
+        default_pg.send([tensor], dst, tag).wait()
     else:
         group_dst_rank = _get_group_rank(group, dst)
         group.send([tensor], group_dst_rank, tag).wait()
@@ -999,17 +1006,12 @@ def recv(tensor,
         else:
             return _get_global_rank(pg, src_rank)
     else:
-        try:
-            if group is None or group is GroupMember.WORLD:
-                pg.recv([tensor], src, tag).wait()
-            else:
-                group_src_rank = _get_group_rank(pg, src)
-                pg.recv([tensor], group_src_rank, tag).wait()
-            return src
-        except RuntimeError as e:
-            logger.error("recv error:" + str(e))
-            _check_re_init()
-            return False
+        if group is None or group is GroupMember.WORLD:
+            pg.recv([tensor], src, tag).wait()
+        else:
+            group_src_rank = _get_group_rank(pg, src)
+            pg.recv([tensor], group_src_rank, tag).wait()
+        return src
 
 
 class P2POp(object):
@@ -1203,11 +1205,7 @@ def broadcast(tensor,
     if async_op:
         return work
     else:
-        try:
-            work.wait()
-        except RuntimeError as e:
-            logger.error("broadcast error:" + str(e))
-            _check_re_init()
+        work.wait()
 
 
 def all_reduce_multigpu(tensor_list,
@@ -1336,12 +1334,7 @@ def all_reduce(tensor,
     if async_op:
         return work
     else:
-        try:
-            work.wait()
-        except RuntimeError as e:
-            logger.error("all_reduce error:" + str(e))
-            _failure_handler()
-            return False
+        work.wait()
 
 
 def all_reduce_coalesced(tensors,
