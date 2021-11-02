@@ -69,47 +69,35 @@ def supports_complex(reduceOp: ReduceOp) -> bool:
 
 def run(func):
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except SwiftInternalError as e:
-            logger.error("catch an error:" + str(e))
-            _failure_handler()
+    def wrapper(timestamp, *args, **kwargs):
+        while True:
+            try:
+                if timestamp:
+                    timestamp.sync()
+
+                return func(timestamp, *args, **kwargs)
+            except SwiftInternalError as e:
+                logger.error("catch an error:" + str(e))
+                _failure_handler()
     return wrapper
 
-
-class _Singleton(type):
-    def __call__(cls, *args, **kwargs):
-        global _timestamp
-        if _timestamp is None:
-            _timestamp = super(_Singleton, cls).__call__(*args, **kwargs)
-        return _timestamp
-
-
-class TimeStamp(metaclass=_Singleton):
+class _AttrDict(dict):
     def __init__(self, *args, **kwargs):
-        self._map = {}
-        for k, v in kwargs.items():
+        super(_AttrDict, self).__init__(*args, dict(sorted(kwargs.items())))
+        self.__dict__ = self
+
+
+class TimeStamp(_AttrDict):
+    def __init__(self, *args, **kwargs):
+        super(TimeStamp, self).__init__(*args, **kwargs)
+        for k, v in self.items():
             if not isinstance(v, int):
                 raise ValueError("the value of {} must be integer!".format(k))
-            self._map[k] = v
-        self._map = dict(sorted(self._map.items()))
-
-    def update(self, key, value):
-        if key not in self._map:
-            raise ValueError("key ({}) not found!".format(key))
-        self._map[key] = value
-
-    def get(self, key):
-        return self._map[key]
 
     def sync(self):
-        """
-        all-reduce
-        """
         tensor = torch.LongTensor(2)
         tensor_list = [torch.LongTensor(2) for _ in range(get_world_size())]
-        for k, v in self._map.items():
+        for k, v in self.items():
             key_hash = int.from_bytes(base64.b64encode(k.encode("utf-8")), byteorder='little')
             tensor[0] = key_hash
             tensor[1] = v
@@ -122,7 +110,7 @@ class TimeStamp(metaclass=_Singleton):
                 values.append(int(t[1]))
 
             consensus_value = self._make_consensus(values)
-            self._map[k] = consensus_value
+            self[k] = consensus_value
 
     def _make_consensus(self, values):
         max_v = max(values)
@@ -132,7 +120,6 @@ class TimeStamp(metaclass=_Singleton):
 
 
 def _failure_handler():
-    global _timestamp
     default_pg = _get_default_group()
     rank = default_pg.rank()
     size = default_pg.size()
@@ -146,10 +133,6 @@ def _failure_handler():
     print("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
 
-    print("all ranks start to make consensus on timestamp")
-    if _timestamp:
-        _timestamp.sync()
-    print("success to re-init")
     # TODO: many logics ....
 
 
@@ -268,26 +251,6 @@ _default_pg_init_method = None
 _group_count = 0
 
 STORE_BASED_BARRIER_PREFIX = "store_based_barrier_key"
-
-_re_init = False
-
-_timestamp = None
-
-
-def _is_re_init():
-    global _re_init
-    return _re_init
-
-
-def _set_re_init(value):
-    global _re_init
-    _re_init = value
-
-
-def _check_re_init():
-    while not _is_re_init():
-        time.sleep(0.1)
-    _set_re_init(False)
 
 
 def _store_based_barrier(rank, store, timeout):
