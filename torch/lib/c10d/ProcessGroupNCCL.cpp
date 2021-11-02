@@ -5,6 +5,7 @@
 #include <map>
 #include <tuple>
 #include <unordered_set>
+#include <signal.h>
 
 #include <THC/THC.h>
 
@@ -20,6 +21,10 @@ namespace c10d {
 constexpr const char* const kNCCLAbortedCommStoreKey = "NCCLABORTEDCOMM";
 
 namespace {
+
+void failure_handler(int signum) {
+  throw std::runtime_error("failure detected!");
+}
 
 constexpr int kBytes = 8;
 
@@ -462,6 +467,16 @@ ProcessGroupNCCL::ProcessGroupNCCL(
     asyncErrorHandling_ = false;
   }
 
+  
+ struct sigaction sa;
+
+ sa.sa_handler = failure_handler;
+ sigemptyset(&sa.sa_mask);
+ sa.sa_flags = SA_RESTART;
+
+ sigaction(SIGUSR1, &sa, NULL);
+
+
 #ifdef ENABLE_NCCL_ERROR_CHECKING
   ncclCommWatchdogThread_ =
       std::thread(&ProcessGroupNCCL::ncclCommWatchdog, this);
@@ -476,6 +491,7 @@ ProcessGroupNCCL::ProcessGroupNCCL(
   if (!ncclDebugLevel) {
     ncclDebugLevel = "UNSET";
   }
+
 
   LOG(INFO) << "[Rank " << rank_
             << "] ProcessGroupNCCL initialized with following options:"

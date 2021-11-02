@@ -4,7 +4,6 @@ import io
 import logging
 import os
 import pickle
-import signal
 import time
 import warnings
 from datetime import timedelta
@@ -119,13 +118,8 @@ class TimeStamp(metaclass=_Singleton):
         return max_v
 
 
-def _failure_handler(signum, frame):
+def _failure_handler():
     global _timestamp
-    data_in_str = input()
-    data_in_str = data_in_str.split()
-    dead_ranks = [int(ele) for ele in data_in_str]
-    print("dead nodes' ranks: {}".format(dead_ranks))
-
     default_pg = _get_default_group()
     rank = default_pg.rank()
     size = default_pg.size()
@@ -664,8 +658,6 @@ def init_process_group(backend,
         # Set sequence numbers for gloo and nccl process groups.
         if get_backend(default_pg) in [Backend.GLOO, Backend.NCCL]:
             default_pg._set_sequence_number_for_group()
-
-    signal.signal(signal.SIGUSR1, _failure_handler)
 
 
 def _new_process_group_helper(world_size,
@@ -1348,7 +1340,7 @@ def all_reduce(tensor,
             work.wait()
         except RuntimeError as e:
             logger.error("all_reduce error:" + str(e))
-            _check_re_init()
+            _failure_handler()
             return False
 
 

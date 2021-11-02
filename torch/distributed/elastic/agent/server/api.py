@@ -860,10 +860,6 @@ class SimpleElasticAgent(ElasticAgent):
             if dead_nodes_rank:
                 # inform the workers about the failure
                 self._send_signal(signal.SIGUSR1)
-                # TODO: send the rank to the workers
-                data_in_str = [str(ele) for ele in dead_nodes_rank]
-                data_in_bytes = ' '.join(data_in_str).encode()
-                self._send_data(data_in_bytes)
 
                 rdzv_handler.clear_dead_nodes_rank()
             time.sleep(0.1)

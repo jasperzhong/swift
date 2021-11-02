@@ -2,9 +2,8 @@
 
 NNODES=2
 NPROC_PER_NODE=1
-MASTER_IP=10.28.1.16
+MASTER_IP=172.30.2.12
 
-export NCCL_SOCKET_IFNAME=eth2
 
 cmd="python3 -m torch.distributed.run \
 	--nnodes=$NNODES --nproc_per_node=$NPROC_PER_NODE \
