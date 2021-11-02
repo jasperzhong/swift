@@ -249,6 +249,8 @@ PyObject* c10d_init(PyObject* _unused, PyObject* noargs) {
 
   auto module = py::handle(m).cast<py::module>();
 
+  py::register_exception<::c10d::SwiftInternalError>(module, "SwiftInternalError");
+
   module
       .def(
           "_register_comm_hook",
@@ -1994,6 +1996,7 @@ static const auto DistributedC10dFrontendTorchBind =
         .def(
             "get_name_of_process_group",
             &::c10d::DistributedC10d::getNameOfProcessGroup);
+
 } // namespace
 
 // c10d methods on torch._C

@@ -23,7 +23,7 @@ constexpr const char* const kNCCLAbortedCommStoreKey = "NCCLABORTEDCOMM";
 namespace {
 
 void failure_handler(int signum) {
-  throw std::runtime_error("failure detected!");
+  throw SwiftInternalError("the worker receives a failure signal from the agent!");
 }
 
 constexpr int kBytes = 8;

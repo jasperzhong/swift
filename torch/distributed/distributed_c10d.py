@@ -16,7 +16,7 @@ from torch._C._distributed_c10d import (AllreduceCoalescedOptions,
                                         GatherOptions, PrefixStore,
                                         ProcessGroup, ReduceOp, ReduceOptions,
                                         ReduceScatterOptions, ScatterOptions,
-                                        Store)
+                                        Store, SwiftInternalError)
 from torch._six import string_classes
 
 from .constants import default_pg_timeout
