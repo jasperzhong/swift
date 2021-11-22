@@ -465,6 +465,11 @@ ProcessGroupNCCL::ProcessGroupNCCL(
   }
 
   
+  if (rank_ == 0) {
+    std::string key = "failure_flag";
+    std::vector<uint8_t> value = {0};
+    store->set(key, value);
+  }
 
 #ifdef ENABLE_NCCL_ERROR_CHECKING
   ncclCommWatchdogThread_ =
@@ -611,45 +616,58 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
           allCommIds.emplace(buildNcclUniqueIdStr(ncclComm->getNcclId()));
         }
         std::exception_ptr ncclErrorException = checkForNCCLErrors(ncclComms);
-        if (ncclErrorException) {
-          LOG(ERROR)
+
+	std::string key = "failure_flag";
+	auto value = store_->get(key);
+        if (ncclErrorException || value[0]) {
+	  if (value[0]) {
+            LOG(ERROR)
+              << "[Rank " << rank_
+              << "] Received NCCL errors for communicators from other workers\n";
+          } else {
+            LOG(ERROR)
               << "[Rank " << rank_
               << "] Received NCCL errors for communicators in the cache: \n"
               << "NCCL error: \n"
               << getExceptionMsgFromExceptionPtr(ncclErrorException);
+	  }
 
-            LOG(ERROR) << "[Rank " << rank_
-                      << "] Aborting communicators that received errors";
-            // We abort NCCL communicators that have received errors from this
-            // thread, and exceptions are set on the corresponding work objects.
-            // The workCleanupThread will then loop through the unfinished
-            // collectives and throw exceptions if an exception has been set on
-            // any of the work objects from this thread.
-            for (const auto& ncclComm : ncclComms) {
-	      LOG(ERROR) << "[DEBUG] ncclCommAbort starts!";
-	      auto start = std::chrono::steady_clock().now();
-              ncclComm->ncclCommAbort();
-	      auto end = std::chrono::steady_clock().now();
-	      double time_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-	      LOG(ERROR) << "[DEBUG] ncclCommAbort ends! Time elapsed = " << time_elapsed << " ms" << std::endl;
-              // Note that we don't remove the aborted communicators from the
-              // cache. The reason is that if we do remove the communicator
-              // from the cache, it is possible that a new collective operation
-              // calls `ncclCommInitRank` to create a new communicator whereas
-              // other ranks might have failed/timed out and didn't enter
-              // `ncclCommInitRank`. As a result, when there is a failure on
-              // a communicator the application receives an exception and its
-              // their responsibility to destroy the process group and recreate
-              // it to recover from errors.
-              abortedCommIds.emplace(
-                  buildNcclUniqueIdStr(ncclComm->getNcclId()));
-            }
-	    if (rank_ == 0) {
-	      // delete the key in the store to avoid race condition
-	      store_->deleteKey(std::to_string(ncclCommCounter_-1));
-	    }
-	    // this thread can exit now
-	    return;
+          LOG(ERROR) << "[Rank " << rank_
+                    << "] Aborting communicators that received errors";
+          // We abort NCCL communicators that have received errors from this
+          // thread, and exceptions are set on the corresponding work objects.
+          // The workCleanupThread will then loop through the unfinished
+          // collectives and throw exceptions if an exception has been set on
+          // any of the work objects from this thread.
+          for (const auto& ncclComm : ncclComms) {
+	    LOG(ERROR) << "[DEBUG] ncclCommAbort starts!";
+	    auto start = std::chrono::steady_clock().now();
+            ncclComm->ncclCommAbort();
+	    auto end = std::chrono::steady_clock().now();
+	    double time_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+	    LOG(ERROR) << "[DEBUG] ncclCommAbort ends! Time elapsed = " << time_elapsed << " ms" << std::endl;
+            // Note that we don't remove the aborted communicators from the
+            // cache. The reason is that if we do remove the communicator
+            // from the cache, it is possible that a new collective operation
+            // calls `ncclCommInitRank` to create a new communicator whereas
+            // other ranks might have failed/timed out and didn't enter
+            // `ncclCommInitRank`. As a result, when there is a failure on
+            // a communicator the application receives an exception and its
+            // their responsibility to destroy the process group and recreate
+            // it to recover from errors.
+            abortedCommIds.emplace(
+                buildNcclUniqueIdStr(ncclComm->getNcclId()));
+          }
+	  if (rank_ == 0) {
+	    // delete the key in the store to avoid race condition
+	    store_->deleteKey(std::to_string(ncclCommCounter_-1));
+	  }
+
+	  // inform other workers about the failure
+	  value[0] = 1;
+	  store_->set(key, value);
+	  // this thread can exit now
+	  return;
         }
       }
     }
