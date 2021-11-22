@@ -12,4 +12,4 @@ cmd="python3 -m torch.distributed.run \
 	--rdzv_endpoint=$MASTER_IP \
 	main.py"
 
-LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec $cmd
+NCCL_IB_DISABLE=1 LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec $cmd
