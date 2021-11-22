@@ -8,6 +8,8 @@
 
 #include <nccl.h>
 
+#include <c10d/Utils.hpp>
+
 namespace {
 // Provides additional detail into NCCL error codes based on when these are
 // thrown in the NCCL codebase.
@@ -140,7 +142,7 @@ class NCCLComm {
   ncclComm_t getNcclComm() {
     std::unique_lock<std::mutex> lock(mutex_);
     if (aborted_) {
-      throw std::runtime_error(
+      throw SwiftInternalError(
           "NCCL communicator was aborted on rank " + std::to_string(rank_) +
           ".");
     }

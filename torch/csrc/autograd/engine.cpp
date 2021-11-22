@@ -35,6 +35,7 @@
 #include <queue>
 #include <TH/TH.h>
 
+
 namespace torch { namespace autograd {
 
 namespace {
@@ -416,6 +417,7 @@ auto Engine::thread_main(const std::shared_ptr<GraphTask>& graph_task) -> void {
           NodeGuard ndguard(task.fn_);
           evaluate_function(local_graph_task, task.fn_.get(), task.inputs_, local_graph_task->cpu_ready_queue_);
         } catch (std::exception& e) {
+	  // restart the device thread later
           thread_on_exception(local_graph_task, task.fn_, e);
         }
       }

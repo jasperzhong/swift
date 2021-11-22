@@ -28,8 +28,20 @@ typedef SSIZE_T ssize_t;
 #include <system_error>
 #include <tuple>
 #include <vector>
+#include <exception>
+#include <stdexcept>
 
 namespace c10d {
+
+
+class SwiftInternalError: public std::exception {
+public:
+  explicit SwiftInternalError(const char * m) : message{m} {}
+  explicit SwiftInternalError(const std::string& m) : message{m} {}
+  const char * what() const noexcept override {return message.c_str();}
+private:
+  std::string message = "";	
+}; 
 
 // Distributed c10d debug levels
 enum DistributedDebugLevel {

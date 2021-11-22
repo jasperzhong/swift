@@ -16,6 +16,7 @@
 #include <exception>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <unordered_map>
 #include <utility>
@@ -361,7 +362,8 @@ struct TORCH_API Engine {
 
   // Ensures device_ready_queues_ are initialized only once
   // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
-  std::once_flag start_device_threads_flag_;
+  std::once_flag start_device_threads_flag_; 
+
   // Safe to read device_ready_queues_ without synchronization after initialization
   // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
   std::vector<std::shared_ptr<ReadyQueue>> device_ready_queues_;

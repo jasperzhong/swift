@@ -3,8 +3,10 @@
 
 #include <exception>
 #include <map>
+#include <string>
 #include <tuple>
 #include <unordered_set>
+#include <chrono>
 
 #include <THC/THC.h>
 
@@ -462,6 +464,8 @@ ProcessGroupNCCL::ProcessGroupNCCL(
     asyncErrorHandling_ = false;
   }
 
+  
+
 #ifdef ENABLE_NCCL_ERROR_CHECKING
   ncclCommWatchdogThread_ =
       std::thread(&ProcessGroupNCCL::ncclCommWatchdog, this);
@@ -476,6 +480,7 @@ ProcessGroupNCCL::ProcessGroupNCCL(
   if (!ncclDebugLevel) {
     ncclDebugLevel = "UNSET";
   }
+
 
   LOG(INFO) << "[Rank " << rank_
             << "] ProcessGroupNCCL initialized with following options:"
@@ -607,14 +612,13 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
         }
         std::exception_ptr ncclErrorException = checkForNCCLErrors(ncclComms);
         if (ncclErrorException) {
-          LOG(INFO)
+          LOG(ERROR)
               << "[Rank " << rank_
               << "] Received NCCL errors for communicators in the cache: \n"
               << "NCCL error: \n"
               << getExceptionMsgFromExceptionPtr(ncclErrorException);
 
-          if (blockingWait_ || asyncErrorHandling_) {
-            LOG(INFO) << "[Rank " << rank_
+            LOG(ERROR) << "[Rank " << rank_
                       << "] Aborting communicators that received errors";
             // We abort NCCL communicators that have received errors from this
             // thread, and exceptions are set on the corresponding work objects.
@@ -622,7 +626,12 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
             // collectives and throw exceptions if an exception has been set on
             // any of the work objects from this thread.
             for (const auto& ncclComm : ncclComms) {
+	      LOG(ERROR) << "[DEBUG] ncclCommAbort starts!";
+	      auto start = std::chrono::steady_clock().now();
               ncclComm->ncclCommAbort();
+	      auto end = std::chrono::steady_clock().now();
+	      double time_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+	      LOG(ERROR) << "[DEBUG] ncclCommAbort ends! Time elapsed = " << time_elapsed << " ms" << std::endl;
               // Note that we don't remove the aborted communicators from the
               // cache. The reason is that if we do remove the communicator
               // from the cache, it is possible that a new collective operation
@@ -635,7 +644,12 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
               abortedCommIds.emplace(
                   buildNcclUniqueIdStr(ncclComm->getNcclId()));
             }
-          }
+	    if (rank_ == 0) {
+	      // delete the key in the store to avoid race condition
+	      store_->deleteKey(std::to_string(ncclCommCounter_-1));
+	    }
+	    // this thread can exit now
+	    return;
         }
       }
     }

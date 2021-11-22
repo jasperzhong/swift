@@ -1,16 +1,15 @@
-import base64
 import contextlib
 import io
 import logging
 import os
 import pickle
-import signal
 import time
 import warnings
 from datetime import timedelta
 from typing import Dict, Optional, Tuple, Union
 
 import torch
+import torch.nn
 from torch._C._distributed_c10d import (AllreduceCoalescedOptions,
                                         AllreduceOptions, AllToAllOptions,
                                         BarrierOptions, BroadcastOptions,
@@ -66,85 +65,28 @@ def supports_complex(reduceOp: ReduceOp) -> bool:
                 ReduceOp.BAND, ReduceOp.BOR, ReduceOp.BXOR]
     return reduceOp not in denyList
 
-class _Singleton(type):
-    def __call__(cls, *args, **kwargs):
-        global _timestamp
-        if _timestamp is None:
-            _timestamp = super(_Singleton, cls).__call__(*args, **kwargs)
-        return _timestamp
 
-
-class TimeStamp(metaclass=_Singleton):
-    def __init__(self, *args, **kwargs):
-        self._map = {}
-        for k, v in kwargs.items():
-            if not isinstance(v, int):
-                raise ValueError("the value of {} must be integer!".format(k))
-            self._map[k] = v
-        self._map = dict(sorted(self._map.items()))
-
-    def update(self, key, value):
-        if key not in self._map:
-            raise ValueError("key ({}) not found!".format(key))
-        self._map[key] = value
-
-    def get(self, key):
-        return self._map[key]
-
-    def sync(self):
-        """
-        all-reduce
-        """
-        tensor = torch.LongTensor(2)
-        tensor_list = [torch.LongTensor(2) for _ in range(get_world_size())]
-        for k, v in self._map.items():
-            key_hash = int.from_bytes(base64.b64encode(k.encode("utf-8")), byteorder='little')
-            tensor[0] = key_hash
-            tensor[1] = v
-            all_gather(tensor_list, tensor)
-
-            values = []
-            for t in tensor_list:
-                if t[0] != key_hash:
-                    raise RuntimeError("timestamp key not matched!")
-                values.append(int(t[1]))
-
-            consensus_value = self._make_consensus(values)
-            self._map[k] = consensus_value
-
-    def _make_consensus(self, values):
-        max_v = max(values)
-        if max_v - 1 in values:
-            return max_v - 1
-        return max_v
-
-
-def _failure_handler(signum, frame):
-    global _timestamp
-    data_in_str = input()
-    data_in_str = data_in_str.split()
-    dead_ranks = [int(ele) for ele in data_in_str]
-    print("dead nodes' ranks: {}".format(dead_ranks))
-
+def _failure_handler():
     default_pg = _get_default_group()
     rank = default_pg.rank()
     size = default_pg.size()
     store = _get_default_store()
     # clear workers
-    store_key = "{}:{}".format(STORE_BASED_BARRIER_PREFIX, _group_count)
-    store.set(store_key, "0")
+    re_init_key = "reinit"
+    re_init = store.add(re_init_key, 1)
+    if re_init == 1:
+        print("rank %d reset STORE_BASED_BARRIER_PREFIX to 0" % rank)
+        store_key = "{}:{}".format(STORE_BASED_BARRIER_PREFIX, _group_count)
+        store.set(store_key, "0")
 
     destroy_process_group()
-    # TODO: use config
     print("start to re-init")
-    init_process_group("gloo", world_size=size, rank=rank, store=store)
-
-    print("all ranks start to make consensus on timestamp")
-    if _timestamp:
-        _timestamp.sync()
+    init_process_group("nccl", world_size=size, rank=rank, store=store)
     print("success to re-init")
-    # TODO: many logics ....
-    _set_re_init(True)
+
+    # wait for restarted workers to initialize CUDA runtime
+    time.sleep(7)
+
 
 
 class Backend(object):
@@ -263,26 +205,6 @@ _group_count = 0
 
 STORE_BASED_BARRIER_PREFIX = "store_based_barrier_key"
 
-_re_init = False
-
-_timestamp = None
-
-
-def _is_re_init():
-    global _re_init
-    return _re_init
-
-
-def _set_re_init(value):
-    global _re_init
-    _re_init = value
-
-
-def _check_re_init():
-    while not _is_re_init():
-        time.sleep(0.1)
-    _set_re_init(False)
-
 
 def _store_based_barrier(rank, store, timeout):
     """
@@ -290,6 +212,7 @@ def _store_based_barrier(rank, store, timeout):
     ``init_process_group`` or ``new_group``. Intended to be used only with
     those two methods and is not a generic alternative to ``barrier()``.
     """
+
     store_key = "{}:{}".format(STORE_BASED_BARRIER_PREFIX, _group_count)
     store.add(store_key, 1)
     logger.info('Added key: {} to store for rank: {}'.format(store_key, rank))
@@ -321,6 +244,10 @@ def _store_based_barrier(rank, store, timeout):
                 "Timed out initializing process group in store based barrier on "
                 "rank: {}, for key: {} (world_size={}, worker_count={}, timeout={})".format(
                     rank, store_key, world_size, worker_count, timeout))
+
+    re_init_key = "reinit"
+    store.set(re_init_key, "0")
+    logger.info('Added key: {} to store for rank: {}'.format(re_init_key, rank))
 
     logger.info(
         f"Rank {rank}: Completed store-based barrier for {world_size} nodes."
@@ -665,8 +592,6 @@ def init_process_group(backend,
         if get_backend(default_pg) in [Backend.GLOO, Backend.NCCL]:
             default_pg._set_sequence_number_for_group()
 
-    signal.signal(signal.SIGUSR1, _failure_handler)
-
 
 def _new_process_group_helper(world_size,
                               rank,
@@ -958,12 +883,7 @@ def send(tensor,
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
-        try:
-            default_pg.send([tensor], dst, tag).wait()
-        except RuntimeError as e:
-            logger.error("send error:" + str(e))
-            _check_re_init()
-            return False
+        default_pg.send([tensor], dst, tag).wait()
     else:
         group_dst_rank = _get_group_rank(group, dst)
         group.send([tensor], group_dst_rank, tag).wait()
@@ -1007,17 +927,12 @@ def recv(tensor,
         else:
             return _get_global_rank(pg, src_rank)
     else:
-        try:
-            if group is None or group is GroupMember.WORLD:
-                pg.recv([tensor], src, tag).wait()
-            else:
-                group_src_rank = _get_group_rank(pg, src)
-                pg.recv([tensor], group_src_rank, tag).wait()
-            return src
-        except RuntimeError as e:
-            logger.error("recv error:" + str(e))
-            _check_re_init()
-            return False
+        if group is None or group is GroupMember.WORLD:
+            pg.recv([tensor], src, tag).wait()
+        else:
+            group_src_rank = _get_group_rank(pg, src)
+            pg.recv([tensor], group_src_rank, tag).wait()
+        return src
 
 
 class P2POp(object):
@@ -1211,11 +1126,7 @@ def broadcast(tensor,
     if async_op:
         return work
     else:
-        try:
-            work.wait()
-        except RuntimeError as e:
-            logger.error("broadcast error:" + str(e))
-            _check_re_init()
+        work.wait()
 
 
 def all_reduce_multigpu(tensor_list,
@@ -1344,12 +1255,7 @@ def all_reduce(tensor,
     if async_op:
         return work
     else:
-        try:
-            work.wait()
-        except RuntimeError as e:
-            logger.error("all_reduce error:" + str(e))
-            _check_re_init()
-            return False
+        work.wait()
 
 
 def all_reduce_coalesced(tensors,
