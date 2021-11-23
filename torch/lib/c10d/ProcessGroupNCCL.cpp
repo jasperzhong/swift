@@ -610,6 +610,7 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
       // Loop through the cache of communicators for NCCL errors.
       std::lock_guard<std::mutex> lock(mutex_);
       for (auto& it : devNCCLCommMap_) {
+	auto devicesKey = it.first;
         auto& ncclComms = it.second;
 
         for (const auto& ncclComm : ncclComms) {
@@ -617,10 +618,10 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
         }
         std::exception_ptr ncclErrorException = checkForNCCLErrors(ncclComms);
 
-	std::string key = "failure_flag";
-	auto value = store_->get(key);
-        if (ncclErrorException || value[0]) {
-	  if (value[0]) {
+	std::string failure_flag_key = "failure_flag";
+	auto is_failure = store_->get(failure_flag_key);
+        if (ncclErrorException || is_failure[0]) {
+	  if (is_failure[0]) {
             LOG(ERROR)
               << "[Rank " << rank_
               << "] Received NCCL errors for communicators from other workers\n";
@@ -663,13 +664,15 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
 	    store_->deleteKey(std::to_string(ncclCommCounter_-1));
 	  }
 
+	  store_->deleteKey(devicesKey);
+
 	  // inform other workers about the failure
-	  value[0] = 1;
-	  store_->set(key, value);
-	  // this thread can exit now
-	  return;
+	  is_failure[0] = 1;
+	  store_->set(failure_flag_key, is_failure);
         }
       }
+      // this thread can exit now
+      return;
     }
 
     if (asyncErrorHandling_) {
