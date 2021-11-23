@@ -552,6 +552,8 @@ class ProcessGroupNCCL : public ProcessGroup {
   // by 1 when ncclGroupStart() is called and decreased by 1 when ncclGroupEnd()
   // is called.
   static thread_local uint64_t ncclActiveGroupCounter_;
+
+  std::mutex store_mutex_;
 };
 
 } // namespace c10d
