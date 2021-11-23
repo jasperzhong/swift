@@ -2,7 +2,6 @@ import argparse
 import os
 import random
 import sys
-import time
 from datetime import timedelta
 
 import numpy as np
@@ -76,33 +75,24 @@ def train(state, args, data_iterator, model, optimizer, loss_func):
     for epoch in range(state.epoch, args.epochs):
         state.epoch = epoch
         iteration = 0
-        throughputs = []
         while True:
             if iteration < state.iteration:
                 iteration += 1
                 continue
 
             try:
-                start = time.time()
                 optimizer.zero_grad()
                 loss = pipedream_flush_schedule(
                     data_iterator, model, loss_func)
                 optimizer.step()
-                elapsed = time.time() - start
 
                 iteration += 1
                 if is_pipeline_last_stage() and iteration % args.print_freq == 0:
-                    throughput = args.global_batch_size / elapsed
-                    print("[Epoch {}/Iteration {}] loss: {:.2f} throughput: {:.0f} imgs/s".format(
-                        epoch, iteration, loss, throughput
+                    print("[Epoch {}/Iteration {}] loss: {:.2f}".format(
+                        epoch, iteration, loss
                     ))
-                    throughputs.append(throughput)
 
                 if iteration == args.benchmark_iters:
-                    throughputs = np.array(throughputs)
-                    print("Avg Throughput per 10 iterations: {:.2f} imgs/s, std: {:.2f} imgs/s".format(
-                        np.mean(throughputs), np.std(throughputs)
-                    ))
                     sys.exit()
 
                 state.iteration = iteration
