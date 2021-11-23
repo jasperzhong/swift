@@ -465,11 +465,11 @@ ProcessGroupNCCL::ProcessGroupNCCL(
   }
 
   
-  if (rank_ == 0) {
-    std::string key = "failure_flag";
-    std::vector<uint8_t> value = {0};
-    store->set(key, value);
-  }
+  // if (rank_ == 0) {
+  //   std::string key = "failure_flag";
+  //   std::vector<uint8_t> value = {0};
+  //   store->set(key, value);
+  // }
 
 #ifdef ENABLE_NCCL_ERROR_CHECKING
   ncclCommWatchdogThread_ =
@@ -627,11 +627,11 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
 	}
       }
 
-      std::string failure_flag_key = "failure_flag";
-      auto failure_flag = store_->get(failure_flag_key);
-      if (failure_flag[0] == 1) {
-        is_failure = true;
-      }
+      // std::string failure_flag_key = "failure_flag";
+      // auto failure_flag = store_->get(failure_flag_key);
+      // if (failure_flag[0] == 1) {
+      //   is_failure = true;
+      // }
 
       if (is_failure) {
         if (ncclErrorException) {
@@ -647,8 +647,8 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
         }
       
         // inform other workers about the failure
-        failure_flag[0] = 1;
-        store_->set(failure_flag_key, failure_flag);
+        // failure_flag[0] = 1;
+        // store_->set(failure_flag_key, failure_flag);
 
         LOG(ERROR) << "[Rank " << rank_
                   << "] Aborting all communicators";
