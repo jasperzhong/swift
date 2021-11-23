@@ -648,7 +648,7 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
       
         // inform other workers about the failure
         failure_flag[0] = 1;
-        store_->set(failure_flag_key, failure_flag);
+        // store_->set(failure_flag_key, failure_flag);
 
         LOG(ERROR) << "[Rank " << rank_
                   << "] Aborting all communicators";
