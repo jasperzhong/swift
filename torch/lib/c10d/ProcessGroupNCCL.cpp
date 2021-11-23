@@ -609,6 +609,9 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
     {
       // Loop through the cache of communicators for NCCL errors.
       std::lock_guard<std::mutex> lock(mutex_);
+
+      bool is_failure = false;
+      std::exception_ptr ncclErrorException;
       for (auto& it : devNCCLCommMap_) {
 	auto devicesKey = it.first;
         auto& ncclComms = it.second;
@@ -616,37 +619,55 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
         for (const auto& ncclComm : ncclComms) {
           allCommIds.emplace(buildNcclUniqueIdStr(ncclComm->getNcclId()));
         }
-        std::exception_ptr ncclErrorException = checkForNCCLErrors(ncclComms);
+        ncclErrorException = checkForNCCLErrors(ncclComms);
+	
+	if (ncclErrorException) {
+	  is_failure = true;
+	  break;
+	}
+      }
 
-	std::string failure_flag_key = "failure_flag";
-	auto is_failure = store_->get(failure_flag_key);
-        if (ncclErrorException || is_failure[0]) {
-	  if (is_failure[0]) {
-            LOG(ERROR)
-              << "[Rank " << rank_
-              << "] Received NCCL errors for communicators from other workers\n";
-          } else {
-            LOG(ERROR)
-              << "[Rank " << rank_
-              << "] Received NCCL errors for communicators in the cache: \n"
-              << "NCCL error: \n"
-              << getExceptionMsgFromExceptionPtr(ncclErrorException);
-	  }
+      std::string failure_flag_key = "failure_flag";
+      auto failure_flag = store_->get(failure_flag_key);
+      if (failure_flag[0] == 1) {
+        is_failure = true;
+      }
 
-          LOG(ERROR) << "[Rank " << rank_
-                    << "] Aborting communicators that received errors";
+      if (is_failure) {
+        if (ncclErrorException) {
+          LOG(ERROR)
+            << "[Rank " << rank_
+            << "] Received NCCL errors for communicators in the cache: \n"
+            << "NCCL error: \n"
+            << getExceptionMsgFromExceptionPtr(ncclErrorException);
+        } else {
+          LOG(ERROR)
+            << "[Rank " << rank_
+            << "] Received NCCL errors for communicators from other workers\n";
+        }
+      
+        // inform other workers about the failure
+        failure_flag[0] = 1;
+        store_->set(failure_flag_key, failure_flag);
+
+        LOG(ERROR) << "[Rank " << rank_
+                  << "] Aborting all communicators";
+        for (auto& it : devNCCLCommMap_) {
+	  auto devicesKey = it.first;
+          auto& ncclComms = it.second;
+
           // We abort NCCL communicators that have received errors from this
           // thread, and exceptions are set on the corresponding work objects.
           // The workCleanupThread will then loop through the unfinished
           // collectives and throw exceptions if an exception has been set on
           // any of the work objects from this thread.
           for (const auto& ncclComm : ncclComms) {
-	    LOG(ERROR) << "[DEBUG] ncclCommAbort starts!";
-	    auto start = std::chrono::steady_clock().now();
+            LOG(ERROR) << "[DEBUG] ncclCommAbort starts!";
+            auto start = std::chrono::steady_clock().now();
             ncclComm->ncclCommAbort();
-	    auto end = std::chrono::steady_clock().now();
-	    double time_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-	    LOG(ERROR) << "[DEBUG] ncclCommAbort ends! Time elapsed = " << time_elapsed << " ms" << std::endl;
+            auto end = std::chrono::steady_clock().now();
+            double time_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+            LOG(ERROR) << "[DEBUG] ncclCommAbort ends! Time elapsed = " << time_elapsed << " ms" << std::endl;
             // Note that we don't remove the aborted communicators from the
             // cache. The reason is that if we do remove the communicator
             // from the cache, it is possible that a new collective operation
@@ -659,20 +680,19 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
             abortedCommIds.emplace(
                 buildNcclUniqueIdStr(ncclComm->getNcclId()));
           }
-	  if (rank_ == 0) {
-	    // delete the key in the store to avoid race condition
-	    store_->deleteKey(std::to_string(ncclCommCounter_-1));
-	  }
-
-	  store_->deleteKey(devicesKey);
-
-	  // inform other workers about the failure
-	  is_failure[0] = 1;
-	  store_->set(failure_flag_key, is_failure);
+      
+	  // delete p2p key
+          store_->deleteKey(devicesKey);
         }
+
+        if (rank_ == 0) {
+          // delete the key in the store to avoid race condition
+          store_->deleteKey(std::to_string(ncclCommCounter_-1));
+        }
+
+	// thread exits
+	return;
       }
-      // this thread can exit now
-      return;
     }
 
     if (asyncErrorHandling_) {
