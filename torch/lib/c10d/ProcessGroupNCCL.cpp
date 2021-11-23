@@ -466,9 +466,11 @@ ProcessGroupNCCL::ProcessGroupNCCL(
 
   
   if (rank_ == 0) {
+    LOG(ERROR) << "before set failure_flag";
     std::string key = "failure_flag";
     std::vector<uint8_t> value = {0};
     store_->set(key, value);
+    LOG(ERROR) << "after set failure_flag";
   }
 
 #ifdef ENABLE_NCCL_ERROR_CHECKING
@@ -627,9 +629,12 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
 	}
       }
 
+      LOG(ERROR) << "before get failure_flag";
       std::string failure_flag_key = "failure_flag";
       auto failure_flag = store_->get(failure_flag_key);
+      LOG(ERROR) << "after get failure_flag";
       if (failure_flag[0] == 1) {
+        LOG(ERROR) << "failure_flag = 1";
         is_failure = true;
       }
 
@@ -647,6 +652,7 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
         }
       
         // inform other workers about the failure
+	LOG(ERROR) << "set failure_flag = 1 to inform other workers";
         failure_flag[0] = 1;
         store_->set(failure_flag_key, failure_flag);
 
