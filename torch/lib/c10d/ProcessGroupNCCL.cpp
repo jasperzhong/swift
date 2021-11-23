@@ -465,11 +465,11 @@ ProcessGroupNCCL::ProcessGroupNCCL(
   }
 
   
-  // if (rank_ == 0) {
-  //   std::string key = "failure_flag";
-  //   std::vector<uint8_t> value = {0};
-  //   store->set(key, value);
-  // }
+  if (rank_ == 0) {
+    std::string key = "failure_flag";
+    std::vector<uint8_t> value = {0};
+    store->set(key, value);
+  }
 
 #ifdef ENABLE_NCCL_ERROR_CHECKING
   ncclCommWatchdogThread_ =
