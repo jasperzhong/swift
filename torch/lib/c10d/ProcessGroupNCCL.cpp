@@ -627,11 +627,11 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
 	}
       }
 
-      // std::string failure_flag_key = "failure_flag";
-      // auto failure_flag = store_->get(failure_flag_key);
-      // if (failure_flag[0] == 1) {
-      //   is_failure = true;
-      // }
+      std::string failure_flag_key = "failure_flag";
+      auto failure_flag = store_->get(failure_flag_key);
+      if (failure_flag[0] == 1) {
+        is_failure = true;
+      }
 
       if (is_failure) {
         if (ncclErrorException) {
