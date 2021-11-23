@@ -467,7 +467,7 @@ ProcessGroupNCCL::ProcessGroupNCCL(
   
   if (rank_ == 0) {
     LOG(ERROR) << "before set failure_flag";
-    std::string key = "failure_flag";
+    std::string key = "failure";
     std::vector<uint8_t> value = {0};
     store_mutex_.lock();
     store_->set(key, value);
@@ -632,7 +632,7 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
       }
 
       LOG(ERROR) << "before get failure_flag";
-      std::string failure_flag_key = "failure_flag";
+      std::string failure_flag_key = "failure";
       store_mutex_.lock();
       auto failure_flag = store_->get(failure_flag_key);
       store_mutex_.unlock();
