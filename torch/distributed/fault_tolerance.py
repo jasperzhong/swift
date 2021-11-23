@@ -1,4 +1,4 @@
-import base64
+import hashlib
 import functools
 
 import torch
@@ -51,22 +51,24 @@ class State(_AttrDict):
         broadcast_parameters(v.state_dict(), 0)
 
     def _optimizer_state_sync_handler(self, k, v):
-        v.clear()
+        if hasattr(v, "clear") and callable(getattr(v, "clear")):
+            v.clear()
         broadcast_optimizer_state(v, 0)
 
     def _timestamp_sync_handler(self, k, v):
-        tensor = torch.LongTensor(2).cuda()
-        tensor_list = [torch.LongTensor(2).cuda() for _ in range(get_world_size())]
-        key_hash = int.from_bytes(base64.b64encode(k.encode("utf-8")), byteorder='little')
-        tensor[0] = key_hash
-        tensor[1] = v
+        tensor = torch.LongTensor(3).cuda()
+        tensor_list = [torch.LongTensor(3).cuda() for _ in range(get_world_size())]
+        md5 = hashlib.md5(k.encode('utf-8'))
+        tensor[0] = int.from_bytes(md5.digest()[:8], byteorder='little', signed=True)
+        tensor[1] = int.from_bytes(md5.digest()[8:], byteorder='little', signed=True)
+        tensor[2] = v
         all_gather(tensor_list, tensor)
 
         values = []
         for t in tensor_list:
-            if t[0] != key_hash:
+            if t[0] != tensor[0] or t[1] != tensor[1]:
                 raise RuntimeError("timestamp key not matched!")
-            values.append(int(t[1].item()))
+            values.append(int(t[2].item()))
 
         consensus_value = self._make_consensus(values)
         self[k] = consensus_value
