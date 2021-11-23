@@ -468,7 +468,7 @@ ProcessGroupNCCL::ProcessGroupNCCL(
   if (rank_ == 0) {
     std::string key = "failure_flag";
     std::vector<uint8_t> value = {0};
-    store->set(key, value);
+    store_->set(key, value);
   }
 
 #ifdef ENABLE_NCCL_ERROR_CHECKING
@@ -648,7 +648,7 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
       
         // inform other workers about the failure
         failure_flag[0] = 1;
-        // store_->set(failure_flag_key, failure_flag);
+        store_->set(failure_flag_key, failure_flag);
 
         LOG(ERROR) << "[Rank " << rank_
                   << "] Aborting all communicators";
