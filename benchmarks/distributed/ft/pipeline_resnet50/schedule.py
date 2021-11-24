@@ -117,7 +117,7 @@ def send_forward_recv_backward(output_tensor, dtype=torch.float32):
         for req in reqs:
             req.wait()
 
-        # torch.cuda.synchronize()
+        torch.cuda.synchronize()
 
     return output_tensor_grad
 
@@ -135,7 +135,7 @@ def send_backward_recv_forward(input_tensor_grad, dtype=torch.float32):
         for req in reqs:
             req.wait()
 
-        # torch.cuda.synchronize()
+        torch.cuda.synchronize()
 
     return input_tensor
 
