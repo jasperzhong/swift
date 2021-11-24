@@ -2,7 +2,6 @@ import argparse
 import os
 import random
 import sys
-from datetime import timedelta
 
 import numpy as np
 import torch
@@ -116,7 +115,7 @@ def main():
     args.local_rank = int(os.environ['LOCAL_RANK'])
     torch.cuda.set_device(args.local_rank)
     torch.distributed.init_process_group(
-        'nccl', timeout=timedelta(seconds=10)
+        'nccl'
     )
 
     data_iterator = get_data_iterator(args)
