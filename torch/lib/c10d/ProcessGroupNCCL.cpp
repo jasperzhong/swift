@@ -633,7 +633,7 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
       if (!devNCCLCommMap_.empty()) {
         auto get_value = store_->get(failure_flag_key);
 	if (get_value[0] == 1) {
-	  is_failure = get_value[0]; 
+	  is_failure = true;
 	}
       }
 
@@ -687,7 +687,6 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
           }
       
 	  // delete p2p key
-	  LOG(ERROR) << "devices key:" << devicesKey;
           store_->deleteKey(devicesKey);
         }
 

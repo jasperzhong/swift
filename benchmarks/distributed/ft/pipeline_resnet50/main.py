@@ -120,7 +120,7 @@ def main():
     )
 
     data_iterator = get_data_iterator(args)
-    model = PipelineParallelResNet50(balance=[6, 5])
+    model = PipelineParallelResNet50()
     model.cuda()
 
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
