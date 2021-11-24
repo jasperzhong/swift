@@ -46,6 +46,7 @@ class PipelineParallelResNet50(ResNet):
         self._input_shape = self._input_shapes[start]
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.resnet50_sequential[start:end]
+        print(f"model shard: input_shape: {self._input_shape} output_shape: {self._output_shape}")
 
     def _profile(self, shape=[3, 224, 224]):
         """
