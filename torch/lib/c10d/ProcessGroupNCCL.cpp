@@ -632,7 +632,9 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
       // the "if" is necessary
       if (!devNCCLCommMap_.empty()) {
         auto get_value = store_->get(failure_flag_key);
-	is_failure = get_value[0]; 
+	if (get_value[0] == 1) {
+	  is_failure = get_value[0]; 
+	}
       }
 
       if (is_failure) {
