@@ -465,6 +465,14 @@ ProcessGroupNCCL::ProcessGroupNCCL(
   }
 
   
+  if (rank_ == 0) {
+    std::string key = "failure_flag";
+    std::vector<uint8_t> value = {0};
+    store_->set(key, value);
+    auto get_value = store_->get(key);
+    LOG(ERROR) << "[main] get value from store:" << static_cast<int>(get_value[0]) << std::endl;
+  }
+
 #ifdef ENABLE_NCCL_ERROR_CHECKING
   ncclCommWatchdogThread_ =
       std::thread(&ProcessGroupNCCL::ncclCommWatchdog, this);
@@ -619,6 +627,15 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
 	  is_failure = true;
 	  break;
 	}
+      }
+
+
+      if (!devNCCLCommMap_.empty()) {
+        // It seems that using store_ in watchdog thread will lead to a crash.
+        // I have no idea...
+        std::string key = "failure_flag";
+        auto get_value = store_->get(key);
+        LOG(ERROR) << "[watchdog] get value from store:" << static_cast<int>(get_value[0]) << std::endl;
       }
 
       if (is_failure) {
