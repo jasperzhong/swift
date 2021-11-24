@@ -7,22 +7,29 @@ import torch.distributed.fault_tolerance
 
 parser = argparse.ArgumentParser("ping pong")
 
+
 @torch.distributed.fault_tolerance.run
 def train(state, world_size):
     print("start from i={}".format(state.i))
 
     x = torch.randn((100000)).cuda()
+    reqs = []
     while True:
         src_rank = state.i % world_size
         dst_rank = (state.i + 1) % world_size
         if torch.distributed.get_rank() == src_rank:
-            torch.distributed.send(x, dst_rank)
+            req = torch.distributed.isend(x, dst_rank)
         elif torch.distributed.get_rank() == dst_rank:
-            torch.distributed.recv(x, src_rank)
+            req = torch.distributed.irecv(x, src_rank)
+        reqs.append(req)
 
         state.i += 1
         if state.i % 1000 == 0:
+            for req in reqs:
+                req.wait()
+            reqs.clear()
             print(state.i)
+
 
 def main():
     args = parser.parse_args()
