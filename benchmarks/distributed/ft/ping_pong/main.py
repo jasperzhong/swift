@@ -12,22 +12,17 @@ parser = argparse.ArgumentParser("ping pong")
 def train(state, world_size):
     print("start from i={}".format(state.i))
 
-    reqs = []
     while True:
         x = torch.randn((100000)).cuda()
         src_rank = state.i % world_size
         dst_rank = (state.i + 1) % world_size
         if torch.distributed.get_rank() == src_rank:
-            req = torch.distributed.isend(x, dst_rank)
+            torch.distributed.send(x, dst_rank)
         elif torch.distributed.get_rank() == dst_rank:
-            req = torch.distributed.irecv(x, src_rank)
-        reqs.append(req)
+            torch.distributed.recv(x, src_rank)
 
         state.i += 1
         if state.i % 1000 == 0:
-            for req in reqs:
-                req.wait()
-            reqs.clear()
             print(state.i)
 
 
