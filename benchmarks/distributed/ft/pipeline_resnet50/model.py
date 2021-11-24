@@ -3,13 +3,13 @@ import torch.nn as nn
 from torchvision.models.resnet import Bottleneck, ResNet
 
 from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
-        get_pipeline_model_parallel_world_size
+    get_pipeline_model_parallel_world_size
 
 
 class PipelineParallelResNet50(ResNet):
-    def __init__(self, balance = None, *args, **kwargs):
+    def __init__(self, balance=None, *args, **kwargs):
         super(PipelineParallelResNet50, self).__init__(
-            Bottleneck, [3, 4, 6, 3], num_classes=1000 , *args, **kwargs
+            Bottleneck, [3, 4, 6, 3], num_classes=1000, *args, **kwargs
         )
         self.resnet50_sequential = nn.Sequential(
             self.conv1, self.bn1, self.relu, self.maxpool, self.layer1, self.layer2,
@@ -22,13 +22,13 @@ class PipelineParallelResNet50(ResNet):
 
         if balance is not None:
             assert len(balance) == get_pipeline_model_parallel_world_size(), \
-                    "The number of `balance` does not match the number of pipeline stages"
+                "The number of `balance` does not match the number of pipeline stages"
             assert sum(balance) == len(self.resnet50_sequential), \
-                    "The summation of `balance` does not match the number of layers"
+                "The summation of `balance` does not match the number of layers"
             self.balance = balance
         else:
             num_layers_per_stage = len(self.resnet50_sequential) // \
-                    get_pipeline_model_parallel_world_size()
+                get_pipeline_model_parallel_world_size()
             self.balance = [num_layers_per_stage] * get_pipeline_model_parallel_world_size()
             remaining = len(self.resnet50_sequential) - num_layers_per_stage * len(self.balance)
             self.balance[-1] += remaining
