@@ -667,12 +667,12 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
           // collectives and throw exceptions if an exception has been set on
           // any of the work objects from this thread.
           for (const auto& ncclComm : ncclComms) {
-            LOG(ERROR) << "[DEBUG] ncclCommAbort starts!";
+            LOG(ERROR) << "[Rank " << rank_ << "] ncclCommAbort starts!";
             auto start = std::chrono::steady_clock().now();
             ncclComm->ncclCommAbort();
             auto end = std::chrono::steady_clock().now();
             double time_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-            LOG(ERROR) << "[DEBUG] ncclCommAbort ends! Time elapsed = " << time_elapsed << " ms" << std::endl;
+            LOG(ERROR) << "[Rank " << rank_ << "] ncclCommAbort ends! Time elapsed = " << time_elapsed << " ms" << std::endl;
             // Note that we don't remove the aborted communicators from the
             // cache. The reason is that if we do remove the communicator
             // from the cache, it is possible that a new collective operation
