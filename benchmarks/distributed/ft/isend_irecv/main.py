@@ -2,6 +2,7 @@ import os
 from datetime import timedelta
 
 import torch
+import torch.distributed.fault_tolerance
 
 
 
