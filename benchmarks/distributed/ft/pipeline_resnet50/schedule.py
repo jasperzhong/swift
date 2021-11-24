@@ -160,7 +160,7 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
         input_tensors.append(input_tensor)
         output_tensors.append(output_tensor)
 
-    if num_microbatches > 0:
+    if num_microbatches_remaining > 0:
         input_tensor = recv_forward(model.input_shape)
 
     # run 1F1B steady state
