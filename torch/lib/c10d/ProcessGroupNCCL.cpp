@@ -656,9 +656,12 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
 	store_->set(failure_flag_key, value);
 
         LOG(ERROR) << "[Rank " << rank_
-                  << "] Aborting all communicators";
+                   << "] Aborting all communicators";
         for (auto& it : devNCCLCommMap_) {
 	  auto devicesKey = it.first;
+          LOG(ERROR) << "[Rank " << rank_
+                     << "] Aborting " << devicesKey;
+
           auto& ncclComms = it.second;
 
           // We abort NCCL communicators that have received errors from this
@@ -1243,8 +1246,6 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::pointToPoint(
   int p2pRank = rank_ <= peer ? 0 : 1;
   auto isSendRecvSelf = rank_ == peer;
   auto& ncclComms = getNCCLComm(key, devices, opType, p2pRank, isSendRecvSelf);
-
-  LOG(ERROR) << profilingTitle << " " << tensors[0].sizes();
 
   // First let NCCL streams wait for input tensors allocation streams
   syncStreams(devices, ncclEvents_[key], ncclStreams_[key]);
