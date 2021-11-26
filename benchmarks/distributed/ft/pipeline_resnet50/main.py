@@ -103,12 +103,6 @@ def main():
     args = parser.parse_args()
     initialize_global_args(args)
 
-    if args.seed is not None:
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-        torch.manual_seed(args.seed)
-        torch.cuda.manual_seed(args.seed)
-
     torch.backends.cudnn.benchmark = True
 
     args.world_size = int(os.environ['WORLD_SIZE'])
@@ -118,6 +112,12 @@ def main():
     torch.distributed.init_process_group(
         'nccl'
     )
+
+    if args.seed is not None:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        torch.cuda.manual_seed(args.seed)
 
     data_iterator = get_data_iterator(args)
     model = PipelineParallelResNet50(balance=[4, 2, 2, 3])
