@@ -69,6 +69,7 @@ class TCPStoreMasterDaemon : public BackgroundThread {
   void checkHandler(int socket) const;
   void getNumKeysHandler(int socket) const;
   void deleteHandler(int socket);
+  void deleteP2PHandler(int socket);
   void waitHandler(int socket);
   void watchHandler(int socket);
 
@@ -148,6 +149,8 @@ class TCPStore : public Store {
   int64_t add(const std::string& key, int64_t value) override;
 
   bool deleteKey(const std::string& key) override;
+
+  bool deleteP2PKeys() override;
 
   // NOTE: calling other TCPStore APIs inside the callback is NOT threadsafe
   // watchKey() is a blocking operation. It will register the socket on

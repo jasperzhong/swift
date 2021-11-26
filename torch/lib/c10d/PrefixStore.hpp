@@ -26,6 +26,8 @@ class PrefixStore : public Store {
 
   bool deleteKey(const std::string& key) override;
 
+  bool deleteP2PKeys() override;
+
   int64_t getNumKeys() override;
 
   bool check(const std::vector<std::string>& keys) override;

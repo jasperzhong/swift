@@ -104,11 +104,11 @@ def benchmark(state):
     log('Running benchmark...')
     img_secs = []
     for x in range(state.i, args.num_iters):
+        state.i = x
         time = timeit.timeit(benchmark_step, number=args.num_batches_per_iter)
         img_sec = args.batch_size * args.num_batches_per_iter / time
         log('Iter #%d: %.1f img/sec per %s' % (x, img_sec, device))
         img_secs.append(img_sec)
-        state.i = x
 
     # Results
     img_sec_mean = np.mean(img_secs)

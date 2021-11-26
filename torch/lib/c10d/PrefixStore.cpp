@@ -46,6 +46,10 @@ bool PrefixStore::deleteKey(const std::string& key) {
   return store_->deleteKey(joinKey(key));
 }
 
+bool PrefixStore::deleteP2PKeys() {
+  return store_->deleteP2PKeys();
+};
+
 void PrefixStore::watchKey(const std::string& key, WatchKeyCallback callback) {
   return store_->watchKey(joinKey(key), std::move(callback));
 }

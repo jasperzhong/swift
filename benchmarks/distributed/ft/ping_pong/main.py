@@ -3,26 +3,28 @@ import os
 from datetime import timedelta
 
 import torch
+import torch.distributed.fault_tolerance
 
 parser = argparse.ArgumentParser("ping pong")
 
-@torch.distributed.run
-def train(ts, world_size):
-   # ts.sync()
-    x = torch.randn((100000)).cuda()
-    print("start from i={}".format(ts.i))
+
+@torch.distributed.fault_tolerance.run
+def train(state, world_size):
+    print("start from i={}".format(state.i))
+
     while True:
-        src_rank = ts.i % world_size
-        dst_rank = (ts.i + 1) % world_size
+        x = torch.randn((100000)).cuda()
+        src_rank = state.i % world_size
+        dst_rank = (state.i + 1) % world_size
         if torch.distributed.get_rank() == src_rank:
-            rc = torch.distributed.send(x, dst_rank)
+            torch.distributed.send(x, dst_rank)
         elif torch.distributed.get_rank() == dst_rank:
-            rc = torch.distributed.recv(x, src_rank)
-        if rc is False:
-            continue
-        ts.i += 1
-        if ts.i % 1000 == 0:
-            print(ts.i)
+            torch.distributed.recv(x, src_rank)
+
+        state.i += 1
+        if state.i % 1000 == 0:
+            print(state.i)
+
 
 def main():
     args = parser.parse_args()
@@ -35,8 +37,8 @@ def main():
         timeout=timedelta(seconds=5)
     )
 
-    ts = torch.distributed.TimeStamp(i=0)
-    train(ts, world_size)
+    state = torch.distributed.fault_tolerance.State(i=0)
+    train(state, world_size)
 
 
 if __name__ == '__main__':

@@ -9,9 +9,7 @@ import abc
 import functools
 import json
 import os
-import signal
 import socket
-import threading
 import time
 import traceback
 import warnings
@@ -470,20 +468,6 @@ class SimpleElasticAgent(ElasticAgent):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def _send_signal(self, sig):
-        """
-        Send signal to workers
-        """
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def _send_data(self, data):
-        """
-        Send data to workers 
-        """
-        raise NotImplementedError()
-
-    @abc.abstractmethod
     def _stop_workers(self, worker_group: WorkerGroup) -> None:
         r"""
         Stops all workers in the given worker group. Implementors
@@ -852,14 +836,6 @@ class SimpleElasticAgent(ElasticAgent):
 
         put_metric(f"workers.{spec.role}.flakiness", int(flakiness))
 
-    def _poll_dead_nodes(self):
-        spec = self._worker_group.spec
-        rdzv_handler = spec.rdzv_handler
-        while True:
-            dead_nodes_rank = rdzv_handler.get_dead_nodes_rank()
-            if dead_nodes_rank:
-                rdzv_handler.clear_dead_nodes_rank()
-            time.sleep(0.1)
 
     def _invoke_run(self, role: str = DEFAULT_ROLE) -> RunResult:
         # NOTE: currently only works for a single role
@@ -874,9 +850,6 @@ class SimpleElasticAgent(ElasticAgent):
         self._initialize_workers(self._worker_group)
         monitor_interval = spec.monitor_interval
         rdzv_handler = spec.rdzv_handler
-
-        detect_failure_thread = threading.Thread(target=self._poll_dead_nodes)
-        detect_failure_thread.start() 
 
         while True:
             assert self._worker_group.state != WorkerState.INIT
@@ -928,7 +901,6 @@ class SimpleElasticAgent(ElasticAgent):
             else:
                 raise Exception(f"[{role}] Worker group in {state.name} state")
 
-        detect_failure_thread.join()
 
     def _exit_barrier(self):
         """

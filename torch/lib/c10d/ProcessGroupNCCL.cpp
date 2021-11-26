@@ -1,12 +1,12 @@
 #include <c10/util/Optional.h>
 #include <c10d/ProcessGroupNCCL.hpp>
 
+#include <chrono>
 #include <exception>
 #include <map>
 #include <string>
 #include <tuple>
 #include <unordered_set>
-#include <chrono>
 
 #include <THC/THC.h>
 
@@ -417,13 +417,13 @@ void ProcessGroupNCCL::WorkNCCL::synchronizeInternal(
 // Same as calling synchronize().
 bool ProcessGroupNCCL::WorkNCCL::wait(std::chrono::milliseconds timeout) {
   RECORD_PARAM_COMMS(
-      rank_,                    // rank
-      "wait",                   // colName
-      0,                        // inSize
-      0,                        // outSize
-      at::kByte,                // dType
-      std::vector<int64_t>(),   // inSplitSizes
-      std::vector<int64_t>());  // outSplitSizes
+      rank_, // rank
+      "wait", // colName
+      0, // inSize
+      0, // outSize
+      at::kByte, // dType
+      std::vector<int64_t>(), // inSplitSizes
+      std::vector<int64_t>()); // outSplitSizes
   synchronizeInternal(timeout);
   // Always return true, because abort API is not implemented.
   return true;
@@ -464,8 +464,6 @@ ProcessGroupNCCL::ProcessGroupNCCL(
     asyncErrorHandling_ = false;
   }
 
-  
-
 #ifdef ENABLE_NCCL_ERROR_CHECKING
   ncclCommWatchdogThread_ =
       std::thread(&ProcessGroupNCCL::ncclCommWatchdog, this);
@@ -480,7 +478,6 @@ ProcessGroupNCCL::ProcessGroupNCCL(
   if (!ncclDebugLevel) {
     ncclDebugLevel = "UNSET";
   }
-
 
   LOG(INFO) << "[Rank " << rank_
             << "] ProcessGroupNCCL initialized with following options:"
@@ -604,53 +601,104 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
     {
       // Loop through the cache of communicators for NCCL errors.
       std::lock_guard<std::mutex> lock(mutex_);
+
+      bool is_failure = false;
+      std::exception_ptr ncclErrorException;
       for (auto& it : devNCCLCommMap_) {
+        auto devicesKey = it.first;
         auto& ncclComms = it.second;
 
         for (const auto& ncclComm : ncclComms) {
           allCommIds.emplace(buildNcclUniqueIdStr(ncclComm->getNcclId()));
         }
-        std::exception_ptr ncclErrorException = checkForNCCLErrors(ncclComms);
+        ncclErrorException = checkForNCCLErrors(ncclComms);
+
+        if (ncclErrorException) {
+          is_failure = true;
+          break;
+        }
+      }
+
+      std::string failure_flag_key = "failure_flag";
+      // the "if" is necessary
+      if (!devNCCLCommMap_.empty()) {
+        auto get_value = store_->get(failure_flag_key);
+        if (get_value[0] == 1) {
+          is_failure = true;
+        }
+      }
+
+      if (is_failure) {
         if (ncclErrorException) {
           LOG(ERROR)
               << "[Rank " << rank_
               << "] Received NCCL errors for communicators in the cache: \n"
               << "NCCL error: \n"
               << getExceptionMsgFromExceptionPtr(ncclErrorException);
-
-            LOG(ERROR) << "[Rank " << rank_
-                      << "] Aborting communicators that received errors";
-            // We abort NCCL communicators that have received errors from this
-            // thread, and exceptions are set on the corresponding work objects.
-            // The workCleanupThread will then loop through the unfinished
-            // collectives and throw exceptions if an exception has been set on
-            // any of the work objects from this thread.
-            for (const auto& ncclComm : ncclComms) {
-	      LOG(ERROR) << "[DEBUG] ncclCommAbort starts!";
-	      auto start = std::chrono::steady_clock().now();
-              ncclComm->ncclCommAbort();
-	      auto end = std::chrono::steady_clock().now();
-	      double time_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-	      LOG(ERROR) << "[DEBUG] ncclCommAbort ends! Time elapsed = " << time_elapsed << " ms" << std::endl;
-              // Note that we don't remove the aborted communicators from the
-              // cache. The reason is that if we do remove the communicator
-              // from the cache, it is possible that a new collective operation
-              // calls `ncclCommInitRank` to create a new communicator whereas
-              // other ranks might have failed/timed out and didn't enter
-              // `ncclCommInitRank`. As a result, when there is a failure on
-              // a communicator the application receives an exception and its
-              // their responsibility to destroy the process group and recreate
-              // it to recover from errors.
-              abortedCommIds.emplace(
-                  buildNcclUniqueIdStr(ncclComm->getNcclId()));
-            }
-	    if (rank_ == 0) {
-	      // delete the key in the store to avoid race condition
-	      store_->deleteKey(std::to_string(ncclCommCounter_-1));
-	    }
-	    // this thread can exit now
-	    return;
+        } else {
+          LOG(ERROR)
+              << "[Rank " << rank_
+              << "] Received NCCL errors for communicators from other workers\n";
         }
+
+        // inform other workers about the failure
+        std::vector<uint8_t> value = {1};
+        store_->set(failure_flag_key, value);
+
+        LOG(ERROR) << "[Rank " << rank_ << "] Aborting all communicators";
+
+        // mark all communicator aborted to avoid deadlock
+        for (auto& it : devNCCLCommMap_) {
+          auto& ncclComms = it.second;
+          for (const auto& ncclComm : ncclComms) {
+            ncclComm->ncclCommMarkAbort();
+          }
+        }
+
+        for (auto& it : devNCCLCommMap_) {
+          auto devicesKey = it.first;
+          LOG(ERROR) << "[Rank " << rank_ << "] Aborting " << devicesKey;
+
+          auto& ncclComms = it.second;
+
+          // We abort NCCL communicators that have received errors from this
+          // thread, and exceptions are set on the corresponding work objects.
+          // The workCleanupThread will then loop through the unfinished
+          // collectives and throw exceptions if an exception has been set on
+          // any of the work objects from this thread.
+          for (const auto& ncclComm : ncclComms) {
+            LOG(ERROR) << "[Rank " << rank_ << "] ncclCommAbort starts!";
+            auto start = std::chrono::steady_clock().now();
+            ncclComm->ncclCommAbort();
+            auto end = std::chrono::steady_clock().now();
+            double time_elapsed =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    end - start)
+                    .count();
+            LOG(ERROR) << "[Rank " << rank_
+                       << "] ncclCommAbort ends! Time elapsed = "
+                       << time_elapsed << " ms" << std::endl;
+            // Note that we don't remove the aborted communicators from the
+            // cache. The reason is that if we do remove the communicator
+            // from the cache, it is possible that a new collective operation
+            // calls `ncclCommInitRank` to create a new communicator whereas
+            // other ranks might have failed/timed out and didn't enter
+            // `ncclCommInitRank`. As a result, when there is a failure on
+            // a communicator the application receives an exception and its
+            // their responsibility to destroy the process group and recreate
+            // it to recover from errors.
+            abortedCommIds.emplace(buildNcclUniqueIdStr(ncclComm->getNcclId()));
+          }
+        }
+
+        if (rank_ == 0) {
+          // delete the key in the store to avoid race condition
+          store_->deleteKey(std::to_string(ncclCommCounter_ - 1));
+          store_->deleteP2PKeys();
+        }
+
+        // thread exits
+        return;
       }
     }
 
@@ -863,6 +911,12 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
   if (!isSendRecvSelf) {
     // Broadcast so that each process can have a unique NCCL ID
     broadcastUniqueNCCLID(&ncclID, opType, devicesKey, p2pRank);
+  }
+
+  if (rank_ == 0 && !hasInitFailureFlag_) {
+    std::vector<uint8_t> value = {0};
+    store_->set("failure_flag", value);
+    hasInitFailureFlag_ = true;
   }
 
   at::cuda::OptionalCUDAGuard gpuGuard;
@@ -1091,7 +1145,6 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::collective(
     PostProcess post,
     OpType opType,
     const char* profilingTitle) {
-
   // Bump collective counter
   if (sequenceNum_) {
     sequenceNum_->increment();
@@ -1158,15 +1211,15 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::collective(
   {
     c10::cuda::CUDAMultiStreamGuard streamGuard(ncclStreams_[key]);
     work->future_ = c10::make_intrusive<at::ivalue::Future>(
-        c10::ListType::create(c10::TensorType::get()),
-        devices);
+        c10::ListType::create(c10::TensorType::get()), devices);
 
     // Add a callback that runs profiling end callbacks. wrapCallback() in CUDA
     // future blocks the stream this callback runs on the corresponding
     // cudaEvents_ ensuring appropriate synchronization.
     if (work->recordFunctionEndCallback_) {
-      work->future_->addCallback(
-          [work](at::ivalue::Future& /* unused */) { work->recordFunctionEndCallback_(); });
+      work->future_->addCallback([work](at::ivalue::Future& /* unused */) {
+        work->recordFunctionEndCallback_();
+      });
     }
     work->future_->markCompleted(at::IValue(*work->outputs_));
   }
@@ -1265,8 +1318,7 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::pointToPoint(
   {
     c10::cuda::CUDAMultiStreamGuard streamGuard(ncclStreams_[key]);
     work->future_ = c10::make_intrusive<at::ivalue::Future>(
-        c10::ListType::create(c10::TensorType::get()),
-        devices);
+        c10::ListType::create(c10::TensorType::get()), devices);
     work->future_->markCompleted(at::IValue(*work->outputs_));
   }
 
@@ -1274,8 +1326,9 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::pointToPoint(
   // future blocks the stream this callback runs on the corresponding
   // cudaEvents_ ensuring appropriate synchronization.
   if (work->recordFunctionEndCallback_) {
-    work->future_->addCallback(
-        [work](at::ivalue::Future& /* unused */) { work->recordFunctionEndCallback_(); });
+    work->future_->addCallback([work](at::ivalue::Future& /* unused */) {
+      work->recordFunctionEndCallback_();
+    });
   }
 
   return work;
@@ -1366,13 +1419,13 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::broadcast(
   // @lint-ignore CLANGTIDY
   auto tensor = tensors.back();
   RECORD_PARAM_COMMS(
-      rank_,                    // rank
-      "broadcast",              // colName
-      tensor.numel(),           // inSize
-      tensor.numel(),           // outSize
-      tensor.scalar_type(),     // dType
-      std::vector<int64_t>(),   // inSplitSizes
-      std::vector<int64_t>());  // outSplitSizes
+      rank_, // rank
+      "broadcast", // colName
+      tensor.numel(), // inSize
+      tensor.numel(), // outSize
+      tensor.scalar_type(), // dType
+      std::vector<int64_t>(), // inSplitSizes
+      std::vector<int64_t>()); // outSplitSizes
 
   return collective(
       tensors,
@@ -1401,13 +1454,13 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::reduce(
   // @lint-ignore CLANGTIDY
   auto tensor = tensors.back();
   RECORD_PARAM_COMMS(
-      rank_,                    // rank
-      "reduce",                 // colName
-      tensor.numel(),           // inSize
-      tensor.numel(),           // outSize
-      tensor.scalar_type(),     // dType
-      std::vector<int64_t>(),   // inSplitSizes
-      std::vector<int64_t>());  // outSplitSizes
+      rank_, // rank
+      "reduce", // colName
+      tensor.numel(), // inSize
+      tensor.numel(), // outSize
+      tensor.scalar_type(), // dType
+      std::vector<int64_t>(), // inSplitSizes
+      std::vector<int64_t>()); // outSplitSizes
 
   return collective(
       tensors,
@@ -1444,14 +1497,14 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::allgather(
   // @lint-ignore CLANGTIDY
   auto tensor = inputTensors.back();
   RECORD_PARAM_COMMS(
-      rank_,                    // rank
-      "all_gather",             // colName
-      tensor.numel(),           // inSize
-      tensor.numel() *          // outSize
-        this->getSize(),        // dType
+      rank_, // rank
+      "all_gather", // colName
+      tensor.numel(), // inSize
+      tensor.numel() * // outSize
+          this->getSize(), // dType
       tensor.scalar_type(),
-      std::vector<int64_t>(),   // inSplitSizes
-      std::vector<int64_t>());  // outSplitSize
+      std::vector<int64_t>(), // inSplitSizes
+      std::vector<int64_t>()); // outSplitSize
 
   return collective(
       inputTensors,
@@ -1505,14 +1558,14 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::reduce_scatter(
   // @lint-ignore CLANGTIDY
   auto tensor = outputTensors.back();
   RECORD_PARAM_COMMS(
-      rank_,                    // rank
-      "reduce_scatter",         // colName
-      tensor.numel() *          // inSize
-        this->getSize(),        // outSize
-      tensor.numel(),           // dType
+      rank_, // rank
+      "reduce_scatter", // colName
+      tensor.numel() * // inSize
+          this->getSize(), // outSize
+      tensor.numel(), // dType
       tensor.scalar_type(),
-      std::vector<int64_t>(),   // inSplitSizes
-      std::vector<int64_t>());  // outSplitSizes
+      std::vector<int64_t>(), // inSplitSizes
+      std::vector<int64_t>()); // outSplitSizes
 
   auto inputFlattened =
       flatten_for_scatter_gather(inputTensors, outputTensors, size_);
@@ -1557,13 +1610,13 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::reduce_scatter(
 c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::barrier(
     const BarrierOptions& opts) {
   RECORD_PARAM_COMMS(
-      rank_,                    // rank
-      "barrier",                // colName
-      0,                        // inSize
-      0,                        // outSize
-      at::kByte,                // dType
-      std::vector<int64_t>(),   // inSplitSizes
-      std::vector<int64_t>());  // outSplitSizes
+      rank_, // rank
+      "barrier", // colName
+      0, // inSize
+      0, // outSize
+      at::kByte, // dType
+      std::vector<int64_t>(), // inSplitSizes
+      std::vector<int64_t>()); // outSplitSizes
 
   std::vector<at::Device> devices;
 
@@ -1631,13 +1684,13 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::alltoall_base(
     std::vector<at::Tensor> outputTensors = {outputTensor};
 
     RECORD_PARAM_COMMS(
-        rank_,                    // rank
-        "all_to_all",             // colName
-        inputTensor.numel(),      // inSize
-        outputTensor.numel(),     // outSize
-        at::kByte,                // dType
-        std::vector<int64_t>(),   // inSplitSizes
-        std::vector<int64_t>());  // outSplitSizes
+        rank_, // rank
+        "all_to_all", // colName
+        inputTensor.numel(), // inSize
+        outputTensor.numel(), // outSize
+        at::kByte, // dType
+        std::vector<int64_t>(), // inSplitSizes
+        std::vector<int64_t>()); // outSplitSizes
 
     return collective(
         inputTensors,
@@ -1662,13 +1715,13 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::alltoall_base(
     std::vector<at::Tensor> outputTensors = {outputTensor};
 
     RECORD_PARAM_COMMS(
-        rank_,                 // rank
-        "all_to_allv",         // colName
-        inputTensor.numel(),   // inSize
-        outputTensor.numel(),  // outSize
-        at::kByte,             // dType
-        inputSplitSizes,       // inSplitSizes
-        outputSplitSizes);     // outSplitSizes
+        rank_, // rank
+        "all_to_allv", // colName
+        inputTensor.numel(), // inSize
+        outputTensor.numel(), // outSize
+        at::kByte, // dType
+        inputSplitSizes, // inSplitSizes
+        outputSplitSizes); // outSplitSizes
 
     return collective(
         inputTensors,
@@ -1851,16 +1904,18 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::_allgather_base(
   check_gpu_single_tensor(output_tensor);
 
   if (input_tensor.dtype() != output_tensor.dtype()) {
-    throw std::runtime_error("output tensor must have the same type as input tensor");
+    throw std::runtime_error(
+        "output tensor must have the same type as input tensor");
   }
 
   if (input_tensor.numel() * size_ != output_tensor.numel()) {
-    throw std::runtime_error("output tensor size must be equal to world_size times input tensor size");
+    throw std::runtime_error(
+        "output tensor size must be equal to world_size times input tensor size");
   }
 
   // just a wrapper to fit the collective interface
-  auto inputs = std::vector<at::Tensor> {input_tensor};
-  auto outputs = std::vector<at::Tensor> {output_tensor};
+  auto inputs = std::vector<at::Tensor>{input_tensor};
+  auto outputs = std::vector<at::Tensor>{output_tensor};
 
   return collective(
       inputs,

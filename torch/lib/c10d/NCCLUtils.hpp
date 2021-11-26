@@ -171,6 +171,26 @@ class NCCLComm {
 #endif
   }
 
+  void ncclCommMarkAbort() {
+    std::unique_lock<std::mutex> lock(mutex_);
+#ifdef ENABLE_NCCL_ERROR_CHECKING
+    if (aborted_) {
+      // Should not abort twice.
+      return;
+    }
+
+    C10D_NCCL_CHECK(::ncclCommMarkAbort(ncclComm_));
+
+    // Set an appropriate error so that we avoid using the communicator.
+    if (ncclAsyncErr_ == ncclSuccess) {
+      ncclAsyncErr_ = ncclSystemError;
+    }
+#else
+    // This is a NOOP, if error checks are disabled.
+    return;
+#endif
+  }
+
   bool isAborted() const {
     std::unique_lock<std::mutex> lock(mutex_);
     return aborted_;

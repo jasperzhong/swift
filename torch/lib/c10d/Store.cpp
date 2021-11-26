@@ -9,12 +9,16 @@ constexpr std::chrono::milliseconds Store::kNoTimeout;
 Store::~Store() {}
 
 const std::chrono::milliseconds& Store::getTimeout() const noexcept {
-    return timeout_;
+  return timeout_;
 }
 
 // Set timeout function
 void Store::setTimeout(const std::chrono::milliseconds& timeout) {
   timeout_ = timeout;
 }
+
+bool Store::deleteP2PKeys() {
+  return true;
+};
 
 } // namespace c10d

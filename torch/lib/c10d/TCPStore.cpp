@@ -1,4 +1,5 @@
 #include <c10d/TCPStore.hpp>
+#include <cctype>
 
 #ifdef _WIN32
 #include <io.h>
@@ -26,11 +27,38 @@ enum class QueryType : uint8_t {
   GETNUMKEYS,
   WATCH_KEY,
   DELETE_KEY,
+  DELETE_P2P_KEYS
 };
 
 enum class CheckResponseType : uint8_t { READY, NOT_READY };
 
 enum class WaitResponseType : uint8_t { STOP_WAITING };
+
+bool isPairP2PKey(const std::string& key) {
+  int state = 0;
+  for (auto it = key.crbegin(); it != key.crend(); ++it) {
+    auto& ch = *it;
+    if (ch == '/') {
+      break;
+    }
+    if (state == 0) {
+      if (std::isdigit(static_cast<unsigned char>(ch))) {
+        continue;
+      } else if (ch == ':') {
+        state = 1;
+      } else {
+        return false;
+      }
+    } else if (state == 1) {
+      if (std::isdigit(static_cast<unsigned char>(ch))) {
+        state = 2;
+      } else {
+        return false;
+      }
+    }
+  }
+  return (state == 2);
+}
 
 } // anonymous namespace
 
@@ -305,6 +333,9 @@ void TCPStoreMasterDaemon::query(int socket) {
   } else if (qt == QueryType::DELETE_KEY) {
     deleteHandler(socket);
 
+  } else if (qt == QueryType::DELETE_P2P_KEYS) {
+    deleteP2PHandler(socket);
+
   } else if (qt == QueryType::WATCH_KEY) {
     watchHandler(socket);
 
@@ -441,6 +472,24 @@ void TCPStoreMasterDaemon::deleteHandler(int socket) {
   }
   auto numDeleted = tcpStore_.erase(key);
   tcputil::sendValue<int64_t>(socket, numDeleted);
+}
+
+void TCPStoreMasterDaemon::deleteP2PHandler(int socket) {
+  std::vector<std::string> needs_removing;
+  for (auto&& pair : tcpStore_) {
+    if (isPairP2PKey(pair.first)) {
+      needs_removing.push_back(pair.first);
+    }
+  }
+  for (auto&& key : needs_removing) {
+    std::vector<uint8_t> oldData = tcpStore_[key];
+    // Send key update to all watching clients
+    std::vector<uint8_t> newData;
+    sendKeyUpdatesToClients(
+        key, WatchResponseType::KEY_DELETED, oldData, newData);
+    tcpStore_.erase(key);
+  }
+  tcputil::sendValue<int64_t>(socket, needs_removing.size());
 }
 
 void TCPStoreMasterDaemon::checkHandler(int socket) const {
@@ -725,6 +774,12 @@ bool TCPStore::deleteKey(const std::string& key) {
   return (numDeleted == 1);
 }
 
+bool TCPStore::deleteP2PKeys() {
+  tcputil::sendValue<QueryType>(storeSocket_, QueryType::DELETE_P2P_KEYS);
+  auto numDeleted = tcputil::recvValue<int64_t>(storeSocket_);
+  return true;
+}
+
 void TCPStore::watchKey(const std::string& key, WatchKeyCallback callback) {
   // Only allow one thread to perform watchKey() at a time
   const std::lock_guard<std::mutex> watchKeyLock(watchKeyMutex_);
@@ -791,12 +846,11 @@ void TCPStore::waitHelper_(
   // Set the socket timeout if there is a wait timeout
   if (timeout != kNoTimeout) {
 #ifdef _WIN32
-    struct timeval timeoutTV = {
-        timeout.count() / 1000, (timeout.count() % 1000) * 1000};
+    struct timeval timeoutTV = {timeout.count() / 1000,
+                                (timeout.count() % 1000) * 1000};
 #else
-    struct timeval timeoutTV = {
-        .tv_sec = timeout.count() / 1000,
-        .tv_usec = (timeout.count() % 1000) * 1000};
+    struct timeval timeoutTV = {.tv_sec = timeout.count() / 1000,
+                                .tv_usec = (timeout.count() % 1000) * 1000};
 #endif
     SYSCHECK_ERR_RETURN_NEG1(::setsockopt(
         storeSocket_,

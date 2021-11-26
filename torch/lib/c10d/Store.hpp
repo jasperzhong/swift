@@ -46,6 +46,8 @@ class Store : public torch::CustomClassHolder {
 
   virtual bool deleteKey(const std::string& key) = 0;
 
+  virtual bool deleteP2PKeys();
+
   virtual bool check(const std::vector<std::string>& keys) = 0;
 
   virtual int64_t getNumKeys() = 0;
