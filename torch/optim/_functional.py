@@ -180,6 +180,39 @@ def sgd(params: List[Tensor],
         param.add_(d_p, alpha=-lr)
 
 
+def undo_sgd(params: List[Tensor],
+             d_p_list: List[Tensor],
+             momentum_buffer_list: List[Optional[Tensor]],
+             *,
+             weight_decay: float,
+             momentum: float,
+             lr: float,
+             dampening: float,
+             nesterov: bool):
+    r"""Functional API that performs SGD algorithm computation.
+
+    See :class:`~torch.optim.SGD` for details.
+    """
+
+    for i, param in enumerate(params):
+
+        d_p = d_p_list[i]
+
+        if momentum != 0:
+            buf = momentum_buffer_list[i]
+
+            if nesterov:
+                param.add_(d_p, alpha=lr)
+                d_p.add_(buf, alpha=-momentum)
+            else:
+                param.add_(buf, alpha=lr)
+
+            buf.add_(d_p, alpha=dampening - 1).div_(momentum)
+        else:
+            param.add_(d_p, alpha=lr)
+
+
+
 def adadelta(params: List[Tensor],
              grads: List[Tensor],
              square_avgs: List[Tensor],

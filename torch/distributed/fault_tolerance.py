@@ -25,6 +25,7 @@ def run(func):
                 _failure_handler()
     return wrapper
 
+
 class _AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(_AttrDict, self).__init__(*args, dict(sorted(kwargs.items())))
@@ -36,16 +37,22 @@ class State(_AttrDict):
         super(State, self).__init__(*args, **kwargs)
 
     def sync(self):
+        need_undo = False
         for k, v in self.items():
             if isinstance(v, torch.nn.Module):
                 self._model_parameters_sync_handler(k, v)
             elif isinstance(v, torch.optim.Optimizer):
                 self._optimizer_state_sync_handler(k, v)
             elif isinstance(v, int):
-                self._timestamp_sync_handler(k, v)
+                need_undo = self._timestamp_sync_handler(k, v)
             else:
                 raise ValueError(f"type {type(v)} of key({k}) is not recognized!")
 
+        if need_undo:
+            print("undo update is needed!")
+            for k, v in self.items():
+                if isinstance(v, torch.optim.Optimizer):
+                    v.undo()
 
     def _model_parameters_sync_handler(self, k, v):
         broadcast_parameters(v.state_dict(), 0)
@@ -72,10 +79,10 @@ class State(_AttrDict):
 
         consensus_value = self._make_consensus(values)
         self[k] = consensus_value
+        return consensus_value == v - 1
 
     def _make_consensus(self, values):
         max_v = max(values)
         if max_v - 1 in values:
             return max_v - 1
         return max_v
-

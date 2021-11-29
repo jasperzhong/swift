@@ -135,6 +135,9 @@ class _DistributedOptimizer(torch.optim.Optimizer):
             self.synchronize()
         return super(self.__class__, self).step(closure)
 
+    def undo(self):
+        return super(self.__class__, self).undo()
+
 
 def DistributedOptimizer(optimizer, named_parameters=None,
                          backward_passes_per_step=1):
