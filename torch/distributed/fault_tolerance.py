@@ -44,9 +44,10 @@ class State(_AttrDict):
             elif isinstance(v, torch.optim.Optimizer):
                 self._optimizer_state_sync_handler(k, v)
             elif isinstance(v, int):
-                need_undo = self._timestamp_sync_handler(k, v)
-                if need_undo:
+                ret = self._timestamp_sync_handler(k, v)
+                if ret:
                     print(f"[Rank {get_rank()}] undo update is needed ({k} = {v} while the consensus value is {v-1})!")
+                    need_undo = True
             else:
                 raise ValueError(f"type {type(v)} of key({k}) is not recognized!")
 
