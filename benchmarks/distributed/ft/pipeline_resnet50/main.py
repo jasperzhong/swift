@@ -1,4 +1,5 @@
 import argparse
+import time
 import os
 import random
 import sys
@@ -80,15 +81,17 @@ def train(state, args, data_iterator, model, optimizer, loss_func):
                 continue
 
             try:
+                start = time.time()
                 optimizer.zero_grad()
                 loss = pipedream_flush_schedule(
                     data_iterator, model, loss_func)
                 optimizer.step()
+                iteration_time = time.time() - start
 
                 iteration += 1
                 if is_pipeline_last_stage() and iteration % args.print_freq == 0:
-                    print("[Epoch {}/Iteration {}] loss: {:.2f}".format(
-                        epoch, iteration, loss
+                    print("[Epoch {}/Iteration {}] loss: {:.4f} Throughput: {:.2f}".format(
+                        epoch, iteration, loss, args.global_batch_size / (iteration_time)
                     ))
 
                 if iteration == args.benchmark_iters:
@@ -104,6 +107,7 @@ def main():
     initialize_global_args(args)
 
     torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.deterministic = True
 
     args.world_size = int(os.environ['WORLD_SIZE'])
     args.rank = int(os.environ['RANK'])
