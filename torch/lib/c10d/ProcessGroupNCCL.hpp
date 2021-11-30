@@ -554,6 +554,8 @@ class ProcessGroupNCCL : public ProcessGroup {
   static thread_local uint64_t ncclActiveGroupCounter_;
 
   bool hasInitFailureFlag_ = false;
+
+  std::mutex store_mutex_;
 };
 
 } // namespace c10d
