@@ -1,20 +1,19 @@
 import argparse
-import time
 import os
 import random
 import sys
+import time
 
 import numpy as np
+from model import PipelineParallelResNet50
+from schedule import (initialize_global_args, is_pipeline_first_stage,
+                      is_pipeline_last_stage, pipedream_flush_schedule)
+from torchvision import datasets, transforms
+
 import torch
+import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms
-import torch.distributed.fault_tolerance
-
-
-from model import PipelineParallelResNet50
-from schedule import (initialize_global_args, is_pipeline_last_stage,
-                      pipedream_flush_schedule)
 
 parser = argparse.ArgumentParser(
     description='Pipeline Parallel ResNet50 Arguments')
@@ -77,6 +76,8 @@ def train(state, args, data_iterator, model, optimizer, loss_func):
         iteration = 0
         while True:
             if iteration < state.iteration:
+                if is_pipeline_first_stage() or is_pipeline_last_stage():
+                    next(data_iterator)
                 iteration += 1
                 continue
 
