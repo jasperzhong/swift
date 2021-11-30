@@ -60,7 +60,7 @@ class State(_AttrDict):
         broadcast_parameters(v.state_dict(), 0)
 
     def _optimizer_state_sync_handler(self, k, v):
-        if isinstance(v, "DistributedOptimizer"): 
+        if type(v).__name__ == "DistributedOptimizer":
             v.clear()
             broadcast_optimizer_state(v, 0)
 
