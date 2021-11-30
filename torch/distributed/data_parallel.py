@@ -174,7 +174,7 @@ def DistributedOptimizer(optimizer, named_parameters=None,
     """
     # We dynamically create a new class that inherits from the optimizer that was passed in.
     # The goal is to override the `step()` method with an all_reduce implementation.
-    cls = type(optimizer.__class__.__name__, (optimizer.__class__,),
+    cls = type("DistributedOptimizer", (optimizer.__class__,),
                dict(_DistributedOptimizer.__dict__))
     return cls(optimizer.param_groups, named_parameters,
                backward_passes_per_step)

@@ -131,7 +131,7 @@ def main():
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     loss_func = nn.CrossEntropyLoss().cuda()
 
-    state = torch.distributed.fault_tolerance.State(epoch=0, iteration=0)
+    state = torch.distributed.fault_tolerance.State(epoch=0, iteration=0, optimizer=optimizer)
     train(state, args, data_iterator, model, optimizer, loss_func)
 
 

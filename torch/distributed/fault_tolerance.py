@@ -60,9 +60,9 @@ class State(_AttrDict):
         broadcast_parameters(v.state_dict(), 0)
 
     def _optimizer_state_sync_handler(self, k, v):
-        if hasattr(v, "clear") and callable(getattr(v, "clear")):
+        if isinstance(v, "DistributedOptimizer"): 
             v.clear()
-        broadcast_optimizer_state(v, 0)
+            broadcast_optimizer_state(v, 0)
 
     def _timestamp_sync_handler(self, k, v):
         tensor = torch.LongTensor(3).cuda()
