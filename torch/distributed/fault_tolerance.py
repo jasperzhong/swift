@@ -4,15 +4,15 @@ import hashlib
 import pyarrow.plasma as plasma
 
 import torch
+import torch.distributed.distributed_c10d as distributed_c10d
 import torch.nn
 import torch.optim
 from torch._C._distributed_c10d import SwiftInternalError
 
 from .data_parallel import (_DistributedOptimizer, broadcast_optimizer_state,
                             broadcast_parameters)
-import distributed_c10d
-from .distributed_c10d import (_failure_handler, all_gather,
-                               get_rank, get_world_size)
+from .distributed_c10d import (_failure_handler, all_gather, get_rank,
+                               get_world_size)
 
 
 def run(logging=False):
