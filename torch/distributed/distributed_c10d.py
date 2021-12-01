@@ -65,6 +65,8 @@ _logging_client = None
 
 _logging_queue = []
 
+_logging_cnt = 0
+
 # Some reduce ops are not supported by complex numbers and will result in an error.
 # We currently provide complex support to the distributed API by viewing
 # complex tensors as real (torch.view_as_real), meaning that calling
@@ -2811,6 +2813,7 @@ def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=N
 def stash(tensor):
     """stash the tensor into in-memory store
     """
+    global _logging_cnt
     if not torch.is_tensor(tensor):
         raise ValueError("stash() only accepts a tensor as input")
 
@@ -2825,7 +2828,9 @@ def stash(tensor):
 
     tensor_np = tensor_cpu.detach().numpy()
     tensor_pa = pa.Tensor.from_numpy(tensor_np)
-    object_id = plasma.ObjectID(np.random.bytes(20))
+    unique_id = _logging_cnt * get_world_size() + get_rank()
+    object_id = plasma.ObjectID(unique_id.to_bytes(20, byteorder='little'))
+    _logging_cnt += 1
     data_size = pa.ipc.get_tensor_size(tensor_pa)
     try:
         buf = _logging_client.create(object_id, data_size)
