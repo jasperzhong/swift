@@ -44,7 +44,11 @@ parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
+parser.add_argument('--logging', default=False, action="store_true",
+                    help='whether to enable logging.')
 
+args = parser.parse_args()
+initialize_global_args(args)
 
 def get_data_iterator(args):
     traindir = os.path.join(args.data, 'train')
@@ -68,7 +72,7 @@ def get_data_iterator(args):
     return data_iterator
 
 
-@torch.distributed.fault_tolerance.run
+@torch.distributed.fault_tolerance.run(logging=args.logging)
 def train(state, args, data_iterator, model, optimizer, loss_func):
     print("start from epoch={} iter={}".format(state.epoch, state.iteration))
     for epoch in range(state.epoch, args.epochs):
@@ -104,9 +108,6 @@ def train(state, args, data_iterator, model, optimizer, loss_func):
 
 
 def main():
-    args = parser.parse_args()
-    initialize_global_args(args)
-
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.deterministic = True
 
