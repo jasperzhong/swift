@@ -2814,8 +2814,6 @@ def stash(tensor):
     if not torch.is_tensor(tensor):
         raise ValueError("stash() only accepts a tensor as input")
 
-    print("enter stash")
-
     tensor_cpu = None
     if tensor.is_cuda:
         tensor_cpu = torch.empty_like(tensor, device="cpu", pin_memory=True)
@@ -2825,7 +2823,7 @@ def stash(tensor):
     else:
         tensor_cpu = tensor
 
-    tensor_np = tensor_cpu.numpy()
+    tensor_np = tensor_cpu.detach().numpy()
     tensor_pa = pa.Tensor.from_numpy(tensor_np)
     object_id = plasma.ObjectID(np.random.bytes(20))
     data_size = pa.ipc.get_tensor_size(tensor_pa)
