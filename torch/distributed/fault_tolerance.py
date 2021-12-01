@@ -10,15 +10,17 @@ from torch._C._distributed_c10d import SwiftInternalError
 
 from .data_parallel import (_DistributedOptimizer, broadcast_optimizer_state,
                             broadcast_parameters)
-from .distributed_c10d import (_failure_handler, _logging, _logging_client, all_gather,
+from .distributed_c10d import (_failure_handler, _logging, _logging_client, _logging_stream, all_gather,
                                get_rank, get_world_size)
 
 
 def run(logging=False):
     global _logging
     global _logging_client
+    global _logging_stream
     _logging = logging
     _logging_client = plasma.connect("/tmp/plasma")
+    _logging_stream = torch.cuda.Stream()
 
     def f(func):
         @functools.wraps(func)

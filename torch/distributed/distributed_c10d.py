@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 # whether to perform logging
 _logging = False
 
-_logging_stream = torch.cuda.Stream()
+_logging_stream = None
 
 _logging_client = None
 
