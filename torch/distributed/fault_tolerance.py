@@ -20,6 +20,7 @@ def run(logging=False):
     global _logging_stream
     _logging = logging
     _logging_client = plasma.connect("/tmp/plasma")
+    print(f"create logging stream on device {torch.cuda.current_device()}")
     _logging_stream = torch.cuda.Stream()
 
     def f(func):
