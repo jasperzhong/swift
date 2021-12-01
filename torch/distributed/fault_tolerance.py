@@ -10,23 +10,21 @@ from torch._C._distributed_c10d import SwiftInternalError
 
 from .data_parallel import (_DistributedOptimizer, broadcast_optimizer_state,
                             broadcast_parameters)
-from .distributed_c10d import (_failure_handler, _logging, _logging_client, _logging_stream, all_gather,
+import distributed_c10d
+from .distributed_c10d import (_failure_handler, all_gather,
                                get_rank, get_world_size)
 
 
 def run(logging=False):
-    global _logging
-    global _logging_client
-    global _logging_stream
-    _logging = logging
+    distributed_c10d._logging = logging
 
     def f(func):
         @functools.wraps(func)
         def wrapper(state, *args, **kwargs):
-            if _logging:
+            if distributed_c10d._logging:
                 print(f"enable logging on device {torch.cuda.current_device()}")
-                _logging_client = plasma.connect("/tmp/plasma")
-                _logging_stream = torch.cuda.Stream()
+                distributed_c10d._logging_client = plasma.connect("/tmp/plasma")
+                distributed_c10d._logging_stream = torch.cuda.Stream()
 
             while True:
                 try:
