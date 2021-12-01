@@ -20,12 +20,14 @@ def run(logging=False):
     global _logging_stream
     _logging = logging
     _logging_client = plasma.connect("/tmp/plasma")
-    print(f"create logging stream on device {torch.cuda.current_device()}")
-    _logging_stream = torch.cuda.Stream()
 
     def f(func):
         @functools.wraps(func)
         def wrapper(state, *args, **kwargs):
+            if _logging:
+                print(f"enable logging on device {torch.cuda.current_device()}")
+                _logging_stream = torch.cuda.Stream()
+
             while True:
                 try:
                     if state:
