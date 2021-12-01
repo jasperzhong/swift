@@ -25,6 +25,7 @@ def run(func):
                 _failure_handler()
     return wrapper
 
+
 class _AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(_AttrDict, self).__init__(*args, dict(sorted(kwargs.items())))
@@ -36,24 +37,32 @@ class State(_AttrDict):
         super(State, self).__init__(*args, **kwargs)
 
     def sync(self):
+        need_undo = False
         for k, v in self.items():
             if isinstance(v, torch.nn.Module):
                 self._model_parameters_sync_handler(k, v)
             elif isinstance(v, torch.optim.Optimizer):
                 self._optimizer_state_sync_handler(k, v)
             elif isinstance(v, int):
-                self._timestamp_sync_handler(k, v)
+                ret = self._timestamp_sync_handler(k, v)
+                if ret:
+                    print(f"[Rank {get_rank()}] undo update is needed ({k} = {v} while the consensus value is {v-1})!")
+                    need_undo = True
             else:
                 raise ValueError(f"type {type(v)} of key({k}) is not recognized!")
 
+        if need_undo:
+            for k, v in self.items():
+                if isinstance(v, torch.optim.Optimizer):
+                    v.undo()
 
     def _model_parameters_sync_handler(self, k, v):
         broadcast_parameters(v.state_dict(), 0)
 
     def _optimizer_state_sync_handler(self, k, v):
-        if hasattr(v, "clear") and callable(getattr(v, "clear")):
+        if type(v).__name__ == "DistributedOptimizer":
             v.clear()
-        broadcast_optimizer_state(v, 0)
+            broadcast_optimizer_state(v, 0)
 
     def _timestamp_sync_handler(self, k, v):
         tensor = torch.LongTensor(3).cuda()
@@ -72,10 +81,10 @@ class State(_AttrDict):
 
         consensus_value = self._make_consensus(values)
         self[k] = consensus_value
+        return consensus_value == v - 1
 
     def _make_consensus(self, values):
         max_v = max(values)
         if max_v - 1 in values:
             return max_v - 1
         return max_v
-

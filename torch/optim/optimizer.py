@@ -228,6 +228,19 @@ class Optimizer(object):
         """
         raise NotImplementedError
 
+    def undo(self):
+        r"""Undo update
+
+        Args:
+            closure (callable): A closure that reevaluates the model and
+                returns the loss. Optional for most optimizers.
+
+        .. note::
+            Unless otherwise specified, this function should not modify the
+            parameters and optimizer states.
+        """
+        raise NotImplementedError
+
     def add_param_group(self, param_group):
         r"""Add a param group to the :class:`Optimizer` s `param_groups`.
 
