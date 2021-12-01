@@ -8,6 +8,10 @@ import warnings
 from datetime import timedelta
 from typing import Dict, Optional, Tuple, Union
 
+import numpy as np
+import pyarrow as pa
+import pyarrow.plasma as plasma
+
 import torch
 import torch.nn
 from torch._C._distributed_c10d import (AllreduceCoalescedOptions,
@@ -24,7 +28,6 @@ from .rendezvous import register_rendezvous_handler, rendezvous  # noqa: F401
 
 # This module is wildcard imported from torch.distributed.
 # TODO: specify __all__
-
 
 
 _MPI_AVAILABLE = True
@@ -52,6 +55,14 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# whether to perform logging
+_logging = False
+
+_logging_stream = torch.cuda.Stream()
+
+_logging_client = None
+
+_logging_queue = []
 
 # Some reduce ops are not supported by complex numbers and will result in an error.
 # We currently provide complex support to the distributed API by viewing
@@ -60,6 +71,8 @@ logger = logging.getLogger(__name__)
 # (e.g. max(2+3i, 3+2i) = 3+3i)
 # We'd like calls to unsupported ops to error out accordingly,
 # rather than returning garbage values.
+
+
 def supports_complex(reduceOp: ReduceOp) -> bool:
     denyList = [ReduceOp.MAX, ReduceOp.MIN, ReduceOp.PRODUCT,
                 ReduceOp.BAND, ReduceOp.BOR, ReduceOp.BXOR]
@@ -86,7 +99,6 @@ def _failure_handler():
 
     # wait for restarted workers to initialize CUDA runtime
     time.sleep(7)
-
 
 
 class Backend(object):
@@ -811,9 +823,15 @@ def isend(tensor,
         None, if not part of the group
 
     """
+    global _logging
+    global _logging_queue
+
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return
+
+    if _logging:
+        _logging_queue.append(tensor)
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
@@ -843,6 +861,9 @@ def irecv(tensor,
         None, if not part of the group
 
     """
+    global _logging
+    global _logging_queue
+
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return
@@ -851,6 +872,12 @@ def irecv(tensor,
         pg = _get_default_group()
     else:
         pg = group
+
+    if _logging and _logging_queue:
+        for tensor in _logging_queue:
+            stash(tensor)
+
+        _logging_queue.clear()
 
     if src is None:
         return pg.recv_anysource([tensor], tag)
@@ -877,9 +904,15 @@ def send(tensor,
         tag (int, optional): Tag to match send with remote recv
 
     """
+    global _logging
+    global _logging_queue
+
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return
+
+    if _logging:
+        _logging_queue.append(tensor)
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
@@ -909,6 +942,9 @@ def recv(tensor,
         -1, if not part of the group
 
     """
+    global _logging
+    global _logging_queue
+
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return -1
@@ -917,6 +953,12 @@ def recv(tensor,
         pg = _get_default_group()
     else:
         pg = group
+
+    if _logging and _logging_queue:
+        for tensor in _logging_queue:
+            stash(tensor)
+
+        _logging_queue.clear()
 
     if src is None:
         work = pg.recv_anysource([tensor], tag)
@@ -2769,3 +2811,28 @@ def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=N
             pg._set_sequence_number_for_group()
 
     return pg
+
+
+def stash(tensor):
+    """stash the tensor into in-memory store
+    """
+    if not torch.is_tensor(tensor):
+        raise ValueError("stash() only accepts a tensor as input")
+
+    tensor_cpu = None
+    if tensor.is_cuda:
+        tensor_cpu = torch.empty_like(tensor, device="cpu", pin_memory=True)
+        _logging_stream.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(_logging_stream):
+            tensor_cpu.copy_(tensor, non_blocking=True)
+    else:
+        tensor_cpu = tensor
+
+    tensor_np = tensor_cpu.numpy()
+    tensor_pa = pa.Tensor.from_numpy(tensor_np)
+    object_id = plasma.ObjectID(np.random.bytes(20))
+    data_size = pa.ipc.get_tensor_size(tensor_pa)
+    buf = _logging_client.create(object_id, data_size)
+    stream = pa.FixedSizeBufferWriter(buf)
+    pa.ipc.write_tensor(tensor, stream)
+    _logging_client.seal(object_id)
