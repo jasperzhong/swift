@@ -2814,6 +2814,8 @@ def stash(tensor):
     if not torch.is_tensor(tensor):
         raise ValueError("stash() only accepts a tensor as input")
 
+    print("enter stash")
+
     tensor_cpu = None
     if tensor.is_cuda:
         tensor_cpu = torch.empty_like(tensor, device="cpu", pin_memory=True)
