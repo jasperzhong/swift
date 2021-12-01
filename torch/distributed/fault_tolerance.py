@@ -35,6 +35,7 @@ def run(logging=False):
                     print("catch an error: " + str(e))
                     _failure_handler()
         return wrapper
+    return f
 
 
 class _AttrDict(dict):
