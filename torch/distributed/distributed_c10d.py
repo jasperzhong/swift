@@ -2834,6 +2834,6 @@ def stash(tensor):
         return False
 
     stream = pa.FixedSizeBufferWriter(buf)
-    pa.ipc.write_tensor(tensor, stream)
+    pa.ipc.write_tensor(tensor_pa, stream)
     _logging_client.seal(object_id)
     return True
