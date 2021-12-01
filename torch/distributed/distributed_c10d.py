@@ -11,6 +11,7 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import pyarrow as pa
 import pyarrow.plasma as plasma
+from pyarrow.plasma import PlasmaStoreFull
 
 import torch
 import torch.nn
@@ -874,10 +875,7 @@ def irecv(tensor,
         pg = group
 
     if _logging and _logging_queue:
-        for tensor in _logging_queue:
-            stash(tensor)
-
-        _logging_queue.clear()
+        _logging_queue = [tensor for tensor in _logging_queue if not stash(tensor)]
 
     if src is None:
         return pg.recv_anysource([tensor], tag)
@@ -955,10 +953,7 @@ def recv(tensor,
         pg = group
 
     if _logging and _logging_queue:
-        for tensor in _logging_queue:
-            stash(tensor)
-
-        _logging_queue.clear()
+        _logging_queue = [tensor for tensor in _logging_queue if not stash(tensor)]
 
     if src is None:
         work = pg.recv_anysource([tensor], tag)
@@ -2832,7 +2827,13 @@ def stash(tensor):
     tensor_pa = pa.Tensor.from_numpy(tensor_np)
     object_id = plasma.ObjectID(np.random.bytes(20))
     data_size = pa.ipc.get_tensor_size(tensor_pa)
-    buf = _logging_client.create(object_id, data_size)
+    try:
+        buf = _logging_client.create(object_id, data_size)
+    except PlasmaStoreFull:
+        logger.warn("Plasma store is full!")
+        return False
+
     stream = pa.FixedSizeBufferWriter(buf)
     pa.ipc.write_tensor(tensor, stream)
     _logging_client.seal(object_id)
+    return True
