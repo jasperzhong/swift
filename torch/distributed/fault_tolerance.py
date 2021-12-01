@@ -1,5 +1,7 @@
-import hashlib
 import functools
+import hashlib
+
+import pyarrow.plasma as plasma
 
 import torch
 import torch.nn
@@ -8,22 +10,29 @@ from torch._C._distributed_c10d import SwiftInternalError
 
 from .data_parallel import (_DistributedOptimizer, broadcast_optimizer_state,
                             broadcast_parameters)
-from .distributed_c10d import _failure_handler, all_gather, get_rank, get_world_size
+from .distributed_c10d import (_failure_handler, _logging, _logging_client, all_gather,
+                               get_rank, get_world_size)
 
 
-def run(func):
-    @functools.wraps(func)
-    def wrapper(state, *args, **kwargs):
-        while True:
-            try:
-                if state:
-                    state.sync()
+def run(logging=False):
+    global _logging
+    global _logging_client
+    _logging = logging
+    _logging_client = plasma.connect("/tmp/plasma")
 
-                return func(state, *args, **kwargs)
-            except SwiftInternalError as e:
-                print("catch an error: " + str(e))
-                _failure_handler()
-    return wrapper
+    def f(func):
+        @functools.wraps(func)
+        def wrapper(state, *args, **kwargs):
+            while True:
+                try:
+                    if state:
+                        state.sync()
+
+                    return func(state, *args, **kwargs)
+                except SwiftInternalError as e:
+                    print("catch an error: " + str(e))
+                    _failure_handler()
+        return wrapper
 
 
 class _AttrDict(dict):
