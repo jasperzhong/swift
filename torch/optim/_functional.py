@@ -6,6 +6,7 @@ from typing import List, Optional
 
 # TODO: use foreach API in optim._functional to do all the computation
 
+
 def _make_sparse(grad, grad_indices, values):
     size = grad.size()
     if grad_indices.numel() == 0 or values.numel() == 0:
@@ -202,15 +203,14 @@ def undo_sgd(params: List[Tensor],
             buf = momentum_buffer_list[i]
 
             if nesterov:
-                param.add_(d_p, alpha=lr)
-                d_p.add_(buf, alpha=-momentum)
+                param.add_(d_p.add(buf, alpha=momentum), alpha=lr).div_(1 - lr * weight_decay)
             else:
                 param.add_(buf, alpha=lr)
 
+            d_p = d_p.add(param, alpha=weight_decay)
             buf.add_(d_p, alpha=dampening - 1).div_(momentum)
         else:
-            param.add_(d_p, alpha=lr)
-
+            param.add_(d_p, alpha=lr).div_(1 - lr * weight_decay)
 
 
 def adadelta(params: List[Tensor],
