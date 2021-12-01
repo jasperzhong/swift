@@ -15,7 +15,10 @@ import torch
 import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributed.fault_tolerance import FaultToleranceConfig, fault_tolerance_train
+from torch.distributed.fault_tolerance import (FaultToleranceConfig,
+                                               fault_tolerance_train)
+
+logging.basicConfig(level=logging.INFO)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -50,6 +53,8 @@ parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
 parser.add_argument('--logging', default=False, action="store_true",
                     help='whether to enable logging.')
+parser.add_argument('--parallel-recovery', default=False, action="store_true",
+                    help='whether to enable parallel recovery.')
 parser.add_argument('--logging-chunk-freq', type=int,
                     default=10, help='chunk logging files every N iterations.')
 parser.add_argument('--logging-compression', default=None, type=str,
@@ -129,8 +134,24 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = get_data_loader(args)
-    model = PipelineParallelResNet50(balance=[4, 2, 2, 3])
+    model = PipelineParallelResNet50(rank=args.rank, balance=[4, 2, 2, 3])
     model.cuda()
+
+    def hook_fn_forward(m, x, y):
+        def _dfs(tensors):
+            checksum = 0
+            if isinstance(tensors, tuple):
+                for t in tensors:
+                    checksum += _dfs(t)
+            elif isinstance(tensors, torch.cuda.FloatTensor):
+                checksum = torch.sum(tensors)
+            return checksum
+
+        input_checksum = _dfs(x)
+        output_checksum = _dfs(y)
+
+        with open("debug_forward_module.log", "a") as f:
+            f.write(f"{m._get_name()} {input_checksum} {output_checksum}\n")
 
     def hook_fn_backward(m, grad_input, grad_output):
         def _dfs(grad_input):
@@ -145,13 +166,14 @@ def main():
         grad_input_checksum = _dfs(grad_input)
         grad_output_checksum = _dfs(grad_output)
 
-        with open("debug_backward.log", "a") as f:
+        with open("debug_backward_module.log", "a") as f:
             f.write(f"{m._get_name()} {grad_input_checksum} {grad_output_checksum}\n")
 
     def dfs(module):
         for m in module.children():
             if len(list(m.children())) == 0:
                 m.register_backward_hook(hook_fn_backward)
+                m.register_forward_hook(hook_fn_forward)
             else:
                 dfs(m)
 
@@ -161,9 +183,9 @@ def main():
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
-        num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, checkpoint_interval=100,
-        replica=False, logging=args.logging, logging_compression=args.logging_compression,
-        logging_chunk_freq=args.logging_chunk_freq,
+        num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
+        checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
+        logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )

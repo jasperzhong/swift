@@ -1,8 +1,9 @@
 r"""Functional interface"""
 import math
+from typing import List, Optional
+
 import torch
 from torch import Tensor
-from typing import List, Optional
 
 # TODO: use foreach API in optim._functional to do all the computation
 
@@ -265,21 +266,32 @@ def undo_sgd(params: List[Tensor],
     """
 
     for i, param in enumerate(params):
+        original_dtype = param.dtype
+        param = param.cpu().double()
 
         d_p = d_p_list[i]
+        d_p = d_p.cpu().double()
 
         if momentum != 0:
             buf = momentum_buffer_list[i]
+            buf = buf.cpu().double()
 
             if nesterov:
                 param.add_(d_p.add(buf, alpha=momentum), alpha=lr).div_(1 - lr * weight_decay)
             else:
                 param.add_(buf, alpha=lr)
 
-            d_p = d_p.add(param, alpha=weight_decay)
-            buf.add_(d_p, alpha=dampening - 1).div_(momentum)
+            if weight_decay != 0:
+                d_p = d_p.add(param, alpha=weight_decay)
+
+            m = torch.empty_like(buf).fill_(momentum)
+            buf.add_(d_p, alpha=dampening - 1).div_(m)
+
+            momentum_buffer_list[i].copy_(buf.type(original_dtype))
         else:
             param.add_(d_p, alpha=lr).div_(1 - lr * weight_decay)
+
+        params[i].copy_(param.type(original_dtype))
 
 
 def adadelta(params: List[Tensor],

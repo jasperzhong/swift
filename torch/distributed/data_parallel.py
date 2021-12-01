@@ -29,7 +29,7 @@ from .distributed_c10d import all_reduce, broadcast, get_rank, get_world_size
 
 class _DistributedOptimizer(torch.optim.Optimizer):
     def __init__(self, params, named_parameters,
-                 backward_passes_per_step=1):
+                 backward_passes_per_step=1, comm_group=None, average=True):
         super(self.__class__, self).__init__(params)
 
         if named_parameters is not None:
@@ -38,15 +38,21 @@ class _DistributedOptimizer(torch.optim.Optimizer):
             named_parameters = []
 
         self.backward_passes_per_step = backward_passes_per_step
+        self.comm_group = comm_group
         self._all_reduce_delay = {v: self.backward_passes_per_step
                                   for _, v in sorted(named_parameters)}
         self._handles = {}
         self._grad_accs = []
         self._requires_update = set()
         self._should_sync = True
-        self._size = get_world_size()
+        self._size = get_world_size(comm_group)
+        self._hook_handles = []
+        self._average = average
         if self._size > 1:
+            print(f"DistributedOptimizer registers hooks when size = {self._size} ")
             self._register_hooks()
+        else:
+            print("there is no need to register hooks when world size == 1")
 
     @staticmethod
     def find_duplicates(lst):
@@ -71,13 +77,15 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                     self._requires_update.add(p)
                     p_tmp = p.expand_as(p)
                     grad_acc = p_tmp.grad_fn.next_functions[0][0]
-                    grad_acc.register_hook(self._make_hook(p))
+                    handle = grad_acc.register_hook(self._make_hook(p))
+                    self._hook_handles.append(handle)
                     self._grad_accs.append(grad_acc)
 
     def _all_reduce_grad_async(self, p):
         tensor = p.grad
-        tensor /= self._size
-        handle = all_reduce(tensor, async_op=True)
+        if self._average:
+            tensor /= self._size
+        handle = all_reduce(tensor, async_op=True, group=self.comm_group)
         return handle
 
     def _make_hook(self, p):
@@ -138,9 +146,18 @@ class _DistributedOptimizer(torch.optim.Optimizer):
     def undo(self):
         return super(self.__class__, self).undo()
 
+    def state_dict(self):
+        return super(self.__class__, self).state_dict()
+
+    def remove_hooks(self):
+        # remove all handles
+        for handle in self._hook_handles:
+            handle.remove()
+        print("hook handles removed")
+
 
 def DistributedOptimizer(optimizer, named_parameters=None,
-                         backward_passes_per_step=1):
+                         backward_passes_per_step=1, comm_group=None, average=True):
     """
     An optimizer that wraps another torch.optim.Optimizer, using an all_reduce to
     average gradient values before applying gradients to model weights.
@@ -171,16 +188,18 @@ def DistributedOptimizer(optimizer, named_parameters=None,
                                   allows accumulating gradients over multiple
                                   mini-batches before executing averaging and
                                   applying them.
+        comm_group: communication group 
+        average: average the gradient
     """
     # We dynamically create a new class that inherits from the optimizer that was passed in.
     # The goal is to override the `step()` method with an all_reduce implementation.
     cls = type("DistributedOptimizer", (optimizer.__class__,),
                dict(_DistributedOptimizer.__dict__))
     return cls(optimizer.param_groups, named_parameters,
-               backward_passes_per_step)
+               backward_passes_per_step, comm_group, average)
 
 
-def broadcast_parameters(params, root_rank):
+def broadcast_parameters(params, root_rank, comm_group=None):
     """
       Broadcasts the parameters from root rank to all other processes.
       Typical usage is to broadcast the `model.state_dict()`,
@@ -202,10 +221,10 @@ def broadcast_parameters(params, root_rank):
 
     # Run synchronous broadcasts.
     for name, p in params:
-        broadcast(p, 0)
+        broadcast(p, root_rank, group=comm_group)
 
 
-def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter."):
+def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", comm_group=None):
     """
     Broadcasts an optimizer state from root rank to all other processes.
     Arguments:
@@ -322,15 +341,15 @@ def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter."):
                     callbacks[key] = _create_state_callback(pid, name)
 
     # Synchronized broadcast of all parameters
-    broadcast_parameters(params, root_rank)
+    # broadcast_parameters(params, root_rank, comm_group=comm_group)
 
     # Broadcast and cleanup for non-tensor parameters
-    scalars = broadcast_object(scalars, root_rank)
-    for key, p in scalars.items():
-        callbacks[key](p)
+    # scalars = broadcast_object(scalars, root_rank, comm_group=comm_group)
+    # for key, p in scalars.items():
+    #     callbacks[key](p)
 
 
-def broadcast_object(obj, root_rank=0, name=None):
+def broadcast_object(obj, root_rank=0, name=None, comm_group=None):
     """
     Serializes and broadcasts an object from root rank to all other processes.
     Typical usage is to broadcast the `optimizer.state_dict()`, for example:
@@ -350,20 +369,20 @@ def broadcast_object(obj, root_rank=0, name=None):
     if name is None:
         name = type(obj).__name__
 
-    if get_rank() == root_rank:
+    if get_rank(comm_group) == root_rank:
         b = io.BytesIO()
         cloudpickle.dump(obj, b)
         t = torch.ByteTensor(bytearray(b.getvalue())).cuda()
         sz = torch.IntTensor([t.shape[0]]).cuda()
-        broadcast_parameters([(name + '.sz', sz)], root_rank)
+        broadcast_parameters([(name + '.sz', sz)], root_rank, comm_group=comm_group)
     else:
         sz = torch.IntTensor([0]).cuda()
-        broadcast_parameters([(name + '.sz', sz)], root_rank)
+        broadcast_parameters([(name + '.sz', sz)], root_rank, comm_group=comm_group)
         t = torch.ByteTensor(sz.cpu().tolist()[0]).cuda()
 
-    broadcast_parameters([(name + '.t', t)], root_rank)
+    broadcast_parameters([(name + '.t', t)], root_rank, comm_group=comm_group)
 
-    if get_rank() != root_rank:
+    if get_rank(comm_group) != root_rank:
         buf = io.BytesIO(t.cpu().numpy().tobytes())
         obj = cloudpickle.load(buf)
 
