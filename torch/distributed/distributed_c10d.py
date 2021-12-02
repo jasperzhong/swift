@@ -2856,6 +2856,8 @@ def flush_objects_to_plasma():
     while True:
         logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
         tensor_np = _logging_cpu_tensor_queue.get()
+        if tensor_np is None:
+            return
         tensor_pa = pa.Tensor.from_numpy(tensor_np)
         unique_id = _logging_cnt * get_world_size() + get_rank()
         object_id = plasma.ObjectID(unique_id.to_bytes(20, byteorder='little'))
