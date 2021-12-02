@@ -100,7 +100,7 @@ def train(state, args, data_iterator, model, optimizer, loss_func):
                     ))
 
                 if iteration == args.benchmark_iters:
-                    sys.exit()
+                    break
 
                 state.iteration = iteration
             except StopIteration:
