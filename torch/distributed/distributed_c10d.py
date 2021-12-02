@@ -405,8 +405,8 @@ def is_torchelastic_launched():
     return os.getenv("TORCHELASTIC_RUN_ID") is not None
 
 def is_cross_machine(src_rank, dst_rank):
-    world_size = get_world_size()
-    return (src_rank // world_size) == (dst_rank // world_size)
+    local_world_size = get_local_world_size()
+    return (src_rank // local_world_size) != (dst_rank // local_world_size)
 
 
 def _get_default_group():
@@ -808,6 +808,12 @@ def get_world_size(group=None):
         return -1
 
     return _get_group_size(group)
+
+def get_local_world_size():
+    """
+    Returns the number of processes in the local worl group
+    """
+    return int(os.environ["LOCAL_WORLD_SIZE"])
 
 
 def isend(tensor,
@@ -2813,13 +2819,19 @@ def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=N
     return pg
 
 
+_profile_time_1 = 0
+_profile_time_2 = 0
+
 def stash(tensor):
     """stash the tensor into in-memory store
     """
     global _logging_cnt
+    global _profile_time_1
+    global _profile_time_2
     if not torch.is_tensor(tensor):
         raise ValueError("stash() only accepts a tensor as input")
 
+    start = time.time()
     tensor_cpu = None
     if tensor.is_cuda:
         tensor_cpu = torch.empty_like(tensor, device="cpu", pin_memory=True)
@@ -2828,7 +2840,9 @@ def stash(tensor):
             tensor_cpu.copy_(tensor, non_blocking=True)
     else:
         tensor_cpu = tensor
+    _profile_time_1 += time.time() - start
 
+    start = time.time()
     tensor_np = tensor_cpu.detach().numpy()
     tensor_pa = pa.Tensor.from_numpy(tensor_np)
     unique_id = _logging_cnt * get_world_size() + get_rank()
@@ -2844,4 +2858,9 @@ def stash(tensor):
     stream = pa.FixedSizeBufferWriter(buf)
     pa.ipc.write_tensor(tensor_pa, stream)
     _logging_client.seal(object_id)
+    _profile_time_2 += time.time() - start
+
+    if (_logging_cnt % 100) == 0:
+        print(f"[Rank {get_rank()}] profile time 1 = {_profile_time_1}")
+        print(f"[Rank {get_rank()}] profile time 2 = {_profile_time_2}")
     return True
