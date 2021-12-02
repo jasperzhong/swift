@@ -62,9 +62,13 @@ _logging_stream = None
 
 _logging_client = None
 
-_logging_queue = []
+_logging_gpu_tensor_queue = []
+
+_logging_cpu_tensor_queue = None
 
 _logging_cnt = 0
+
+_logging_thread = None
 
 # Some reduce ops are not supported by complex numbers and will result in an error.
 # We currently provide complex support to the distributed API by viewing
@@ -836,14 +840,14 @@ def isend(tensor,
 
     """
     global _logging
-    global _logging_queue
+    global _logging_gpu_tensor_queue
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return
 
     if _logging and is_cross_machine(get_rank(), dst):
-        _logging_queue.append(tensor)
+        _logging_gpu_tensor_queue.append(tensor)
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
@@ -874,7 +878,7 @@ def irecv(tensor,
 
     """
     global _logging
-    global _logging_queue
+    global _logging_gpu_tensor_queue
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
@@ -885,8 +889,10 @@ def irecv(tensor,
     else:
         pg = group
 
-    if _logging and _logging_queue:
-        _logging_queue = [tensor for tensor in _logging_queue if not stash(tensor)]
+    if _logging and _logging_gpu_tensor_queue:
+        for tensor in _logging_gpu_tensor_queue:
+            stash(tensor)
+        _logging_gpu_tensor_queue.clear()
 
     if src is None:
         return pg.recv_anysource([tensor], tag)
@@ -914,14 +920,14 @@ def send(tensor,
 
     """
     global _logging
-    global _logging_queue
+    global _logging_gpu_tensor_queue
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return
 
     if _logging and is_cross_machine(get_rank(), dst):
-        _logging_queue.append(tensor)
+        _logging_gpu_tensor_queue.append(tensor)
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
@@ -952,7 +958,7 @@ def recv(tensor,
 
     """
     global _logging
-    global _logging_queue
+    global _logging_gpu_tensor_queue
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
@@ -963,8 +969,10 @@ def recv(tensor,
     else:
         pg = group
 
-    if _logging and _logging_queue:
-        _logging_queue = [tensor for tensor in _logging_queue if not stash(tensor)]
+    if _logging and _logging_gpu_tensor_queue:
+        for tensor in _logging_gpu_tensor_queue:
+            stash(tensor)
+        _logging_gpu_tensor_queue.clear()
 
     if src is None:
         work = pg.recv_anysource([tensor], tag)
@@ -2819,19 +2827,14 @@ def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=N
     return pg
 
 
-_profile_time_1 = 0
-_profile_time_2 = 0
 
 def stash(tensor):
     """stash the tensor into in-memory store
     """
-    global _logging_cnt
-    global _profile_time_1
-    global _profile_time_2
+    global _logging_cpu_tensor_queue
     if not torch.is_tensor(tensor):
         raise ValueError("stash() only accepts a tensor as input")
 
-    start = time.time()
     tensor_cpu = None
     if tensor.is_cuda:
         tensor_cpu = torch.empty_like(tensor, device="cpu", pin_memory=True)
@@ -2840,27 +2843,28 @@ def stash(tensor):
             tensor_cpu.copy_(tensor, non_blocking=True)
     else:
         tensor_cpu = tensor
-    _profile_time_1 += time.time() - start
 
-    start = time.time()
-    tensor_np = tensor_cpu.detach().numpy()
-    tensor_pa = pa.Tensor.from_numpy(tensor_np)
-    unique_id = _logging_cnt * get_world_size() + get_rank()
-    object_id = plasma.ObjectID(unique_id.to_bytes(20, byteorder='little'))
-    _logging_cnt += 1
-    data_size = pa.ipc.get_tensor_size(tensor_pa)
-    try:
-        buf = _logging_client.create(object_id, data_size)
-    except PlasmaStoreFull:
-        logger.warn("Plasma store is full!")
-        return False
+    _logging_cpu_tensor_queue.put(tensor_cpu)
 
-    stream = pa.FixedSizeBufferWriter(buf)
-    pa.ipc.write_tensor(tensor_pa, stream)
-    _logging_client.seal(object_id)
-    _profile_time_2 += time.time() - start
 
-    if (_logging_cnt % 100) == 0:
-        print(f"[Rank {get_rank()}] profile time 1 = {_profile_time_1}")
-        print(f"[Rank {get_rank()}] profile time 2 = {_profile_time_2}")
-    return True
+def flush_objects_to_plasma():
+    global _logging_cnt
+    global _logging_client
+    global _logging_cpu_tensor_queue
+    while True:
+        tensor_cpu = _logging_cpu_tensor_queue.get()
+
+        tensor_np = tensor_cpu.detach().numpy()
+        tensor_pa = pa.Tensor.from_numpy(tensor_np)
+        unique_id = _logging_cnt * get_world_size() + get_rank()
+        object_id = plasma.ObjectID(unique_id.to_bytes(20, byteorder='little'))
+        _logging_cnt += 1
+        data_size = pa.ipc.get_tensor_size(tensor_pa)
+        try:
+            buf = _logging_client.create(object_id, data_size)
+        except PlasmaStoreFull:
+            logger.warn("Plasma store is full!")
+
+        stream = pa.FixedSizeBufferWriter(buf)
+        pa.ipc.write_tensor(tensor_pa, stream)
+        _logging_client.seal(object_id)
