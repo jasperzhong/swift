@@ -2846,7 +2846,7 @@ def stash(tensor):
     else:
         tensor_cpu = tensor
     tensor_np = tensor_cpu.detach().numpy()
-    _logging_cpu_tensor_queue.put(tensor_np)
+    # _logging_cpu_tensor_queue.put(tensor_np)
 
 
 def flush_objects_to_plasma():
