@@ -50,6 +50,7 @@ parser.add_argument('--logging', default=False, action="store_true",
 args = parser.parse_args()
 initialize_global_args(args)
 
+
 def get_data_iterator(args):
     traindir = os.path.join(args.data, 'train')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -100,7 +101,7 @@ def train(state, args, data_iterator, model, optimizer, loss_func):
                     ))
 
                 if iteration == args.benchmark_iters:
-                    break
+                    return
 
                 state.iteration = iteration
             except StopIteration:
