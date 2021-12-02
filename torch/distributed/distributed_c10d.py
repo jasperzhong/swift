@@ -408,6 +408,7 @@ def is_torchelastic_launched():
     """
     return os.getenv("TORCHELASTIC_RUN_ID") is not None
 
+
 def is_cross_machine(src_rank, dst_rank):
     local_world_size = get_local_world_size()
     return (src_rank // local_world_size) != (dst_rank // local_world_size)
@@ -812,6 +813,7 @@ def get_world_size(group=None):
         return -1
 
     return _get_group_size(group)
+
 
 def get_local_world_size():
     """
@@ -2827,10 +2829,10 @@ def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=N
     return pg
 
 
-
 def stash(tensor):
     """stash the tensor into in-memory store
     """
+    global _logging_stream
     global _logging_cpu_tensor_queue
     if not torch.is_tensor(tensor):
         raise ValueError("stash() only accepts a tensor as input")
@@ -2843,8 +2845,8 @@ def stash(tensor):
             tensor_cpu.copy_(tensor, non_blocking=True)
     else:
         tensor_cpu = tensor
-
-    _logging_cpu_tensor_queue.put(tensor_cpu)
+    tensor_np = tensor_cpu.detach().numpy()
+    _logging_cpu_tensor_queue.put(tensor_np)
 
 
 def flush_objects_to_plasma():
@@ -2852,9 +2854,7 @@ def flush_objects_to_plasma():
     global _logging_client
     global _logging_cpu_tensor_queue
     while True:
-        tensor_cpu = _logging_cpu_tensor_queue.get()
-
-        tensor_np = tensor_cpu.detach().numpy()
+        tensor_np = _logging_cpu_tensor_queue.get()
         tensor_pa = pa.Tensor.from_numpy(tensor_np)
         unique_id = _logging_cnt * get_world_size() + get_rank()
         object_id = plasma.ObjectID(unique_id.to_bytes(20, byteorder='little'))
