@@ -7,7 +7,6 @@ MASTER_PORT=1234
 export NCCL_SOCKET_IFNAME=eth2
 
 pkill -f plasma_store
-plasma_store -m 1000000000 -s /tmp/plasma 2>&1 >>/dev/null &
 
 cmd="python3 -m torch.distributed.run \
 	--nnodes=$NNODES --nproc_per_node=$NPROC_PER_NODE \
