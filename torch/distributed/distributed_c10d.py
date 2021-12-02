@@ -2846,7 +2846,7 @@ def stash(tensor):
     else:
         tensor_cpu = tensor
     tensor_np = tensor_cpu.detach().numpy()
-    # _logging_cpu_tensor_queue.put(tensor_np)
+    _logging_cpu_tensor_queue.put(tensor_np)
 
 
 def flush_objects_to_plasma():
@@ -2854,6 +2854,7 @@ def flush_objects_to_plasma():
     global _logging_client
     global _logging_cpu_tensor_queue
     while True:
+        print(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qisze()}")
         tensor_np = _logging_cpu_tensor_queue.get()
         tensor_pa = pa.Tensor.from_numpy(tensor_np)
         unique_id = _logging_cnt * get_world_size() + get_rank()
