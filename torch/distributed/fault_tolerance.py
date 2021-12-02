@@ -29,8 +29,8 @@ def run(logging=False):
                 distributed_c10d._logging_client = plasma.connect("/tmp/plasma")
                 distributed_c10d._logging_stream = torch.cuda.Stream()
                 distributed_c10d._logging_cpu_tensor_queue = Queue()
-                # distributed_c10d._logging_thread = threading.Thread(target=distributed_c10d.flush_objects_to_plasma)
-                # atexit.register(distributed_c10d._logging_thread.join)
+                distributed_c10d._logging_thread = threading.Thread(target=distributed_c10d.flush_objects_to_plasma)
+                atexit.register(distributed_c10d._logging_thread.join)
 
             while True:
                 try:
