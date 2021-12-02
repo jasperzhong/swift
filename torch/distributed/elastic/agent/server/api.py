@@ -844,8 +844,9 @@ class SimpleElasticAgent(ElasticAgent):
         available_memory_in_bytes = psutil.virtual_memory().available
         object_store_size = available_memory_in_bytes * 0.9
         self.object_store_process = subprocess.Popen(['plasma_store',
-                             '-s', '/tmp/store',
-                              '-m', str(object_store_size)])
+                                                      '-s', '/tmp/store',
+                                                      '-m', str(object_store_size)])
+        log.info("start the plasma store")
 
         spec = self._worker_group.spec
         role = spec.role
