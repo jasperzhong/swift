@@ -1,5 +1,4 @@
 import functools
-import atexit
 import hashlib
 import threading
 from queue import Queue
@@ -31,14 +30,19 @@ def run(logging=False):
                 distributed_c10d._logging_cpu_tensor_queue = Queue()
                 distributed_c10d._logging_thread = threading.Thread(target=distributed_c10d.flush_objects_to_plasma)
                 distributed_c10d._logging_thread.start()
-                atexit.register(distributed_c10d._logging_thread.join)
 
             while True:
                 try:
                     if state:
                         state.sync()
 
-                    return func(state, *args, **kwargs)
+                    func(state, *args, **kwargs)
+
+                    if distributed_c10d._logging:
+                        distributed_c10d._logging_cpu_tensor_queue.put(None)
+                        distributed_c10d._logging_thread.join()
+
+                    return
                 except SwiftInternalError as e:
                     print("catch an error: " + str(e))
                     _failure_handler()
