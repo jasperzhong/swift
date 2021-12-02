@@ -844,7 +844,7 @@ class SimpleElasticAgent(ElasticAgent):
         shm_avail_size = statvfs.f_bavail * statvfs.f_bsize
         shm_avail_size = int(shm_avail_size * 0.9)  # keep some safety margin
         self.object_store_process = subprocess.Popen(['plasma_store',
-                                                      '-s', '/tmp/store',
+                                                      '-s', '/tmp/plasma',
                                                       '-m', str(shm_avail_size)])
         log.info("start the plasma store")
 
