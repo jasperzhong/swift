@@ -10,6 +10,8 @@ import functools
 import json
 import os
 import socket
+import psutil
+import subprocess
 import time
 import traceback
 import warnings
@@ -836,9 +838,14 @@ class SimpleElasticAgent(ElasticAgent):
 
         put_metric(f"workers.{spec.role}.flakiness", int(flakiness))
 
-
     def _invoke_run(self, role: str = DEFAULT_ROLE) -> RunResult:
         # NOTE: currently only works for a single role
+
+        available_memory_in_bytes = psutil.virtual_memory().available
+        object_store_size = available_memory_in_bytes * 0.9
+        self.object_store_process = subprocess.Popen(['plasma_store',
+                             '-s', '/tmp/store',
+                              '-m', str(object_store_size)])
 
         spec = self._worker_group.spec
         role = spec.role
@@ -901,7 +908,6 @@ class SimpleElasticAgent(ElasticAgent):
             else:
                 raise Exception(f"[{role}] Worker group in {state.name} state")
 
-
     def _exit_barrier(self):
         """
         Wait for ``exit_barrier_timeout`` seconds for all agents to finish
@@ -913,6 +919,9 @@ class SimpleElasticAgent(ElasticAgent):
             f"Local worker group finished ({self._worker_group.state}). "
             f"Waiting {self._exit_barrier_timeout} seconds for other agents to finish"
         )
+
+        self.object_store_process.kill()
+
         start = time.time()
         try:
             store_util.barrier(
