@@ -892,8 +892,8 @@ def irecv(tensor,
         pg = group
 
     if _logging and _logging_gpu_tensor_queue:
-        for tensor in _logging_gpu_tensor_queue:
-            stash(tensor)
+        for logging_tensor in _logging_gpu_tensor_queue:
+            stash(logging_tensor)
         _logging_gpu_tensor_queue.clear()
 
     if src is None:
@@ -972,8 +972,8 @@ def recv(tensor,
         pg = group
 
     if _logging and _logging_gpu_tensor_queue:
-        for tensor in _logging_gpu_tensor_queue:
-            stash(tensor)
+        for logging_tensor in _logging_gpu_tensor_queue:
+            stash(logging_tensor)
         _logging_gpu_tensor_queue.clear()
 
     if src is None:
