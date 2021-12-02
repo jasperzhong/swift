@@ -8,7 +8,6 @@ import warnings
 from datetime import timedelta
 from typing import Dict, Optional, Tuple, Union
 
-import numpy as np
 import pyarrow as pa
 import pyarrow.plasma as plasma
 from pyarrow.plasma import PlasmaStoreFull
@@ -404,6 +403,10 @@ def is_torchelastic_launched():
     non-null value indicating the job id for peer discovery purposes..
     """
     return os.getenv("TORCHELASTIC_RUN_ID") is not None
+
+def is_cross_machine(src_rank, dst_rank):
+    world_size = get_world_size()
+    return (src_rank // world_size) == (dst_rank // world_size)
 
 
 def _get_default_group():
@@ -833,7 +836,7 @@ def isend(tensor,
     if _rank_not_in_group(group):
         return
 
-    if _logging:
+    if _logging and is_cross_machine(get_rank(), dst):
         _logging_queue.append(tensor)
 
     if group is None or group is GroupMember.WORLD:
@@ -911,7 +914,7 @@ def send(tensor,
     if _rank_not_in_group(group):
         return
 
-    if _logging:
+    if _logging and is_cross_machine(get_rank(), dst):
         _logging_queue.append(tensor)
 
     if group is None or group is GroupMember.WORLD:
