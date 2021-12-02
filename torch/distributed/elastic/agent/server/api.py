@@ -841,10 +841,11 @@ class SimpleElasticAgent(ElasticAgent):
         # NOTE: currently only works for a single role
 
         statvfs = os.statvfs('/dev/shm')
-        object_store_size = statvfs.f_bfree * statvfs.f_bsize
+        shm_avail_size = statvfs.f_bavail * statvfs.f_bsize
+        shm_avail_size = int(shm_avail_size * 0.9)  # keep some safety margin
         self.object_store_process = subprocess.Popen(['plasma_store',
                                                       '-s', '/tmp/store',
-                                                      '-m', str(object_store_size)])
+                                                      '-m', str(shm_avail_size)])
         log.info("start the plasma store")
 
         spec = self._worker_group.spec
