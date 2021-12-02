@@ -10,7 +10,6 @@ import functools
 import json
 import os
 import socket
-import psutil
 import subprocess
 import time
 import traceback
@@ -841,8 +840,8 @@ class SimpleElasticAgent(ElasticAgent):
     def _invoke_run(self, role: str = DEFAULT_ROLE) -> RunResult:
         # NOTE: currently only works for a single role
 
-        available_memory_in_bytes = psutil.virtual_memory().available
-        object_store_size = int(available_memory_in_bytes * 0.9)
+        statvfs = os.statvfs('/dev/shm')
+        object_store_size = statvfs.f_bfree * statvfs.f_bsize
         self.object_store_process = subprocess.Popen(['plasma_store',
                                                       '-s', '/tmp/store',
                                                       '-m', str(object_store_size)])
