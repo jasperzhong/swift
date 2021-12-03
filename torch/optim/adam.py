@@ -141,8 +141,6 @@ class Adam(Optimizer):
                     exp_avgs.append(state['exp_avg'])
                     exp_avg_sqs.append(state['exp_avg_sq'])
 
-                    # undo the steps for each param group update
-                    state['step'] -= 1
                     # record the step after step update
                     state_steps.append(state['step'])
 
@@ -160,6 +158,7 @@ class Adam(Optimizer):
             # update exp_avg, exo_avg_sq in state
             for p, mt, vt in zip(params_with_grad, exp_avgs, exp_avg_sqs):
                 state = self.state[p]
+                state['step'] -= 1
                 state['exp_avg_sq'] = vt
                 state['exp_avg'] = mt
                 
