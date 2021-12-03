@@ -2873,17 +2873,18 @@ def flush_objects_to_plasma():
         pa.ipc.write_tensor(tensor_pa, stream)
         _logging_client.seal(object_id)
 
-
 def flush_objects_to_fs():
     global _logging_cnt
     global _logging_client
     global _logging_cpu_tensor_queue
 
-    f = tables.open_file("logging.npy", mode='a')
+    f = tables.open_file("logging.h5", mode='a')
+    table = f.create_earray(f.root, 'data')
     while True:
         logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
         tensor_np = _logging_cpu_tensor_queue.get()
         if tensor_np is None:
             f.close()
             return
-        f.root.data.append(tensor_np)
+        table.append(x)
+
