@@ -117,3 +117,50 @@ class Adam(Optimizer):
                    weight_decay=group['weight_decay'],
                    eps=group['eps'])
         return loss
+
+    @torch.no_grad()
+    def undo(self):
+        for group in self.param_groups:
+            params_with_grad = []
+            grads = []
+            exp_avgs = []
+            exp_avg_sqs = []
+            state_steps = []
+            beta1, beta2 = group['betas']
+
+            for p in group['params']:
+                if p.grad is not None:
+                    params_with_grad.append(p)
+                    if p.grad.is_sparse:
+                        raise RuntimeError('Adam does not support sparse gradients, please consider SparseAdam instead')
+                    grads.append(p.grad)
+
+                    state = self.state[p]
+                    # Don't need lazy state initialization
+
+                    exp_avgs.append(state['exp_avg'])
+                    exp_avg_sqs.append(state['exp_avg_sq'])
+
+                    # undo the steps for each param group update
+                    state['step'] -= 1
+                    # record the step after step update
+                    state_steps.append(state['step'])
+
+            F.undo_adam(params_with_grad,
+                   grads,
+                   exp_avgs,
+                   exp_avg_sqs,
+                   state_steps,
+                   beta1=beta1,
+                   beta2=beta2,
+                   lr=group['lr'],
+                   weight_decay=group['weight_decay'],
+                   eps=group['eps'])
+
+            # update exp_avg, exo_avg_sq in state
+            for p, mt, vt in zip(params_with_grad, exp_avgs, exp_avg_sqs):
+                state = self.state[p]
+                state['exp_avg_sq'] = vt
+                state['exp_avg'] = mt
+                
+
