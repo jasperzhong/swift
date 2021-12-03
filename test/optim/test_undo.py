@@ -73,22 +73,22 @@ class UndoTestCase(unittest.TestCase):
             params.append(param)
             params_copy.append(param_copy)
             grads.append(torch.randn(size=size).cuda())
-            exp_avg = torch.randn_like(param, memory_format=torch.preserve_format).cuda()
+            exp_avg = torch.ones_like(param, memory_format=torch.preserve_format).cuda()
             exp_avgs.append(exp_avg)
             exp_avg_copy = exp_avg.clone()
             exp_avgs_copy.append(exp_avg_copy)
-            exp_avg_sq = torch.randn_like(param, memory_format=torch.preserve_format).cuda()
+            exp_avg_sq = torch.ones_like(param, memory_format=torch.preserve_format).cuda()
             exp_avg_sqs.append(exp_avg_sq)
-            exp_avg_sq_copy = exp_avg_sqs.clone()
+            exp_avg_sq_copy = exp_avg_sq.clone()
             exp_avg_sqs_copy.append(exp_avg_sq_copy)
             state_steps.append(1)
 
         lr = 0.1
         with torch.no_grad():
-            F.adam(params, grads, exp_avgs=exp_avgs, exp_avg_sqs=exp_avg_sqs, state_steps=state_steps, amsgrad=False, 
+            F.adam(params, grads, exp_avgs=exp_avgs, exp_avg_sqs=exp_avg_sqs, max_exp_avg_sqs=[], state_steps=state_steps, amsgrad=False, 
                     beta1=b1, beta2=b2, lr=lr, weight_decay=wd, eps=eps)
 
-            F.undo_adam(params, grads, exp_avgs=exp_avgs, exp_avg_sqs=exp_avg_sqs, state_steps=state_steps, amsgrad=False, 
+            F.undo_adam(params, grads, exp_avgs=exp_avgs, exp_avg_sqs=exp_avg_sqs, state_steps=state_steps, 
                     beta1=b1, beta2=b2, lr=lr, weight_decay=wd, eps=eps)
 
         atol = torch.finfo(torch.float).resolution
