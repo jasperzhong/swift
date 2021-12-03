@@ -2878,7 +2878,6 @@ def flush_objects_to_fs():
     global _logging_cpu_tensor_queue
 
     path = '/tmp/logging.npy'
-    os.remove(path)
     with htpy.File(path, "w") as f:
         while True:
             logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
