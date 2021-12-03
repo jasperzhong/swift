@@ -2884,7 +2884,8 @@ def flush_objects_to_fs():
         logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
         tensor_np = _logging_cpu_tensor_queue.get()
         if tensor_np is None:
+            logger.info("closing h5 file")
             f.close()
             return
-        table.append(x)
+        table.append(tensor_np)
 
