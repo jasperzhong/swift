@@ -10,7 +10,7 @@ from typing import Dict, Optional, Tuple, Union
 
 import pyarrow as pa
 import pyarrow.plasma as plasma
-import tables
+import h5py
 from pyarrow.plasma import PlasmaStoreFull
 
 import torch
@@ -2875,17 +2875,16 @@ def flush_objects_to_plasma():
 
 def flush_objects_to_fs():
     global _logging_cnt
-    global _logging_client
     global _logging_cpu_tensor_queue
 
-    f = tables.open_file("logging.h5", mode='w')
-    table = f.create_earray(f.root, 'data')
-    while True:
-        logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
-        tensor_np = _logging_cpu_tensor_queue.get()
-        if tensor_np is None:
-            logger.info("closing h5 file")
-            f.close()
-            return
-        table.append(tensor_np)
-
+    path = '/tmp/logging.npy'
+    os.remove(path)
+    with htpy.File(path, "w") as f:
+        while True:
+            logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
+            tensor_np = _logging_cpu_tensor_queue.get()
+            if tensor_np is None:
+                return
+            unique_id = _logging_cnt * get_world_size() + get_rank()
+            dataset = f.create_dataset(str(unique_id), data=tensor_np)
+            _logging_cnt += 1
