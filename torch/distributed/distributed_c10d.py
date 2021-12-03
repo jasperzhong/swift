@@ -10,6 +10,7 @@ from typing import Dict, Optional, Tuple, Union
 
 import pyarrow as pa
 import pyarrow.plasma as plasma
+import tables
 from pyarrow.plasma import PlasmaStoreFull
 
 import torch
@@ -2871,3 +2872,17 @@ def flush_objects_to_plasma():
         stream = pa.FixedSizeBufferWriter(buf)
         pa.ipc.write_tensor(tensor_pa, stream)
         _logging_client.seal(object_id)
+
+def flush_objects_to_fs():
+    global _logging_cnt
+    global _logging_client
+    global _logging_cpu_tensor_queue
+
+    f = tables.open_file("logging.npy", mode='a')
+    while True:
+        logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
+        tensor_np = _logging_cpu_tensor_queue.get()
+        if tensor_np is None:
+            return
+        f.root.data.append(tensor_np)
+
