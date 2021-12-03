@@ -72,9 +72,9 @@ class UndoTestCase(unittest.TestCase):
             params.append(param)
             params_copy.append(param_copy)
             grads.append(torch.randn(size=size).cuda())
-            exp_avgs = torch.randn(size=size, memory_format=torch.preserve_format).cuda()
+            exp_avgs = torch.randn_like(param, memory_format=torch.preserve_format).cuda()
             exp_avgs_copy = exp_avgs.clone()
-            exp_avg_sqs = torch.randn(size=size, memory_format=torch.preserve_format).cuda()
+            exp_avg_sqs = torch.randn_like(param, memory_format=torch.preserve_format).cuda()
             exp_avg_sqs_copy = exp_avg_sqs.clone()
             state_steps = torch.ones(size=size).cuda()
 
