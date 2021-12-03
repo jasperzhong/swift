@@ -2878,7 +2878,7 @@ def flush_objects_to_fs():
     global _logging_client
     global _logging_cpu_tensor_queue
 
-    f = tables.open_file("logging.h5", mode='a')
+    f = tables.open_file("logging.h5", mode='w')
     table = f.create_earray(f.root, 'data')
     while True:
         logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
