@@ -98,6 +98,42 @@ def adam(params: List[Tensor],
 
         param.addcdiv_(exp_avg, denom, value=-step_size)
 
+def undo_adam(params: List[Tensor],
+              grads: List[Tensor],
+              exp_avgs: List[Tensor],
+              exp_avg_sqs: List[Tensor],
+              state_steps: List[int],
+              *,
+              beta1: float,
+              beta2: float,
+              lr: float,
+              weight_decay: float,
+              eps: float):
+    for i, param in enumerate(params):
+
+        grad = grads[i]
+        exp_avg = exp_avgs[i]
+        exp_avg_sq = exp_avg_sqs[i]
+        # same as step 
+        # because the worker didn't call optim.adam to update step
+        step = state_steps[i]
+
+        bias_correction1 = 1 - beta1 ** step
+        bias_correction2 = 1 - beta2 ** step
+
+        # undo param
+        step_size = lr / bias_correction1
+        denom = (exp_avg_sq.sqrt() / math.sqrt(bias_correction2)).add_(eps)
+        param.addcdiv_(exp_avg, denom, value=step_size)
+
+        if weight_decay != 0:
+            grad = grad.add(param, alpha=weight_decay)
+
+        # undo Vt
+        exp_avg_sq.sub_(grad ** 2, alpha=1 - beta2).div_(beta2)
+
+        # undo Mt
+        exp_avg.sub_(grad, alpha=1 - beta1).div_(beta1)   
 
 def adamw(params: List[Tensor],
           grads: List[Tensor],
@@ -143,6 +179,39 @@ def adamw(params: List[Tensor],
 
         param.addcdiv_(exp_avg, denom, value=-step_size)
 
+def undo_adamw(params: List[Tensor],
+               grads: List[Tensor],
+               exp_avgs: List[Tensor],
+               exp_avg_sqs: List[Tensor],
+               state_steps: List[int],
+               *,
+               beta1: float,
+               beta2: float,
+               lr: float,
+               weight_decay: float,
+               eps: float):
+    for i, param in enumerate(params):
+        grad = grads[i]
+        exp_avg = exp_avgs[i]
+        exp_avg_sq = exp_avg_sqs[i]
+        # same as step 
+        # because the worker didn't call optim.adam to update step
+        step = state_steps[i]
+
+        bias_correction1 = 1 - beta1 ** step
+        bias_correction2 = 1 - beta2 ** step
+
+        # undo param
+        step_size = lr / bias_correction1
+        denom = (exp_avg_sq.sqrt() / math.sqrt(bias_correction2)).add_(eps)
+        param.addcdiv_(exp_avg, denom, value=step_size)
+        param.div_(1 - lr * weight_decay)
+
+        # undo Vt
+        exp_avg_sq.sub_(grad ** 2, alpha=1 - beta2).div_(beta2)
+
+        # undo Mt
+        exp_avg.sub_(grad, alpha=1 - beta1).div_(beta1)
 
 def sgd(params: List[Tensor],
         d_p_list: List[Tensor],
