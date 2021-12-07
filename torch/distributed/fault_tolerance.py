@@ -15,8 +15,10 @@ from .distributed_c10d import (_failure_handler, all_gather, get_rank,
                                get_world_size)
 
 
-def run(logging=False):
+def run(logging=False, compression=None):
     distributed_c10d._logging = logging
+    distributed_c10d._logging_compression = compression
+
 
     def f(func):
         @functools.wraps(func)
