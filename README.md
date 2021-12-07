@@ -196,7 +196,6 @@ Other potentially useful environment variables may be found in `setup.py`.
 Common
 ```bash
 conda install astunparse numpy ninja pyyaml mkl mkl-include setuptools cmake cffi typing_extensions future six requests dataclasses
-pip install pyarrow
 ```
 
 On Linux

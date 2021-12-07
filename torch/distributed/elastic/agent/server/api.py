@@ -10,7 +10,6 @@ import functools
 import json
 import os
 import socket
-import subprocess
 import time
 import traceback
 import warnings
@@ -840,14 +839,6 @@ class SimpleElasticAgent(ElasticAgent):
     def _invoke_run(self, role: str = DEFAULT_ROLE) -> RunResult:
         # NOTE: currently only works for a single role
 
-        statvfs = os.statvfs('/dev/shm')
-        shm_avail_size = statvfs.f_bavail * statvfs.f_bsize
-        shm_avail_size = int(shm_avail_size * 0.9)  # keep some safety margin
-        self.object_store_process = subprocess.Popen(['plasma_store',
-                                                      '-s', '/tmp/plasma',
-                                                      '-m', str(shm_avail_size)])
-        log.info("start the plasma store")
-
         spec = self._worker_group.spec
         role = spec.role
 
@@ -920,8 +911,6 @@ class SimpleElasticAgent(ElasticAgent):
             f"Local worker group finished ({self._worker_group.state}). "
             f"Waiting {self._exit_barrier_timeout} seconds for other agents to finish"
         )
-
-        self.object_store_process.kill()
 
         start = time.time()
         try:
