@@ -2855,6 +2855,7 @@ def flush_objects_to_fs():
             logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
             tensor_np = _logging_cpu_tensor_queue.get()
             if tensor_np is None:
+                logger.info("logging thread finishes")
                 return
             unique_id = _logging_cnt * get_world_size() + get_rank()
             dataset = f.create_dataset(str(unique_id), data=tensor_np)
