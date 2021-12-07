@@ -2877,7 +2877,7 @@ def flush_objects_to_fs():
     global _logging_cnt
     global _logging_cpu_tensor_queue
 
-    path = 'logging.h5'
+    path = 'logging_%d.h5' % (get_rank())
     with h5py.File(path, "w") as f:
         while True:
             logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
