@@ -912,6 +912,9 @@ class SimpleElasticAgent(ElasticAgent):
             f"Waiting {self._exit_barrier_timeout} seconds for other agents to finish"
         )
 
+        spec = self._worker_group.spec
+        spec.rdzv_handler.shutdown()
+
         start = time.time()
         try:
             store_util.barrier(
