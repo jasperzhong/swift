@@ -8,10 +8,7 @@ import warnings
 from datetime import timedelta
 from typing import Dict, Optional, Tuple, Union
 
-import pyarrow as pa
-import pyarrow.plasma as plasma
 import h5py
-from pyarrow.plasma import PlasmaStoreFull
 
 import torch
 import torch.nn
@@ -60,8 +57,6 @@ logger = logging.getLogger(__name__)
 _logging = False
 
 _logging_stream = None
-
-_logging_client = None
 
 _logging_gpu_tensor_queue = []
 
@@ -2849,29 +2844,6 @@ def stash(tensor):
     tensor_np = tensor_cpu.detach().numpy()
     _logging_cpu_tensor_queue.put(tensor_np)
 
-
-def flush_objects_to_plasma():
-    global _logging_cnt
-    global _logging_client
-    global _logging_cpu_tensor_queue
-    while True:
-        logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
-        tensor_np = _logging_cpu_tensor_queue.get()
-        if tensor_np is None:
-            return
-        tensor_pa = pa.Tensor.from_numpy(tensor_np)
-        unique_id = _logging_cnt * get_world_size() + get_rank()
-        object_id = plasma.ObjectID(unique_id.to_bytes(20, byteorder='little'))
-        _logging_cnt += 1
-        data_size = pa.ipc.get_tensor_size(tensor_pa)
-        try:
-            buf = _logging_client.create(object_id, data_size)
-        except PlasmaStoreFull:
-            logger.warn("Plasma store is full!")
-
-        stream = pa.FixedSizeBufferWriter(buf)
-        pa.ipc.write_tensor(tensor_pa, stream)
-        _logging_client.seal(object_id)
 
 def flush_objects_to_fs():
     global _logging_cnt
