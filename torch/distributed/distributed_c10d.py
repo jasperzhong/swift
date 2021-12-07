@@ -56,6 +56,8 @@ logger = logging.getLogger(__name__)
 # whether to perform logging
 _logging = False
 
+_logging_compression = None
+
 _logging_stream = None
 
 _logging_gpu_tensor_queue = []
@@ -2848,6 +2850,7 @@ def stash(tensor):
 def flush_objects_to_fs():
     global _logging_cnt
     global _logging_cpu_tensor_queue
+    global _logging_compression
 
     path = 'logging_%d.h5' % (get_rank())
     with h5py.File(path, "w") as f:
@@ -2858,5 +2861,5 @@ def flush_objects_to_fs():
                 logger.info("logging thread finishes")
                 return
             unique_id = _logging_cnt * get_world_size() + get_rank()
-            dataset = f.create_dataset(str(unique_id), data=tensor_np)
+            dataset = f.create_dataset(str(unique_id), data=tensor_np, compression=_logging_compression)
             _logging_cnt += 1

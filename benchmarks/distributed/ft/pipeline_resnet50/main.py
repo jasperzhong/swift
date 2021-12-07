@@ -46,6 +46,8 @@ parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
 parser.add_argument('--logging', default=False, action="store_true",
                     help='whether to enable logging.')
+parser.add_argument('--logging-compression', default=None, type=str,
+                    help='compression methods for logging')
 
 args = parser.parse_args()
 initialize_global_args(args)
@@ -73,7 +75,7 @@ def get_data_iterator(args):
     return data_iterator
 
 
-@torch.distributed.fault_tolerance.run(logging=args.logging)
+@torch.distributed.fault_tolerance.run(logging=args.logging, compression=args.logging_compression)
 def train(state, args, data_iterator, model, optimizer, loss_func):
     print("start from epoch={} iter={}".format(state.epoch, state.iteration))
     for epoch in range(state.epoch, args.epochs):
