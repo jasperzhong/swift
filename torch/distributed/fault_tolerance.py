@@ -89,32 +89,43 @@ def run(replica=False, logging=False, compression=None):
     return f
 
 
-class Timestamp:
-    def __init__(self, value):
-        if not isinstance(value, int):
-            raise ValueError("Timestamp only accepts integer!")
+class Timestamp(int):
+    def __new__(cls, value):
+        if value < 0:
+            raise ValueError("timestamp must not be less than zero!")
+        return super(cls, cls).__new__(cls, value)
 
-        self._value = value
+    def __add__(self, other):
+        res = super(Timestamp, self).__add__(other)
+        return self.__class__(res)
 
-    @property
-    def value(self):
-        return self._value
+    def __sub__(self, other):
+        res = super(Timestamp, self).__sub__(other)
+        return self.__class__(res)
 
-    @value.setter
-    def value(self, v):
-        if not isinstance(value, int):
-            raise ValueError("Timestamp only accepts integer!")
+    def __mul__(self, other):
+        res = super(Timestamp, self).__mul__(other)
+        return self.__class__(res)
 
-        self._value = v
+    def __div__(self, other):
+        res = super(Timestamp, self).__div__(other)
+        return self.__class__(res)
+
+    def __str__(self):
+        return "%d" % int(self)
+
+    def __repr__(self):
+        return "timestamp(%d)" % int(self)
 
     def sync(self):
         """
         Return need_undo (bool), failure_workers (list)
 
         """
+        self_value = int(self)
         tensor = torch.LongTensor(1).cuda()
         tensor_list = [torch.LongTensor(1).cuda() for _ in range(get_world_size())]
-        tensor[0] = self._value
+        tensor[0] = self_value
         all_gather(tensor_list, tensor)
 
         values = []
@@ -131,14 +142,14 @@ class Timestamp:
             if v == 0:
                 failure_workers.append(i)
 
-        if self._value == 0:
+        if self_value == 0:
             # failure workers
             return need_undo, failure_workers
         else:
             # living workers
             consensus_value = self._make_consensus(values)
-            self[k] = consensus_value
-            need_undo = consensus_value == self._value - 1
+            self = Timestamp(consensus_value)
+            need_undo = consensus_value == self_value - 1
             return need_undo, failure_workers
 
     def _make_consensus(self, values):

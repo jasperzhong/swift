@@ -1,7 +1,6 @@
 import argparse
 import os
 import random
-import sys
 import time
 
 import numpy as np
@@ -12,6 +11,7 @@ from torchvision import datasets, transforms
 
 import torch
 import torch.distributed.fault_tolerance
+from torch.distributed.fault_tolerance import Timestamp
 import torch.nn as nn
 import torch.optim as optim
 
@@ -76,13 +76,12 @@ def get_data_iterator(args):
 
 
 @torch.distributed.fault_tolerance.run(logging=args.logging, compression=args.logging_compression)
-def train(state, args, data_iterator, model, optimizer, loss_func):
-    print("start from epoch={} iter={}".format(state.epoch, state.iteration))
-    for epoch in range(state.epoch, args.epochs):
-        state.epoch = epoch
-        iteration = 0
+def train(ts, model, optimizer, args, data_iterator, loss_func):
+    print("start from iter={}".format(ts.value))
+    iteration = 0
+    for epoch in range(args.epochs):
         while True:
-            if iteration < state.iteration:
+            if iteration < ts:
                 if is_pipeline_first_stage() or is_pipeline_last_stage():
                     next(data_iterator)
                 iteration += 1
@@ -97,6 +96,7 @@ def train(state, args, data_iterator, model, optimizer, loss_func):
                 iteration_time = time.time() - start
 
                 iteration += 1
+                ts += 1
                 if is_pipeline_last_stage() and iteration % args.print_freq == 0:
                     print("[Epoch {}/Iteration {}] loss: {:.4f} Throughput: {:.2f}".format(
                         epoch, iteration, loss, args.global_batch_size / (iteration_time)
@@ -105,7 +105,6 @@ def train(state, args, data_iterator, model, optimizer, loss_func):
                 if iteration == args.benchmark_iters:
                     return
 
-                state.iteration = iteration
             except StopIteration:
                 break
 
@@ -135,8 +134,8 @@ def main():
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     loss_func = nn.CrossEntropyLoss().cuda()
 
-    state = torch.distributed.fault_tolerance.State(epoch=0, iteration=0, optimizer=optimizer)
-    train(state, args, data_iterator, model, optimizer, loss_func)
+    ts = Timestamp(0)
+    train(ts, model, optimizer, args, data_iterator, loss_func)
 
 
 if __name__ == '__main__':
