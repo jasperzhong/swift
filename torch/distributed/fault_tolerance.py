@@ -57,6 +57,7 @@ def run(replica=False, logging=False, compression=None):
             while True:
                 try:
                     need_undo, failure_workers = timestamp.sync()
+                    print("failure workers: ", failure_workers)
 
                     if need_undo:
                         print(f"[Rank {get_rank()}] undo update is needed"
@@ -89,48 +90,78 @@ def run(replica=False, logging=False, compression=None):
     return f
 
 
-class Timestamp(int):
-    def __new__(cls, value):
+class Timestamp:
+    def __init__(self, value):
         if value < 0:
             raise ValueError("timestamp must not be less than zero!")
-        return super(cls, cls).__new__(cls, value)
+        self._value = value
 
     def __add__(self, other):
-        res = super(Timestamp, self).__add__(other)
-        return self.__class__(res)
+        return self._value + other
+
+    def __iadd__(self, other):
+        self._value += other
+        return self._value
 
     def __sub__(self, other):
-        res = super(Timestamp, self).__sub__(other)
-        return self.__class__(res)
+        return self._value - other
+
+    def __isub__(self, other):
+        self._value -= other
+        return self._value
 
     def __mul__(self, other):
-        res = super(Timestamp, self).__mul__(other)
-        return self.__class__(res)
+        return self._value * other
+
+    def __imul__(self, other):
+        self._value *= other
+        return self._value
 
     def __div__(self, other):
-        res = super(Timestamp, self).__div__(other)
-        return self.__class__(res)
+        return self._value / other
+
+    def __idiv__(self, other):
+        self._value /= other
+        return self._value
+
+    def __lt__(self, other):
+        return self._value < other
+
+    def __le__(self, other):
+        return self._value <= other
+
+    def __gt__(self, other):
+        return self._value > other
+
+    def __ge__(self, other):
+        return self._value >= other
+
+    def __eq__(self, other):
+        return self._value == other
+
+    def __ne__(self, other):
+        return self._value != other
 
     def __str__(self):
-        return "%d" % int(self)
+        return "%d" % int(self._value)
 
     def __repr__(self):
-        return "timestamp(%d)" % int(self)
+        return "timestamp(%d)" % int(self._value)
 
     def sync(self):
         """
         Return need_undo (bool), failure_workers (list)
 
         """
-        self_value = int(self)
         tensor = torch.LongTensor(1).cuda()
         tensor_list = [torch.LongTensor(1).cuda() for _ in range(get_world_size())]
-        tensor[0] = self_value
+        tensor[0] = self._value
         all_gather(tensor_list, tensor)
 
         values = []
         for t in tensor_list:
             values.append(int(t[0].item()))
+        print("values:", values)
 
         need_undo = False
         failure_workers = []
@@ -142,14 +173,14 @@ class Timestamp(int):
             if v == 0:
                 failure_workers.append(i)
 
-        if self_value == 0:
+        if self._value == 0:
             # failure workers
             return need_undo, failure_workers
         else:
             # living workers
             consensus_value = self._make_consensus(values)
             self = Timestamp(consensus_value)
-            need_undo = consensus_value == self_value - 1
+            need_undo = consensus_value == self._value - 1
             return need_undo, failure_workers
 
     def _make_consensus(self, values):
