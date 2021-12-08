@@ -2864,7 +2864,7 @@ def flush_objects_to_fs():
         if path in path_to_files:
             file = path_to_files[path]
         else:
-            file = h5py.File(path, "a")
+            file = h5py.File(path, "w")
             path_to_files[path] = file
 
         file.create_dataset(str(_logging_cnt), data=tensor, compression=_logging_compression)
