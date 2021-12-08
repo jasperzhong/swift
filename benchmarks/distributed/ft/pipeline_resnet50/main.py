@@ -77,7 +77,7 @@ def get_data_iterator(args):
 
 @torch.distributed.fault_tolerance.run(logging=args.logging, compression=args.logging_compression)
 def train(ts, model, optimizer, args, data_iterator, loss_func):
-    print("start from iter={}".format(ts.value))
+    print("start from iter={}".format(ts))
     iteration = 0
     for epoch in range(args.epochs):
         while True:
