@@ -1,5 +1,6 @@
 import functools
-import hashlib
+import os
+import re
 import threading
 from queue import Queue
 
@@ -15,15 +16,38 @@ from .distributed_c10d import (_failure_handler, all_gather, get_rank,
                                get_world_size)
 
 
-def run(logging=False, compression=None):
+def _is_failure_worker(failure_workers):
+    return get_rank() in failure_workers
+
+
+def _need_to_resend(failure_workers):
+    logging_files = [f for f in os.listdir('.') if re.match("logging_.*\.h5", f)]
+    for f in logging_files:
+        _, src, dst = f.split('.')[0].split("_")
+        src, dst = int(src), int(dst)
+        if src == get_rank() and dst in failure_workers:
+            return True
+    return False
+
+
+def _resend(failure_workers):
+    pass
+
+
+def run(replica=False, logging=False, compression=None):
     distributed_c10d._logging = logging
     distributed_c10d._logging_compression = compression
 
-
     def f(func):
         @functools.wraps(func)
-        def wrapper(state, *args, **kwargs):
-            if distributed_c10d._logging:
+        def wrapper(timestamp, model, optimizer, *args, **kwargs):
+            assert isinstance(timestamp, Timestamp)
+            assert isinstance(model, torch.nn.Module)
+            assert isinstance(optimizer, torch.optim.Optimizer)
+            if replica:
+                assert type(optimizer).__name__ == "DistributedOptimizer"
+
+            if logging:
                 print(f"enable logging on device {torch.cuda.current_device()}")
                 distributed_c10d._logging_stream = torch.cuda.Stream()
                 distributed_c10d._logging_cpu_tensor_queue = Queue()
@@ -32,12 +56,28 @@ def run(logging=False, compression=None):
 
             while True:
                 try:
-                    if state:
-                        state.sync()
+                    need_undo, failure_workers = timestamp.sync()
 
-                    func(state, *args, **kwargs)
+                    if need_undo:
+                        print(f"[Rank {get_rank()}] undo update is needed"
+                              "(iteration = {timestamp.value} while the consensus value is {timestamp.value-1})!")
+                        optimizer.undo()
 
-                    if distributed_c10d._logging:
+                    if replica:
+                        broadcast_parameters(model.named_parameters(), 0)
+                        optimizer.clear()
+                        broadcast_optimizer_state(optimizer.state_dict(), 0)
+                    elif logging:
+                        if _is_failure_worker(failure_workers):
+                            # (TODO): load checkpoint
+                            pass
+                        elif _need_to_resend(failure_workers):
+                            print(f"[Rank {get_rank()} needs to resend logging data]")
+                            _resend(failure_workers)
+
+                    func(timestamp, model, optimizer, *args, **kwargs)
+
+                    if logging:
                         distributed_c10d._logging_cpu_tensor_queue.put(None)
                         distributed_c10d._logging_thread.join()
 
@@ -49,62 +89,57 @@ def run(logging=False, compression=None):
     return f
 
 
-class _AttrDict(dict):
-    def __init__(self, *args, **kwargs):
-        super(_AttrDict, self).__init__(*args, dict(sorted(kwargs.items())))
-        self.__dict__ = self
+class Timestamp:
+    def __init__(self, value):
+        if not isinstance(value, int):
+            raise ValueError("Timestamp only accepts integer!")
 
+        self._value = value
 
-class State(_AttrDict):
-    def __init__(self, *args, **kwargs):
-        super(State, self).__init__(*args, **kwargs)
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, v):
+        if not isinstance(value, int):
+            raise ValueError("Timestamp only accepts integer!")
+
+        self._value = v
 
     def sync(self):
-        need_undo = False
-        for k, v in self.items():
-            if isinstance(v, torch.nn.Module):
-                self._model_parameters_sync_handler(k, v)
-            elif isinstance(v, torch.optim.Optimizer):
-                self._optimizer_state_sync_handler(k, v)
-            elif isinstance(v, int):
-                ret = self._timestamp_sync_handler(k, v)
-                if ret:
-                    print(f"[Rank {get_rank()}] undo update is needed ({k} = {v} while the consensus value is {v-1})!")
-                    need_undo = True
-            else:
-                raise ValueError(f"type {type(v)} of key({k}) is not recognized!")
+        """
+        Return need_undo (bool), failure_workers (list)
 
-        if need_undo:
-            for k, v in self.items():
-                if isinstance(v, torch.optim.Optimizer):
-                    v.undo()
-
-    def _model_parameters_sync_handler(self, k, v):
-        broadcast_parameters(v.state_dict(), 0)
-
-    def _optimizer_state_sync_handler(self, k, v):
-        if type(v).__name__ == "DistributedOptimizer":
-            v.clear()
-            broadcast_optimizer_state(v, 0)
-
-    def _timestamp_sync_handler(self, k, v):
-        tensor = torch.LongTensor(3).cuda()
-        tensor_list = [torch.LongTensor(3).cuda() for _ in range(get_world_size())]
-        md5 = hashlib.md5(k.encode('utf-8'))
-        tensor[0] = int.from_bytes(md5.digest()[:8], byteorder='little', signed=True)
-        tensor[1] = int.from_bytes(md5.digest()[8:], byteorder='little', signed=True)
-        tensor[2] = v
+        """
+        tensor = torch.LongTensor(1).cuda()
+        tensor_list = [torch.LongTensor(1).cuda() for _ in range(get_world_size())]
+        tensor[0] = self._value
         all_gather(tensor_list, tensor)
 
         values = []
         for t in tensor_list:
-            if t[0] != tensor[0] or t[1] != tensor[1]:
-                raise RuntimeError("timestamp key not matched!")
-            values.append(int(t[2].item()))
+            values.append(int(t[0].item()))
 
-        consensus_value = self._make_consensus(values)
-        self[k] = consensus_value
-        return consensus_value == v - 1
+        need_undo = False
+        failure_workers = []
+        # all start from 0
+        if not any(values):
+            return need_undo, failure_workers
+
+        for i, v in enumerate(values):
+            if v == 0:
+                failure_workers.append(i)
+
+        if self._value == 0:
+            # failure workers
+            return need_undo, failure_workers
+        else:
+            # living workers
+            consensus_value = self._make_consensus(values)
+            self[k] = consensus_value
+            need_undo = consensus_value == self._value - 1
+            return need_undo, failure_workers
 
     def _make_consensus(self, values):
         max_v = max(values)
