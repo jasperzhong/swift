@@ -2867,8 +2867,7 @@ def flush_objects_to_fs():
             file = h5py.File(path, "a")
             path_to_files[path] = file
 
-        unique_id = _logging_cnt * get_world_size() + get_rank()
-        dataset = file.create_dataset(str(unique_id), data=tensor, compression=_logging_compression)
+        file.create_dataset(str(_logging_cnt), data=tensor, compression=_logging_compression)
         _logging_cnt += 1
 
     for _, file in path_to_files.items():
