@@ -6,8 +6,7 @@ MASTER_IP=10.28.1.16
 MASTER_PORT=1234
 export NCCL_SOCKET_IFNAME=eth2
 
-rm -rf logging.h5
-pkill -f plasma_store
+rm -rf logging*.h5
 
 cmd="python3 -m torch.distributed.run \
 	--nnodes=$NNODES --nproc_per_node=$NPROC_PER_NODE \

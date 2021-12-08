@@ -847,7 +847,7 @@ def isend(tensor,
         return
 
     if _logging and is_cross_machine(get_rank(), dst):
-        _logging_gpu_tensor_queue.append(tensor)
+        _logging_gpu_tensor_queue.append((dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
@@ -890,8 +890,8 @@ def irecv(tensor,
         pg = group
 
     if _logging and _logging_gpu_tensor_queue:
-        for logging_tensor in _logging_gpu_tensor_queue:
-            stash(logging_tensor)
+        for dst, logging_tensor in _logging_gpu_tensor_queue:
+            stash(dst, logging_tensor)
         _logging_gpu_tensor_queue.clear()
 
     if src is None:
@@ -927,7 +927,7 @@ def send(tensor,
         return
 
     if _logging and is_cross_machine(get_rank(), dst):
-        _logging_gpu_tensor_queue.append(tensor)
+        _logging_gpu_tensor_queue.append((dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
@@ -970,8 +970,8 @@ def recv(tensor,
         pg = group
 
     if _logging and _logging_gpu_tensor_queue:
-        for logging_tensor in _logging_gpu_tensor_queue:
-            stash(logging_tensor)
+        for dst, logging_tensor in _logging_gpu_tensor_queue:
+            stash(dst, logging_tensor)
         _logging_gpu_tensor_queue.clear()
 
     if src is None:
@@ -2827,7 +2827,7 @@ def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=N
     return pg
 
 
-def stash(tensor):
+def stash(dst, tensor):
     """stash the tensor into in-memory store
     """
     global _logging_stream
@@ -2844,7 +2844,7 @@ def stash(tensor):
     else:
         tensor_cpu = tensor
     tensor_np = tensor_cpu.detach().numpy()
-    _logging_cpu_tensor_queue.put(tensor_np)
+    _logging_cpu_tensor_queue.put((dst, tensor_np))
 
 
 def flush_objects_to_fs():
@@ -2852,14 +2852,24 @@ def flush_objects_to_fs():
     global _logging_cpu_tensor_queue
     global _logging_compression
 
-    path = 'logging_%d.h5' % (get_rank())
-    with h5py.File(path, "w") as f:
-        while True:
-            logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
-            tensor_np = _logging_cpu_tensor_queue.get()
-            if tensor_np is None:
-                logger.info("logging thread finishes")
-                return
-            unique_id = _logging_cnt * get_world_size() + get_rank()
-            dataset = f.create_dataset(str(unique_id), data=tensor_np, compression=_logging_compression)
-            _logging_cnt += 1
+    path_to_files = {}
+    while True:
+        logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
+        item = _logging_cpu_tensor_queue.get()
+        if item is None:
+            break
+        dst, tensor = item
+        path = 'logging_%d_%d.h5' % (get_rank(), dst)
+        file = None
+        if path in path_to_files:
+            file = path_to_files[path]
+        else:
+            file = h5py.File(path, "a")
+            path_to_files[path] = file
+
+        unique_id = _logging_cnt * get_world_size() + get_rank()
+        dataset = file.create_dataset(str(unique_id), data=tensor, compression=_logging_compression)
+        _logging_cnt += 1
+
+    for _, file in path_to_files.items():
+        file.close()
