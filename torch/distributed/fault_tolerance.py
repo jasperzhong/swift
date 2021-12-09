@@ -2,7 +2,10 @@ import functools
 import os
 import re
 import threading
+import numpy as np
 from queue import Queue
+
+import h5py
 
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
@@ -20,18 +23,28 @@ def _is_failure_worker(failure_workers):
     return get_rank() in failure_workers
 
 
-def _need_to_resend(failure_workers):
+def _find_resend_tasks(failure_workers):
     logging_files = [f for f in os.listdir('.') if re.match("logging_.*\.h5", f)]
+    resend_tasks = []
     for f in logging_files:
         _, src, dst = f.split('.')[0].split("_")
         src, dst = int(src), int(dst)
         if src == get_rank() and dst in failure_workers:
-            return True
-    return False
+            resend_tasks.append((f, dst))
+    return resend_tasks
 
 
-def _resend(failure_workers):
-    pass
+def _resend(resend_tasks):
+    for path, dst in resend_tasks:
+        with h5py.File(path, "r") as f:
+            keys = sorted(list(f.keys()), key=lambda x: int(x))
+            for key in keys:
+                print("resend %d" % key)
+                dest = f[key]
+                tensor_np = np.empty(dest.shape)
+                dest.read_direct(tensor_np)
+                tensor = torch.from_numpy(tensor_np).cuda()
+                torch.distributed.send(tensor, dst)
 
 
 def run(replica=False, logging=False, compression=None):
@@ -72,9 +85,11 @@ def run(replica=False, logging=False, compression=None):
                         if _is_failure_worker(failure_workers):
                             # (TODO): load checkpoint
                             pass
-                        elif _need_to_resend(failure_workers):
-                            print(f"[Rank {get_rank()} needs to resend logging data]")
-                            _resend(failure_workers)
+                        else:
+                            resend_tasks = _find_resend_tasks(failure_workers)
+                            if resend_tasks:
+                                print(f"[Rank {get_rank()} needs to resend logging data]")
+                                _resend(resend_tasks)
 
                     func(timestamp, model, optimizer, *args, **kwargs)
 
@@ -161,7 +176,6 @@ class Timestamp:
         values = []
         for t in tensor_list:
             values.append(int(t[0].item()))
-        print("values:", values)
 
         need_undo = False
         failure_workers = []
