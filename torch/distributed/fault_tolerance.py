@@ -35,6 +35,8 @@ def _find_resend_tasks(failure_workers):
 
 
 def _resend(resend_tasks):
+    # disable logging 
+    distributed_c10d._logging = False
     for path, dst in resend_tasks:
         with h5py.File(path, "r") as f:
             keys = sorted(list(f.keys()), key=lambda x: int(x))
@@ -45,6 +47,9 @@ def _resend(resend_tasks):
                 dest.read_direct(tensor_np)
                 tensor = torch.from_numpy(tensor_np).cuda()
                 torch.distributed.send(tensor, dst)
+
+    # enable logging 
+    distributed_c10d._logging = True
 
 
 def run(replica=False, logging=False, compression=None):
