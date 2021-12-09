@@ -39,7 +39,7 @@ def _resend(resend_tasks):
         with h5py.File(path, "r") as f:
             keys = sorted(list(f.keys()), key=lambda x: int(x))
             for key in keys:
-                print("resend %d" % key)
+                print("resend %s" % key)
                 dest = f[key]
                 tensor_np = np.empty(dest.shape)
                 dest.read_direct(tensor_np)
