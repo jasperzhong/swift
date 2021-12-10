@@ -45,7 +45,7 @@ def _set_recv_mask(client):
         # send to the failure worker
         if dst == get_rank():
             logger.info(f"download {file} from hdfs")
-            client.download('/' + file, file, overwrite=True)
+            client.download('/' + file, file)
             f = h5py.File(file, "r")
             distributed_c10d._logging_recv_mask[src] = (f, 0, len(f.keys()))
 
