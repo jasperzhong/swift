@@ -41,6 +41,7 @@ def _set_recv_mask(client):
     logging_files = [f for f in files if re.match("logging_.*\.h5", f)]
     for file in logging_files:
         _, src, dst = file.split('.')[0].split('_')
+        src, dst = int(src), int(dst)
         # send to the failure worker
         if dst == get_rank():
             logger.info(f"download {file} from hdfs")
