@@ -9,6 +9,7 @@ from datetime import timedelta
 from typing import Dict, Optional, Tuple, Union
 
 import h5py
+import numpy as np
 
 import torch
 import torch.nn
@@ -56,6 +57,10 @@ logger = logging.getLogger(__name__)
 # whether to perform logging
 _logging = False
 
+_logging_hdfs_client = None
+
+_logging_recv_mask = {}
+
 _logging_compression = None
 
 _logging_stream = None
@@ -84,6 +89,8 @@ def supports_complex(reduceOp: ReduceOp) -> bool:
 
 
 def _failure_handler():
+    global _logging
+    global _logging_cpu_tensor_queue
     default_pg = _get_default_group()
     rank = default_pg.rank()
     size = default_pg.size()
@@ -97,12 +104,14 @@ def _failure_handler():
         store.set(store_key, "0")
 
     destroy_process_group()
+
+    # put the logging finish
+    if _logging:
+        _logging_cpu_tensor_queue.put(None)
+
     print("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
     print("success to re-init")
-
-    # wait for restarted workers to initialize CUDA runtime
-    time.sleep(7)
 
 
 class Backend(object):
@@ -841,9 +850,14 @@ def isend(tensor,
     """
     global _logging
     global _logging_gpu_tensor_queue
+    global _logging_recv_mask
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
+        return
+
+    # do not send back to the upstream node during recovery
+    if _logging and _logging_recv_mask.get(dst) is not None:
         return
 
     if _logging and is_cross_machine(get_rank(), dst):
@@ -889,6 +903,20 @@ def irecv(tensor,
     else:
         pg = group
 
+    # read from the log data
+    if _logging and _logging_recv_mask.get(src) is not None:
+        f, cnt, total_cnt = _logging_recv_mask.get(src)
+        dest = f[str(cnt)]
+        tensor_np = np.empty(dest.shape)
+        dest.read_direct(tensor_np)
+        tensor.copy_(torch.from_numpy(tensor_np))
+        # read over
+        if cnt == total_cnt:
+            del _logging_recv_mask[src]
+        else:
+            _logging_recv_mask[src] = (f, cnt + 1, total_cnt)
+        return
+
     if _logging and _logging_gpu_tensor_queue:
         for dst, logging_tensor in _logging_gpu_tensor_queue:
             stash(dst, logging_tensor)
@@ -921,9 +949,14 @@ def send(tensor,
     """
     global _logging
     global _logging_gpu_tensor_queue
+    global _logging_recv_mask
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
+        return
+
+    # do not send back to the upstream node during recovery
+    if _logging and _logging_recv_mask.get(dst) is not None:
         return
 
     if _logging and is_cross_machine(get_rank(), dst):
@@ -959,6 +992,7 @@ def recv(tensor,
     """
     global _logging
     global _logging_gpu_tensor_queue
+    global _logging_recv_mask
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
@@ -968,6 +1002,20 @@ def recv(tensor,
         pg = _get_default_group()
     else:
         pg = group
+
+    # read from the log data
+    if _logging and _logging_recv_mask.get(src) is not None:
+        f, cnt, total_cnt = _logging_recv_mask.get(src)
+        dest = f[str(cnt)]
+        tensor_np = np.empty(dest.shape)
+        dest.read_direct(tensor_np)
+        tensor.copy_(torch.from_numpy(tensor_np))
+        # read over
+        if cnt == total_cnt:
+            del _logging_recv_mask[src]
+        else:
+            _logging_recv_mask[src] = (f, cnt + 1, total_cnt)
+        return
 
     if _logging and _logging_gpu_tensor_queue:
         for dst, logging_tensor in _logging_gpu_tensor_queue:
@@ -2851,6 +2899,7 @@ def flush_objects_to_fs():
     global _logging_cnt
     global _logging_cpu_tensor_queue
     global _logging_compression
+    global _logging_hdfs_client
 
     path_to_files = {}
     while True:
@@ -2864,11 +2913,14 @@ def flush_objects_to_fs():
         if path in path_to_files:
             file = path_to_files[path]
         else:
-            file = h5py.File(path, "w")
+            file = h5py.File(path, "a")
             path_to_files[path] = file
 
         file.create_dataset(str(_logging_cnt), data=tensor, compression=_logging_compression)
         _logging_cnt += 1
 
-    for _, file in path_to_files.items():
+    for name, file in path_to_files.items():
         file.close()
+        _logging_hdfs_client.delete("/" + name)
+        _logging_hdfs_client.upload("/" + name, name)
+        print(f"put {name} on hdfs")

@@ -1,11 +1,11 @@
 import functools
+import getpass
 import os
-import re
 import threading
-import numpy as np
 from queue import Queue
 
 import h5py
+from hdfs import InsecureClient
 
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
@@ -23,33 +23,14 @@ def _is_failure_worker(failure_workers):
     return get_rank() in failure_workers
 
 
-def _find_resend_tasks(failure_workers):
-    logging_files = [f for f in os.listdir('.') if re.match("logging_.*\.h5", f)]
-    resend_tasks = []
-    for f in logging_files:
-        _, src, dst = f.split('.')[0].split("_")
-        src, dst = int(src), int(dst)
-        if src == get_rank() and dst in failure_workers:
-            resend_tasks.append((f, dst))
-    return resend_tasks
-
-
-def _resend(resend_tasks):
-    # disable logging 
-    distributed_c10d._logging = False
-    for path, dst in resend_tasks:
-        with h5py.File(path, "r") as f:
-            keys = sorted(list(f.keys()), key=lambda x: int(x))
-            for key in keys:
-                print("resend %s" % key)
-                dest = f[key]
-                tensor_np = np.empty(dest.shape)
-                dest.read_direct(tensor_np)
-                tensor = torch.from_numpy(tensor_np).cuda()
-                torch.distributed.send(tensor, dst)
-
-    # enable logging 
-    distributed_c10d._logging = True
+def _set_recv_mask(client):
+    files = client.list('/')
+    for file in files:
+        _, src, dst = file.split('.')[0].split('_')
+        # send to the failure worker
+        if dst == get_rank():
+            f = h5py.File(file, "r")
+            distributed_c10d._logging_recv_mask[src] = (f, 0, len(f.keys()))
 
 
 def run(replica=False, logging=False, compression=None):
@@ -69,11 +50,19 @@ def run(replica=False, logging=False, compression=None):
                 print(f"enable logging on device {torch.cuda.current_device()}")
                 distributed_c10d._logging_stream = torch.cuda.Stream()
                 distributed_c10d._logging_cpu_tensor_queue = Queue()
-                distributed_c10d._logging_thread = threading.Thread(target=distributed_c10d.flush_objects_to_fs)
-                distributed_c10d._logging_thread.start()
+
+                # connect to hdfs
+                host = os.environ["MASTER_ADDR"]
+                user = getpass.getuser()
+                client = InsecureClient(f"http://{host}:50070", user=user)
+                distributed_c10d._logging_hdfs_client = client
 
             while True:
                 try:
+                    if logging:
+                        distributed_c10d._logging_thread = threading.Thread(target=distributed_c10d.flush_objects_to_fs)
+                        distributed_c10d._logging_thread.start()
+
                     need_undo, failure_workers = timestamp.sync()
                     print("failure workers: ", failure_workers)
 
@@ -88,24 +77,20 @@ def run(replica=False, logging=False, compression=None):
                         broadcast_optimizer_state(optimizer.state_dict(), 0)
                     elif logging:
                         if _is_failure_worker(failure_workers):
-                            # (TODO): load checkpoint
-                            pass
+                            _set_recv_mask(client)
                         else:
-                            resend_tasks = _find_resend_tasks(failure_workers)
-                            if resend_tasks:
-                                print(f"[Rank {get_rank()} needs to resend logging data]")
-                                _resend(resend_tasks)
+                            # TODO: parallel recovery
+                            pass
 
-                    func(timestamp, model, optimizer, *args, **kwargs)
-
+                    return func(timestamp, model, optimizer, *args, **kwargs)
+                except SwiftInternalError as e:
+                    print("catch an error: " + str(e))
+                    _failure_handler()
+                finally:
                     if logging:
                         distributed_c10d._logging_cpu_tensor_queue.put(None)
                         distributed_c10d._logging_thread.join()
 
-                    return
-                except SwiftInternalError as e:
-                    print("catch an error: " + str(e))
-                    _failure_handler()
         return wrapper
     return f
 
