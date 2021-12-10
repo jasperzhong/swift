@@ -905,7 +905,7 @@ def irecv(tensor,
         dest = f[str(cnt)]
         tensor_np = np.empty(dest.shape)
         dest.read_direct(tensor_np)
-        with torh.no_grad():
+        with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
         # read over
         if cnt == total_cnt:
@@ -1007,7 +1007,7 @@ def recv(tensor,
         dest = f[str(cnt)]
         tensor_np = np.empty(dest.shape)
         dest.read_direct(tensor_np)
-        with torh.no_grad():
+        with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
         # read over
         if cnt == total_cnt:
