@@ -908,7 +908,7 @@ def irecv(tensor,
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
         # read over
-        if cnt == total_cnt:
+        if cnt == total_cnt - 1:
             f.close()
             del _logging_recv_mask[src]
         else:
@@ -1010,7 +1010,7 @@ def recv(tensor,
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
         # read over
-        if cnt == total_cnt:
+        if cnt == total_cnt - 1:
             f.close()
             del _logging_recv_mask[src]
         else:
