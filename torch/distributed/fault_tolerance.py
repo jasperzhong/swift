@@ -32,7 +32,7 @@ def _set_recv_mask(client):
     # wait for copying done
     while True:
         files = client.list('/')
-        coping_files = [f for f in file if re.match("logging_.*\.h5._COPYING_", f)]
+        coping_files = [f for f in files if re.match("logging_.*\.h5._COPYING_", f)]
         if coping_files:
             time.sleep(0.1)
         else:
