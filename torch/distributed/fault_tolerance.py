@@ -1,5 +1,6 @@
 import functools
 import getpass
+import logging
 import os
 import re
 import threading
@@ -20,6 +21,9 @@ from .distributed_c10d import (_failure_handler, all_gather, get_rank,
                                get_world_size)
 
 
+logger = logging.getLogger(__name__)
+
+
 def _is_failure_worker(failure_workers):
     return get_rank() in failure_workers
 
@@ -30,6 +34,7 @@ def _set_recv_mask(client):
         _, src, dst = file.split('.')[0].split('_')
         # send to the failure worker
         if dst == get_rank():
+            client.download('/' + file, file, overwrite=True)
             f = h5py.File(file, "r")
             distributed_c10d._logging_recv_mask[src] = (f, 0, len(f.keys()))
 
@@ -48,7 +53,7 @@ def run(replica=False, logging=False, compression=None):
                 assert type(optimizer).__name__ == "DistributedOptimizer"
 
             if logging:
-                print(f"enable logging on device {torch.cuda.current_device()}")
+                logger.info(f"enable logging on device {torch.cuda.current_device()}")
                 distributed_c10d._logging_stream = torch.cuda.Stream()
                 distributed_c10d._logging_cpu_tensor_queue = Queue()
 
@@ -65,11 +70,11 @@ def run(replica=False, logging=False, compression=None):
                         distributed_c10d._logging_thread.start()
 
                     need_undo, failure_workers = timestamp.sync()
-                    print("failure workers: ", failure_workers)
+                    logger.info("failure workers: ", failure_workers)
 
                     if need_undo:
-                        print(f"[Rank {get_rank()}] undo update is needed"
-                              "(iteration = {timestamp.value} while the consensus value is {timestamp.value-1})!")
+                        logger.info(f"[Rank {get_rank()}] undo update is needed"
+                                    "(iteration = {timestamp.value} while the consensus value is {timestamp.value-1})!")
                         optimizer.undo()
 
                     if replica:
@@ -85,7 +90,7 @@ def run(replica=False, logging=False, compression=None):
 
                     return func(timestamp, model, optimizer, *args, **kwargs)
                 except SwiftInternalError as e:
-                    print("catch an error: " + str(e))
+                    logger.info("catch an error: " + str(e))
                     _failure_handler()
                 finally:
                     if logging:
@@ -107,28 +112,28 @@ class Timestamp:
 
     def __iadd__(self, other):
         self._value += other
-        return self._value
+        return self
 
     def __sub__(self, other):
         return self._value - other
 
     def __isub__(self, other):
         self._value -= other
-        return self._value
+        return self
 
     def __mul__(self, other):
         return self._value * other
 
     def __imul__(self, other):
         self._value *= other
-        return self._value
+        return self
 
     def __div__(self, other):
         return self._value / other
 
     def __idiv__(self, other):
         self._value /= other
-        return self._value
+        return self
 
     def __lt__(self, other):
         return self._value < other
