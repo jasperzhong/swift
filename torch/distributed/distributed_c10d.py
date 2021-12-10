@@ -105,10 +105,6 @@ def _failure_handler():
 
     destroy_process_group()
 
-    # put the logging finish
-    if _logging:
-        _logging_cpu_tensor_queue.put(None)
-
     logger.info("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
     logger.info("success to re-init")
