@@ -1005,7 +1005,7 @@ def recv(tensor,
     if _logging and _logging_recv_mask.get(src) is not None:
         f, cnt, total_cnt = _logging_recv_mask.get(src)
         dest = f[str(cnt)]
-        tensor_np = np.empty(dest.shape)
+        tensor_np = np.empty(dest.shape, dest.dtype)
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
