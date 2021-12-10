@@ -29,11 +29,21 @@ def _is_failure_worker(failure_workers):
 
 
 def _set_recv_mask(client):
-    files = [f for f in client.list('/') if re.match("logging_.*\.h5", f)]
-    for file in files:
+    # wait for copying done
+    while True:
+        files = client.list('/')
+        coping_files = [f for f in file if re.match("logging_.*\.h5._COPYING_", f)]
+        if coping_files:
+            time.sleep(0.1)
+        else:
+            break
+
+    logging_files = [f for f in files if re.match("logging_.*\.h5", f)]
+    for file in logging_files:
         _, src, dst = file.split('.')[0].split('_')
         # send to the failure worker
         if dst == get_rank():
+            logger.info(f"download {file} from hdfs")
             client.download('/' + file, file, overwrite=True)
             f = h5py.File(file, "r")
             distributed_c10d._logging_recv_mask[src] = (f, 0, len(f.keys()))
@@ -189,8 +199,8 @@ class Timestamp:
         else:
             # living workers
             consensus_value = self._make_consensus(values)
-            self = Timestamp(consensus_value)
             need_undo = consensus_value == self._value - 1
+            self._value = consensus_value
             return need_undo, failure_workers
 
     def _make_consensus(self, values):
