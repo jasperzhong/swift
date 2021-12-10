@@ -99,7 +99,7 @@ def _failure_handler():
     re_init_key = "reinit"
     re_init = store.add(re_init_key, 1)
     if re_init == 1:
-        print("rank %d reset STORE_BASED_BARRIER_PREFIX to 0" % rank)
+        logger.info("rank %d reset STORE_BASED_BARRIER_PREFIX to 0" % rank)
         store_key = "{}:{}".format(STORE_BASED_BARRIER_PREFIX, _group_count)
         store.set(store_key, "0")
 
@@ -109,9 +109,9 @@ def _failure_handler():
     if _logging:
         _logging_cpu_tensor_queue.put(None)
 
-    print("start to re-init")
+    logger.info("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
-    print("success to re-init")
+    logger.info("success to re-init")
 
 
 class Backend(object):
@@ -256,7 +256,7 @@ def _store_based_barrier(rank, store, timeout):
         time.sleep(0.01)
         worker_count = store.add(store_key, 0)
 
-        # Print status periodically to keep track.
+        # logger.info status periodically to keep track.
         if timedelta(seconds=(time.time() - log_time)) > timedelta(seconds=10):
             logger.info(
                 "Waiting in store based barrier to initialize process group for "
@@ -912,6 +912,7 @@ def irecv(tensor,
         tensor.copy_(torch.from_numpy(tensor_np))
         # read over
         if cnt == total_cnt:
+            f.close()
             del _logging_recv_mask[src]
         else:
             _logging_recv_mask[src] = (f, cnt + 1, total_cnt)
@@ -1012,6 +1013,7 @@ def recv(tensor,
         tensor.copy_(torch.from_numpy(tensor_np))
         # read over
         if cnt == total_cnt:
+            f.close()
             del _logging_recv_mask[src]
         else:
             _logging_recv_mask[src] = (f, cnt + 1, total_cnt)
@@ -2923,4 +2925,4 @@ def flush_objects_to_fs():
         file.close()
         _logging_hdfs_client.delete("/" + name)
         _logging_hdfs_client.upload("/" + name, name)
-        print(f"put {name} on hdfs")
+        logger.info(f"put {name} on hdfs")
