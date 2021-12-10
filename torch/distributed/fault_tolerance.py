@@ -1,6 +1,7 @@
 import functools
 import getpass
 import os
+import re
 import threading
 from queue import Queue
 
@@ -24,7 +25,7 @@ def _is_failure_worker(failure_workers):
 
 
 def _set_recv_mask(client):
-    files = client.list('/')
+    files = [f for f in client.list('/') if re.match("logging_.*\.h5", f)]
     for file in files:
         _, src, dst = file.split('.')[0].split('_')
         # send to the failure worker
