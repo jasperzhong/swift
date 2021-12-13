@@ -909,6 +909,7 @@ def irecv(tensor,
             tensor.copy_(torch.from_numpy(tensor_np))
         # read over
         if cnt == total_cnt - 1:
+            logger.info("finish reading from log file")
             f.close()
             del _logging_recv_mask[src]
         else:
@@ -1004,6 +1005,7 @@ def recv(tensor,
     # read from the log data
     if _logging and _logging_recv_mask.get(src) is not None:
         f, cnt, total_cnt = _logging_recv_mask.get(src)
+        logger.info(f"read {cnt} from file. src={src}")
         dest = f[str(cnt)]
         tensor_np = np.empty(dest.shape, dest.dtype)
         dest.read_direct(tensor_np)
@@ -1011,6 +1013,7 @@ def recv(tensor,
             tensor.copy_(torch.from_numpy(tensor_np))
         # read over
         if cnt == total_cnt - 1:
+            logger.info(f"close file. src={src}")
             f.close()
             del _logging_recv_mask[src]
         else:
@@ -2888,7 +2891,7 @@ def stash(dst, tensor):
         tensor_cpu = torch.empty_like(tensor, device="cpu", pin_memory=True)
         _logging_stream.wait_stream(torch.cuda.current_stream())
         with torch.cuda.stream(_logging_stream):
-            tensor_cpu.copy_(tensor, non_blocking=True)
+            tensor_cpu.copy_(tensor)
     else:
         tensor_cpu = tensor
     tensor_np = tensor_cpu.detach().numpy()
@@ -2917,6 +2920,7 @@ def flush_objects_to_fs():
             path_to_files[path] = file
 
         file.create_dataset(str(_logging_cnt), data=tensor, compression=_logging_compression)
+        # TODO: every send/recv pair should have a logging cnt
         _logging_cnt += 1
 
     for name, file in path_to_files.items():

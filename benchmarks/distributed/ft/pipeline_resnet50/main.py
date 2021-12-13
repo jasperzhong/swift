@@ -2,6 +2,7 @@ import argparse
 import os
 import random
 import time
+import logging
 
 import numpy as np
 from model import PipelineParallelResNet50
@@ -14,6 +15,8 @@ import torch.distributed.fault_tolerance
 from torch.distributed.fault_tolerance import Timestamp
 import torch.nn as nn
 import torch.optim as optim
+
+logging.basicConfig(level=logging.INFO)
 
 parser = argparse.ArgumentParser(
     description='Pipeline Parallel ResNet50 Arguments')
