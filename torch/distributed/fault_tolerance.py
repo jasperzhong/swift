@@ -67,8 +67,8 @@ def run(replica=False, logging=False, *args_, **kwargs_):
     """
     distributed_c10d._logging = logging
     if logging:
-        if "compression" in kwargs:
-            distributed_c10d._logging_compression = kwargs['compression']
+        if "compression" in kwargs_:
+            distributed_c10d._logging_compression = kwargs_['compression']
 
     def f(func):
         @functools.wraps(func)
