@@ -85,7 +85,7 @@ def run(replica=False, logging=False, *args, **kwargs):
                 distributed_c10d._logging_cpu_tensor_queue = Queue()
 
                 dfs = kwargs["dfs"]
-                distributed_c10d._logging_dfs_client = DFSClient.create(dfs)
+                distributed_c10d._logging_dfs_client = DFSClient.create(dfs, kwargs)
 
             while True:
                 try:
