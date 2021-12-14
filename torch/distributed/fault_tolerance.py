@@ -85,7 +85,7 @@ def run(replica=False, logging=False, *args_, **kwargs_):
                 distributed_c10d._logging_cpu_tensor_queue = Queue()
 
                 dfs = kwargs_["dfs"]
-                distributed_c10d._logging_dfs_client = DFSClient.create(dfs, kwargs_)
+                distributed_c10d._logging_dfs_client = DFSClient.create(dfs, **kwargs_)
 
             while True:
                 try:
@@ -232,7 +232,7 @@ class DFSClient(ABC):
         if dfs == "hdfs":
             return HDFSClient()
         elif dfs == "s3":
-            return S3Client(kwargs)
+            return S3Client(**kwargs)
         else:
             raise ValueError(f"unknown dfs client: {dfs}")
 
