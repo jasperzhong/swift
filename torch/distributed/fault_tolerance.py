@@ -39,6 +39,8 @@ def _set_recv_mask(consensus_value, pairs):
         files = client.ls()
         for file in files:
             if file in logging_files:
+                _, src, dst = file.split('.')[0].split('_')
+                src, dst = int(src), int(dst)
                 logger.info(f"download {file} from hdfs")
                 client.download(dfs_path=file, local_path=file)
                 f = h5py.File(file, "r")
