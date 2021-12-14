@@ -5,7 +5,7 @@ import os
 import re
 import threading
 from queue import Queue
-from abc import ABC
+from abc import ABC, abstractmethod
 
 import h5py
 from hdfs import InsecureClient
