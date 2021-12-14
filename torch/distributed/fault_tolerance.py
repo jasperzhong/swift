@@ -48,7 +48,7 @@ def _set_recv_mask(consensus_value, pairs):
                 valid_keys = filter(lambda x: int(x.split(":")[0]) < consensus_value, keys)
                 # (file handle, valid_keys)
                 distributed_c10d._logging_recv_mask[src] = (f, valid_keys)
-            logging_files.remove(file)
+                logging_files.remove(file)
 
         time.sleep(0.1)
 
