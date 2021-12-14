@@ -58,7 +58,7 @@ def _set_recv_mask(client, consensus_value):
             distributed_c10d._logging_recv_mask[src] = (f, valid_keys)
 
 
-def run(replica=False, logging=False, *args, **kwargs):
+def run(replica=False, logging=False, *args_, **kwargs_):
     """
     kwargs:
          compression: whether to enable compression for logging data True/False
@@ -84,8 +84,8 @@ def run(replica=False, logging=False, *args, **kwargs):
                 distributed_c10d._logging_stream = torch.cuda.Stream()
                 distributed_c10d._logging_cpu_tensor_queue = Queue()
 
-                dfs = kwargs["dfs"]
-                distributed_c10d._logging_dfs_client = DFSClient.create(dfs, kwargs)
+                dfs = kwargs_["dfs"]
+                distributed_c10d._logging_dfs_client = DFSClient.create(dfs, kwargs_)
 
             while True:
                 try:
