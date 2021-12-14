@@ -7,7 +7,7 @@ import logging
 import numpy as np
 from model import PipelineParallelResNet50
 from schedule import (initialize_global_args, is_pipeline_first_stage,
-                      is_pipeline_last_stage, pipedream_flush_schedule)
+                      is_pipeline_last_stage, get_num_microbatches, pipedream_flush_schedule)
 from torchvision import datasets, transforms
 
 import torch
@@ -56,7 +56,7 @@ args = parser.parse_args()
 initialize_global_args(args)
 
 
-def get_data_iterator(args):
+def get_data_loader(args):
     traindir = os.path.join(args.data, 'train')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
@@ -74,19 +74,28 @@ def get_data_iterator(args):
         train_dataset, batch_size=args.micro_batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True
     )
-    data_iterator = iter(train_loader)
-    return data_iterator
+    return train_loader
+
+def get_data_iterator(data_loader):
+    if args.seed is not None:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        torch.cuda.manual_seed(args.seed)
+    return iter(data_loader)
 
 
 @torch.distributed.fault_tolerance.run(logging=args.logging, compression=args.logging_compression)
-def train(ts, model, optimizer, args, data_iterator, loss_func):
+def train(ts, model, optimizer, train_loader, args, loss_func):
     print("start from iter={}".format(ts))
     iteration = 0
+    data_iterator = get_data_iterator(train_loader)
     for epoch in range(args.epochs):
         while True:
             if iteration < ts:
                 if is_pipeline_first_stage() or is_pipeline_last_stage():
-                    next(data_iterator)
+                    for _ in range(get_num_microbatches()):
+                        next(data_iterator)
                 iteration += 1
                 continue
 
@@ -130,7 +139,7 @@ def main():
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
 
-    data_iterator = get_data_iterator(args)
+    data_loader = get_data_loader(args)
     model = PipelineParallelResNet50(balance=[4, 2, 2, 3])
     model.cuda()
 
@@ -138,7 +147,7 @@ def main():
     loss_func = nn.CrossEntropyLoss().cuda()
 
     ts = Timestamp(0)
-    train(ts, model, optimizer, args, data_iterator, loss_func)
+    train(ts, model, optimizer, data_loader, args, loss_func)
 
 
 if __name__ == '__main__':
