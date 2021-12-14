@@ -71,12 +71,12 @@ def run(replica=False, logging=False, *args_, **kwargs_):
             if replica:
                 assert type(optimizer).__name__ == "DistributedOptimizer"
 
-            if logging:
+            if distributed_c10d._logging:
                 groups = get_groups(**kwargs_)
                 pairs = groups_to_pairs(groups)
                 if not need_logging(pairs):
                     logging = False
-                    distributed_c10d._logging = logging
+                    distributed_c10d._logging = False
 
             if logging:
                 logger.info(f"enable logging on device {torch.cuda.current_device()}")
