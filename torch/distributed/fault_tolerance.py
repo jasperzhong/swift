@@ -32,7 +32,8 @@ def _is_failure_worker(failure_workers):
     return get_rank() in failure_workers
 
 
-def _set_recv_mask(client, consensus_value, pairs):
+def _set_recv_mask(consensus_value, pairs):
+    client = distributed_c10d._logging_dfs_client
     logging_files = get_logging_files(pairs)
     while logging_files:
         files = client.ls()
@@ -106,7 +107,7 @@ def run(replica=False, logging=False, *args_, **kwargs_):
                         broadcast_optimizer_state(optimizer.state_dict(), 0)
                     elif logging:
                         if _is_failure_worker(failure_workers):
-                            _set_recv_mask(client, consensus_value)
+                            _set_recv_mask(consensus_value, pairs)
                         else:
                             # TODO: parallel recovery
                             pass
