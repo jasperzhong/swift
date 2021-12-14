@@ -20,6 +20,10 @@ from .data_parallel import (_DistributedOptimizer, broadcast_optimizer_state,
 from .distributed_c10d import (_failure_handler, all_gather, get_rank,
                                get_world_size)
 
+try:
+    import boto3
+except ImportError:
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +49,7 @@ def _set_recv_mask(client, consensus_value):
         # send to the failure worker
         if dst == get_rank():
             logger.info(f"download {file} from hdfs")
-            client.download('/' + file, file)
+            client.download(dfs_path=file, local_path=file)
             f = h5py.File(file, "r")
             keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
             valid_keys = filter(lambda x: int(x.split(":")[0]) < consensus_value, keys)
@@ -53,9 +57,17 @@ def _set_recv_mask(client, consensus_value):
             distributed_c10d._logging_recv_mask[src] = (f, valid_keys)
 
 
-def run(replica=False, logging=False, compression=None):
+def run(replica=False, logging=False, *args, **kwargs):
+    """
+    kwargs:
+         compression: whether to enable compression for logging data True/False
+         dfs: which distributed filesystem in use ['s3', 'hfds']
+
+    """
     distributed_c10d._logging = logging
-    distributed_c10d._logging_compression = compression
+    if logging:
+        if "compression" in kwargs:
+            distributed_c10d._logging_compression = kwargs['compression']
 
     def f(func):
         @functools.wraps(func)
@@ -71,17 +83,14 @@ def run(replica=False, logging=False, compression=None):
                 distributed_c10d._logging_stream = torch.cuda.Stream()
                 distributed_c10d._logging_cpu_tensor_queue = Queue()
 
-                # connect to hdfs
-                host = os.environ["MASTER_ADDR"]
-                user = getpass.getuser()
-                client = InsecureClient(f"http://{host}:50070", user=user)
-                distributed_c10d._logging_hdfs_client = client
+                dfs = kwargs["dfs"]
+                distributed_c10d._logging_dfs_client = DFSClient.create(dfs)
 
             while True:
                 try:
                     if logging:
                         distributed_c10d._logging_thread = threading.Thread(
-                            target=distributed_c10d.flush_objects_to_fs, args=(timestamp, ))
+                            target=distributed_c10d.flush_objects_to_dfs, args=(timestamp, ))
                         distributed_c10d._logging_thread.start()
 
                     consensus_value, need_undo, failure_workers = timestamp.sync()
@@ -214,3 +223,55 @@ class Timestamp:
         if max_v - 1 in values:
             return max_v - 1
         return max_v
+
+
+class DFSClient:
+    @classmethod
+    def create(cls, dfs, *args, **kwargs):
+        if dfs == "hdfs":
+            return HDFSClient()
+        elif dfs == "s3":
+            return S3Client(kwargs)
+        else:
+            raise ValueError(f"unknown dfs client: {dfs}")
+
+    @abstractmethod
+    def upload(self, dfs_path, local_path):
+        raise NotImplementedError
+
+    @abstractmethod
+    def download(self, dfs_path, local_path):
+        raise NotImplementedError
+
+
+class HDFSClient(DFSClient):
+    def __init__(self, *args, **kwargs):
+        host = os.environ["MASTER_ADDR"]
+        user = getpass.getuser()
+        self.client = InsecureClient(f"http://{host}:50070", user=user)
+
+    def upload(self, dfs_path, local_path):
+        self.client.upload("/" + dfs_path, local_path, overwrite=True)
+
+    def download(self, dfs_path, local_path):
+        self.cient.download("/" + dfs_path, local_path)
+
+
+class S3Client(DFSClient):
+    def __init__(self, *args, **kwargs):
+        if "bucket" in kwargs:
+            bucket = kwargs["bucket"]
+        else:
+            raise ValueError("bucket not found")
+
+        self.s3 = boto3.client('s3')
+        rsp = s3.list_buckets()
+        all_buckets = [bucket['Name'] for bucket in rsp['Buckets']]
+        assert bucket in all_buckets
+        self.bucket = bucket
+
+    def upload(self, dfs_path, local_path):
+        self.s3.upload_file(local_path, self.bucket, dfs_path)
+
+    def download(self, dfs_path, local_path):
+        self.s3.download_file(self.bucket, dfs_path, local_path)
