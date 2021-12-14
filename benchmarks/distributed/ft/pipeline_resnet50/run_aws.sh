@@ -5,6 +5,8 @@ NPROC_PER_NODE=1
 MASTER_IP=172.30.2.12
 MASTER_PORT=1234
 
+rm -rf logging*.h5
+
 cmd="python3 -m torch.distributed.run \
 	--nnodes=$NNODES --nproc_per_node=$NPROC_PER_NODE \
 	--rdzv_id=1234 --rdzv_backend=c10d \
