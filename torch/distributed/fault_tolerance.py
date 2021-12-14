@@ -251,6 +251,10 @@ class DFSClient(ABC):
     def ls(self):
         raise NotImplementedError
 
+    @abstractmethod
+    def rm(self, dfs_path):
+        raise NotImplementedError
+
 
 class HDFSClient(DFSClient):
     def __init__(self, *args, **kwargs):
@@ -266,6 +270,10 @@ class HDFSClient(DFSClient):
 
     def ls(self):
         return self.client.list("/")
+    
+    def rm(self, dfs_path):
+        self.client.delete("/" + dfs_path)
+
 
 
 class S3Client(DFSClient):
@@ -291,6 +299,9 @@ class S3Client(DFSClient):
         rsp = self.s3.list_objects(Bucket=self.bucket)
         files = rsp['Contents']
         return [file['Key'] for file in files]
+
+    def rm(self, dfs_path):
+        self.s3.delete_object(Bucket=self.bucket, Key=dfs_path)
 
 
 def get_groups(group_size=None, groups=None, **kwargs):
