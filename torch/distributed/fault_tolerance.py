@@ -84,8 +84,7 @@ def run(replica=False, logging=False, *args_, **kwargs_):
                 distributed_c10d._logging_stream = torch.cuda.Stream()
                 distributed_c10d._logging_cpu_tensor_queue = Queue()
 
-                dfs = kwargs_["dfs"]
-                distributed_c10d._logging_dfs_client = DFSClient.create(dfs, **kwargs_)
+                distributed_c10d._logging_dfs_client = DFSClient.create(**kwargs_)
 
             while True:
                 try:
@@ -228,7 +227,8 @@ class Timestamp:
 
 class DFSClient(ABC):
     @classmethod
-    def create(cls, dfs, *args, **kwargs):
+    def create(cls, *args, **kwargs):
+        dfs = kwargs['dfs']
         if dfs == "hdfs":
             return HDFSClient()
         elif dfs == "s3":
