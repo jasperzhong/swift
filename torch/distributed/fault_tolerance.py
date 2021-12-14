@@ -75,8 +75,9 @@ def run(replica=False, logging=False, *args_, **kwargs_):
                 groups = get_groups(**kwargs_)
                 pairs = groups_to_pairs(groups)
                 if not need_logging(pairs):
-                    logging = False
                     distributed_c10d._logging = False
+
+            logging = distributed_c10d._logging
 
             if logging:
                 logger.info(f"enable logging on device {torch.cuda.current_device()}")
