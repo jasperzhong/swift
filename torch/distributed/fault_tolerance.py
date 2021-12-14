@@ -2,7 +2,6 @@ import functools
 import getpass
 import logging
 import os
-import re
 import threading
 from queue import Queue
 from abc import ABC, abstractmethod
@@ -33,29 +32,22 @@ def _is_failure_worker(failure_workers):
     return get_rank() in failure_workers
 
 
-def _set_recv_mask(client, consensus_value):
-    # wait for copying done
-    while True:
-        files = client.list('/')
-        coping_files = [f for f in files if re.match("logging_.*\.h5._COPYING_", f)]
-        if coping_files:
-            time.sleep(0.1)
-        else:
-            break
+def _set_recv_mask(client, consensus_value, pairs):
+    logging_files = get_logging_files(pairs)
+    while logging_files:
+        files = client.ls()
+        for file in files:
+            if file in logging_files:
+                logger.info(f"download {file} from hdfs")
+                client.download(dfs_path=file, local_path=file)
+                f = h5py.File(file, "r")
+                keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
+                valid_keys = filter(lambda x: int(x.split(":")[0]) < consensus_value, keys)
+                # (file handle, valid_keys)
+                distributed_c10d._logging_recv_mask[src] = (f, valid_keys)
+            logging_files.remove(file)
 
-    logging_files = [f for f in files if re.match("logging_.*\.h5", f)]
-    for file in logging_files:
-        _, src, dst = file.split('.')[0].split('_')
-        src, dst = int(src), int(dst)
-        # send to the failure worker
-        if dst == get_rank():
-            logger.info(f"download {file} from hdfs")
-            client.download(dfs_path=file, local_path=file)
-            f = h5py.File(file, "r")
-            keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
-            valid_keys = filter(lambda x: int(x.split(":")[0]) < consensus_value, keys)
-            # (file handle, valid_keys)
-            distributed_c10d._logging_recv_mask[src] = (f, valid_keys)
+        time.sleep(0.1)
 
 
 def run(replica=False, logging=False, *args_, **kwargs_):
@@ -80,10 +72,16 @@ def run(replica=False, logging=False, *args_, **kwargs_):
                 assert type(optimizer).__name__ == "DistributedOptimizer"
 
             if logging:
+                groups = get_groups(**kwargs_)
+                pairs = groups_to_pairs(groups)
+                if not need_logging(pairs):
+                    logging = False
+                    distributed_c10d._logging = logging
+
+            if logging:
                 logger.info(f"enable logging on device {torch.cuda.current_device()}")
                 distributed_c10d._logging_stream = torch.cuda.Stream()
                 distributed_c10d._logging_cpu_tensor_queue = Queue()
-
                 distributed_c10d._logging_dfs_client = DFSClient.create(**kwargs_)
 
             while True:
@@ -244,6 +242,10 @@ class DFSClient(ABC):
     def download(self, dfs_path, local_path):
         raise NotImplementedError
 
+    @abstractmethod
+    def ls(self):
+        raise NotImplementedError
+
 
 class HDFSClient(DFSClient):
     def __init__(self, *args, **kwargs):
@@ -255,7 +257,10 @@ class HDFSClient(DFSClient):
         self.client.upload("/" + dfs_path, local_path, overwrite=True)
 
     def download(self, dfs_path, local_path):
-        self.cient.download("/" + dfs_path, local_path)
+        self.client.download("/" + dfs_path, local_path)
+
+    def ls(self):
+        return self.client.list("/")
 
 
 class S3Client(DFSClient):
@@ -276,3 +281,59 @@ class S3Client(DFSClient):
 
     def download(self, dfs_path, local_path):
         self.s3.download_file(self.bucket, dfs_path, local_path)
+
+    def ls(self):
+        rsp = self.s3.list_objects(Bucket=self.bucket)
+        files = rsp['Contents']
+        return [file['Key'] for file in files]
+
+
+def get_groups(group_size=None, groups=None, **kwargs):
+    workers = get_world_size()
+    if groups:
+        workers_in_groups = [worker for worker in group for group in groups]
+        workers_in_groups = sorted(workers_in_groups)
+        all_workers = list(range(workers))
+        for lhs, rhs in zip(workers_in_groups, all_workers):
+            if lhs != rhs:
+                raise ValueError("wrong input groups")
+        return groups
+
+    if group_size is None:
+        group_size = get_local_world_size()
+
+    group_num = workers // group_size
+    remainder = workers % group_size
+    groups = []
+    cnt = 0
+    for _ in range(group_num):
+        groups.append(list(range(cnt, cnt + group_size)))
+        cnt += group_size
+    if remainder:
+        groups.append(list(range(cnt, cnt + remainder)))
+    return groups
+
+
+def groups_to_pairs(groups):
+    pairs = []
+    for i in range(len(groups) - 1):
+        pairs.append((groups[i][-1], groups[i + 1][0]))
+    return pairs
+
+
+def need_logging(pairs):
+    rank = get_rank()
+    for pair in pairs:
+        if rank in pair:
+            return True
+    return False
+
+
+def get_logging_files(pairs):
+    rank = get_rank()
+    logging_files = []
+    for pair in pairs:
+        if rank in pair:
+            peer = pair[1] if pair[0] == rank else pair[0]
+            logging_files.append(f"logging_{peer}_{rank}.h5")
+    return logging_files
