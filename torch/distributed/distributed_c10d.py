@@ -2931,5 +2931,6 @@ def flush_objects_to_dfs(ts):
 
     for name, file in path_to_files.items():
         file.close()
+        _logging_dfs_client.rm(dfs_path=name)
         _logging_dfs_client.upload(dfs_path=name, local_path=name)
         logger.info(f"put {name} on dfs")
