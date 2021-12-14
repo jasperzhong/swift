@@ -266,7 +266,7 @@ class S3Client(DFSClient):
             raise ValueError("bucket not found")
 
         self.s3 = boto3.client('s3')
-        rsp = s3.list_buckets()
+        rsp = self.s3.list_buckets()
         all_buckets = [bucket['Name'] for bucket in rsp['Buckets']]
         assert bucket in all_buckets
         self.bucket = bucket
