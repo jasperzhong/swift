@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 # whether to perform logging
 _logging = False
 
-_logging_hdfs_client = None
+_logging_dfs_client = None
 
 _logging_recv_mask = {}
 
@@ -2899,11 +2899,11 @@ def stash(dst, tensor):
     _logging_cpu_tensor_queue.put((dst, tensor_np))
 
 
-def flush_objects_to_fs(ts):
+def flush_objects_to_dfs(ts):
     global _logging_cnt
     global _logging_cpu_tensor_queue
     global _logging_compression
-    global _logging_hdfs_client
+    global _logging_dfs_client
 
     path_to_files = {}
     while True:
@@ -2931,6 +2931,5 @@ def flush_objects_to_fs(ts):
 
     for name, file in path_to_files.items():
         file.close()
-        _logging_hdfs_client.delete("/" + name)
-        _logging_hdfs_client.upload("/" + name, name, overwrite=True)
+        _logging_dfs_client.upload(dfs_path=name, local_path=name)
         logger.info(f"put {name} on hdfs")

@@ -52,6 +52,8 @@ parser.add_argument('--logging', default=False, action="store_true",
                     help='whether to enable logging.')
 parser.add_argument('--logging-compression', default=None, type=str,
                     help='compression methods for logging')
+parser.add_argument('--logging-dfs', default='hdfs', type=str,
+                    help='distributed filesystem for logging')
 
 args = parser.parse_args()
 initialize_global_args(args)
@@ -86,7 +88,7 @@ def get_data_iterator(data_loader):
     return iter(data_loader)
 
 
-@torch.distributed.fault_tolerance.run(logging=args.logging, compression=args.logging_compression)
+@torch.distributed.fault_tolerance.run(logging=args.logging, compression=args.logging_compression, dfs=args.logging_dfs)
 def train(ts, model, optimizer, train_loader, args, loss_func):
     print("start from iter={}".format(ts))
     iteration = 0
