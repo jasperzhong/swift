@@ -5,6 +5,7 @@ import os
 import re
 import threading
 from queue import Queue
+from abc import ABC
 
 import h5py
 from hdfs import InsecureClient
@@ -225,7 +226,7 @@ class Timestamp:
         return max_v
 
 
-class DFSClient:
+class DFSClient(ABC):
     @classmethod
     def create(cls, dfs, *args, **kwargs):
         if dfs == "hdfs":
