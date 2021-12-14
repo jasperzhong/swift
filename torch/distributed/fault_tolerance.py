@@ -28,7 +28,7 @@ def _is_failure_worker(failure_workers):
     return get_rank() in failure_workers
 
 
-def _set_recv_mask(client):
+def _set_recv_mask(client, consensus_value):
     # wait for copying done
     while True:
         files = client.list('/')
@@ -47,7 +47,10 @@ def _set_recv_mask(client):
             logger.info(f"download {file} from hdfs")
             client.download('/' + file, file)
             f = h5py.File(file, "r")
-            distributed_c10d._logging_recv_mask[src] = (f, 0, len(f.keys()))
+            keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
+            valid_keys = filter(lambda x: int(x.split(":")[0]) < consensus_value, keys)
+            # (file handle, valid_keys)
+            distributed_c10d._logging_recv_mask[src] = (f, valid_keys)
 
 
 def run(replica=False, logging=False, compression=None):
@@ -77,11 +80,12 @@ def run(replica=False, logging=False, compression=None):
             while True:
                 try:
                     if logging:
-                        distributed_c10d._logging_thread = threading.Thread(target=distributed_c10d.flush_objects_to_fs)
+                        distributed_c10d._logging_thread = threading.Thread(
+                            target=distributed_c10d.flush_objects_to_fs, args=(timestamp, ))
                         distributed_c10d._logging_thread.start()
 
-                    need_undo, failure_workers = timestamp.sync()
-                    logger.info("failure workers: ", failure_workers)
+                    consensus_value, need_undo, failure_workers = timestamp.sync()
+                    logger.info(f"failure workers: {failure_workers}")
 
                     if need_undo:
                         logger.info(f"[Rank {get_rank()}] undo update is needed"
@@ -94,7 +98,7 @@ def run(replica=False, logging=False, compression=None):
                         broadcast_optimizer_state(optimizer.state_dict(), 0)
                     elif logging:
                         if _is_failure_worker(failure_workers):
-                            _set_recv_mask(client)
+                            _set_recv_mask(client, consensus_value)
                         else:
                             # TODO: parallel recovery
                             pass
@@ -184,25 +188,26 @@ class Timestamp:
         for t in tensor_list:
             values.append(int(t[0].item()))
 
+        consensus_value = 0
         need_undo = False
         failure_workers = []
         # all start from 0
         if not any(values):
-            return need_undo, failure_workers
+            return consensus_value, need_undo, failure_workers
 
         for i, v in enumerate(values):
             if v == 0:
                 failure_workers.append(i)
 
+        consensus_value = self._make_consensus(values)
         if self._value == 0:
             # failure workers
-            return need_undo, failure_workers
+            return consensus_value, need_undo, failure_workers
         else:
             # living workers
-            consensus_value = self._make_consensus(values)
             need_undo = consensus_value == self._value - 1
             self._value = consensus_value
-            return need_undo, failure_workers
+            return consensus_value, need_undo, failure_workers
 
     def _make_consensus(self, values):
         max_v = max(values)

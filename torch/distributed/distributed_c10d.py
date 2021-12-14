@@ -69,7 +69,7 @@ _logging_gpu_tensor_queue = []
 
 _logging_cpu_tensor_queue = None
 
-_logging_cnt = 0
+_logging_cnt = {}
 
 _logging_thread = None
 
@@ -900,20 +900,21 @@ def irecv(tensor,
         pg = group
 
     # read from the log data
-    if _logging and _logging_recv_mask.get(src) is not None:
-        f, cnt, total_cnt = _logging_recv_mask.get(src)
-        dest = f[str(cnt)]
+    while _logging and _logging_recv_mask.get(src) is not None:
+        f, keys = _logging_recv_mask.get(src)
+        try:
+            key = next(keys)
+        except StopIteration:
+            logger.info(f"close file. src={src}")
+            f.close()
+            del _logging_recv_mask[src]
+            break
+
+        dest = f[key]
         tensor_np = np.empty(dest.shape, dest.dtype)
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
-        # read over
-        if cnt == total_cnt - 1:
-            logger.info("finish reading from log file")
-            f.close()
-            del _logging_recv_mask[src]
-        else:
-            _logging_recv_mask[src] = (f, cnt + 1, total_cnt)
         return
 
     if _logging and _logging_gpu_tensor_queue:
@@ -1003,21 +1004,21 @@ def recv(tensor,
         pg = group
 
     # read from the log data
-    if _logging and _logging_recv_mask.get(src) is not None:
-        f, cnt, total_cnt = _logging_recv_mask.get(src)
-        logger.info(f"read {cnt} from file. src={src}")
-        dest = f[str(cnt)]
+    while _logging and _logging_recv_mask.get(src) is not None:
+        f, keys = _logging_recv_mask.get(src)
+        try:
+            key = next(keys)
+        except StopIteration:
+            logger.info(f"close file. src={src}")
+            f.close()
+            del _logging_recv_mask[src]
+            break
+
+        dest = f[key]
         tensor_np = np.empty(dest.shape, dest.dtype)
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
-        # read over
-        if cnt == total_cnt - 1:
-            logger.info(f"close file. src={src}")
-            f.close()
-            del _logging_recv_mask[src]
-        else:
-            _logging_recv_mask[src] = (f, cnt + 1, total_cnt)
         return
 
     if _logging and _logging_gpu_tensor_queue:
@@ -2898,7 +2899,7 @@ def stash(dst, tensor):
     _logging_cpu_tensor_queue.put((dst, tensor_np))
 
 
-def flush_objects_to_fs():
+def flush_objects_to_fs(ts):
     global _logging_cnt
     global _logging_cpu_tensor_queue
     global _logging_compression
@@ -2919,12 +2920,17 @@ def flush_objects_to_fs():
             file = h5py.File(path, "a")
             path_to_files[path] = file
 
-        file.create_dataset(str(_logging_cnt), data=tensor, compression=_logging_compression)
-        # TODO: every send/recv pair should have a logging cnt
-        _logging_cnt += 1
+        # every send/recv pair should have a logging cnt
+        if dst not in _logging_cnt:
+            _logging_cnt[dst] = 0
+
+        # key = "{iteration}:{_logging_cnt[dst]}"
+        key = f"{ts._value}:{_logging_cnt[dst]}"
+        file.create_dataset(key, data=tensor, compression=_logging_compression)
+        _logging_cnt[dst] += 1
 
     for name, file in path_to_files.items():
         file.close()
         _logging_hdfs_client.delete("/" + name)
-        _logging_hdfs_client.upload("/" + name, name)
+        _logging_hdfs_client.upload("/" + name, name, overwrite=True)
         logger.info(f"put {name} on hdfs")
