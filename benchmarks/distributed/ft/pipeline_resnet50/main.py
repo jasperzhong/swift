@@ -1,20 +1,21 @@
 import argparse
+import logging
 import os
 import random
 import time
-import logging
 
 import numpy as np
 from model import PipelineParallelResNet50
-from schedule import (initialize_global_args, is_pipeline_first_stage,
-                      is_pipeline_last_stage, get_num_microbatches, pipedream_flush_schedule)
+from schedule import (get_num_microbatches, initialize_global_args,
+                      is_pipeline_first_stage, is_pipeline_last_stage,
+                      pipedream_flush_schedule)
 from torchvision import datasets, transforms
 
 import torch
 import torch.distributed.fault_tolerance
-from torch.distributed.fault_tolerance import Timestamp
 import torch.nn as nn
 import torch.optim as optim
+from torch.distributed.fault_tolerance import Timestamp
 
 logging.basicConfig(level=logging.INFO)
 
