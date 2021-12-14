@@ -54,7 +54,8 @@ parser.add_argument('--logging-compression', default=None, type=str,
                     help='compression methods for logging')
 parser.add_argument('--logging-dfs', default='hdfs', type=str,
                     help='distributed filesystem for logging')
-
+parser.add_argument('--logging-s3-bucket', default=None, type=str,
+                    help='s3 bucket if using s3 as logging store')
 args = parser.parse_args()
 initialize_global_args(args)
 
@@ -88,7 +89,7 @@ def get_data_iterator(data_loader):
     return iter(data_loader)
 
 
-@torch.distributed.fault_tolerance.run(logging=args.logging, compression=args.logging_compression, dfs=args.logging_dfs)
+@torch.distributed.fault_tolerance.run(logging=args.logging, compression=args.logging_compression, dfs=args.logging_dfs, bucket=args.logging_s3_bucket)
 def train(ts, model, optimizer, train_loader, args, loss_func):
     print("start from iter={}".format(ts))
     iteration = 0
