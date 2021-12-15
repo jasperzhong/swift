@@ -50,7 +50,7 @@ def _set_recv_mask(consensus_value, pairs):
                 print("valid keys:")
                 print(valid_keys)
                 # (file handle, valid_keys)
-                distributed_c10d._logging_recv_mask[src] = (f, valid_keys)
+                distributed_c10d._logging_recv_mask[src] = (f, iter(valid_keys))
                 logging_files.remove(file)
 
         time.sleep(0.1)
