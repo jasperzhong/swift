@@ -56,6 +56,8 @@ parser.add_argument('--logging-dfs', default='hdfs', type=str,
                     help='distributed filesystem for logging')
 parser.add_argument('--logging-s3-bucket', default=None, type=str,
                     help='s3 bucket if using s3 as logging store')
+parser.add_argument('--logging-group-size', default=None, type=int,
+                    help='group size for logging')
 args = parser.parse_args()
 initialize_global_args(args)
 
@@ -80,6 +82,7 @@ def get_data_loader(args):
     )
     return train_loader
 
+
 def get_data_iterator(data_loader):
     if args.seed is not None:
         random.seed(args.seed)
@@ -89,7 +92,11 @@ def get_data_iterator(data_loader):
     return iter(data_loader)
 
 
-@torch.distributed.fault_tolerance.run(logging=args.logging, compression=args.logging_compression, dfs=args.logging_dfs, bucket=args.logging_s3_bucket)
+@torch.distributed.fault_tolerance.run(logging=args.logging,
+                                       compression=args.logging_compression,
+                                       dfs=args.logging_dfs,
+                                       bucket=args.logging_s3_bucket,
+                                       group_size=args.logging_group_size)
 def train(ts, model, optimizer, train_loader, args, loss_func):
     print("start from iter={}".format(ts))
     iteration = 0
@@ -113,10 +120,15 @@ def train(ts, model, optimizer, train_loader, args, loss_func):
 
                 iteration += 1
                 ts += 1
-                if is_pipeline_last_stage() and iteration % args.print_freq == 0:
-                    print("[Epoch {}/Iteration {}] loss: {:.4f} Throughput: {:.2f}".format(
-                        epoch, iteration, loss, args.global_batch_size / (iteration_time)
-                    ))
+                if iteration % args.print_freq == 0:
+                    if is_pipeline_last_stage():
+                        print("[Epoch {}/Iteration {}] loss: {:.4f} Throughput: {:.2f}".format(
+                            epoch, iteration, loss, args.global_batch_size / (iteration_time)
+                        ))
+                    else:
+                        print("[Epoch {}/Iteration {}] Throughput: {:.2f}".format(
+                            epoch, iteration, args.global_batch_size / (iteration_time)
+                        ))
 
                 if iteration == args.benchmark_iters:
                     return
