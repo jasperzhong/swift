@@ -1262,8 +1262,6 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::pointToPoint(
   auto isSendRecvSelf = rank_ == peer;
   auto& ncclComms = getNCCLComm(key, devices, opType, p2pRank, isSendRecvSelf);
 
-  LOG(ERROR) << profilingTitle << " myself=" << rank_ << " peer=" << peer << " shape=" << tensors[0].sizes();
-
   // First let NCCL streams wait for input tensors allocation streams
   syncStreams(devices, ncclEvents_[key], ncclStreams_[key]);
 

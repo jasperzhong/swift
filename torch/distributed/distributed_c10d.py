@@ -914,7 +914,6 @@ def irecv(tensor,
 
         try:
             key = next(keys)
-            logger.info(f"read {key}")
         except StopIteration:
             logger.info(f"close file. src={src}")
             f.close()
