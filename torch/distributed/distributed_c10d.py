@@ -856,7 +856,13 @@ def isend(tensor,
         return
 
     # do not send back to the upstream node during recovery
-    if _logging and _logging_recv_mask.get(dst) is not None:
+    while _logging and _logging_recv_mask.get(dst) is not None:
+        f, consensus_value, keys = _logging_recv_mask.get(dst)
+        if _ts >= consensus_value:
+            logger.info(f"close file. src={dst}")
+            f.close()
+            del _logging_recv_mask[dst]
+            break
         return
 
     if _logging and is_cross_machine(get_rank(), dst):
@@ -904,7 +910,8 @@ def irecv(tensor,
 
     # read from the log data
     while _logging and _logging_recv_mask.get(src) is not None:
-        f, keys = _logging_recv_mask.get(src)
+        f, consensus_value, keys = _logging_recv_mask.get(src)
+
         try:
             key = next(keys)
             logger.info(f"read {key}")
@@ -961,7 +968,13 @@ def send(tensor,
         return
 
     # do not send back to the upstream node during recovery
-    if _logging and _logging_recv_mask.get(dst) is not None:
+    while _logging and _logging_recv_mask.get(dst) is not None:
+        f, consensus_value, keys = _logging_recv_mask.get(dst)
+        if _ts >= consensus_value:
+            logger.info(f"close file. src={dst}")
+            f.close()
+            del _logging_recv_mask[dst]
+            break
         return
 
     if _logging and is_cross_machine(get_rank(), dst):
@@ -1010,10 +1023,10 @@ def recv(tensor,
 
     # read from the log data
     while _logging and _logging_recv_mask.get(src) is not None:
-        f, keys = _logging_recv_mask.get(src)
+        f, consensus_value, keys = _logging_recv_mask.get(src)
+
         try:
             key = next(keys)
-            logger.info(f"read {key}")
         except StopIteration:
             logger.info(f"close file. src={src}")
             f.close()
