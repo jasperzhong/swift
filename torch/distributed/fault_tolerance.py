@@ -72,6 +72,8 @@ def run(replica=False, logging=False, *args_, **kwargs_):
             assert isinstance(timestamp, Timestamp)
             assert isinstance(model, torch.nn.Module)
             assert isinstance(optimizer, torch.optim.Optimizer)
+            distributed_c10d._ts = timestamp
+
             if replica:
                 assert type(optimizer).__name__ == "DistributedOptimizer"
 
@@ -101,7 +103,7 @@ def run(replica=False, logging=False, *args_, **kwargs_):
 
                     if need_undo:
                         logger.info(f"[Rank {get_rank()}] undo update is needed"
-                                    "(iteration = {timestamp.value} while the consensus value is {timestamp.value-1})!")
+                                    f"(iteration = {timestamp.value} while the consensus value is {timestamp.value-1})!")
                         optimizer.undo()
 
                     if replica:
@@ -270,10 +272,9 @@ class HDFSClient(DFSClient):
 
     def ls(self):
         return self.client.list("/")
-    
+
     def rm(self, dfs_path):
         self.client.delete("/" + dfs_path)
-
 
 
 class S3Client(DFSClient):

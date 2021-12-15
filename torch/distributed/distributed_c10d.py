@@ -55,6 +55,8 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # whether to perform logging
+_ts = None
+
 _logging = False
 
 _logging_dfs_client = None
@@ -844,6 +846,7 @@ def isend(tensor,
         None, if not part of the group
 
     """
+    global _ts
     global _logging
     global _logging_gpu_tensor_queue
     global _logging_recv_mask
@@ -857,7 +860,7 @@ def isend(tensor,
         return
 
     if _logging and is_cross_machine(get_rank(), dst):
-        _logging_gpu_tensor_queue.append((dst, tensor))
+        _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
@@ -918,8 +921,8 @@ def irecv(tensor,
         return
 
     if _logging and _logging_gpu_tensor_queue:
-        for dst, logging_tensor in _logging_gpu_tensor_queue:
-            stash(dst, logging_tensor)
+        for ts_value, dst, logging_tensor in _logging_gpu_tensor_queue:
+            stash(ts_value, dst, logging_tensor)
         _logging_gpu_tensor_queue.clear()
 
     if src is None:
@@ -947,6 +950,7 @@ def send(tensor,
         tag (int, optional): Tag to match send with remote recv
 
     """
+    global _ts
     global _logging
     global _logging_gpu_tensor_queue
     global _logging_recv_mask
@@ -960,7 +964,7 @@ def send(tensor,
         return
 
     if _logging and is_cross_machine(get_rank(), dst):
-        _logging_gpu_tensor_queue.append((dst, tensor))
+        _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
@@ -1022,8 +1026,8 @@ def recv(tensor,
         return
 
     if _logging and _logging_gpu_tensor_queue:
-        for dst, logging_tensor in _logging_gpu_tensor_queue:
-            stash(dst, logging_tensor)
+        for ts_value, dst, logging_tensor in _logging_gpu_tensor_queue:
+            stash(ts_value, dst, logging_tensor)
         _logging_gpu_tensor_queue.clear()
 
     if src is None:
@@ -2879,7 +2883,7 @@ def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=N
     return pg
 
 
-def stash(dst, tensor):
+def stash(ts_value, dst, tensor):
     """stash the tensor into in-memory store
     """
     global _logging_stream
@@ -2896,10 +2900,10 @@ def stash(dst, tensor):
     else:
         tensor_cpu = tensor
     tensor_np = tensor_cpu.detach().numpy()
-    _logging_cpu_tensor_queue.put((dst, tensor_np))
+    _logging_cpu_tensor_queue.put((ts_value, dst, tensor_np))
 
 
-def flush_objects_to_dfs(ts):
+def flush_objects_to_dfs():
     global _logging_cnt
     global _logging_cpu_tensor_queue
     global _logging_compression
@@ -2911,7 +2915,7 @@ def flush_objects_to_dfs(ts):
         item = _logging_cpu_tensor_queue.get()
         if item is None:
             break
-        dst, tensor = item
+        ts_value, dst, tensor = item
         path = 'logging_%d_%d.h5' % (get_rank(), dst)
         file = None
         if path in path_to_files:
@@ -2925,7 +2929,7 @@ def flush_objects_to_dfs(ts):
             _logging_cnt[dst] = 0
 
         # key = "{iteration}:{_logging_cnt[dst]}"
-        key = f"{ts._value}:{_logging_cnt[dst]}"
+        key = f"{ts_value}:{_logging_cnt[dst]}"
         file.create_dataset(key, data=tensor, compression=_logging_compression)
         _logging_cnt[dst] += 1
 
