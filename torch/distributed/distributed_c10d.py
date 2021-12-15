@@ -907,6 +907,7 @@ def irecv(tensor,
         f, keys = _logging_recv_mask.get(src)
         try:
             key = next(keys)
+            logger.info(f"read {key}")
         except StopIteration:
             logger.info(f"close file. src={src}")
             f.close()
@@ -1012,6 +1013,7 @@ def recv(tensor,
         f, keys = _logging_recv_mask.get(src)
         try:
             key = next(keys)
+            logger.info(f"read {key}")
         except StopIteration:
             logger.info(f"close file. src={src}")
             f.close()
