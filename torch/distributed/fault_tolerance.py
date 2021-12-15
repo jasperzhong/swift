@@ -47,6 +47,8 @@ def _set_recv_mask(consensus_value, pairs):
                 f = h5py.File(file, "r")
                 keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
                 valid_keys = filter(lambda x: int(x.split(":")[0]) < consensus_value, keys)
+                print("valid keys:")
+                print(list(valid_keys))
                 # (file handle, valid_keys)
                 distributed_c10d._logging_recv_mask[src] = (f, valid_keys)
                 logging_files.remove(file)
