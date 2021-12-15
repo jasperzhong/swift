@@ -19,6 +19,7 @@ cmd="python3 -m torch.distributed.run \
 	--logging \
 	--logging-dfs s3 \
 	--logging-s3-bucket yczhong-swift \
+	--logging-group-size 2 \
 	~/data/ILSVRC2012" 
 
 OMP_NUM_THREADS=4 NCCL_IB_DISABLE=1 LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec $cmd
