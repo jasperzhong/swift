@@ -95,7 +95,7 @@ def run(replica=False, logging=False, *args_, **kwargs_):
                 try:
                     if logging:
                         distributed_c10d._logging_thread = threading.Thread(
-                            target=distributed_c10d.flush_objects_to_dfs, args=(timestamp, ))
+                            target=distributed_c10d.flush_objects_to_dfs)
                         distributed_c10d._logging_thread.start()
 
                     consensus_value, need_undo, failure_workers = timestamp.sync()
