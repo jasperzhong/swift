@@ -2933,6 +2933,9 @@ def flush_objects_to_dfs():
         item = _logging_cpu_tensor_queue.get()
         if item is None:
             break
+        elif item == "flush":
+            pass
+
         ts_value, dst, tensor = item
         path = 'logging_%d_%d.h5' % (get_rank(), dst)
         file = None
