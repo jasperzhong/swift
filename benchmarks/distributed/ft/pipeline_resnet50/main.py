@@ -15,7 +15,7 @@ import torch
 import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributed.fault_tolerance import FaultToleranceConfig, Timestamp
+from torch.distributed.fault_tolerance import FaultToleranceConfig, fault_tolerance_train
 
 logging.basicConfig(level=logging.INFO)
 
@@ -61,13 +61,6 @@ parser.add_argument('--logging-group-size', default=None, type=int,
 args = parser.parse_args()
 initialize_global_args(args)
 
-config = FaultToleranceConfig(
-    checkpoint_interval=100, replica=False, logging=True,
-    logging_compression=args.logging_compression, logging_dfs=args.logging_dfs,
-    logging_bucket=args.logging_s3_bucket,
-    logging_group_size=args.logging_group_size, logging_groups=None
-)
-
 
 def get_data_loader(args):
     traindir = os.path.join(args.data, 'train')
@@ -90,54 +83,27 @@ def get_data_loader(args):
     return train_loader
 
 
-def get_data_iterator(data_loader):
+def reset_data_iterator(data_loader, ts):
     if args.seed is not None:
         random.seed(args.seed)
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
-    return iter(data_loader)
+    data_iterator = iter(data_loader)
+    for _ in range(ts):
+        if is_pipeline_first_stage() or is_pipeline_last_stage():
+            for _ in range(get_num_microbatches()):
+                next(data_iterator)
 
 
-@torch.distributed.fault_tolerance.run(config)
-def train(ts, model, optimizer, train_loader, args, loss_func):
-    print("start from iter={}".format(ts))
-    iteration = 0
-    data_iterator = get_data_iterator(train_loader)
-    for epoch in range(args.epochs):
-        while True:
-            if iteration < ts:
-                if is_pipeline_first_stage() or is_pipeline_last_stage():
-                    for _ in range(get_num_microbatches()):
-                        next(data_iterator)
-                iteration += 1
-                continue
-
-            try:
-                start = time.time()
-                optimizer.zero_grad()
-                loss = pipedream_flush_schedule(
-                    data_iterator, model, loss_func)
-                optimizer.step()
-                iteration_time = time.time() - start
-
-                iteration += 1
-                ts += 1
-                if iteration % args.print_freq == 0:
-                    if is_pipeline_last_stage():
-                        print("[Epoch {}/Iteration {}] loss: {:.4f} Throughput: {:.2f}".format(
-                            epoch, iteration, loss, args.global_batch_size / (iteration_time)
-                        ))
-                    else:
-                        print("[Epoch {}/Iteration {}] Throughput: {:.2f}".format(
-                            epoch, iteration, args.global_batch_size / (iteration_time)
-                        ))
-
-                if iteration == args.benchmark_iters:
-                    return
-
-            except StopIteration:
-                break
+def train_iter(model, optimizer, data_iterator, loss_func):
+    start = time.time()
+    optimizer.zero_grad()
+    loss = pipedream_flush_schedule(
+        data_iterator, model, loss_func)
+    optimizer.step()
+    iteration_time = time.time() - start
+    return loss
 
 
 def main():
@@ -165,8 +131,14 @@ def main():
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     loss_func = nn.CrossEntropyLoss().cuda()
 
-    ts = Timestamp(0)
-    train(ts, model, optimizer, data_loader, args, loss_func)
+    config = FaultToleranceConfig(
+        num_iteration=args.benchmark_iters, checkpoint_interval=100, replica=False, logging=True,
+        logging_compression=args.logging_compression, logging_dfs=args.logging_dfs,
+        logging_bucket=args.logging_s3_bucket,
+        logging_group_size=args.logging_group_size, logging_groups=None,
+    )
+    fault_tolerance_train(config, train_iter, model, optimizer,
+                          data_loader, loss_func, reset_data_iterator_func=reset_data_iterator)
 
 
 if __name__ == '__main__':
