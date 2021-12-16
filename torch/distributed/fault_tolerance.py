@@ -87,6 +87,7 @@ def run(config):
             if config.logging:
                 groups = get_groups(config.logging_group_size, config.logging_groups)
                 pairs = groups_to_pairs(groups)
+                distributed_c10d._logging_pairs = pairs
                 if not need_logging(pairs):
                     distributed_c10d._logging = False
 
