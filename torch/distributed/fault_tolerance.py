@@ -1,4 +1,3 @@
-import functools
 import getpass
 import logging
 import os
@@ -33,9 +32,9 @@ def _is_failure_worker(failure_workers):
     return get_rank() in failure_workers
 
 
-def _set_recovery_mask(consensus_value, pairs):
+def _set_recovery_mask(consensus_value):
     client = distributed_c10d._logging_dfs_client
-    logging_files = get_logging_files(pairs)
+    logging_files = get_logging_files()
     while logging_files:
         files = client.ls()
         for file in files:
@@ -55,9 +54,10 @@ def _set_recovery_mask(consensus_value, pairs):
 
 
 class FaultToleranceConfig:
-    def __init__(self, checkpoint_interval, replica=False, logging=False,
+    def __init__(self, num_iteration, checkpoint_interval, replica=False, logging=False,
                  logging_compression=None, logging_dfs=None, logging_bucket=None,
                  logging_group_size=None, logging_groups=None):
+        self.num_iteration = num_iteration
         self.checkpoint_interval = checkpoint_interval
         self.replica = replica
         self.logging = logging
@@ -68,74 +68,70 @@ class FaultToleranceConfig:
         self.logging_groups = logging_groups
 
 
-def run(config):
-    distributed_c10d._logging = config.logging
+def setup(config):
     if config.logging:
-        distributed_c10d._logging_compression = config.logging_compression
+        groups = get_groups(config.logging_group_size, config.logging_groups)
+        pairs = groups_to_pairs(groups)
+        if not set_logging_mask(pairs):
+            config.logging = False
+        else:
+            logger.info(f"enable logging on device {torch.cuda.current_device()}")
+            distributed_c10d._logging_compression = config.logging_compression
+            distributed_c10d._logging = True
+            distributed_c10d._logging_stream = torch.cuda.Stream()
+            distributed_c10d._logging_cpu_tensor_queue = Queue()
+            distributed_c10d._logging_dfs_client = DFSClient.create(logging_dfs=config.logging_dfs,
+                                                                    logging_bucket=config.logging_bucket)
+            distributed_c10d._logging_thread = threading.Thread(
+                target=distributed_c10d.flush_objects_to_dfs)
+            distributed_c10d._logging_thread.start()
 
-    def f(func):
-        @functools.wraps(func)
-        def wrapper(timestamp, model, optimizer, *args, **kwargs):
-            assert isinstance(timestamp, Timestamp)
-            assert isinstance(model, torch.nn.Module)
-            assert isinstance(optimizer, torch.optim.Optimizer)
-            distributed_c10d._ts = timestamp
 
-            if config.replica:
-                assert type(optimizer).__name__ == "DistributedOptimizer"
+def teardown(config):
+    if config.logging:
+        distributed_c10d._logging_cpu_tensor_queue.put(None)
+        distributed_c10d._logging_thread.join()
 
-            if config.logging:
-                groups = get_groups(config.logging_group_size, config.logging_groups)
-                pairs = groups_to_pairs(groups)
-                if not set_logging_mask(pairs):
-                    distributed_c10d._logging = False
 
-            config.logging = distributed_c10d._logging
+def recovery(config, ts, model, optimizer):
+    consensus_value, need_undo, failure_workers = ts.sync()
+    logger.info(f"failure workers: {failure_workers}")
 
-            if config.logging:
-                logger.info(f"enable logging on device {torch.cuda.current_device()}")
-                distributed_c10d._logging_stream = torch.cuda.Stream()
-                distributed_c10d._logging_cpu_tensor_queue = Queue()
-                distributed_c10d._logging_dfs_client = DFSClient.create(logging_dfs=config.logging_dfs,
-                                                                        logging_bucket=config.logging_bucket)
+    if need_undo:
+        logger.info(f"[Rank {get_rank()}] undo update is needed"
+                    f"(iteration = {timestamp.value} while the consensus value is {timestamp.value-1})!")
+        optimizer.undo()
 
-            while True:
-                try:
-                    if config.logging:
-                        distributed_c10d._logging_thread = threading.Thread(
-                            target=distributed_c10d.flush_objects_to_dfs)
-                        distributed_c10d._logging_thread.start()
+    if config.replica:
+        broadcast_parameters(model.named_parameters(), 0)
+        optimizer.clear()
+        broadcast_optimizer_state(optimizer.state_dict(), 0)
+    elif config.logging:
+        if _is_failure_worker(failure_workers):
+            _set_recovery_mask(consensus_value)
+        else:
+            # TODO: parallel recovery
+            pass
 
-                    consensus_value, need_undo, failure_workers = timestamp.sync()
-                    logger.info(f"failure workers: {failure_workers}")
 
-                    if need_undo:
-                        logger.info(f"[Rank {get_rank()}] undo update is needed"
-                                    f"(iteration = {timestamp.value} while the consensus value is {timestamp.value-1})!")
-                        optimizer.undo()
+def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
+                          reset_data_iterator_func):
+    setup(config)
 
-                    if config.replica:
-                        broadcast_parameters(model.named_parameters(), 0)
-                        optimizer.clear()
-                        broadcast_optimizer_state(optimizer.state_dict(), 0)
-                    elif config.logging:
-                        if _is_failure_worker(failure_workers):
-                            _set_recovery_mask(consensus_value, pairs)
-                        else:
-                            # TODO: parallel recovery
-                            pass
+    ts = Timestamp(0)
+    while True:
+        recovery(config, ts, model, optimizer, data_loader)
+        data_iterator = reset_data_iterator_func(data_loader, ts)
+        try:
+            for _ in range(ts, config.num_iteration):
+                train_iter(model, optimizer, data_iterator, loss_func)
+                ts += 1
+            break
+        except SwiftInternalError as e:
+            logger.info("catch an error: " + str(e))
+            _failure_handler()
 
-                    return func(timestamp, model, optimizer, *args, **kwargs)
-                except SwiftInternalError as e:
-                    logger.info("catch an error: " + str(e))
-                    _failure_handler()
-                finally:
-                    if config.logging:
-                        distributed_c10d._logging_cpu_tensor_queue.put(None)
-                        distributed_c10d._logging_thread.join()
-
-        return wrapper
-    return f
+    teardown(config)
 
 
 class Timestamp:
@@ -357,11 +353,9 @@ def set_logging_mask(pairs):
     return False
 
 
-def get_logging_files(pairs):
+def get_logging_files():
     rank = get_rank()
     logging_files = []
-    for pair in pairs:
-        if rank in pair:
-            peer = pair[1] if pair[0] == rank else pair[0]
-            logging_files.append(f"logging_{peer}_{rank}.h5")
+    for peer, _ in distributed_c10d._logging_mask.items():
+        logging_files.append(f"logging_{peer}_{rank}.h5")
     return logging_files
