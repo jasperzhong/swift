@@ -59,11 +59,11 @@ _ts = None
 
 _logging = False
 
-_logging_pairs = []
+_logging_mask = {}
 
 _logging_dfs_client = None
 
-_logging_recv_mask = {}
+_logging_recovery_mask = {}
 
 _logging_compression = None
 
@@ -851,24 +851,24 @@ def isend(tensor,
     global _ts
     global _logging
     global _logging_gpu_tensor_queue
-    global _logging_recv_mask
-    global _logging_pairs
+    global _logging_recovery_mask
+    global _logging_mask
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return
 
     # do not send back to the upstream node during recovery
-    while _logging and dst in _logging_pairs and _logging_recv_mask.get(dst) is not None:
-        f, consensus_value, keys = _logging_recv_mask.get(dst)
+    while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
+        f, consensus_value, keys = _logging_recovery_mask.get(dst)
         if _ts >= consensus_value:
             logger.info(f"close file. src={dst}")
             f.close()
-            del _logging_recv_mask[dst]
+            del _logging_recovery_mask[dst]
             break
         return
 
-    if _logging and dst in _logging_pairs and is_cross_machine(get_rank(), dst):
+    if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
         _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
@@ -912,15 +912,15 @@ def irecv(tensor,
         pg = group
 
     # read from the log data
-    while _logging and _logging_recv_mask.get(src) is not None:
-        f, consensus_value, keys = _logging_recv_mask.get(src)
+    while _logging and _logging_recovery_mask.get(src) is not None:
+        f, consensus_value, keys = _logging_recovery_mask.get(src)
 
         try:
             key = next(keys)
         except StopIteration:
             logger.info(f"close file. src={src}")
             f.close()
-            del _logging_recv_mask[src]
+            del _logging_recovery_mask[src]
             break
 
         dest = f[key]
@@ -963,24 +963,24 @@ def send(tensor,
     global _ts
     global _logging
     global _logging_gpu_tensor_queue
-    global _logging_recv_mask
-    global _logging_pairs
+    global _logging_recovery_mask
+    global _logging_mask
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return
 
     # do not send back to the upstream node during recovery
-    while _logging and dst in _logging_pairs and _logging_recv_mask.get(dst) is not None:
-        f, consensus_value, keys = _logging_recv_mask.get(dst)
+    while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
+        f, consensus_value, keys = _logging_recovery_mask.get(dst)
         if _ts >= consensus_value:
             logger.info(f"close file. src={dst}")
             f.close()
-            del _logging_recv_mask[dst]
+            del _logging_recovery_mask[dst]
             break
         return
 
-    if _logging and dst in _logging_pairs and is_cross_machine(get_rank(), dst):
+    if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
         _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
@@ -1013,7 +1013,7 @@ def recv(tensor,
     """
     global _logging
     global _logging_gpu_tensor_queue
-    global _logging_recv_mask
+    global _logging_recovery_mask
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
@@ -1025,15 +1025,15 @@ def recv(tensor,
         pg = group
 
     # read from the log data
-    while _logging and _logging_recv_mask.get(src) is not None:
-        f, consensus_value, keys = _logging_recv_mask.get(src)
+    while _logging and _logging_recovery_mask.get(src) is not None:
+        f, consensus_value, keys = _logging_recovery_mask.get(src)
 
         try:
             key = next(keys)
         except StopIteration:
             logger.info(f"close file. src={src}")
             f.close()
-            del _logging_recv_mask[src]
+            del _logging_recovery_mask[src]
             break
 
         dest = f[key]

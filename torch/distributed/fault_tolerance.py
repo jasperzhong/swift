@@ -33,7 +33,7 @@ def _is_failure_worker(failure_workers):
     return get_rank() in failure_workers
 
 
-def _set_recv_mask(consensus_value, pairs):
+def _set_recovery_mask(consensus_value, pairs):
     client = distributed_c10d._logging_dfs_client
     logging_files = get_logging_files(pairs)
     while logging_files:
@@ -48,7 +48,7 @@ def _set_recv_mask(consensus_value, pairs):
                 keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
                 valid_keys = filter(lambda x: int(x.split(":")[0]) < consensus_value, keys)
                 # (file handle, valid_keys)
-                distributed_c10d._logging_recv_mask[src] = (f, consensus_value, valid_keys)
+                distributed_c10d._logging_recovery_mask[src] = (f, consensus_value, valid_keys)
                 logging_files.remove(file)
 
         time.sleep(0.1)
@@ -87,8 +87,7 @@ def run(config):
             if config.logging:
                 groups = get_groups(config.logging_group_size, config.logging_groups)
                 pairs = groups_to_pairs(groups)
-                distributed_c10d._logging_pairs = pairs
-                if not need_logging(pairs):
+                if not set_logging_mask(pairs):
                     distributed_c10d._logging = False
 
             config.logging = distributed_c10d._logging
@@ -121,7 +120,7 @@ def run(config):
                         broadcast_optimizer_state(optimizer.state_dict(), 0)
                     elif config.logging:
                         if _is_failure_worker(failure_workers):
-                            _set_recv_mask(consensus_value, pairs)
+                            _set_recovery_mask(consensus_value, pairs)
                         else:
                             # TODO: parallel recovery
                             pass
@@ -347,10 +346,13 @@ def groups_to_pairs(groups):
     return pairs
 
 
-def need_logging(pairs):
+def set_logging_mask(pairs):
     rank = get_rank()
     for pair in pairs:
         if rank in pair:
+            peer = pair[1] if pair[0] == rank else pair[0]
+            distributed_c10d._logging_mask[peer] = True
+
             return True
     return False
 
