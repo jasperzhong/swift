@@ -94,6 +94,7 @@ def reset_data_iterator(data_loader, ts):
         if is_pipeline_first_stage() or is_pipeline_last_stage():
             for _ in range(get_num_microbatches()):
                 next(data_iterator)
+    return data_iterator
 
 
 def train_iter(model, optimizer, data_iterator, loss_func):
