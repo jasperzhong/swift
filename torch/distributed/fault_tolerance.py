@@ -10,7 +10,7 @@ import h5py
 from hdfs import InsecureClient
 
 import torch
-import torch.distributed.distributed_c10d as distributed_c10d
+from torch.distributed import distributed_c10d
 import torch.nn
 import torch.optim
 from torch._C._distributed_c10d import SwiftInternalError
@@ -108,7 +108,7 @@ def recovery(config, ts, model, optimizer):
 
     if need_undo:
         logger.info(f"[Rank {get_rank()}] undo update is needed"
-                    f"(iteration = {timestamp.value} while the consensus value is {timestamp.value-1})!")
+                    f"(iteration = {ts.value} while the consensus value is {ts.value-1})!")
         optimizer.undo()
 
     if config.replica:
@@ -130,7 +130,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
     ts = Timestamp(0)
     distributed_c10d._ts = ts
-    checkpoint(config, model, optimizer)
+    checkpoint(config, ts, model, optimizer)
     while True:
         recovery(config, ts, model, optimizer)
         data_iterator = reset_data_iterator_func(data_loader, ts)

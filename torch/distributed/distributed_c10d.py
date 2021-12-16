@@ -11,7 +11,7 @@ from typing import Dict, Optional, Tuple, Union
 import h5py
 import numpy as np
 
-import torch 
+import torch
 import torch.nn
 from torch._C._distributed_c10d import (AllreduceCoalescedOptions,
                                         AllreduceOptions, AllToAllOptions,
