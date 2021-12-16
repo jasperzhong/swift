@@ -64,8 +64,8 @@ class PipelineParallelResNet50(ResNet):
                 self._output_shapes.append(output.shape)
                 input = output
 
-    def parameters(self, recursive=True):
-        return self.model_split.parameters(recursive=recursive)
+    def parameters(self, recurse=True):
+        return self.model_split.parameters(recurse=recurse)
 
     def state_dict(self):
         return self.model_split.state_dict()
