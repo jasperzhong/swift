@@ -59,6 +59,8 @@ _ts = None
 
 _logging = False
 
+_logging_pairs = []
+
 _logging_dfs_client = None
 
 _logging_recv_mask = {}
@@ -850,13 +852,14 @@ def isend(tensor,
     global _logging
     global _logging_gpu_tensor_queue
     global _logging_recv_mask
+    global _logging_pairs
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return
 
     # do not send back to the upstream node during recovery
-    while _logging and _logging_recv_mask.get(dst) is not None:
+    while _logging and dst in _logging_pairs and _logging_recv_mask.get(dst) is not None:
         f, consensus_value, keys = _logging_recv_mask.get(dst)
         if _ts >= consensus_value:
             logger.info(f"close file. src={dst}")
@@ -865,7 +868,7 @@ def isend(tensor,
             break
         return
 
-    if _logging and is_cross_machine(get_rank(), dst):
+    if _logging and dst in _logging_pairs and is_cross_machine(get_rank(), dst):
         _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
@@ -961,13 +964,14 @@ def send(tensor,
     global _logging
     global _logging_gpu_tensor_queue
     global _logging_recv_mask
+    global _logging_pairs
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return
 
     # do not send back to the upstream node during recovery
-    while _logging and _logging_recv_mask.get(dst) is not None:
+    while _logging and dst in _logging_pairs and _logging_recv_mask.get(dst) is not None:
         f, consensus_value, keys = _logging_recv_mask.get(dst)
         if _ts >= consensus_value:
             logger.info(f"close file. src={dst}")
@@ -976,7 +980,7 @@ def send(tensor,
             break
         return
 
-    if _logging and is_cross_machine(get_rank(), dst):
+    if _logging and dst in _logging_pairs and is_cross_machine(get_rank(), dst):
         _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
