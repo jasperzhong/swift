@@ -140,6 +140,9 @@ class Timestamp:
             raise ValueError("timestamp must not be less than zero!")
         self._value = value
 
+    def __index__(self):
+        return self._value
+
     def __add__(self, other):
         return self._value + other
 
