@@ -54,17 +54,24 @@ def _set_recv_mask(consensus_value, pairs):
         time.sleep(0.1)
 
 
-def run(replica=False, logging=False, *args_, **kwargs_):
-    """
-    kwargs:
-         compression: whether to enable compression for logging data True/False
-         dfs: which distributed filesystem in use ['s3', 'hfds']
+class FaultToleranceConfig:
+    def __init__(self, checkpoint_interval, replica=False, logging=False,
+                 logging_compression=None, logging_dfs=None, logging_bucket=None,
+                 logging_group_size=None, logging_groups=None):
+        self.checkpoint_interval = checkpoint_interval
+        self.replica = replica
+        self.logging = logging
+        self.logging_compression = logging_compression
+        self.logging_dfs = logging_dfs
+        self.logging_bucket = logging_bucket
+        self.logging_group_size = self.logging_group_size
+        self.logging_groups = logging_groups
 
-    """
-    distributed_c10d._logging = logging
-    if logging:
-        if "compression" in kwargs_:
-            distributed_c10d._logging_compression = kwargs_['compression']
+
+def run(config):
+    distributed_c10d._logging = config.logging
+    if config.logging:
+        distributed_c10d._logging_compression = config.logging_compression
 
     def f(func):
         @functools.wraps(func)
@@ -74,26 +81,27 @@ def run(replica=False, logging=False, *args_, **kwargs_):
             assert isinstance(optimizer, torch.optim.Optimizer)
             distributed_c10d._ts = timestamp
 
-            if replica:
+            if config.replica:
                 assert type(optimizer).__name__ == "DistributedOptimizer"
 
-            if distributed_c10d._logging:
-                groups = get_groups(**kwargs_)
+            if config.logging:
+                groups = get_groups(config.logging_group_size, config.logging_groups)
                 pairs = groups_to_pairs(groups)
                 if not need_logging(pairs):
                     distributed_c10d._logging = False
 
-            logging = distributed_c10d._logging
+            config.logging = distributed_c10d._logging
 
-            if logging:
+            if config.logging:
                 logger.info(f"enable logging on device {torch.cuda.current_device()}")
                 distributed_c10d._logging_stream = torch.cuda.Stream()
                 distributed_c10d._logging_cpu_tensor_queue = Queue()
-                distributed_c10d._logging_dfs_client = DFSClient.create(**kwargs_)
+                distributed_c10d._logging_dfs_client = DFSClient.create(logging_dfs=config.logging_dfs,
+                                                                        logging_bucket=config.logging_bucket)
 
             while True:
                 try:
-                    if logging:
+                    if config.logging:
                         distributed_c10d._logging_thread = threading.Thread(
                             target=distributed_c10d.flush_objects_to_dfs)
                         distributed_c10d._logging_thread.start()
@@ -106,11 +114,11 @@ def run(replica=False, logging=False, *args_, **kwargs_):
                                     f"(iteration = {timestamp.value} while the consensus value is {timestamp.value-1})!")
                         optimizer.undo()
 
-                    if replica:
+                    if config.replica:
                         broadcast_parameters(model.named_parameters(), 0)
                         optimizer.clear()
                         broadcast_optimizer_state(optimizer.state_dict(), 0)
-                    elif logging:
+                    elif config.logging:
                         if _is_failure_worker(failure_workers):
                             _set_recv_mask(consensus_value, pairs)
                         else:
@@ -122,7 +130,7 @@ def run(replica=False, logging=False, *args_, **kwargs_):
                     logger.info("catch an error: " + str(e))
                     _failure_handler()
                 finally:
-                    if logging:
+                    if config.logging:
                         distributed_c10d._logging_cpu_tensor_queue.put(None)
                         distributed_c10d._logging_thread.join()
 
@@ -233,7 +241,7 @@ class Timestamp:
 class DFSClient(ABC):
     @classmethod
     def create(cls, *args, **kwargs):
-        dfs = kwargs['dfs']
+        dfs = kwargs['logging_dfs']
         if dfs == "hdfs":
             return HDFSClient()
         elif dfs == "s3":
@@ -279,8 +287,8 @@ class HDFSClient(DFSClient):
 
 class S3Client(DFSClient):
     def __init__(self, *args, **kwargs):
-        if "bucket" in kwargs:
-            bucket = kwargs["bucket"]
+        if "logging_bucket" in kwargs:
+            bucket = kwargs["logging_bucket"]
         else:
             raise ValueError("bucket not found")
 
@@ -305,7 +313,7 @@ class S3Client(DFSClient):
         self.s3.delete_object(Bucket=self.bucket, Key=dfs_path)
 
 
-def get_groups(group_size=None, groups=None, **kwargs):
+def get_groups(group_size=None, groups=None):
     workers = get_world_size()
     if groups:
         workers_in_groups = [worker for worker in group for group in groups]

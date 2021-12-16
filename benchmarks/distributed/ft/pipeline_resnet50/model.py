@@ -65,12 +65,13 @@ class PipelineParallelResNet50(ResNet):
                 input = output
 
     def parameters(self, recursive=True):
-        params = []
-        for layer in self.model_split:
-            params.extend(list(layer.parameters()))
+        return self.model_split.parameters(recursive=recursive)
 
-        for param in params:
-            yield param
+    def state_dict(self):
+        return self.model_split.state_dict()
+
+    def load_state_dict(self, state_dict):
+        self.model_split.load_state_dict(state_dict)
 
     @property
     def input_shape(self):
