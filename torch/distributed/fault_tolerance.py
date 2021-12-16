@@ -120,7 +120,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
     ts = Timestamp(0)
     while True:
-        recovery(config, ts, model, optimizer, data_loader)
+        recovery(config, ts, model, optimizer)
         data_iterator = reset_data_iterator_func(data_loader, ts)
         try:
             for _ in range(ts, config.num_iteration):
