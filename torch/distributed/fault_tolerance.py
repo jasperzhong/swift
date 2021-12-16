@@ -28,8 +28,14 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-def _is_failure_worker(failure_workers):
-    return get_rank() in failure_workers
+def _need_recovery(groups, failure_workers):
+    rank = get_rank()
+    for group in groups:
+        if rank in group:
+            for failure_worker in failure_workers:
+                if failure_worker in group:
+                    return True
+    return False
 
 
 def _set_recovery_mask(consensus_value):
@@ -56,7 +62,7 @@ def _set_recovery_mask(consensus_value):
 class FaultToleranceConfig:
     def __init__(self, num_iteration, batch_size, checkpoint_interval, replica=False, logging=False,
                  logging_compression=None, logging_dfs=None, logging_bucket=None,
-                 logging_group_size=None, logging_groups=None, print_freq=5):
+                 logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_path="swift.ckpt"):
         self.num_iteration = num_iteration
         self.batch_size = batch_size
         self.checkpoint_interval = checkpoint_interval
@@ -68,11 +74,12 @@ class FaultToleranceConfig:
         self.logging_group_size = logging_group_size
         self.logging_groups = logging_groups
         self.print_freq = print_freq
+        self.checkpoint_path = checkpoint_path
 
 
 def setup(config):
     if config.logging:
-        groups = get_groups(config.logging_group_size, config.logging_groups)
+        config.groups = get_groups(config.logging_group_size, config.logging_groups)
         pairs = groups_to_pairs(groups)
         if not set_logging_mask(pairs):
             config.logging = False
@@ -109,7 +116,8 @@ def recovery(config, ts, model, optimizer):
         optimizer.clear()
         broadcast_optimizer_state(optimizer.state_dict(), 0)
     elif config.logging:
-        if _is_failure_worker(failure_workers):
+        if _need_recovery(config.groups, failure_workers):
+            load_checkpoint(config, ts, model, optimizer)
             _set_recovery_mask(consensus_value)
         else:
             # TODO: parallel recovery
@@ -122,6 +130,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
     ts = Timestamp(0)
     distributed_c10d._ts = ts
+    checkpoint(config, model, optimizer)
     while True:
         recovery(config, ts, model, optimizer)
         data_iterator = reset_data_iterator_func(data_loader, ts)
@@ -375,3 +384,21 @@ def get_logging_files():
     for peer, _ in distributed_c10d._logging_mask.items():
         logging_files.append(f"logging_{peer}_{rank}.h5")
     return logging_files
+
+
+def checkpoint(config, ts, model, optimizer):
+    logger.info("save checkpoint")
+    torch.save({
+        'ts': ts._value,
+        'model': model.state_dict(),
+        'optimizer': optimizer.state_dict()
+    }, config.checkpoint_path)
+    logger.info(f"save checkpoint in iteration {ts}")
+
+
+def load_checkpoint(config, ts, model, optimizer):
+    checkpoint = torch.load(config.checkpoint_path)
+    ts._value = checkpoint['ts']
+    model.load_state_dict(checkpoint['model'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+    logger.info(f"load checkpoint from iteration {ts}")
