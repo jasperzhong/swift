@@ -11,7 +11,7 @@ from typing import Dict, Optional, Tuple, Union
 import h5py
 import numpy as np
 
-import torch
+import torch 
 import torch.nn
 from torch._C._distributed_c10d import (AllreduceCoalescedOptions,
                                         AllreduceOptions, AllToAllOptions,
@@ -108,6 +108,9 @@ def _failure_handler():
         store.set(store_key, "0")
 
     destroy_process_group()
+
+    if _logging:
+        _logging_cpu_tensor_queue.put("flush")
 
     logger.info("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
@@ -2934,7 +2937,12 @@ def flush_objects_to_dfs():
         if item is None:
             break
         elif item == "flush":
-            pass
+            for name, file in path_to_files.items():
+                file.close()
+                _logging_dfs_client.rm(dfs_path=name)
+                _logging_dfs_client.upload(dfs_path=name, local_path=name)
+                logger.info(f"put {name} on dfs")
+                continue
 
         ts_value, dst, tensor = item
         path = 'logging_%d_%d.h5' % (get_rank(), dst)
@@ -2956,6 +2964,3 @@ def flush_objects_to_dfs():
 
     for name, file in path_to_files.items():
         file.close()
-        _logging_dfs_client.rm(dfs_path=name)
-        _logging_dfs_client.upload(dfs_path=name, local_path=name)
-        logger.info(f"put {name} on dfs")
