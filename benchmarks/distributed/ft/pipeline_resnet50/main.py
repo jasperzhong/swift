@@ -133,10 +133,10 @@ def main():
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
-        num_iteration=args.benchmark_iters, checkpoint_interval=100, replica=False, logging=True,
-        logging_compression=args.logging_compression, logging_dfs=args.logging_dfs,
-        logging_bucket=args.logging_s3_bucket,
-        logging_group_size=args.logging_group_size, logging_groups=None,
+        num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, checkpoint_interval=100,
+        replica=False, logging=True, logging_compression=args.logging_compression,
+        logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
+        logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, reset_data_iterator_func=reset_data_iterator)
