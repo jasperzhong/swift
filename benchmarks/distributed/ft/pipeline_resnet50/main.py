@@ -15,7 +15,7 @@ import torch
 import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributed.fault_tolerance import Timestamp
+from torch.distributed.fault_tolerance import FaultToleranceConfig, Timestamp
 
 logging.basicConfig(level=logging.INFO)
 
@@ -61,6 +61,13 @@ parser.add_argument('--logging-group-size', default=None, type=int,
 args = parser.parse_args()
 initialize_global_args(args)
 
+config = FaultToleranceConfig(
+    checkpoint_interval=100, replica=False, logging=True,
+    logging_compression=args.logging_compression, logging_dfs=args.logging_dfs,
+    logging_bucket=args.logging_s3_bucket,
+    logging_group_size=args.logging_group_size, logging_groups=None
+)
+
 
 def get_data_loader(args):
     traindir = os.path.join(args.data, 'train')
@@ -92,11 +99,7 @@ def get_data_iterator(data_loader):
     return iter(data_loader)
 
 
-@torch.distributed.fault_tolerance.run(logging=args.logging,
-                                       compression=args.logging_compression,
-                                       dfs=args.logging_dfs,
-                                       bucket=args.logging_s3_bucket,
-                                       group_size=args.logging_group_size)
+@torch.distributed.fault_tolerance.run(config)
 def train(ts, model, optimizer, train_loader, args, loss_func):
     print("start from iter={}".format(ts))
     iteration = 0
