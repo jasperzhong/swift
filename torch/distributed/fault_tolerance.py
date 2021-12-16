@@ -64,7 +64,7 @@ class FaultToleranceConfig:
         self.logging_compression = logging_compression
         self.logging_dfs = logging_dfs
         self.logging_bucket = logging_bucket
-        self.logging_group_size = self.logging_group_size
+        self.logging_group_size = logging_group_size
         self.logging_groups = logging_groups
 
 
