@@ -132,7 +132,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 iteration_time = time.time() - start
                 ts += 1
 
-                if ts == config.print_freq:
+                if ts % config.print_freq == 0:
                     logger.info("[Iteration {}] loss: {:.4f} throughput: {:.2f}".format(
                         ts, loss, config.batch_size / iteration_time))
 
