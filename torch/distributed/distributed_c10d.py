@@ -2942,6 +2942,7 @@ def flush_objects_to_dfs():
                 _logging_dfs_client.rm(dfs_path=name)
                 _logging_dfs_client.upload(dfs_path=name, local_path=name)
                 logger.info(f"put {name} on dfs")
+            path_to_files.clear()
             continue
 
         ts_value, dst, tensor = item
