@@ -54,10 +54,11 @@ def _set_recovery_mask(consensus_value):
 
 
 class FaultToleranceConfig:
-    def __init__(self, num_iteration, checkpoint_interval, replica=False, logging=False,
+    def __init__(self, num_iteration, batch_size, checkpoint_interval, replica=False, logging=False,
                  logging_compression=None, logging_dfs=None, logging_bucket=None,
-                 logging_group_size=None, logging_groups=None):
+                 logging_group_size=None, logging_groups=None, print_freq=5):
         self.num_iteration = num_iteration
+        self.batch_size = batch_size
         self.checkpoint_interval = checkpoint_interval
         self.replica = replica
         self.logging = logging
@@ -66,6 +67,7 @@ class FaultToleranceConfig:
         self.logging_bucket = logging_bucket
         self.logging_group_size = logging_group_size
         self.logging_groups = logging_groups
+        self.print_freq = print_freq
 
 
 def setup(config):
@@ -119,13 +121,21 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     setup(config)
 
     ts = Timestamp(0)
+    distributed_c10d._ts = ts
     while True:
         recovery(config, ts, model, optimizer)
         data_iterator = reset_data_iterator_func(data_loader, ts)
         try:
             for _ in range(ts, config.num_iteration):
-                train_iter(model, optimizer, data_iterator, loss_func)
+                start = time.time()
+                loss = train_iter(model, optimizer, data_iterator, loss_func)
+                iteration_time = time.time() - start
                 ts += 1
+
+                if ts == config.print_freq:
+                    logger.info("[Iteration {}] loss: {:.4f} throughput: {:.2f}".format(
+                        ts, loss, config.batch_size / iteration_time))
+
             break
         except SwiftInternalError as e:
             logger.info("catch an error: " + str(e))
