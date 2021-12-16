@@ -153,6 +153,9 @@ class Timestamp:
     def __index__(self):
         return self._value
 
+    def __mod__(self, other):
+        return self._value % other
+
     def __add__(self, other):
         return self._value + other
 
