@@ -306,3 +306,4 @@ bazel-*
 core.*
 
 *.h5
+*.ckpt
