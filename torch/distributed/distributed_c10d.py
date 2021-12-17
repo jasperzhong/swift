@@ -2947,7 +2947,7 @@ def flush_objects_to_dfs():
             path_to_files.clear()
             continue
 
-        ts_value, dst, tensor, event = item
+        ts_value, dst, tensor = item
         path = 'logging_%d_%d.h5' % (get_rank(), dst)
         file = None
         if path in path_to_files:
