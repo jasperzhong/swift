@@ -95,7 +95,7 @@ def setup(config):
 
 
 def teardown(config):
-    if config.logging:
+    if distributed_c10d._logging:
         distributed_c10d._logging_cpu_tensor_queue.put(None)
         distributed_c10d._logging_thread.join()
 
