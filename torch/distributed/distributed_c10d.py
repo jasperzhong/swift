@@ -2964,7 +2964,7 @@ def flush_objects_to_dfs():
 
         # key = "{iteration}:{_logging_cnt[dst]}"
         key = f"{ts_value}:{_logging_cnt[dst]}"
-        _logging_stream.wait_event(event)
+        event.synchronize()
         file.create_dataset(key, data=tensor, compression=_logging_compression)
         _logging_cnt[dst] += 1
 
