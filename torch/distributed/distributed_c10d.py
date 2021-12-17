@@ -2919,11 +2919,10 @@ def stash(ts_value, dst, tensor):
         with torch.cuda.stream(_logging_stream):
             with torch.no_grad():
                 tensor_cpu.copy_(tensor, non_blocking=True)
-                event = _logging_stream.record_event()
     else:
         tensor_cpu = tensor
     tensor_np = tensor_cpu.numpy()
-    _logging_cpu_tensor_queue.put((ts_value, dst, tensor_np, event))
+    _logging_cpu_tensor_queue.put((ts_value, dst, tensor_np))
 
 
 def flush_objects_to_dfs():
@@ -2963,7 +2962,8 @@ def flush_objects_to_dfs():
 
         # key = "{iteration}:{_logging_cnt[dst]}"
         key = f"{ts_value}:{_logging_cnt[dst]}"
-        _logging_stream.wait_event(event)
+        logger.info(f"logging stream query {_logging_stream.query()}")
+        _logging_stream.synchronize()
         file.create_dataset(key, data=tensor, compression=_logging_compression)
         _logging_cnt[dst] += 1
 
