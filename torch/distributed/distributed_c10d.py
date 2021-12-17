@@ -2917,10 +2917,11 @@ def stash(ts_value, dst, tensor):
         tensor_cpu = torch.empty_like(tensor, device="cpu", pin_memory=True)
         _logging_stream.wait_stream(torch.cuda.current_stream())
         with torch.cuda.stream(_logging_stream):
-            tensor_cpu.copy_(tensor)
+            with torch.no_grad():
+                tensor_cpu.copy_(tensor, non_blocking=True)
     else:
         tensor_cpu = tensor
-    tensor_np = tensor_cpu.detach().numpy()
+    tensor_np = tensor_cpu.numpy()
     _logging_cpu_tensor_queue.put((ts_value, dst, tensor_np))
 
 
