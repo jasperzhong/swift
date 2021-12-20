@@ -121,7 +121,7 @@ def recovery(config, ts, model, optimizer):
     elif config.logging:
         if _need_recovery(config.groups, failure_workers):
             load_checkpoint(config, ts, model, optimizer)
-            _set_recovery_mask(consensus_value)
+            _set_recovery_mask(config, ts, consensus_value)
         else:
             # TODO: parallel recovery
             pass
