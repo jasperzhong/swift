@@ -2998,7 +2998,7 @@ def flush_objects_to_dfs(config):
         if need_create_new_file:
             path = 'logging_%d_%d_%d.h5' % (get_rank(), dst, ts_value)
             file = h5py.File(path, "a")
-            logging_pairs_to_files[path].append((file, path))
+            logging_pairs_to_files[key].append((file, path))
         else:
             file, _ = logging_pairs_to_files[key][-1]
 
