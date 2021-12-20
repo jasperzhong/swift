@@ -2988,7 +2988,11 @@ def flush_objects_to_dfs(config):
             need_create_new_file = True
 
         if ts_value % config.logging_chunk_freq == 0:
-            need_create_new_file = True
+            idx = ts_value // config.logging_chunk_freq
+            # not created yet
+            if idx == len(logging_pairs_to_files[key]):
+                need_create_new_file = True
+
             # close the preivous file
             if len(logging_pairs_to_files[key]) > 0:
                 prev_file, _ = logging_pairs_to_files[key][-1]
