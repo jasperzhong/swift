@@ -2993,10 +2993,10 @@ def flush_objects_to_dfs(config):
             if idx == len(logging_pairs_to_files[key]):
                 need_create_new_file = True
 
-            # close the preivous file
-            if len(logging_pairs_to_files[key]) > 0:
-                prev_file, _ = logging_pairs_to_files[key][-1]
-                prev_file.close()
+                # close the preivous file
+                if len(logging_pairs_to_files[key]) > 0:
+                    prev_file, _ = logging_pairs_to_files[key][-1]
+                    prev_file.close()
 
         file = None
         if need_create_new_file:
