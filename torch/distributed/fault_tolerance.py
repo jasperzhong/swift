@@ -408,6 +408,13 @@ def get_logging_files(config, ts, consensus_value):
 
 def checkpoint(config, ts, model, optimizer):
     logger.info("save checkpoint")
+    if os.path.exists(config.checkpoint_path):
+        ckpt = torch.load(config.checkpoint_path)
+        if ts <= ckpt['ts']:
+            logger.info("checkpoint aborted because there is already a newer checkpoint")
+            load_checkpoint(config, ts, model, optimizer)
+            return
+
     torch.save({
         'ts': ts._value,
         'model': model.state_dict(),
