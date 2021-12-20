@@ -331,8 +331,11 @@ class S3Client(DFSClient):
 
     def ls(self):
         rsp = self.s3.list_objects(Bucket=self.bucket)
-        files = rsp['Contents']
-        return [file['Key'] for file in files]
+        key = 'Contents'
+        if key in rsp:
+            files = rsp[key]
+            return [file['Key'] for file in files]
+        return []
 
     def rm(self, dfs_path):
         self.s3.delete_object(Bucket=self.bucket, Key=dfs_path)
