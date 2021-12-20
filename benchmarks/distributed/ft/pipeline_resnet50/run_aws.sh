@@ -6,6 +6,7 @@ MASTER_IP=172.30.2.12
 MASTER_PORT=1234
 
 rm -rf logging*.h5
+aws s3 rm s3://yczhong-swift/ --recursive --include='*.h5'
 
 cmd="python3 -m torch.distributed.run \
 	--nnodes=$NNODES --nproc_per_node=$NPROC_PER_NODE \
