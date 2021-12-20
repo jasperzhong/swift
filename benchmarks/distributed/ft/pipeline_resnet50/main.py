@@ -104,6 +104,7 @@ def train_iter(model, optimizer, data_iterator, loss_func):
     optimizer.zero_grad()
     loss = pipedream_flush_schedule(
         data_iterator, model, loss_func)
+    torch.cuda.synchronize()
     optimizer.step()
     iteration_time = time.time() - start
     return loss
