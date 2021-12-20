@@ -863,9 +863,10 @@ def isend(tensor,
 
     # do not send back to the upstream node during recovery
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
-        f, consensus_value, keys = _logging_recovery_mask.get(dst)
+        idx, file_info_list, consensus_value = _logging_recovery_mask.get(dst)
         if _ts >= consensus_value:
             logger.info(f"close file. src={dst}")
+            f = file_info_list[idx].file_object
             f.close()
             del _logging_recovery_mask[dst]
             break
@@ -916,15 +917,27 @@ def irecv(tensor,
 
     # read from the log data
     while _logging and _logging_recovery_mask.get(src) is not None:
-        f, consensus_value, keys = _logging_recovery_mask.get(src)
+        idx, file_info_list, consensus_value = _logging_recovery_mask.get(src)
+        file_info = file_info_list[idx]
+        if file_info.file_object is None:
+            # open file
+            f, valid_keys = _open_logging_file(file_info.filename, consensus_value)
+            _logging_recovery_mask[src][1][idx].file_object = f
+            _logging_recovery_mask[src][1][idx].valid_keys = valid_keys
 
+        f = file_info.file_object
+        keys = file_info.valid_keys
         try:
             key = next(keys)
         except StopIteration:
             logger.info(f"close file. src={src}")
             f.close()
-            del _logging_recovery_mask[src]
-            break
+            idx += 1
+            _logging_recovery_mask[src][0] += 1
+            if idx == len(file_info_list):
+                del _logging_recovery_mask[src]
+                break
+            continue
 
         dest = f[key]
         tensor_np = np.empty(dest.shape, dest.dtype)
@@ -975,9 +988,10 @@ def send(tensor,
 
     # do not send back to the upstream node during recovery
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
-        f, consensus_value, keys = _logging_recovery_mask.get(dst)
+        idx, file_info_list, consensus_value = _logging_recovery_mask.get(dst)
         if _ts >= consensus_value:
             logger.info(f"close file. src={dst}")
+            f = file_info_list[idx].file_object
             f.close()
             del _logging_recovery_mask[dst]
             break
@@ -1029,15 +1043,27 @@ def recv(tensor,
 
     # read from the log data
     while _logging and _logging_recovery_mask.get(src) is not None:
-        f, consensus_value, keys = _logging_recovery_mask.get(src)
+        idx, file_info_list, consensus_value = _logging_recovery_mask.get(src)
+        file_info = file_info_list[idx]
+        if file_info.file_object is None:
+            # open file
+            f, valid_keys = _open_logging_file(file_info.filename, consensus_value)
+            _logging_recovery_mask[src][1][idx].file_object = f
+            _logging_recovery_mask[src][1][idx].valid_keys = valid_keys
 
+        f = file_info.file_object
+        keys = file_info.valid_keys
         try:
             key = next(keys)
         except StopIteration:
             logger.info(f"close file. src={src}")
             f.close()
-            del _logging_recovery_mask[src]
-            break
+            idx += 1
+            _logging_recovery_mask[src][0] += 1
+            if idx == len(file_info_list):
+                del _logging_recovery_mask[src]
+                break
+            continue
 
         dest = f[key]
         tensor_np = np.empty(dest.shape, dest.dtype)
@@ -2927,36 +2953,54 @@ def stash(ts_value, dst, tensor):
     _logging_cpu_tensor_queue.put((ts_value, dst, tensor_np, event))
 
 
-def flush_objects_to_dfs():
+def flush_objects_to_dfs(config):
     global _logging_cnt
     global _logging_cpu_tensor_queue
     global _logging_compression
     global _logging_dfs_client
     global _logging_stream
 
-    path_to_files = {}
+    logging_pairs_to_files = {}
     while True:
         logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
         item = _logging_cpu_tensor_queue.get()
         if item is None:
             break
         elif item == "flush":
-            for name, file in path_to_files.items():
-                file.close()
-                _logging_dfs_client.rm(dfs_path=name)
-                _logging_dfs_client.upload(dfs_path=name, local_path=name)
-                logger.info(f"put {name} on dfs")
-            path_to_files.clear()
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    # if file is not closed
+                    if file:
+                        file.close()
+                    _logging_dfs_client.rm(dfs_path=path)
+                    _logging_dfs_client.upload(dfs_path=path, local_path=path)
+                    logger.info(f"put {path} on dfs")
+            logging_pairs_to_files.clear()
             continue
 
         ts_value, dst, tensor, event = item
-        path = 'logging_%d_%d.h5' % (get_rank(), dst)
+        key = '%d:%d' % (get_rank(), dst)
         file = None
-        if path in path_to_files:
-            file = path_to_files[path]
-        else:
+
+        need_create_new_file = False
+        if key not in logging_pairs_to_files:
+            logging_pairs_to_files[key] = []
+            need_create_new_file = True
+
+        if ts_value % config.logging_chunk_freq == 0:
+            need_create_new_file = True
+            # close the preivous file
+            if len(logging_pairs_to_files[key]) > 0:
+                prev_file, _ = logging_pairs_to_files[key][-1]
+                prev_file.close()
+
+        file = None
+        if need_create_new_file:
+            path = 'logging_%d_%d_%d.h5' % (get_rank(), dst, ts_value)
             file = h5py.File(path, "a")
-            path_to_files[path] = file
+            logging_pairs_to_files[path].append((file, path))
+        else:
+            file, _ = logging_pairs_to_files[key][-1]
 
         # every send/recv pair should have a logging cnt
         if dst not in _logging_cnt:
@@ -2968,5 +3012,18 @@ def flush_objects_to_dfs():
         file.create_dataset(key, data=tensor, compression=_logging_compression)
         _logging_cnt[dst] += 1
 
-    for name, file in path_to_files.items():
-        file.close()
+    for name, files in logging_pairs_to_files.items():
+        for file, _ in files:
+            if file:
+                file.close()
+
+
+def _open_logging_file(filename, consensus_value):
+    global _logging_recovery_mask
+
+    while not os.path.exists(filename):
+        time.sleep(0.1)
+    f = h5py.File(filename, "a")
+    keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
+    valid_keys = filter(lambda x: int(x.split(":")[0]) < consensus_value, keys)
+    return f, valid_keys

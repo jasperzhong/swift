@@ -6,7 +6,6 @@ import time
 from abc import ABC, abstractmethod
 from queue import Queue
 
-import h5py
 from hdfs import InsecureClient
 
 import torch
@@ -38,30 +37,35 @@ def _need_recovery(groups, failure_workers):
     return False
 
 
-def _set_recovery_mask(consensus_value):
+def _download_logging_files(logging_files):
     client = distributed_c10d._logging_dfs_client
-    logging_files = get_logging_files()
-    while logging_files:
-        files = client.ls()
-        for file in files:
-            if file in logging_files:
-                _, src, dst = file.split('.')[0].split('_')
-                src, dst = int(src), int(dst)
-                logger.info(f"download {file} from hdfs")
-                client.download(dfs_path=file, local_path=file)
-                f = h5py.File(file, "r")
-                keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
-                valid_keys = filter(lambda x: int(x.split(":")[0]) < consensus_value, keys)
-                # (file handle, valid_keys)
-                distributed_c10d._logging_recovery_mask[src] = (f, consensus_value, valid_keys)
-                logging_files.remove(file)
+    for i in range(len(logging_files)):
+        while logging_files[i]:
+            dfs_files = client.ls()
+            for file in logging_files[i]:
+                if file in dfs_files:
+                    client.download(dfs_path=file, local_path=file)
+                    logger.info(f"download {file} from dfs")
+                    logging_files[i].remove(file)
+            time.sleep(0.1)
 
-        time.sleep(0.1)
+
+class FileInfo:
+    def __init__(self, filename, file_object, valid_keys):
+        self.filename = filename
+        self.file_object = file_object
+        self.valid_keys = valid_keys
+
+
+def _set_recovery_mask(config, ts, consensus_value):
+    logging_files = get_logging_files(config, ts, consensus_value)
+    download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
+    download_thread.start()
 
 
 class FaultToleranceConfig:
     def __init__(self, num_iteration, batch_size, checkpoint_interval, replica=False, logging=False,
-                 logging_compression=None, logging_dfs=None, logging_bucket=None,
+                 logging_compression=None, logging_chunk_freq=None, logging_dfs=None, logging_bucket=None,
                  logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_path="swift.ckpt"):
         self.num_iteration = num_iteration
         self.batch_size = batch_size
@@ -69,6 +73,7 @@ class FaultToleranceConfig:
         self.replica = replica
         self.logging = logging
         self.logging_compression = logging_compression
+        self.logging_chunk_freq = logging_chunk_freq
         self.logging_dfs = logging_dfs
         self.logging_bucket = logging_bucket
         self.logging_group_size = logging_group_size
@@ -90,7 +95,7 @@ def setup(config):
             distributed_c10d._logging_dfs_client = DFSClient.create(logging_dfs=config.logging_dfs,
                                                                     logging_bucket=config.logging_bucket)
             distributed_c10d._logging_thread = threading.Thread(
-                target=distributed_c10d.flush_objects_to_dfs)
+                target=distributed_c10d.flush_objects_to_dfs, args=(config, ))
             distributed_c10d._logging_thread.start()
 
 
@@ -377,11 +382,24 @@ def set_logging_mask(pairs):
     return False
 
 
-def get_logging_files():
+def get_logging_files(config, ts, consensus_value):
     rank = get_rank()
     logging_files = []
-    for peer, _ in distributed_c10d._logging_mask.items():
-        logging_files.append(f"logging_{peer}_{rank}.h5")
+    for i, chunk in enumerate(range(ts, consensus_value, config.logging_chunk_freq)):
+        logging_files.append([])
+        for peer, _ in sorted(distributed_c10d._logging_mask.items()):
+            filename = f"logging_{peer}_{rank}_{chunk}.h5"
+            logging_files[i].append(filename)
+
+            if peer not in distributed_c10d._logging_recovery_mask:
+                # [idx, FileInfo list, consensus_value]
+                distributed_c10d._logging_recovery_mask[peer] = [0, [], consensus_value]
+
+            distributed_c10d._logging_recovery_mask[peer][1].append(FileInfo(
+                filename=filename,
+                file_object=None,
+                valid_keys=None
+            ))
     return logging_files
 
 
