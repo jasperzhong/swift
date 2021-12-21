@@ -137,7 +137,7 @@ def main():
 
     config = FaultToleranceConfig(
         num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, checkpoint_interval=100,
-        replica=False, logging=True, logging_compression=args.logging_compression,
+        replica=False, logging=args.logging, logging_compression=args.logging_compression,
         logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
