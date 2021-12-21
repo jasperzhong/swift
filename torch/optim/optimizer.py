@@ -213,6 +213,11 @@ class Optimizer(object):
                                 p.grad.detach_()
                             else:
                                 p.grad.requires_grad_(False)
+
+                            # cache previous gradient in GPU memory
+                            if not hasattr(p, "prev_grad"):
+                                p.prev_grad = torch.clone(p.grad).detach()
+                            p.prev_grad.copy_(p.grad)
                             p.grad.zero_()
 
     def step(self, closure):
