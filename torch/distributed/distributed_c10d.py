@@ -947,7 +947,7 @@ def irecv(tensor,
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
             with open("debug_%d.log" % get_rank(), "a") as f:
-                f.write(f"{torch.max(tensor)}\n")
+                f.write(f"{torch.sum(tensor)}\n")
         return
 
     if _logging and _logging_gpu_tensor_queue:
