@@ -86,6 +86,7 @@ class FaultToleranceConfig:
 def setup(config):
     if config.logging:
         config.groups = get_groups(config.logging_group_size, config.logging_groups)
+        logger.info(pairs)
         pairs = groups_to_pairs(config.groups)
         if set_logging_mask(pairs):
             logger.info(f"enable logging on device {torch.cuda.current_device()}")
