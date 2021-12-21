@@ -71,7 +71,7 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad):
         input_tensor.retain_grad()
 
     with open("debug_backward.log", "a") as f:
-        f.write(f"{_cnt} {torch.sum(input_tensor)} {torch.sum(output_tensor)} {torch.sum(output_tensor_grad)}")
+        f.write(f"{_cnt} {0 if input_tensor is None else torch.sum(input_tensor)} {torch.sum(output_tensor)} {torch.sum(output_tensor_grad)}")
     torch.autograd.backward(output_tensor, grad_tensors=output_tensor_grad)
 
     input_tensor_grad = None
