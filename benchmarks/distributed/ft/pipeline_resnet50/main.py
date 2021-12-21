@@ -138,7 +138,7 @@ def main():
             if isinstance(grad_input, tuple):
                 for grad in grad_input:
                     checksum += _dfs(grad)
-            elif isinstance(grad_input, torch.FloatTensor):
+            elif isinstance(grad_input, torch.cuda.FloatTensor):
                 checksum = torch.sum(grad_input)
             return checksum
 
@@ -146,7 +146,7 @@ def main():
         grad_output_checksum = _dfs(grad_output)
 
         with open("debug_backward.log", "a") as f:
-            f.write(f"{m._get_name()} {grad_input_checksum} {grad_output_checksum}")
+            f.write(f"{m._get_name()} {grad_input_checksum} {grad_output_checksum}\n")
 
     def dfs(module):
         for m in module.children():
