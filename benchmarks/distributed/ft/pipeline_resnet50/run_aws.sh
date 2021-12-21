@@ -25,7 +25,7 @@ LOGGING_ARGS="
 	--logging \
 	--logging-dfs s3 \
 	--logging-s3-bucket yczhong-swift \
-	--logging-group-size 2" 
+	--logging-group-size $2" 
 
 if [[ ENABLE_LOGGING -eq 1 ]];then
 	cmd="${cmd} ${LOGGING_ARGS}"
