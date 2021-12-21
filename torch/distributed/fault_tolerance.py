@@ -59,6 +59,7 @@ class FileInfo:
 
 def _set_recovery_mask(config, ts, consensus_value):
     logging_files = get_logging_files(config, ts, consensus_value)
+    logger.info(logging_files)
     download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
     download_thread.start()
 
