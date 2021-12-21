@@ -134,7 +134,7 @@ def main():
 
     def hook_fn_backward(m, grad_input, grad_output):
         with open("debug_backward.log", "a") as f:
-            f.write(f"{m._get_name()} {torch.sum(grad_input) {torch.sum(grad_output)}}")
+            f.write(f"{m._get_name()} {torch.sum(grad_input)} {torch.sum(grad_output)}")
 
     for module in model.model_split.named_modules():
         module.register_backward_hook(hook_fn_backward)
