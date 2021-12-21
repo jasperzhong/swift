@@ -76,6 +76,7 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad):
         output_tensor_checksum = 0 if output_tensor is None else torch.sum(output_tensor)
         output_tensor_grad_checksum = 0 if output_tensor_grad is None else torch.sum(output_tensor_grad)
         f.write(f"{_cnt} {input_tensor_checksum} {output_tensor_checksum} {output_tensor_grad_checksum}\n")
+        _cnt += 1
     torch.autograd.backward(output_tensor, grad_tensors=output_tensor_grad)
 
     input_tensor_grad = None
