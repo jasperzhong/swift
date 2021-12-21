@@ -2,6 +2,7 @@ import torch
 
 _GLOBAL_ARGS = None
 
+_cnt = 0
 
 def initialize_global_args(args):
     global _GLOBAL_ARGS
@@ -69,6 +70,8 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad):
     if input_tensor is not None:
         input_tensor.retain_grad()
 
+    with open("debug_backward.log", "a") as f:
+        f.write(f"{_cnt} {torch.sum(input_tensor)} {torch.sum(output_tensor)} {torch.sum(output_tensor_grad)}")
     torch.autograd.backward(output_tensor, grad_tensors=output_tensor_grad)
 
     input_tensor_grad = None
