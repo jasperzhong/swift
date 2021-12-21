@@ -138,7 +138,7 @@ def main():
 
     def dfs(module):
         for m in module.children():
-            if len(m.children()) == 0:
+            if len(list(m.children())) == 0:
                 m.register_backward_hook(hook_fn_backward)
             else:
                 dfs(m)
