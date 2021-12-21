@@ -113,7 +113,7 @@ def recovery(config, ts, model, optimizer):
 
     if need_undo:
         logger.info(f"[Rank {get_rank()}] undo update is needed"
-                    f"(iteration = {ts} while the consensus value is {ts-1})!")
+                    f"(iteration = {consensus_value+1} while the consensus value is {consensus_value})!")
         optimizer.undo()
 
     if config.replica:
