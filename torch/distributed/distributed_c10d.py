@@ -873,8 +873,6 @@ def isend(tensor,
         return
 
     if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
-        with open("debug_%d.log" % dst, "a") as f:
-            f.write(f"{torch.sum(tensor)}\n")
         _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
@@ -946,8 +944,6 @@ def irecv(tensor,
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
-            with open("debug_%d.log" % get_rank(), "a") as f:
-                f.write(f"{torch.sum(tensor)}\n")
         return
 
     if _logging and _logging_gpu_tensor_queue:
@@ -1002,8 +998,6 @@ def send(tensor,
         return
 
     if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
-        with open("debug_%d.log" % dst, "a") as f:
-            f.write(f"{torch.sum(tensor)}\n")
         _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
@@ -1076,8 +1070,6 @@ def recv(tensor,
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
-            with open("debug_%d.log" % get_rank(), "a") as f:
-                f.write(f"{torch.sum(tensor)}\n")
         return
 
     if _logging and _logging_gpu_tensor_queue:
