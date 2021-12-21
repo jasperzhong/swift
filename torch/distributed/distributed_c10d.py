@@ -873,6 +873,8 @@ def isend(tensor,
         return
 
     if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
+        with open("debug_%d.log" % dst, "a") as f:
+            f.write("{_ts} {torch.sum(tensor)}\n")
         _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
@@ -998,6 +1000,8 @@ def send(tensor,
         return
 
     if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
+        with open("debug_%d.log" % dst, "a") as f:
+            f.write("{_ts} {torch.sum(tensor)}\n")
         _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:

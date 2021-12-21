@@ -307,3 +307,4 @@ core.*
 
 *.h5
 *.ckpt
+*.log
