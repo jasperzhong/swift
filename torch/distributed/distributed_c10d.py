@@ -862,7 +862,7 @@ def isend(tensor,
         return
 
     with open("debug_%d.log" % dst, "a") as f:
-        f.write("{_ts} {torch.sum(tensor)}\n")
+        f.write(f"{_ts} {torch.sum(tensor)}\n")
 
     # do not send back to the upstream node during recovery
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
@@ -990,7 +990,7 @@ def send(tensor,
         return
 
     with open("debug_%d.log" % dst, "a") as f:
-        f.write("{_ts} {torch.sum(tensor)}\n")
+        f.write(f"{_ts} {torch.sum(tensor)}\n")
 
     # do not send back to the upstream node during recovery
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
