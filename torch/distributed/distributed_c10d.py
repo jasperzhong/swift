@@ -947,6 +947,8 @@ def irecv(tensor,
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
+        with open("debug_recv_%d.log" % src, "a") as f:
+            f.write(f"{_ts} {torch.sum(tensor)}\n")
         return
 
     if _logging and _logging_gpu_tensor_queue:
@@ -1047,6 +1049,7 @@ def recv(tensor,
     else:
         pg = group
 
+
     # read from the log data
     while _logging and _logging_recovery_mask.get(src) is not None:
         idx, file_info_list, consensus_value = _logging_recovery_mask.get(src)
@@ -1076,7 +1079,10 @@ def recv(tensor,
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
+        with open("debug_recv_%d.log" % src, "a") as f:
+            f.write(f"{_ts} {torch.sum(tensor)}\n")
         return
+
 
     if _logging and _logging_gpu_tensor_queue:
         for ts_value, dst, logging_tensor in _logging_gpu_tensor_queue:
