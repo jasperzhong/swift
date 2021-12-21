@@ -397,13 +397,14 @@ def groups_to_pairs(groups):
 
 def set_logging_mask(pairs):
     rank = get_rank()
+    ok = False
     for pair in pairs:
         if rank in pair:
             peer = pair[1] if pair[0] == rank else pair[0]
             distributed_c10d._logging_mask[peer] = True
+            ok = True
 
-            return True
-    return False
+    return ok
 
 
 def get_logging_files(config, ts, consensus_value):
