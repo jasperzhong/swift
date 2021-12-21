@@ -861,6 +861,9 @@ def isend(tensor,
     if _rank_not_in_group(group):
         return
 
+    with open("debug_%d.log" % dst, "a") as f:
+        f.write("{_ts} {torch.sum(tensor)}\n")
+
     # do not send back to the upstream node during recovery
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
         idx, file_info_list, consensus_value = _logging_recovery_mask.get(dst)
@@ -873,8 +876,6 @@ def isend(tensor,
         return
 
     if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
-        with open("debug_%d.log" % dst, "a") as f:
-            f.write("{_ts} {torch.sum(tensor)}\n")
         _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
@@ -988,6 +989,9 @@ def send(tensor,
     if _rank_not_in_group(group):
         return
 
+    with open("debug_%d.log" % dst, "a") as f:
+        f.write("{_ts} {torch.sum(tensor)}\n")
+
     # do not send back to the upstream node during recovery
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
         idx, file_info_list, consensus_value = _logging_recovery_mask.get(dst)
@@ -1000,8 +1004,6 @@ def send(tensor,
         return
 
     if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
-        with open("debug_%d.log" % dst, "a") as f:
-            f.write("{_ts} {torch.sum(tensor)}\n")
         _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
