@@ -127,7 +127,7 @@ def recovery(config, ts, model, optimizer):
             pass
 
 
-def cheksum(ts, model, optimizer):
+def checksum(ts, model, optimizer):
     model_sum = 0
     for param in model.parameters():
         model_sum += torch.sum(param)
@@ -154,6 +154,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     while True:
         recovery(config, ts, model, optimizer)
         data_iterator = reset_data_iterator_func(data_loader, ts)
+        checksum(ts, model, optimizer)
         try:
             logger.info(f"start from iteration {ts}")
             for _ in range(ts, config.num_iteration):
@@ -161,7 +162,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 loss = train_iter(model, optimizer, data_iterator, loss_func)
                 iteration_time = time.time() - start
                 ts += 1
-                cheksum(ts, model, optimizer)
+                checksum(ts, model, optimizer)
 
                 if ts % config.print_freq == 0:
                     logger.info("[Iteration {}] loss: {:.4f} throughput: {:.2f}".format(
