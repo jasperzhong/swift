@@ -136,8 +136,14 @@ def main():
         with open("debug_backward.log", "a") as f:
             f.write(f"{m._get_name()} {torch.sum(grad_input)} {torch.sum(grad_output)}")
 
-    for module in model.model_split.named_modules():
-        module.register_backward_hook(hook_fn_backward)
+    def dfs(module):
+        for m in module.children():
+            if len(m.children()) == 0:
+                m.register_backward_hook(hook_fn_backward)
+            else:
+                dfs(m)
+
+    dfs(model.model_split)
 
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     loss_func = nn.CrossEntropyLoss().cuda()
