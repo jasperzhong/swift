@@ -121,6 +121,12 @@ class SGD(Optimizer):
                 state = self.state[p]
                 state['momentum_buffer'] = momentum_buffer
 
+                # cache previous gradient in GPU memory
+                if not hasattr(p, "prev_grad"):
+                    p.prev_grad = torch.clone(p.grad).detach()
+                else:
+                    p.prev_grad.copy_(p.grad)
+
         return loss
 
     @torch.no_grad()
