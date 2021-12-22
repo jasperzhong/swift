@@ -28,6 +28,7 @@
 #include <mutex>
 #include <sstream>
 #include <iostream>
+#include <unistd.h>
 #include <unordered_map>
 
 // Note [behavior of cudnnFind and cudnnGet]
@@ -139,7 +140,7 @@ struct BenchmarkCache {
         map[params] = results;
 	cnt += 1;
       }
-      std::cout << "read " << cnt << " items from " << filename << std::endl;
+      std::cout << getpid() <<  " read " << cnt << " items from " << filename << std::endl;
     }
   }
 
