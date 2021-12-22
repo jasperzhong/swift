@@ -167,7 +167,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 checksum(ts, model, optimizer)
 
                 if ts % config.print_freq == 0:
-                    logger.info("[Iteration {}] loss: {:.4f} throughput: {:.2f}".format(
+                    logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f}".format(
                         ts, loss, config.batch_size / iteration_time))
 
             break
