@@ -10,7 +10,6 @@ ENABLE_LOGGING=$1
 rm -rf logging*.h5
 rm -rf *.log
 rm -rf *.ckpt
-rm -rf *.cache
 aws s3 rm s3://yczhong-swift/ --recursive --include='*.h5'
 
 cmd="python3 -m torch.distributed.run \
