@@ -168,7 +168,7 @@ struct BenchmarkCache {
 BenchmarkCache<cudnnConvolutionFwdAlgoPerf_t> fwd_algos(
     "cudnnConvolutionFwdAlgo_t");
 BenchmarkCache<cudnnConvolutionBwdDataAlgoPerf_t> bwd_data_algos(
-    "cudnnConvolutionBackwardData");
+    "cudnnConvolutionBwdDataAlgo_t");
 BenchmarkCache<cudnnConvolutionBwdFilterAlgoPerf_t> bwd_filter_algos(
     "cudnnConvolutionBwdFilterAlgo_t");
 
