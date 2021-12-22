@@ -27,6 +27,7 @@
 #include <memory>
 #include <mutex>
 #include <sstream>
+#include <iostream>
 #include <unordered_map>
 
 // Note [behavior of cudnnFind and cudnnGet]
@@ -124,6 +125,7 @@ struct BenchmarkCache {
     if (in.is_open()) {
       int num_bytes = sizeof(ConvolutionParams) + sizeof(T);
       std::vector<char> buffer(num_bytes);
+      int cnt = 0;
       while (in.read(buffer.data(), num_bytes)) {
         std::lock_guard<std::mutex> guard(mutex);
         ConvolutionParams params;
@@ -135,7 +137,9 @@ struct BenchmarkCache {
             sizeof(T));
 
         map[params] = results;
+	cnt += 1;
       }
+      std::cout << "read " << cnt << " items from " << filename << std::endl;
     }
   }
 
