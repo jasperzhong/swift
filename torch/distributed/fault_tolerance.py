@@ -50,6 +50,11 @@ def _download_logging_files(logging_files):
             time.sleep(0.1)
 
 
+def _get_checkpoint_path(config):
+    rank = get_rank()
+    return config.prefix + str(rank) + ".ckpt"
+
+
 class FileInfo:
     def __init__(self, filename, file_object, valid_keys):
         self.filename = filename
@@ -66,13 +71,14 @@ def _set_recovery_mask(config, ts, consensus_value):
 
 class FaultToleranceConfig:
     def __init__(self, num_iteration, batch_size, checkpoint_interval, replica=False, logging=False,
-                 logging_compression=None, logging_chunk_freq=None, logging_dfs=None, logging_bucket=None,
-                 logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_path="swift.ckpt"):
+                 parallel_recovery=False, logging_compression=None, logging_chunk_freq=None, logging_dfs=None,
+                 logging_bucket=None, logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
         self.num_iteration = num_iteration
         self.batch_size = batch_size
         self.checkpoint_interval = checkpoint_interval
         self.replica = replica
         self.logging = logging
+        self.parallel_recovery = parallel_recovery
         self.logging_compression = logging_compression
         self.logging_chunk_freq = logging_chunk_freq
         self.logging_dfs = logging_dfs
@@ -80,7 +86,7 @@ class FaultToleranceConfig:
         self.logging_group_size = logging_group_size
         self.logging_groups = logging_groups
         self.print_freq = print_freq
-        self.checkpoint_path = checkpoint_path
+        self.checkpoint_prefix = checkpoint_prefix
 
 
 def setup(config):
@@ -121,12 +127,12 @@ def recovery(config, ts, model, optimizer):
         optimizer.clear()
         broadcast_optimizer_state(optimizer.state_dict(), 0)
     elif config.logging:
-        if _need_recovery(config.groups, failure_workers):
-            load_checkpoint(config, ts, model, optimizer)
-            _set_recovery_mask(config, ts, consensus_value)
-        else:
-            # TODO: parallel recovery
+        if config.parallel_recovery:
             pass
+        elif _need_recovery(config.groups, failure_workers):
+            filename = _get_checkpoint_path(config)
+            load_checkpoint(filename, ts, model, optimizer)
+            _set_recovery_mask(config, ts, consensus_value)
 
 
 def checksum(ts, model, optimizer):
@@ -152,7 +158,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
     ts = Timestamp(0)
     distributed_c10d._ts = ts
-    checkpoint(config, ts, model, optimizer)
+    filename = _get_checkpoint_path(config)
+    checkpoint(filename, ts, model, optimizer)
     while True:
         recovery(config, ts, model, optimizer)
         data_iterator = reset_data_iterator_func(data_loader, ts)
@@ -428,25 +435,25 @@ def get_logging_files(config, ts, consensus_value):
     return logging_files
 
 
-def checkpoint(config, ts, model, optimizer):
+def checkpoint(filename, ts, model, optimizer):
     logger.info("save checkpoint")
-    if os.path.exists(config.checkpoint_path):
-        ckpt = torch.load(config.checkpoint_path)
+    if os.path.exists(filename):
+        ckpt = torch.load(filename)
         if ts <= ckpt['ts']:
             logger.info("checkpoint aborted because there is already a newer checkpoint")
-            load_checkpoint(config, ts, model, optimizer)
+            load_checkpoint(filename, ts, model, optimizer)
             return
 
     torch.save({
         'ts': ts._value,
         'model': model.state_dict(),
         'optimizer': optimizer.state_dict()
-    }, config.checkpoint_path)
+    }, filename)
     logger.info(f"save checkpoint in iteration {ts}")
 
 
-def load_checkpoint(config, ts, model, optimizer):
-    checkpoint = torch.load(config.checkpoint_path)
+def load_checkpoint(filename, ts, model, optimizer):
+    checkpoint = torch.load(filename)
     ts._value = checkpoint['ts']
     model.load_state_dict(checkpoint['model'])
     optimizer.load_state_dict(checkpoint['optimizer'])

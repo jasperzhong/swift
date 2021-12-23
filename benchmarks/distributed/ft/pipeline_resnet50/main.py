@@ -50,6 +50,8 @@ parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
 parser.add_argument('--logging', default=False, action="store_true",
                     help='whether to enable logging.')
+parser.add_argument('--parallel-recovery', default=False, action="store_true",
+                    help='whether to enable parallel recovery.')
 parser.add_argument('--logging-chunk-freq', type=int,
                     default=10, help='chunk logging files every N iterations.')
 parser.add_argument('--logging-compression', default=None, type=str,
@@ -162,8 +164,8 @@ def main():
 
     config = FaultToleranceConfig(
         num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, checkpoint_interval=100,
-        replica=False, logging=args.logging, logging_compression=args.logging_compression,
-        logging_chunk_freq=args.logging_chunk_freq,
+        replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
+        logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )

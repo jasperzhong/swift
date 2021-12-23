@@ -5,7 +5,9 @@ NPROC_PER_NODE=1
 MASTER_IP=172.30.2.12
 MASTER_PORT=1234
 
-ENABLE_LOGGING=$1
+ENABLE_LOGGING=${1:-0}
+LOGGING_GROUP_SIZE=${2:-${NPROC_PER_NODE}}
+PARALLEL_RECOVERY=${3:-0}
 
 rm -rf logging*.h5
 rm -rf *.log
@@ -26,7 +28,8 @@ LOGGING_ARGS="
 	--logging \
 	--logging-dfs s3 \
 	--logging-s3-bucket yczhong-swift \
-	--logging-group-size $2" 
+	--logging-group-size ${LOGGING_GROUP_SIZE} \
+	--parallel-recovery ${PARALLEL_RECOVERY}" 
 
 if [[ ENABLE_LOGGING -eq 1 ]];then
 	cmd="${cmd} ${LOGGING_ARGS}"
