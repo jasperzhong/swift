@@ -28,10 +28,13 @@ LOGGING_ARGS="
 	--logging \
 	--logging-dfs s3 \
 	--logging-s3-bucket yczhong-swift \
-	--logging-group-size ${LOGGING_GROUP_SIZE} \
-	--parallel-recovery ${PARALLEL_RECOVERY}" 
+	--logging-group-size ${LOGGING_GROUP_SIZE}"
 
-if [[ ENABLE_LOGGING -eq 1 ]];then
+if [[ $PARALLEL_RECOVERY -eq 1 ]]; then
+	LOGGING_ARGS="${LOGGING_ARGS} --parallel-recovery ${PARALLEL_RECOVERY}" 
+fi
+
+if [[ $ENABLE_LOGGING -eq 1 ]];then
 	cmd="${cmd} ${LOGGING_ARGS}"
 fi
 
