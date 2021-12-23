@@ -5,7 +5,57 @@ from torchvision.models.resnet import Bottleneck, ResNet
 from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
     get_pipeline_model_parallel_world_size
 
+class PipelinParallel(nn.Modulle):
+    def __init__(self,
+                 rank: int,
+                 module: nn.Sequential,
+                 balance: Optional[Iterable[int]] = None,
+                 *args, **kwargs
+                 ) -> None:
+        super(module, self).__init__()
+        # need?
+        self.module = module
+        self.rank = rank
+        if balance is not None:
+            assert len(balance) == get_pipeline_model_parallel_world_size(), \
+                "The number of `balance` does not match the number of pipeline stages"
+            assert sum(balance) == len(self.module), \
+                "The summation of `balance` does not match the number of layers"
+            self.balance = balance
+        else:
+            # auto pipeline
+            pass
+        
+    # We should manage the device of each partition.
+    # Deny cuda(), cpu(), and to() with device, by TypeError.
+    def cuda(self, device: Optional[Device] = None) -> 'GPipe':
+        raise MOVING_DENIED
 
+    def cpu(self) -> 'GPipe':
+        raise MOVING_DENIED
+
+    def to(self, *args: Any, **kwargs: Any) -> 'GPipe':
+        # Deny these usages:
+        #
+        # - to(device[, dtype, non_blocking])
+        # - to(tensor[, non_blocking])
+        #
+        # But allow this:
+        #
+        # - to(dtype[, non_blocking])
+        #
+        if 'device' in kwargs or 'tensor' in kwargs:
+            raise MOVING_DENIED
+
+        if args:
+            if isinstance(args[0], (torch.device, int, str)):
+                raise MOVING_DENIED
+            if torch.is_tensor(args[0]):
+                raise MOVING_DENIED
+
+        return super().to(*args, **kwargs)
+
+    
 class PipelineParallelResNet50(ResNet):
     def __init__(self, balance=None, *args, **kwargs):
         super(PipelineParallelResNet50, self).__init__(
