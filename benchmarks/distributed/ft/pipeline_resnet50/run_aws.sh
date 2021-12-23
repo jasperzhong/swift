@@ -31,7 +31,7 @@ LOGGING_ARGS="
 	--logging-group-size ${LOGGING_GROUP_SIZE}"
 
 if [[ $PARALLEL_RECOVERY -eq 1 ]]; then
-	LOGGING_ARGS="${LOGGING_ARGS} --parallel-recovery ${PARALLEL_RECOVERY}" 
+	LOGGING_ARGS="${LOGGING_ARGS} --parallel-recovery"
 fi
 
 if [[ $ENABLE_LOGGING -eq 1 ]];then
