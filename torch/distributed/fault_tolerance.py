@@ -52,7 +52,7 @@ def _download_logging_files(logging_files):
 
 def _get_checkpoint_path(config):
     rank = get_rank()
-    return config.prefix + str(rank) + ".ckpt"
+    return config.checkpoint_prefix + str(rank) + ".ckpt"
 
 
 class FileInfo:
