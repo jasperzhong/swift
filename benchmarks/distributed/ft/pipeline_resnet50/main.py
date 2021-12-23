@@ -131,7 +131,7 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = get_data_loader(args)
-    model = PipelineParallelResNet50(balance=[4, 2, 2, 3])
+    model = PipelineParallelResNet50(rank=args.rank, balance=[4, 2, 2, 3])
     model.cuda()
 
     def hook_fn_backward(m, grad_input, grad_output):

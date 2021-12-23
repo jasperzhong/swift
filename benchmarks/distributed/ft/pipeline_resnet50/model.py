@@ -7,10 +7,12 @@ from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
 
 
 class PipelineParallelResNet50(ResNet):
-    def __init__(self, balance=None, *args, **kwargs):
+    def __init__(self, rank, balance=None, *args, **kwargs):
         super(PipelineParallelResNet50, self).__init__(
             Bottleneck, [3, 4, 6, 3], num_classes=1000, *args, **kwargs
         )
+        self.rank = rank
+
         self.resnet50_sequential = nn.Sequential(
             self.conv1, self.bn1, self.relu, self.maxpool, self.layer1, self.layer2,
             self.layer3,
@@ -34,15 +36,15 @@ class PipelineParallelResNet50(ResNet):
             self.balance[-1] += remaining
 
         self._profile()
+        self.assign_model_split(self.rank)
 
-        self.rank = get_pipeline_model_parallel_rank()
-
+    def assign_model_split(self, rank):
         # assign model split
         start = 0
-        for i in range(self.rank):
+        for i in range(rank):
             start += self.balance[i]
 
-        end = start + self.balance[self.rank]
+        end = start + self.balance[rank]
         self._input_shape = self._input_shapes[start]
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.resnet50_sequential[start:end]
@@ -66,6 +68,9 @@ class PipelineParallelResNet50(ResNet):
 
     def parameters(self, recurse=True):
         return self.model_split.parameters(recurse=recurse)
+
+    def named_parameters(self, prefix='', recurse=True):
+        return self.model_split.named_parameters(prefix=prefix, recurse=recurse)
 
     def state_dict(self):
         return self.model_split.state_dict()

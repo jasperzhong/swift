@@ -180,7 +180,7 @@ def DistributedOptimizer(optimizer, named_parameters=None,
                backward_passes_per_step)
 
 
-def broadcast_parameters(params, root_rank):
+def broadcast_parameters(params, root_rank, group=None):
     """
       Broadcasts the parameters from root rank to all other processes.
       Typical usage is to broadcast the `model.state_dict()`,
@@ -202,10 +202,10 @@ def broadcast_parameters(params, root_rank):
 
     # Run synchronous broadcasts.
     for name, p in params:
-        broadcast(p, 0)
+        broadcast(p, 0, group=group)
 
 
-def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter."):
+def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", group=None):
     """
     Broadcasts an optimizer state from root rank to all other processes.
     Arguments:
@@ -322,7 +322,7 @@ def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter."):
                     callbacks[key] = _create_state_callback(pid, name)
 
     # Synchronized broadcast of all parameters
-    broadcast_parameters(params, root_rank)
+    broadcast_parameters(params, root_rank, group)
 
     # Broadcast and cleanup for non-tensor parameters
     scalars = broadcast_object(scalars, root_rank)
@@ -330,7 +330,7 @@ def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter."):
         callbacks[key](p)
 
 
-def broadcast_object(obj, root_rank=0, name=None):
+def broadcast_object(obj, root_rank=0, name=None, group=None):
     """
     Serializes and broadcasts an object from root rank to all other processes.
     Typical usage is to broadcast the `optimizer.state_dict()`, for example:
@@ -361,7 +361,7 @@ def broadcast_object(obj, root_rank=0, name=None):
         broadcast_parameters([(name + '.sz', sz)], root_rank)
         t = torch.ByteTensor(sz.cpu().tolist()[0]).cuda()
 
-    broadcast_parameters([(name + '.t', t)], root_rank)
+    broadcast_parameters([(name + '.t', t)], root_rank, group)
 
     if get_rank() != root_rank:
         buf = io.BytesIO(t.cpu().numpy().tobytes())

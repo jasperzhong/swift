@@ -14,10 +14,10 @@ import torch.nn
 import torch.optim
 from torch._C._distributed_c10d import SwiftInternalError
 
-from .data_parallel import (_DistributedOptimizer, broadcast_optimizer_state,
+from .data_parallel import (DistributedOptimizer, broadcast_optimizer_state,
                             broadcast_parameters)
 from .distributed_c10d import (_failure_handler, all_gather,
-                               get_local_world_size, get_rank, get_world_size)
+                               get_local_world_size, get_rank, get_world_size, new_group)
 
 try:
     import boto3
@@ -127,12 +127,73 @@ def recovery(config, ts, model, optimizer):
         optimizer.clear()
         broadcast_optimizer_state(optimizer.state_dict(), 0)
     elif config.logging:
-        if config.parallel_recovery:
-            pass
-        elif _need_recovery(config.groups, failure_workers):
+        need_recovery = _need_recovery(config.groups, failure_workers)
+        if need_recovery:
             filename = _get_checkpoint_path(config)
             load_checkpoint(filename, ts, model, optimizer)
             _set_recovery_mask(config, ts, consensus_value)
+
+        if config.parallel_recovery:
+            # 1. living workers do checkpoint
+            if not need_recovery:
+                filename = _get_checkpoint_path(config)
+                checkpoint(filename, ts, model, optimizer)
+
+            # 2. all workers build new comm group
+            comm = build_communication_group(config)
+            group_rank = get_rank(group=comm)
+            group_size = get_world_size(group=comm)
+
+            # 3. living workers build model and optimizer
+            model, optimizer = build_model_and_optimizer(config, model,
+                                                         optimizer, comm,
+                                                         failure_workers)
+
+
+def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
+    global_rank = get_rank()
+
+    # find which group the failure worker belongs to
+    failure_group = None
+    for group in config.groups:
+        for failure_worker in failure_workers:
+            if failure_worker in group:
+                failure_group = group
+                break
+        if failure_group:
+            break
+
+    # find which failure worker belongs to my data parallel group
+    data_parallel_groups = list(zip(*config.groups))
+    peer_failure_worker = None
+    for group in data_parallel_groups:
+        if global_rank in group:
+            for worker in group:
+                if worker in failure_group:
+                    peer_failure_worker = worker
+                    break
+        if peer_failure_worker:
+            break
+
+    model.assign_model_split(peer_failure_worker)
+    optimizer_cls = optimizer.__class__
+    optimizer_defaults = optimizer.defaults
+    optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
+    optimizer = DistributedOptimizer(optimizer, model.named_parameters())
+
+    # peer failure worker broadcast its parameters and optimizer states
+    # to other group members
+    broadcast_parameters(model.named_parameters(), peer_failure_worker, group=comm)
+    broadcast_optimizer_state(optimizer.state_dict(), peer_failure_worker, group=comm)
+    return model, optimizer
+
+
+def build_communication_group(config):
+    data_parallel_groups = list(zip(*config.groups))
+    rank = get_rank()
+    for group in data_parallel_groups:
+        if rank in group:
+            return new_group(group)
 
 
 def checksum(ts, model, optimizer):
