@@ -116,6 +116,14 @@ class Adam(Optimizer):
                    lr=group['lr'],
                    weight_decay=group['weight_decay'],
                    eps=group['eps'])
+            
+            # cache previous gradient in GPU memory
+            for p in params_with_grad:
+                if not hasattr(p, "prev_grad"):
+                    p.prev_grad = torch.clone(p.grad).detach()
+                else:
+                    p.prev_grad.copy_(p.grad)
+            
         return loss
 
     @torch.no_grad()
@@ -129,11 +137,11 @@ class Adam(Optimizer):
             beta1, beta2 = group['betas']
 
             for p in group['params']:
-                if p.grad is not None:
+                if p.grad is not None and p.prev_grad is not None:
                     params_with_grad.append(p)
                     if p.grad.is_sparse:
                         raise RuntimeError('Adam does not support sparse gradients, please consider SparseAdam instead')
-                    grads.append(p.grad)
+                    grads.append(p.prev_grad)
 
                     state = self.state[p]
                     # Don't need lazy state initialization
