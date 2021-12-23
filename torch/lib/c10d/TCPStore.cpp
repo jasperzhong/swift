@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <algorithm>
 #include <system_error>
+#include <iostream>
 
 namespace c10d {
 
@@ -732,6 +733,9 @@ void TCPStore::waitForWorkers() {
 
 void TCPStore::set(const std::string& key, const std::vector<uint8_t>& data) {
   std::string regKey = regularPrefix_ + key;
+
+  std::cout << "TCPStore: " << regKey << std::endl;
+  
   tcputil::sendValue<QueryType>(storeSocket_, QueryType::SET);
   tcputil::sendString(storeSocket_, regKey, true);
   tcputil::sendVector<uint8_t>(storeSocket_, data);
