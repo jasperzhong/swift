@@ -1,10 +1,11 @@
+import unittest
 from math import exp
-from torch._C import memory_format
+
 import torch
 import torch.optim._functional as F
-import unittest
 from parameterized import parameterized
-import itertools
+from torch._C import memory_format
+from torchvision.models import resnet50
 
 
 def custom_name_func(testcase_func, param_num, param):
@@ -12,6 +13,22 @@ def custom_name_func(testcase_func, param_num, param):
         testcase_func.__name__,
         parameterized.to_safe_name("_".join(str(x) for x in param.args)),
     )
+
+
+def checksum(model, optimizer):
+    model_sum = 0
+    for param in model.parameters():
+        model_sum += torch.sum(param)
+
+    optimizer_sum = 0
+    for group in optimizer.param_groups:
+        for p in group['params']:
+            if p.grad is not None:
+                state = optimizer.state[p]
+                if 'momentum_buffer' in state:
+                    optimizer_sum += torch.sum(state['momentum_buffer'])
+
+    return model_sum, optimizer_sum
 
 
 class UndoTestCase(unittest.TestCase):
@@ -23,7 +40,7 @@ class UndoTestCase(unittest.TestCase):
         momentum_buffer_list = []
         momentum_buffer_list_copy = []
 
-        num_tensors = 50 
+        num_tensors = 50
         size = (32, 32)
         for _ in range(num_tensors):
             param = torch.randn(size=size, requires_grad=True).cuda()
@@ -155,7 +172,6 @@ class UndoTestCase(unittest.TestCase):
             if torch.allclose(exp_avg_sqs[i], exp_avg_sqs_copy[i], atol=atol) is False:
                 print(exp_avg_sqs[i] - exp_avg_sqs_copy[i])
                 self.assertTrue(False)
-
 
 if __name__ == "__main__":
     unittest.main()
