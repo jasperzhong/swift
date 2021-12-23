@@ -133,7 +133,7 @@ def recovery(config, ts, model, optimizer):
             load_checkpoint(filename, ts, model, optimizer)
             _set_recovery_mask(config, ts, consensus_value)
 
-        if config.parallel_recovery:
+        if failure_workers and config.parallel_recovery:
             # 1. living workers do checkpoint
             if not need_recovery:
                 filename = _get_checkpoint_path(config)
