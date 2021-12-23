@@ -685,7 +685,6 @@ def _new_process_group_helper(world_size,
 
         # Use the group name as prefix in the default store, such that
         # a single store can be reused by multiple groups.
-        print("group_name: ", group_name)
         prefix_store = PrefixStore(group_name, store)
 
         if backend == Backend.GLOO:
