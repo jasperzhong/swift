@@ -123,9 +123,9 @@ def recovery(config, ts, model, optimizer):
         optimizer.undo()
 
     if config.replica:
-        broadcast_parameters(model.named_parameters(), 0)
+        broadcast_parameters(model.state_dict(), 0)
         optimizer.clear()
-        broadcast_optimizer_state(optimizer.state_dict(), 0)
+        broadcast_optimizer_state(optimizer, 0)
     elif config.logging:
         need_recovery = _need_recovery(config.groups, failure_workers)
         if need_recovery:
@@ -183,8 +183,8 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
 
     # peer failure worker broadcast its parameters and optimizer states
     # to other group members
-    broadcast_parameters(model.named_parameters(), peer_failure_worker, group=comm)
-    broadcast_optimizer_state(optimizer.state_dict(), peer_failure_worker, group=comm)
+    broadcast_parameters(model.state_dict(), peer_failure_worker, group=comm)
+    broadcast_optimizer_state(optimizer, peer_failure_worker, group=comm)
     return model, optimizer
 
 
