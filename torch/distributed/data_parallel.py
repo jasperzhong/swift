@@ -202,7 +202,7 @@ def broadcast_parameters(params, root_rank, group=None):
 
     # Run synchronous broadcasts.
     for name, p in params:
-        broadcast(p, 0, group=group)
+        broadcast(p, root_rank, group=group)
 
 
 def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", group=None):
