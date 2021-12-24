@@ -180,7 +180,7 @@ def DistributedOptimizer(optimizer, named_parameters=None,
                backward_passes_per_step)
 
 
-def broadcast_parameters(params, root_rank, group=None):
+def broadcast_parameters(params, root_rank, comm_group=None):
     """
       Broadcasts the parameters from root rank to all other processes.
       Typical usage is to broadcast the `model.state_dict()`,
@@ -202,10 +202,10 @@ def broadcast_parameters(params, root_rank, group=None):
 
     # Run synchronous broadcasts.
     for name, p in params:
-        broadcast(p, root_rank, group=group)
+        broadcast(p, root_rank, group=comm_group)
 
 
-def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", group=None):
+def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", comm_group=None):
     """
     Broadcasts an optimizer state from root rank to all other processes.
     Arguments:
@@ -322,10 +322,10 @@ def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", group=N
                     callbacks[key] = _create_state_callback(pid, name)
 
     # Synchronized broadcast of all parameters
-    broadcast_parameters(params, root_rank, group)
+    broadcast_parameters(params, root_rank, comm_group)
 
     # Broadcast and cleanup for non-tensor parameters
-    scalars = broadcast_object(scalars, root_rank, group=group)
+    scalars = broadcast_object(scalars, root_rank, group=comm_group)
     for key, p in scalars.items():
         callbacks[key](p)
 
