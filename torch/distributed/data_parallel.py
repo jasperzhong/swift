@@ -325,12 +325,12 @@ def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", comm_gr
     broadcast_parameters(params, root_rank, comm_group)
 
     # Broadcast and cleanup for non-tensor parameters
-    scalars = broadcast_object(scalars, root_rank, group=comm_group)
+    scalars = broadcast_object(scalars, root_rank, comm_group=comm_group)
     for key, p in scalars.items():
         callbacks[key](p)
 
 
-def broadcast_object(obj, root_rank=0, name=None, group=None):
+def broadcast_object(obj, root_rank=0, name=None, comm_group=None):
     """
     Serializes and broadcasts an object from root rank to all other processes.
     Typical usage is to broadcast the `optimizer.state_dict()`, for example:
@@ -355,13 +355,13 @@ def broadcast_object(obj, root_rank=0, name=None, group=None):
         cloudpickle.dump(obj, b)
         t = torch.ByteTensor(bytearray(b.getvalue())).cuda()
         sz = torch.IntTensor([t.shape[0]]).cuda()
-        broadcast_parameters([(name + '.sz', sz)], root_rank, group)
+        broadcast_parameters([(name + '.sz', sz)], root_rank, comm_group)
     else:
         sz = torch.IntTensor([0]).cuda()
-        broadcast_parameters([(name + '.sz', sz)], root_rank, group)
+        broadcast_parameters([(name + '.sz', sz)], root_rank, comm_group)
         t = torch.ByteTensor(sz.cpu().tolist()[0]).cuda()
 
-    broadcast_parameters([(name + '.t', t)], root_rank, group)
+    broadcast_parameters([(name + '.t', t)], root_rank, comm_group)
 
     if get_rank() != root_rank:
         buf = io.BytesIO(t.cpu().numpy().tobytes())
