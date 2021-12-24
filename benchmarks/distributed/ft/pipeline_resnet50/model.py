@@ -18,7 +18,7 @@ def verify_module(module: nn.Sequential) -> None:
     if num_parameters != num_child_parameters:
         raise ValueError('module with duplicate parameters in distinct children is not supported')
 
-class PipelineParallel(nn.Modulle):
+class PipelineParallel(nn.Module):
     def __init__(self,
                  rank: int,
                  module: nn.Sequential,
