@@ -1,21 +1,35 @@
 import torch
 import torch.nn as nn
 from torchvision.models.resnet import Bottleneck, ResNet
-
+from typing import Optional, Iterable
 from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
     get_pipeline_model_parallel_world_size
 
-class PipelinParallel(nn.Modulle):
+def verify_module(module: nn.Sequential) -> None:
+    if not isinstance(module, nn.Sequential):
+        raise TypeError('module must be nn.Sequential to be partitioned')
+
+    named_children = list(module.named_children())
+    if len(named_children) != len(module):
+        raise ValueError('module with duplicate children is not supported')
+
+    num_parameters = len(list(module.parameters()))
+    num_child_parameters = sum(len(list(child.parameters())) for child in module.children())
+    if num_parameters != num_child_parameters:
+        raise ValueError('module with duplicate parameters in distinct children is not supported')
+
+class PipelineParallel(nn.Modulle):
     def __init__(self,
                  rank: int,
                  module: nn.Sequential,
                  balance: Optional[Iterable[int]] = None,
                  *args, **kwargs
                  ) -> None:
-        super(module, self).__init__()
-        # need?
+        super(PipelineParallel, self).__init__()
+
+        verify_module(module)
         self.module = module
-        self.rank = rank
+        
         if balance is not None:
             assert len(balance) == get_pipeline_model_parallel_world_size(), \
                 "The number of `balance` does not match the number of pipeline stages"
@@ -23,37 +37,65 @@ class PipelinParallel(nn.Modulle):
                 "The summation of `balance` does not match the number of layers"
             self.balance = balance
         else:
-            # auto pipeline
-            pass
-        
-    # We should manage the device of each partition.
-    # Deny cuda(), cpu(), and to() with device, by TypeError.
-    def cuda(self, device: Optional[Device] = None) -> 'GPipe':
-        raise MOVING_DENIED
+            num_layers_per_stage = len(self.module) // \
+                get_pipeline_model_parallel_world_size()
+            self.balance = [num_layers_per_stage] * get_pipeline_model_parallel_world_size()
+            remaining = len(self.module) - num_layers_per_stage * len(self.balance)
+            self.balance[-1] += remaining
 
-    def cpu(self) -> 'GPipe':
-        raise MOVING_DENIED
+        self._profile()
 
-    def to(self, *args: Any, **kwargs: Any) -> 'GPipe':
-        # Deny these usages:
-        #
-        # - to(device[, dtype, non_blocking])
-        # - to(tensor[, non_blocking])
-        #
-        # But allow this:
-        #
-        # - to(dtype[, non_blocking])
-        #
-        if 'device' in kwargs or 'tensor' in kwargs:
-            raise MOVING_DENIED
+        self.rank = rank
 
-        if args:
-            if isinstance(args[0], (torch.device, int, str)):
-                raise MOVING_DENIED
-            if torch.is_tensor(args[0]):
-                raise MOVING_DENIED
+        # assign model split
+        start = 0
+        for i in range(self.rank):
+            start += self.balance[i]
 
-        return super().to(*args, **kwargs)
+        end = start + self.balance[self.rank]
+        self._input_shape = self._input_shapes[start]
+        self._output_shape = self._output_shapes[end - 1]
+        self.model_split = self.module[start:end]
+
+    def _profile(self, shape=[3, 224, 224]):
+        """
+        get each layer's input/output shape by running one forward pass
+        """
+        micro_batch_size = get_microbatch_size()
+        fake_input = torch.randn(tuple([micro_batch_size] + shape))
+
+        self._input_shapes = []
+        self._output_shapes = []
+        input = fake_input
+        with torch.no_grad():
+            for layer in self.resnet50_sequential:
+                self._input_shapes.append(input.shape)
+                output = layer(input)
+                self._output_shapes.append(output.shape)
+                input = output
+
+    def parameters(self, recursive=True):
+        params = []
+        for layer in self.model_split:
+            params.extend(list(layer.parameters()))
+
+        for param in params:
+            yield param
+
+    @property
+    def input_shape(self):
+        return self._input_shape
+
+    @property
+    def output_shape(self):
+        return self._output_shape
+
+    def forward(self, x):
+        return self.model_split(x)
+
+    def __len__(self) -> int:
+        return len(self.model_split)
+
 
     
 class PipelineParallelResNet50(ResNet):
