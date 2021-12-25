@@ -176,10 +176,12 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
         if peer_failure_worker:
             break
 
-    model.assign_model_split(peer_failure_worker)
-    optimizer_cls = optimizer.__class__
-    optimizer_defaults = optimizer.defaults
-    optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
+    if global_rank != peer_failure_worker:
+        model.assign_model_split(peer_failure_worker)
+        optimizer_cls = optimizer.__class__
+        optimizer_defaults = optimizer.defaults
+        optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
+
     optimizer = DistributedOptimizer(optimizer, model.named_parameters())
 
     # peer failure worker broadcast its parameters and optimizer states
