@@ -369,6 +369,7 @@ class Timestamp:
 
     def broadcast(self, src_rank):
         tensor = torch.LongTensor(1).cuda()
+        tensor[0] = self._value
         broadcast(tensor, src_rank)
         self._value = int(tensor[0].item())
 
