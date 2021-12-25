@@ -153,7 +153,7 @@ def recovery(config, ts, model, optimizer):
             # 4. download the same set of logging files as the failure worker
             if not need_recovery:
                 logging_files = get_logging_files_for_parallel_recovery(config, ts, consensus_value,
-                                                                        peer_of_peer_failure_worker)
+                                                                        peer_failure_worker)
                 logger.info(f"logging_files: {logging_files}")
                 download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
                                                    daemon=True)
