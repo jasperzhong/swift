@@ -16,7 +16,7 @@ from torch._C._distributed_c10d import SwiftInternalError
 
 from .data_parallel import (DistributedOptimizer, broadcast_optimizer_state,
                             broadcast_parameters)
-from .distributed_c10d import (_failure_handler, all_gather,
+from .distributed_c10d import (_failure_handler, all_gather, broadcast,
                                get_local_world_size, get_rank, get_world_size, new_group)
 
 try:
