@@ -64,7 +64,7 @@ class FileInfo:
 
 def _set_recovery_mask(config, ts, consensus_value):
     logging_files = get_logging_files(config, ts, consensus_value)
-    logger.info(logging_files)
+    logger.info(f"logging_files: {logging_files}")
     download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
     download_thread.start()
 
@@ -146,9 +146,18 @@ def recovery(config, ts, model, optimizer):
             logger.info(f"build new communication group ({group_rank} / {group_size})")
 
             # 3. living workers build model and optimizer
-            model, optimizer = build_model_and_optimizer(config, model,
-                                                         optimizer, comm,
-                                                         failure_workers)
+            model, optimizer, peer_failure_worker = build_model_and_optimizer(config, model,
+                                                                              optimizer, comm,
+                                                                              failure_workers)
+
+            # 4. download the same set of logging files as the failure worker
+            if not need_recovery:
+                logging_files = get_logging_files_for_parallel_recovery(config, ts, consensus_value,
+                                                                        peer_of_peer_failure_worker)
+                logger.info(f"logging_files: {logging_files}")
+                download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
+                                                   daemon=True)
+                download_thread.start()
 
 
 def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
@@ -190,7 +199,7 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
     broadcast_optimizer_state(optimizer, peer_failure_worker, comm_group=comm)
     logger.info(f"Rank {peer_failure_worker} broadcast its parameters and optimizer states")
 
-    return model, optimizer
+    return model, optimizer, peer_failure_worker
 
 
 def build_communication_group(config):
@@ -487,6 +496,28 @@ def get_logging_files(config, ts, consensus_value):
         logging_files.append([])
         for peer, _ in sorted(distributed_c10d._logging_mask.items()):
             filename = f"logging_{peer}_{rank}_{chunk}.h5"
+            logging_files[i].append(filename)
+
+            if peer not in distributed_c10d._logging_recovery_mask:
+                # [idx, FileInfo list, consensus_value]
+                distributed_c10d._logging_recovery_mask[peer] = [0, [], consensus_value]
+
+            distributed_c10d._logging_recovery_mask[peer][1].append(FileInfo(
+                filename=filename,
+                file_object=None,
+                valid_keys=None
+            ))
+    return logging_files
+
+
+def get_logging_files_for_parallel_recovery(config, ts, consensus_value, peer_failure_worker):
+    rank = get_rank()
+    logging_files = []
+    for i, chunk in enumerate(range(ts, consensus_value, config.logging_chunk_freq)):
+        logging_files.append([])
+        for peer, _ in sorted(distributed_c10d._logging_mask.items()):
+            peer_of_peer_failure_worker = peer_failure_worker + (peer - rank)
+            filename = f"logging_{peer_of_peer_failure_worker}_{peer_failure_worker}_{chunk}.h5"
             logging_files[i].append(filename)
 
             if peer not in distributed_c10d._logging_recovery_mask:
