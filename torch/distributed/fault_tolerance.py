@@ -143,6 +143,7 @@ def recovery(config, ts, model, optimizer):
             comm = build_communication_group(config)
             group_rank = get_rank(group=comm)
             group_size = get_world_size(group=comm)
+            logger.info(f"build new communication group ({group_rank} / {group_size})")
 
             # 3. living workers build model and optimizer
             model, optimizer = build_model_and_optimizer(config, model,
@@ -183,9 +184,12 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
 
     # peer failure worker broadcast its parameters and optimizer states
     # to other group members
-    print("peer failure_worker:", peer_failure_worker)
     broadcast_parameters(model.state_dict(), peer_failure_worker, comm_group=comm)
     broadcast_optimizer_state(optimizer, peer_failure_worker, comm_group=comm)
+    logger.info(f"Rank {peer_failure_worker} broadcast its parameters and optimizer states")
+    # for debug
+    time.sleep(1000)
+
     return model, optimizer
 
 
