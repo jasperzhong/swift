@@ -149,8 +149,10 @@ def recovery(config, ts, model, optimizer):
             model, optimizer, peer_failure_worker = build_model_and_optimizer(config, model,
                                                                               optimizer, comm,
                                                                               failure_workers)
+            # 4. broadcast failure worker's ts
+            ts.broadcast(peer_failure_worker)
 
-            # 4. download the same set of logging files as the failure worker
+            # 5. download the same set of logging files as the failure worker
             if not need_recovery:
                 logging_files = get_logging_files_for_parallel_recovery(config, ts, consensus_value,
                                                                         peer_failure_worker)
@@ -364,6 +366,11 @@ class Timestamp:
         if max_v - 1 in values:
             return max_v - 1
         return max_v
+
+    def broadcast(self, src_rank):
+        tensor = torch.LongTensor(1).cuda()
+        broadcast(tensor, src_rank)
+        self._value = int(tensor[0].item())
 
 
 class DFSClient(ABC):
