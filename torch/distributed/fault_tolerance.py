@@ -190,22 +190,6 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
     broadcast_optimizer_state(optimizer, peer_failure_worker, comm_group=comm)
     logger.info(f"Rank {peer_failure_worker} broadcast its parameters and optimizer states")
 
-    model_sum = 0
-    for param in model.parameters():
-        model_sum += torch.sum(param)
-
-    optimizer_sum = 0
-    for group in optimizer.param_groups:
-        for p in group['params']:
-            if p.grad is not None:
-                state = optimizer.state[p]
-                if 'momentum_buffer' in state:
-                    optimizer_sum += torch.sum(state['momentum_buffer'])
-
-    logger.info(f"{model_sum} {optimizer_sum}")
-    # for debug
-    time.sleep(1000)
-
     return model, optimizer
 
 
