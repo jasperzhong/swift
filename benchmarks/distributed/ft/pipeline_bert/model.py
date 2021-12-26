@@ -1,11 +1,11 @@
 import torch
+from torch._C import ThroughputBenchmark
 import torch.nn as nn
 import modeling
-from modeling import BertForPreTraining, BertForMaskedLM, BertConfig
+from modeling import BertForPreTraining, BertForMaskedLM, BertConfig, BertEmbeddings, BertLayer, BertPooler, BertPreTrainingHeads
 from typing import Optional, Iterable
 from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
     get_pipeline_model_parallel_world_size, is_pipeline_first_stage
-from torch.nn.modules.container import Sequential
 
 # Prepare model config
 config = BertConfig.from_json_file('./bert_config.json')
@@ -65,29 +65,35 @@ class PipelineParallelBert(BertForPreTraining):
         fake_input_ids = torch.randn(tuple([micro_batch_size] + shape))
         fake_segment_ids = torch.randn(tuple([micro_batch_size] + shape))
         fake_input_mask = torch.randn(tuple([micro_batch_size] + shape))
-        fake_input = torch.randn(tuple([micro_batch_size] + shape))
+        extended_attention_mask = fake_input_mask.unsqueeze(1).unsqueeze(2)
+        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         
         self._input_shapes = []
         self._output_shapes = []
-        input = fake_input
-        first_flag = True
-        with torch.no_grad():
-            # first layer
-            self._input_shapes.append(input.shape)
-            output = self.bert_sequential[0](input_ids=fake_input_ids, token_type_ids=fake_segment_ids, attention_mask=fake_input_mask)
-            self._output_shapes.append(output.shape)
-            input = output
-            # middle layer
-            for layer in self.bert_sequential[1:-1]:
+        input = fake_input_ids
+        with torch.no_grad():      
+            for layer in self.model_split:
                 self._input_shapes.append(input.shape)
-                output = layer(input)
+                if isinstance(layer, BertEmbeddings):
+                    output = layer(input_ids=fake_input_ids, token_type_ids=fake_segment_ids)
+                if isinstance(layer, BertLayer):
+                    hidden_states = input
+                    output = layer(hidden_states=hidden_states , attention_mask=extended_attention_mask)
+                if isinstance(layer, BertPooler):
+                    encoded_layers = input
+                    sequence_output = encoded_layers[-1]
+                    # default not output all encoded layers
+                    encoded_layers = encoded_layers[-1:]
+                    pooled_output = layer(hidden_states=sequence_output)
+                    output = [encoded_layers, pooled_output]
+                if isinstance(layer, BertPreTrainingHeads):
+                    encoded_layers, pooled_output = input
+                    sequence_output = encoded_layers[-1]
+                    prediction_scores, seq_relationship_score = layer(sequence_output, pooled_output)
+                    output = [prediction_scores, seq_relationship_score]
                 self._output_shapes.append(output.shape)
-                input = output        
-            # last layer
-            self._input_shapes.append(input.shape)
-            prediction_scores, seq_relationship_score = self.bert_sequential[-1]
-            self._output_shape.append(prediction_scores.shape)
-            print("prediction_scores: {}, seq_relationship_score: {}".format(prediction_scores.shape, seq_relationship_score.shape))
+                input = output
+            
             
     def parameters(self, recursive=True):
         params = []
@@ -105,8 +111,40 @@ class PipelineParallelBert(BertForPreTraining):
     def output_shape(self):
         return self._output_shape
 
-    def forward(self, x):
-        if is_pipeline_first_stage():
-            input_ids, segment_ids, input_mask = x
-            return self.model_split(input_ids=input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
-        return self.model_split(x)
+    def forward(self, input, token_type_ids, attention_mask):
+        # We create a 3D attention mask from a 2D tensor mask.
+        # Sizes are [batch_size, 1, 1, to_seq_length]
+        # So we can broadcast to [batch_size, num_heads, from_seq_length, to_seq_length]
+        # this attention mask is more simple than the triangular masking of causal attention
+        # used in OpenAI GPT, we just need to prepare the broadcast dimension here.
+        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+        
+        # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
+        # masked positions, this operation will create a tensor which is 0.0 for
+        # positions we want to attend and -10000.0 for masked positions.
+        # Since we are adding it to the raw scores before the softmax, this is
+        # effectively the same as removing these entirely.
+        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        
+        for layer in self.model_split:    
+            if isinstance(layer, BertEmbeddings):
+                input_ids = input
+                output = layer(input_ids=input_ids, token_type_ids=token_type_ids)
+            if isinstance(layer, BertLayer):
+                hidden_states = input
+                output = layer(hidden_states=hidden_states , attention_mask=extended_attention_mask)
+            if isinstance(layer, BertPooler):
+                encoded_layers = input
+                sequence_output = encoded_layers[-1]
+                # default not output all encoded layers
+                encoded_layers = encoded_layers[-1:]
+                pooled_output = layer(hidden_states=sequence_output)
+                output = [encoded_layers, pooled_output]
+            if isinstance(layer, BertPreTrainingHeads):
+                encoded_layers, pooled_output = input
+                sequence_output = encoded_layers[-1]
+                prediction_scores, seq_relationship_score = layer(sequence_output, pooled_output)
+                output = [prediction_scores, seq_relationship_score]
+                
+            input = output
+        return output

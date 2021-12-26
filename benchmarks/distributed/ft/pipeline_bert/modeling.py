@@ -472,7 +472,8 @@ class BertModel(nn.Module):
         pooled_output = self.pooler(sequence_output)
         if not self.output_all_encoded_layers:
             encoded_layers = encoded_layers[-1:]
-        return encoded_layers, pooled_output
+        out = [encoded_layers, pooled_output]
+        return out
 
 class BertPredictionHeadTransform(nn.Module):
     def __init__(self, config):
@@ -513,7 +514,8 @@ class BertPreTrainingHeads(nn.Module):
     def forward(self, sequence_output, pooled_output):
         prediction_scores = self.predictions(sequence_output)
         seq_relationship_score = self.seq_relationship(pooled_output)
-        return prediction_scores, seq_relationship_score
+        out = [prediction_scores, seq_relationship_score]
+        return out
 
 class BertForPreTraining(BertModel):
     """BERT model with pre-training heads.
