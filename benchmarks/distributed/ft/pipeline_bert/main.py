@@ -8,6 +8,7 @@ import numpy as np
 from model import PipelineParallelBert
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, Dataset
 import modeling
+import h5py
 
 from schedule import (initialize_global_args, is_pipeline_first_stage,
                       is_pipeline_last_stage, pipedream_flush_schedule,
@@ -64,8 +65,13 @@ parser.add_argument('--logging-s3-bucket', default=None, type=str,
 parser.add_argument('--logging-group-size', default=None, type=int,
                     help='group size for logging')
 # addition
-parser.add_argument("--warmup_proportion", default=0.01, type=float, help="Proportion of training to perform linear learning rate warmup for. "
+parser.add_argument("--warmup_proportion", default=0.01, type=float, 
+                    help="Proportion of training to perform linear learning rate warmup for. "
                     "E.g., 0.1 = 10%% of training.")
+parser.add_argument("--max_predictions_per_seq", default=80, type=int, 
+                    help="The maximum total of masked tokens in input sequence")
+parser.add_argument("--max_steps", default=1000, type=float, 
+                    help="Total number of training steps to perform.")
 
 args = parser.parse_args()
 initialize_global_args(args)
@@ -131,7 +137,8 @@ def prepare_model_and_optimizer(args):
 
     # base on the NVIDIA example: 5e-5
     optimizer = optim.Adam(model.parameters(), lr=5e-5)
-                           
+
+    # TODO: args      
     lr_scheduler = PolyWarmUpScheduler(optimizer, 
                                        warmup=args.warmup_proportion, 
                                        total_steps=args.max_steps)
