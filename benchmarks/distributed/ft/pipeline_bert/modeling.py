@@ -8,6 +8,7 @@ import tarfile
 import tempfile
 import sys
 from io import open
+from benchmarks.distributed.ft.pipeline_bert.main import prepare_model_and_optimizer
 
 import torch
 from torch import nn
@@ -569,8 +570,8 @@ class BertForPreTraining(BertModel):
         encoded_layers, pooled_output = self.bert(input_ids, token_type_ids, attention_mask)
         sequence_output = encoded_layers[-1]
         prediction_scores, seq_relationship_score = self.cls(sequence_output, pooled_output)
-
-        return prediction_scores, seq_relationship_score
+        out = [prediction_scores, seq_relationship_score]
+        return out
 
 class BertOnlyMLMHead(nn.Module):
     def __init__(self, config, bert_model_embedding_weights):

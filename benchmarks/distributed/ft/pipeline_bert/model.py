@@ -1,21 +1,20 @@
 import torch
 import torch.nn as nn
+import modeling
 from modeling import BertForPreTraining, BertForMaskedLM, BertConfig
 from typing import Optional, Iterable
 from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
-    get_pipeline_model_parallel_world_size
+    get_pipeline_model_parallel_world_size, is_pipeline_first_stage
 from torch.nn.modules.container import Sequential
 
-def getConfig(vocab_size_or_config_json_file=32000, 
-              hidden_size=768,
-              num_hidden_layers=12, 
-              num_attention_heads=12, 
-              intermediate_size=3072) -> BertConfig:
-    config = BertConfig(vocab_size_or_config_json_file=32000, hidden_size=768,
-        num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072)
-    return config
+# Prepare model config
+config = BertConfig.from_json_file('./bert_config.json')
 
-config = getConfig()
+# Padding for divisibility by 8
+if config.vocab_size % 8 != 0:
+    config.vocab_size += 8 - (config.vocab_size % 8)
+
+modeling.ACT2FN["bias_gelu"] = modeling.bias_gelu_training
 
 class PipelineParallelBert(BertForPreTraining):
     def __init__(self, rank=get_pipeline_model_parallel_rank(), balance=None, *args, **kwargs):
@@ -43,7 +42,6 @@ class PipelineParallelBert(BertForPreTraining):
             remaining = len(self.bert_sequential) - num_layers_per_stage * len(self.balance)
             self.balance[-1] += remaining
 
-        # TODO
         self._profile()
 
         self.rank = rank
@@ -58,8 +56,6 @@ class PipelineParallelBert(BertForPreTraining):
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.bert[start:end]
 
-
-    # TODO: shape
     def _profile(self, shape=[3, 224, 224]):
         """
         get each layer's input/output shape by running one forward pass
@@ -94,4 +90,7 @@ class PipelineParallelBert(BertForPreTraining):
         return self._output_shape
 
     def forward(self, x):
+        if is_pipeline_first_stage():
+            input_ids, segment_ids, input_mask = x
+            return self.model_split(input_ids=input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
         return self.model_split(x)

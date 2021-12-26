@@ -99,20 +99,21 @@ def get_microbatch_size():
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
-        images, labels = data
-        images, labels = images.cuda(), labels.cuda()
+        batch = [t.cuda() for t in data]
+        input_ids, segment_ids, input_mask, masked_lm_labels, next_sentence_labels = batch
 
     if is_pipeline_first_stage():
         assert input_tensor is None
-        input_tensor = images
+        input_tensor = [input_ids, segment_ids, input_mask]
 
     output_tensor = model(input_tensor)
 
     if is_pipeline_last_stage():
-        output_tensor = loss_func(output_tensor, labels)
+        prediction_scores, seq_relationship_score = output_tensor
+        output_tensor = loss_func(prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels)
         output_tensor /= get_num_microbatches()
         loss += output_tensor.item()
-
+        
     return output_tensor
 
 

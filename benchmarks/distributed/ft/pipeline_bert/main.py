@@ -21,128 +21,53 @@ from torch.distributed.fault_tolerance import FaultToleranceConfig, fault_tolera
 
 logging.basicConfig(level=logging.INFO)
 
-def parse_arguments():
+## Required parameters
+parser = argparse.ArgumentParser(
+    description='Pipeline Parallel ResNet50 Arguments')
+parser.add_argument('data', metavar='DIR', help='path to dataset')
+parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
+                    help='number of data loading workers (default: 4)')
+parser.add_argument('--epochs', default=90, type=int, metavar='N',
+                    help='number of total epochs to run')
+parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
+                    metavar='LR', help='initial learning rate', dest='lr')
+parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
+                    help='momentum')
+parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
+                    metavar='W', help='weight decay (default: 1e-4)',
+                    dest='weight_decay')
+parser.add_argument('-p', '--print-freq', default=10, type=int,
+                    metavar='N', help='print frequency (default: 10)')
+parser.add_argument('--seed', default=None, type=int,
+                    help='seed for initializing training. ')
+parser.add_argument('--benchmark-iters', default=100, type=int, metavar='N',
+                    help='number of total iterations to run for benchmark')
+parser.add_argument('--master_ip', default=None, type=str,
+                    help='master ip for c10d')
+parser.add_argument('--master_port', default=None, type=int,
+                    help='master port for c10d')
+# Pipeline parallelism
+parser.add_argument('--micro-batch-size', type=int, default=None,
+                    help='Batch size per model instance (local batch size).')
+parser.add_argument('--global-batch-size', type=int,
+                    default=256, help='Training batch size.')
+parser.add_argument('--logging', default=False, action="store_true",
+                    help='whether to enable logging.')
+parser.add_argument('--logging-chunk-freq', type=int,
+                    default=10, help='chunk logging files every N iterations.')
+parser.add_argument('--logging-compression', default=None, type=str,
+                    help='compression methods for logging')
+parser.add_argument('--logging-dfs', default='hdfs', type=str,
+                    help='distributed filesystem for logging')
+parser.add_argument('--logging-s3-bucket', default=None, type=str,
+                    help='s3 bucket if using s3 as logging store')
+parser.add_argument('--logging-group-size', default=None, type=int,
+                    help='group size for logging')
+# addition
+parser.add_argument("--warmup_proportion", default=0.01, type=float, help="Proportion of training to perform linear learning rate warmup for. "
+                    "E.g., 0.1 = 10%% of training.")
 
-    parser = argparse.ArgumentParser()
-
-    ## Required parameters
-    parser.add_argument("--input_dir",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="The input data dir. Should contain .hdf5 files  for the task.")
-
-    parser.add_argument("--config_file",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="The BERT model config")
-
-    parser.add_argument("--bert_model", default="bert-large-uncased", type=str,
-                        help="Bert pre-trained model selected in the list: bert-base-uncased, "
-                             "bert-large-uncased, bert-base-cased, bert-base-multilingual, bert-base-chinese.")
-
-    parser.add_argument("--output_dir",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="The output directory where the model checkpoints will be written.")
-
-
-    parser.add_argument("--max_seq_length",
-                        default=512,
-                        type=int,
-                        help="The maximum total input sequence length after WordPiece tokenization. \n"
-                             "Sequences longer than this will be truncated, and sequences shorter \n"
-                             "than this will be padded.")
-    parser.add_argument("--max_predictions_per_seq",
-                        default=80,
-                        type=int,
-                        help="The maximum total of masked tokens in input sequence")
-    parser.add_argument("--train_batch_size",
-                        default=32,
-                        type=int,
-                        help="Total batch size for training.")
-    parser.add_argument("--learning_rate",
-                        default=5e-5,
-                        type=float,
-                        help="The initial learning rate for Adam.")
-    parser.add_argument("--num_train_epochs",
-                        default=3.0,
-                        type=float,
-                        help="Total number of training epochs to perform.")
-    parser.add_argument("--max_steps",
-                        default=1000,
-                        type=float,
-                        help="Total number of training steps to perform.")
-    parser.add_argument("--warmup_proportion",
-                        default=0.01,
-                        type=float,
-                        help="Proportion of training to perform linear learning rate warmup for. "
-                             "E.g., 0.1 = 10%% of training.")
-    parser.add_argument("--local_rank",
-                        type=int,
-                        default=os.getenv('LOCAL_RANK', -1),
-                        help="local_rank for distributed training on gpus")
-    parser.add_argument('--seed',
-                        type=int,
-                        default=42,
-                        help="random seed for initialization")
-    parser.add_argument('--gradient_accumulation_steps',
-                        type=int,
-                        default=1,
-                        help="Number of updates steps to accumualte before performing a backward/update pass.")
-    parser.add_argument('--loss_scale',
-                        type=float, default=0.0,
-                        help='Loss scaling, positive power of 2 values can improve fp16 convergence.')
-    parser.add_argument('--log_freq',
-                        type=float, default=1.0,
-                        help='frequency of logging loss.')
-    parser.add_argument('--num_steps_per_checkpoint',
-                        type=int,
-                        default=100,
-                        help="Number of update steps until a model checkpoint is saved to disk.")
-    parser.add_argument('--skip_checkpoint',
-                        default=False,
-                        action='store_true',
-                        help="Whether to save checkpoints")
-    parser.add_argument('--phase2',
-                        default=False,
-                        action='store_true',
-                        help="Whether to train with seq len 512")
-
-    parser.add_argument('--phase1_end_step',
-                        type=int,
-                        default=7038,
-                        help="Number of training steps in Phase1 - seq len 128")
-    parser.add_argument('--init_loss_scale',
-                        type=int,
-                        default=2**20,
-                        help="Initial loss scaler value")
-    parser.add_argument("--do_train",
-                        default=False,
-                        action='store_true',
-                        help="Whether to run training.")
-    parser.add_argument('--json-summary', type=str, default="results/dllogger.json",
-                        help='If provided, the json summary will be written to'
-                             'the specified file.')
-    parser.add_argument("--use_env",
-                        action='store_true',
-                        help="Whether to read local rank from ENVVAR")
-    parser.add_argument('--disable_progress_bar',
-                        default=False,
-                        action='store_true',
-                        help='Disable tqdm progress bar')
-
-    args = parser.parse_args()
-
-    if args.steps_this_run < 0:
-        args.steps_this_run = args.max_steps
-    
-    return args
-
-args = parse_arguments()
-
+args = parser.parse_args()
 initialize_global_args(args)
 
 def create_pretraining_dataset(args):
@@ -199,38 +124,20 @@ class BertPretrainingCriterion(torch.nn.Module):
 
 def prepare_model_and_optimizer(args):
 
-    # Prepare model
-    config = modeling.BertConfig.from_json_file(args.config_file)
-
-    # Padding for divisibility by 8
-    if config.vocab_size % 8 != 0:
-        config.vocab_size += 8 - (config.vocab_size % 8)
-
-    modeling.ACT2FN["bias_gelu"] = modeling.bias_gelu_training
-
-    # TODO: initialize logic need some thoughts
     model = PipelineParallelBert(
         rank=torch.distributed.get_rank(),
-        balance=
+        balance=None
         )
-    model = modeling.BertForPreTraining(config)
 
-
-    param_optimizer = list(model.named_parameters())
-    no_decay = ['bias', 'gamma', 'beta', 'LayerNorm']
-    
-    optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}]
-    
-    # TODO: parameter
-    optimizer = optim.Adam()
+    # base on the NVIDIA example: 5e-5
+    optimizer = optim.Adam(model.parameters(), lr=5e-5)
                            
     lr_scheduler = PolyWarmUpScheduler(optimizer, 
                                        warmup=args.warmup_proportion, 
                                        total_steps=args.max_steps)
 
-    loss_func = BertPretrainingCriterion(config.vocab_size)
+    # base on the config file: Vocab size
+    loss_func = BertPretrainingCriterion(30522)
 
     return model, optimizer, lr_scheduler, loss_func
 
