@@ -75,8 +75,25 @@ parser.add_argument("--max_steps", default=1000, type=float,
 args = parser.parse_args()
 initialize_global_args(args)
 
+def handle_train_dir(args):
+    train_dir = os.path.join(args.data, 'train')
+    files = [os.path.join(train_dir, f) for f in os.listdir(train_dir) if
+                         os.path.isfile(os.path.join(train_dir, f)) and 'training' in f]
+    files.sort()
+    num_files = len(files)
+    # random.Random(args.seed + epoch).shuffle(files)
+    f_start_id = 0
+    if torch.distributed.is_initialized() and torch.distributed.get_world_size() > num_files:
+        remainder = torch.distributed.get_world_size() % num_files
+        data_file = files[(f_start_id*torch.distributed.get_world_size()+torch.distributed.get_rank() + remainder*f_start_id)%num_files]
+    else:
+        data_file = files[(f_start_id*torch.distributed.get_world_size()+torch.distributed.get_rank())%num_files]
+
+    return data_file
+
 def create_pretraining_dataset(args):
-    train_data = pretraining_dataset(input_file=args.input_dir, max_pred_length=args.max_predictions_per_seq)
+    data_file = handle_train_dir(args)
+    train_data = pretraining_dataset(input_file=data_file, max_pred_length=args.max_predictions_per_seq)
     train_sampler = RandomSampler(train_data)
     train_dataloader = DataLoader(train_data, sampler=train_sampler,
                                   batch_size=args.micro_batch_size, shuffle=True,
