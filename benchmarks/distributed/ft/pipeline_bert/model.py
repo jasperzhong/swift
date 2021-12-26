@@ -57,7 +57,7 @@ class PipelineParallelBert(BertForPreTraining):
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.bert[start:end]
 
-    def _profile(self, shape=[3, 224, 224]):
+    def _profile(self, shape=[128]):
         """
         get each layer's input/output shape by running one forward pass
         """

@@ -144,6 +144,12 @@ class BertPretrainingCriterion(torch.nn.Module):
         total_loss = masked_lm_loss + next_sentence_loss
         return total_loss
 
+def get_input_shape(data_loader: DataLoader):
+    data_iter = iter(data_loader)
+    input_ids, segment_ids, input_mask, _, _ = next(data_iter)
+    return input_ids.shape, segment_ids.shape, input_mask.shape
+
+
 def prepare_model_and_optimizer(args):
 
     model = PipelineParallelBert(
@@ -209,6 +215,8 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = create_pretraining_dataset(args)
+    input_ids, segment_ids, input_mask = get_input_shape(data_loader)
+    print("input_ids: {}, segment_ids: {}, input_mask: {}".format(input_ids, segment_ids, input_mask))
 
     model, optimizer, lr_scheduler, loss_func = prepare_model_and_optimizer(args)
     model.cuda()
