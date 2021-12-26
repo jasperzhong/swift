@@ -45,7 +45,8 @@ class PipelineParallel(nn.Module):
 
         self._profile()
 
-        self.rank = rank
+        if rank is None:
+            self.rank = get_pipeline_model_parallel_rank()
 
         # assign model split
         start = 0

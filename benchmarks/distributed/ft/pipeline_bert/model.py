@@ -17,7 +17,7 @@ if config.vocab_size % 8 != 0:
 modeling.ACT2FN["bias_gelu"] = modeling.bias_gelu_training
 
 class PipelineParallelBert(BertForPreTraining):
-    def __init__(self, rank=get_pipeline_model_parallel_rank(), balance=None, *args, **kwargs):
+    def __init__(self, rank=None, balance=None, *args, **kwargs):
         super(PipelineParallelBert, self).__init__(
             config=config
         )
@@ -44,7 +44,8 @@ class PipelineParallelBert(BertForPreTraining):
 
         self._profile()
 
-        self.rank = rank
+        if rank is None:
+            self.rank = get_pipeline_model_parallel_rank()
 
         # assign model split
         start = 0
