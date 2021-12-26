@@ -46,7 +46,10 @@ class _DistributedOptimizer(torch.optim.Optimizer):
         self._should_sync = True
         self._size = get_world_size()
         if self._size > 1:
+            print("DistributedOptimizer registers hooks")
             self._register_hooks()
+        else:
+            print("there is no need to register hooks when world size == 1")
 
     @staticmethod
     def find_duplicates(lst):
