@@ -153,9 +153,9 @@ def recovery(config, ts, model, optimizer):
             ts.broadcast(peer_failure_worker)
 
             # 5. hijack get_rank() 
-            get_rank_bck = distributed_c10d.get_rank
-            distributed_c10d.get_rank = lambda group=None: peer_failure_worker
-            logger.info(f"Rank {get_rank_bck()} changes the rank to {distributed_c10d.get_rank()}")
+            get_rank_bck = torch.distributed.distributed_c10d.get_rank
+            torch.distributed.distributed_c10d.get_rank = lambda group=None: peer_failure_worker
+            logger.info(f"Rank {get_rank_bck()} changes the rank to {torch.distributed.distributed_c10d.get_rank()}")
 
             # 6. download the same set of logging files as the failure worker
             if not need_recovery:
@@ -527,7 +527,6 @@ def get_logging_files(config, ts, consensus_value):
 
 
 def get_logging_files_for_parallel_recovery(config, ts, consensus_value, peer_failure_worker):
-    peer_logging_mask = {}
     pairs = groups_to_pairs(config.groups)
     # reset logging mask
     distributed_c10d._logging_mask.clear()
@@ -535,12 +534,11 @@ def get_logging_files_for_parallel_recovery(config, ts, consensus_value, peer_fa
         if peer_failure_worker in pair:
             peer = pair[1] if pair[0] == peer_failure_worker else pair[0]
             distributed_c10d._logging_mask[peer] = True
-            peer_logging_mask[peer] = True
 
     logging_files = []
     for i, chunk in enumerate(range(ts, consensus_value, config.logging_chunk_freq)):
         logging_files.append([])
-        for peer, _ in sorted(peer_logging_mask.items()):
+        for peer, _ in sorted(distributed_c10d._logging_mask.items()):
             filename = f"logging_{peer}_{peer_failure_worker}_{chunk}.h5"
             logging_files[i].append(filename)
 
