@@ -62,18 +62,33 @@ class PipelineParallelBert(BertForPreTraining):
         get each layer's input/output shape by running one forward pass
         """
         micro_batch_size = get_microbatch_size()
+        fake_input_ids = torch.randn(tuple([micro_batch_size] + shape))
+        fake_segment_ids = torch.randn(tuple([micro_batch_size] + shape))
+        fake_input_mask = torch.randn(tuple([micro_batch_size] + shape))
         fake_input = torch.randn(tuple([micro_batch_size] + shape))
-
+        
         self._input_shapes = []
         self._output_shapes = []
         input = fake_input
+        first_flag = True
         with torch.no_grad():
-            for layer in self.bert_sequential:
+            # first layer
+            self._input_shapes.append(input.shape)
+            output = self.bert_sequential[0](input_ids=fake_input_ids, token_type_ids=fake_segment_ids, attention_mask=fake_input_mask)
+            self._output_shapes.append(output.shape)
+            input = output
+            # middle layer
+            for layer in self.bert_sequential[1:-1]:
                 self._input_shapes.append(input.shape)
                 output = layer(input)
                 self._output_shapes.append(output.shape)
-                input = output
-
+                input = output        
+            # last layer
+            self._input_shapes.append(input.shape)
+            prediction_scores, seq_relationship_score = self.bert_sequential[-1]
+            self._output_shape.append(prediction_scores.shape)
+            print("prediction_scores: {}, seq_relationship_score: {}".format(prediction_scores.shape, seq_relationship_score.shape))
+            
     def parameters(self, recursive=True):
         params = []
         for layer in self.model_split:
