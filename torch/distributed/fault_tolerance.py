@@ -153,9 +153,9 @@ def recovery(config, ts, model, optimizer):
             ts.broadcast(peer_failure_worker)
 
             # 5. hijack get_rank() 
-            get_rank_bck = torch.distributed.distributed_c10d.get_rank
-            torch.distributed.distributed_c10d.get_rank = lambda group=None: peer_failure_worker
-            logger.info(f"Rank {get_rank_bck()} changes the rank to {torch.distributed.distributed_c10d.get_rank()}")
+            get_rank_bck = torch.distributed.get_rank
+            torch.distributed.get_rank = lambda group=None: peer_failure_worker
+            logger.info(f"Rank {get_rank_bck()} changes the rank to {torch.distributed.get_rank()}")
 
             # 6. download the same set of logging files as the failure worker
             if not need_recovery:
