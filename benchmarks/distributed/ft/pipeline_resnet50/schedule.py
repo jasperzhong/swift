@@ -55,7 +55,6 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
 
     if is_pipeline_first_stage():
         assert input_tensor is None
-        print(f"Rank {torch.distributed.get_rank()} is the first stage")
         input_tensor = images
 
     output_tensor = model(input_tensor)

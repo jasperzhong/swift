@@ -9,7 +9,7 @@ from queue import Queue
 from hdfs import InsecureClient
 
 import torch
-from torch.distributed import distributed_c10d
+import torch.distributed.distributed_c10d as distributed_c10d
 import torch.nn
 import torch.optim
 from torch._C._distributed_c10d import SwiftInternalError
