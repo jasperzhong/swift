@@ -62,9 +62,9 @@ class PipelineParallelBert(BertForPreTraining):
         get each layer's input/output shape by running one forward pass
         """
         micro_batch_size = get_microbatch_size()
-        fake_input_ids = torch.randn(tuple([micro_batch_size] + shape))
-        fake_segment_ids = torch.randn(tuple([micro_batch_size] + shape))
-        fake_input_mask = torch.randn(tuple([micro_batch_size] + shape))
+        fake_input_ids = torch.randint(1, 10, tuple([micro_batch_size] + shape))
+        fake_segment_ids = torch.randint(1, 10, tuple([micro_batch_size] + shape))
+        fake_input_mask = torch.randint(1, 10, tuple([micro_batch_size] + shape))
         extended_attention_mask = fake_input_mask.unsqueeze(1).unsqueeze(2)
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         
