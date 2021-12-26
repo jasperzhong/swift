@@ -23,7 +23,7 @@ cmd="python3 -m torch.distributed.run \
 	--global-batch-size 128 \
 	--seed 2021 \
 	-p 5 \
-	-j 2" 
+	-j 0" 
 
 LOGGING_ARGS="
 	--logging \
