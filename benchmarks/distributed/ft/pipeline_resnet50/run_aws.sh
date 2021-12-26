@@ -22,7 +22,8 @@ cmd="python3 -m torch.distributed.run \
 	--micro-batch-size 16 \
 	--global-batch-size 128 \
 	--seed 2021 \
-	-p 5" 
+	-p 5 \
+	-j 2" 
 
 LOGGING_ARGS="
 	--logging \
@@ -42,4 +43,4 @@ cmd="${cmd} ~/data/ILSVRC2012"
 
 echo $cmd
 
-CUDA_LAUNCH_BLOCKING=1 OMP_NUM_THREADS=4 NCCL_IB_DISABLE=1 LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec $cmd
+OMP_NUM_THREADS=4 NCCL_IB_DISABLE=1 LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec $cmd
