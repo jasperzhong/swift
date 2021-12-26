@@ -304,3 +304,8 @@ bazel-*
 
 # core dump files
 core.*
+
+*.h5
+*.ckpt
+*.log
+*.cache

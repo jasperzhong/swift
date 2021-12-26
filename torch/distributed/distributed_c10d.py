@@ -8,6 +8,9 @@ import warnings
 from datetime import timedelta
 from typing import Dict, Optional, Tuple, Union
 
+import h5py
+import numpy as np
+
 import torch
 import torch.nn
 from torch._C._distributed_c10d import (AllreduceCoalescedOptions,
@@ -24,7 +27,6 @@ from .rendezvous import register_rendezvous_handler, rendezvous  # noqa: F401
 
 # This module is wildcard imported from torch.distributed.
 # TODO: specify __all__
-
 
 
 _MPI_AVAILABLE = True
@@ -52,6 +54,28 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# whether to perform logging
+_ts = None
+
+_logging = False
+
+_logging_mask = {}
+
+_logging_dfs_client = None
+
+_logging_recovery_mask = {}
+
+_logging_compression = None
+
+_logging_stream = None
+
+_logging_gpu_tensor_queue = []
+
+_logging_cpu_tensor_queue = None
+
+_logging_cnt = {}
+
+_logging_thread = None
 
 # Some reduce ops are not supported by complex numbers and will result in an error.
 # We currently provide complex support to the distributed API by viewing
@@ -60,6 +84,8 @@ logger = logging.getLogger(__name__)
 # (e.g. max(2+3i, 3+2i) = 3+3i)
 # We'd like calls to unsupported ops to error out accordingly,
 # rather than returning garbage values.
+
+
 def supports_complex(reduceOp: ReduceOp) -> bool:
     denyList = [ReduceOp.MAX, ReduceOp.MIN, ReduceOp.PRODUCT,
                 ReduceOp.BAND, ReduceOp.BOR, ReduceOp.BXOR]
@@ -67,6 +93,8 @@ def supports_complex(reduceOp: ReduceOp) -> bool:
 
 
 def _failure_handler():
+    global _logging
+    global _logging_cpu_tensor_queue
     default_pg = _get_default_group()
     rank = default_pg.rank()
     size = default_pg.size()
@@ -75,18 +103,18 @@ def _failure_handler():
     re_init_key = "reinit"
     re_init = store.add(re_init_key, 1)
     if re_init == 1:
-        print("rank %d reset STORE_BASED_BARRIER_PREFIX to 0" % rank)
+        logger.info("rank %d reset STORE_BASED_BARRIER_PREFIX to 0" % rank)
         store_key = "{}:{}".format(STORE_BASED_BARRIER_PREFIX, _group_count)
         store.set(store_key, "0")
 
     destroy_process_group()
-    print("start to re-init")
+
+    if _logging:
+        _logging_cpu_tensor_queue.put("flush")
+
+    logger.info("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
-    print("success to re-init")
-
-    # wait for restarted workers to initialize CUDA runtime
-    time.sleep(7)
-
+    logger.info("success to re-init")
 
 
 class Backend(object):
@@ -231,7 +259,7 @@ def _store_based_barrier(rank, store, timeout):
         time.sleep(0.01)
         worker_count = store.add(store_key, 0)
 
-        # Print status periodically to keep track.
+        # logger.info status periodically to keep track.
         if timedelta(seconds=(time.time() - log_time)) > timedelta(seconds=10):
             logger.info(
                 "Waiting in store based barrier to initialize process group for "
@@ -389,6 +417,11 @@ def is_torchelastic_launched():
     non-null value indicating the job id for peer discovery purposes..
     """
     return os.getenv("TORCHELASTIC_RUN_ID") is not None
+
+
+def is_cross_machine(src_rank, dst_rank):
+    local_world_size = get_local_world_size()
+    return (src_rank // local_world_size) != (dst_rank // local_world_size)
 
 
 def _get_default_group():
@@ -792,6 +825,13 @@ def get_world_size(group=None):
     return _get_group_size(group)
 
 
+def get_local_world_size():
+    """
+    Returns the number of processes in the local worl group
+    """
+    return int(os.environ["LOCAL_WORLD_SIZE"])
+
+
 def isend(tensor,
           dst,
           group=None,
@@ -811,9 +851,32 @@ def isend(tensor,
         None, if not part of the group
 
     """
+    global _ts
+    global _logging
+    global _logging_gpu_tensor_queue
+    global _logging_recovery_mask
+    global _logging_mask
+
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return
+
+    with open("debug_%d.log" % dst, "a") as f:
+        f.write(f"{_ts} {torch.sum(tensor)}\n")
+
+    # do not send back to the upstream node during recovery
+    while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
+        idx, file_info_list, consensus_value = _logging_recovery_mask.get(dst)
+        if _ts >= consensus_value:
+            logger.info(f"close file. src={dst}")
+            f = file_info_list[idx].file_object
+            f.close()
+            del _logging_recovery_mask[dst]
+            break
+        return
+
+    if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
+        _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
@@ -843,6 +906,9 @@ def irecv(tensor,
         None, if not part of the group
 
     """
+    global _logging
+    global _logging_gpu_tensor_queue
+
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return
@@ -851,6 +917,44 @@ def irecv(tensor,
         pg = _get_default_group()
     else:
         pg = group
+
+    # read from the log data
+    while _logging and _logging_recovery_mask.get(src) is not None:
+        idx, file_info_list, consensus_value = _logging_recovery_mask.get(src)
+        file_info = file_info_list[idx]
+        if file_info.file_object is None:
+            # open file
+            f, valid_keys = _open_logging_file(file_info.filename, consensus_value)
+            _logging_recovery_mask[src][1][idx].file_object = f
+            _logging_recovery_mask[src][1][idx].valid_keys = valid_keys
+
+        f = file_info.file_object
+        keys = file_info.valid_keys
+        try:
+            key = next(keys)
+        except StopIteration:
+            logger.info(f"close file. src={src}")
+            f.close()
+            idx += 1
+            _logging_recovery_mask[src][0] += 1
+            if idx == len(file_info_list):
+                del _logging_recovery_mask[src]
+                break
+            continue
+
+        dest = f[key]
+        tensor_np = np.empty(dest.shape, dest.dtype)
+        dest.read_direct(tensor_np)
+        with torch.no_grad():
+            tensor.copy_(torch.from_numpy(tensor_np))
+        with open("debug_recv_%d.log" % src, "a") as f:
+            f.write(f"{_ts} {torch.sum(tensor)}\n")
+        return
+
+    if _logging and _logging_gpu_tensor_queue:
+        for ts_value, dst, logging_tensor in _logging_gpu_tensor_queue:
+            stash(ts_value, dst, logging_tensor)
+        _logging_gpu_tensor_queue.clear()
 
     if src is None:
         return pg.recv_anysource([tensor], tag)
@@ -877,9 +981,32 @@ def send(tensor,
         tag (int, optional): Tag to match send with remote recv
 
     """
+    global _ts
+    global _logging
+    global _logging_gpu_tensor_queue
+    global _logging_recovery_mask
+    global _logging_mask
+
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return
+
+    with open("debug_%d.log" % dst, "a") as f:
+        f.write(f"{_ts} {torch.sum(tensor)}\n")
+
+    # do not send back to the upstream node during recovery
+    while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
+        idx, file_info_list, consensus_value = _logging_recovery_mask.get(dst)
+        if _ts >= consensus_value:
+            logger.info(f"close file. src={dst}")
+            f = file_info_list[idx].file_object
+            f.close()
+            del _logging_recovery_mask[dst]
+            break
+        return
+
+    if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
+        _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
@@ -909,6 +1036,10 @@ def recv(tensor,
         -1, if not part of the group
 
     """
+    global _logging
+    global _logging_gpu_tensor_queue
+    global _logging_recovery_mask
+
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
         return -1
@@ -917,6 +1048,46 @@ def recv(tensor,
         pg = _get_default_group()
     else:
         pg = group
+
+
+    # read from the log data
+    while _logging and _logging_recovery_mask.get(src) is not None:
+        idx, file_info_list, consensus_value = _logging_recovery_mask.get(src)
+        file_info = file_info_list[idx]
+        if file_info.file_object is None:
+            # open file
+            f, valid_keys = _open_logging_file(file_info.filename, consensus_value)
+            _logging_recovery_mask[src][1][idx].file_object = f
+            _logging_recovery_mask[src][1][idx].valid_keys = valid_keys
+
+        f = file_info.file_object
+        keys = file_info.valid_keys
+        try:
+            key = next(keys)
+        except StopIteration:
+            logger.info(f"close file. src={src}")
+            f.close()
+            idx += 1
+            _logging_recovery_mask[src][0] += 1
+            if idx == len(file_info_list):
+                del _logging_recovery_mask[src]
+                break
+            continue
+
+        dest = f[key]
+        tensor_np = np.empty(dest.shape, dest.dtype)
+        dest.read_direct(tensor_np)
+        with torch.no_grad():
+            tensor.copy_(torch.from_numpy(tensor_np))
+        with open("debug_recv_%d.log" % src, "a") as f:
+            f.write(f"{_ts} {torch.sum(tensor)}\n")
+        return
+
+
+    if _logging and _logging_gpu_tensor_queue:
+        for ts_value, dst, logging_tensor in _logging_gpu_tensor_queue:
+            stash(ts_value, dst, logging_tensor)
+        _logging_gpu_tensor_queue.clear()
 
     if src is None:
         work = pg.recv_anysource([tensor], tag)
@@ -2769,3 +2940,106 @@ def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=N
             pg._set_sequence_number_for_group()
 
     return pg
+
+
+def stash(ts_value, dst, tensor):
+    """stash the tensor into in-memory store
+    """
+    global _logging_stream
+    global _logging_cpu_tensor_queue
+    if not torch.is_tensor(tensor):
+        raise ValueError("stash() only accepts a tensor as input")
+
+    tensor_cpu = None
+    if tensor.is_cuda:
+        tensor_cpu = torch.empty_like(tensor, device="cpu", pin_memory=True)
+        _logging_stream.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(_logging_stream):
+            with torch.no_grad():
+                tensor_cpu.copy_(tensor, non_blocking=True)
+                event = torch.cuda.Event(blocking=True)
+                event = _logging_stream.record_event(event)
+    else:
+        tensor_cpu = tensor
+    tensor_np = tensor_cpu.numpy()
+    _logging_cpu_tensor_queue.put((ts_value, dst, tensor_np, event))
+
+
+def flush_objects_to_dfs(config):
+    global _logging_cnt
+    global _logging_cpu_tensor_queue
+    global _logging_compression
+    global _logging_dfs_client
+    global _logging_stream
+
+    logging_pairs_to_files = {}
+    while True:
+        logger.debug(f"# tensors waiting to be flushed = {_logging_cpu_tensor_queue.qsize()}")
+        item = _logging_cpu_tensor_queue.get()
+        if item is None:
+            break
+        elif item == "flush":
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    # if file is not closed
+                    if file:
+                        file.close()
+                    _logging_dfs_client.rm(dfs_path=path)
+                    _logging_dfs_client.upload(dfs_path=path, local_path=path)
+                    logger.info(f"put {path} on dfs")
+            logging_pairs_to_files.clear()
+            continue
+
+        ts_value, dst, tensor, event = item
+        key = '%d:%d' % (get_rank(), dst)
+        file = None
+
+        need_create_new_file = False
+        if key not in logging_pairs_to_files:
+            logging_pairs_to_files[key] = []
+            need_create_new_file = True
+
+        if ts_value % config.logging_chunk_freq == 0:
+            idx = ts_value // config.logging_chunk_freq
+            # not created yet
+            if idx == len(logging_pairs_to_files[key]):
+                need_create_new_file = True
+
+                # close the preivous file
+                if len(logging_pairs_to_files[key]) > 0:
+                    prev_file, _ = logging_pairs_to_files[key][-1]
+                    prev_file.close()
+
+        file = None
+        if need_create_new_file:
+            path = 'logging_%d_%d_%d.h5' % (get_rank(), dst, ts_value)
+            file = h5py.File(path, "a")
+            logging_pairs_to_files[key].append((file, path))
+        else:
+            file, _ = logging_pairs_to_files[key][-1]
+
+        # every send/recv pair should have a logging cnt
+        if dst not in _logging_cnt:
+            _logging_cnt[dst] = 0
+
+        # key = "{iteration}:{_logging_cnt[dst]}"
+        key = f"{ts_value}:{_logging_cnt[dst]}"
+        event.synchronize()
+        file.create_dataset(key, data=tensor, compression=_logging_compression)
+        _logging_cnt[dst] += 1
+
+    for name, files in logging_pairs_to_files.items():
+        for file, _ in files:
+            if file:
+                file.close()
+
+
+def _open_logging_file(filename, consensus_value):
+    global _logging_recovery_mask
+
+    while not os.path.exists(filename):
+        time.sleep(0.1)
+    f = h5py.File(filename, "a")
+    keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
+    valid_keys = filter(lambda x: int(x.split(":")[0]) < consensus_value, keys)
+    return f, valid_keys

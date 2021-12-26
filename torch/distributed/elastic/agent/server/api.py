@@ -836,7 +836,6 @@ class SimpleElasticAgent(ElasticAgent):
 
         put_metric(f"workers.{spec.role}.flakiness", int(flakiness))
 
-
     def _invoke_run(self, role: str = DEFAULT_ROLE) -> RunResult:
         # NOTE: currently only works for a single role
 
@@ -901,7 +900,6 @@ class SimpleElasticAgent(ElasticAgent):
             else:
                 raise Exception(f"[{role}] Worker group in {state.name} state")
 
-
     def _exit_barrier(self):
         """
         Wait for ``exit_barrier_timeout`` seconds for all agents to finish
@@ -913,6 +911,10 @@ class SimpleElasticAgent(ElasticAgent):
             f"Local worker group finished ({self._worker_group.state}). "
             f"Waiting {self._exit_barrier_timeout} seconds for other agents to finish"
         )
+
+        spec = self._worker_group.spec
+        spec.rdzv_handler.shutdown()
+
         start = time.time()
         try:
             store_util.barrier(

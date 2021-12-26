@@ -7,6 +7,7 @@
 # LICENSE file in the root directory of this source tree.
 import inspect
 import os
+import re
 import signal
 import sys
 import time
@@ -196,6 +197,10 @@ def handler(signum, frame):
     time.sleep(15)
     # DEBUG
     print(sys.argv)
+    # remove all logging files
+    files = [f for f in os.listdir('.') if re.match("logging_.*\.h5", f)]
+    for file in files:
+        os.remove(file)
     os.execv("/proc/self/exe", [sys.executable] + sys.argv)
 
 

@@ -213,7 +213,9 @@ class Optimizer(object):
                                 p.grad.detach_()
                             else:
                                 p.grad.requires_grad_(False)
+
                             p.grad.zero_()
+
 
     def step(self, closure):
         r"""Performs a single optimization step (parameter update).
