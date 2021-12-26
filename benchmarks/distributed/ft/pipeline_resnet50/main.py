@@ -1,19 +1,23 @@
 import argparse
+import logging
 import os
 import random
-import sys
 import time
 
 import numpy as np
 from model import PipelineParallelResNet50
-from schedule import (initialize_global_args, is_pipeline_first_stage,
-                      is_pipeline_last_stage, pipedream_flush_schedule)
+from schedule import (get_num_microbatches, initialize_global_args,
+                      is_pipeline_first_stage, is_pipeline_last_stage,
+                      pipedream_flush_schedule)
 from torchvision import datasets, transforms
 
 import torch
 import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
+from torch.distributed.fault_tolerance import FaultToleranceConfig, fault_tolerance_train
+
+logging.basicConfig(level=logging.INFO)
 
 parser = argparse.ArgumentParser(
     description='Pipeline Parallel ResNet50 Arguments')
@@ -44,9 +48,23 @@ parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
+parser.add_argument('--logging', default=False, action="store_true",
+                    help='whether to enable logging.')
+parser.add_argument('--logging-chunk-freq', type=int,
+                    default=10, help='chunk logging files every N iterations.')
+parser.add_argument('--logging-compression', default=None, type=str,
+                    help='compression methods for logging')
+parser.add_argument('--logging-dfs', default='hdfs', type=str,
+                    help='distributed filesystem for logging')
+parser.add_argument('--logging-s3-bucket', default=None, type=str,
+                    help='s3 bucket if using s3 as logging store')
+parser.add_argument('--logging-group-size', default=None, type=int,
+                    help='group size for logging')
+args = parser.parse_args()
+initialize_global_args(args)
 
 
-def get_data_iterator(args):
+def get_data_loader(args):
     traindir = os.path.join(args.data, 'train')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
@@ -64,49 +82,35 @@ def get_data_iterator(args):
         train_dataset, batch_size=args.micro_batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True
     )
-    data_iterator = iter(train_loader)
+    return train_loader
+
+
+def reset_data_iterator(data_loader, ts):
+    if args.seed is not None:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        torch.cuda.manual_seed(args.seed)
+    data_iterator = iter(data_loader)
+    for _ in range(ts):
+        if is_pipeline_first_stage() or is_pipeline_last_stage():
+            for _ in range(get_num_microbatches()):
+                next(data_iterator)
     return data_iterator
 
 
-@torch.distributed.fault_tolerance.run
-def train(state, args, data_iterator, model, optimizer, loss_func):
-    print("start from epoch={} iter={}".format(state.epoch, state.iteration))
-    for epoch in range(state.epoch, args.epochs):
-        state.epoch = epoch
-        iteration = 0
-        while True:
-            if iteration < state.iteration:
-                if is_pipeline_first_stage() or is_pipeline_last_stage():
-                    next(data_iterator)
-                iteration += 1
-                continue
-
-            try:
-                start = time.time()
-                optimizer.zero_grad()
-                loss = pipedream_flush_schedule(
-                    data_iterator, model, loss_func)
-                optimizer.step()
-                iteration_time = time.time() - start
-
-                iteration += 1
-                if is_pipeline_last_stage() and iteration % args.print_freq == 0:
-                    print("[Epoch {}/Iteration {}] loss: {:.4f} Throughput: {:.2f}".format(
-                        epoch, iteration, loss, args.global_batch_size / (iteration_time)
-                    ))
-
-                if iteration == args.benchmark_iters:
-                    sys.exit()
-
-                state.iteration = iteration
-            except StopIteration:
-                break
+def train_iter(model, optimizer, data_iterator, loss_func):
+    start = time.time()
+    optimizer.zero_grad()
+    loss = pipedream_flush_schedule(
+        data_iterator, model, loss_func)
+    torch.cuda.synchronize()
+    optimizer.step()
+    iteration_time = time.time() - start
+    return loss
 
 
 def main():
-    args = parser.parse_args()
-    initialize_global_args(args)
-
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.deterministic = True
 
@@ -124,15 +128,47 @@ def main():
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
 
-    data_iterator = get_data_iterator(args)
+    data_loader = get_data_loader(args)
     model = PipelineParallelResNet50(balance=[4, 2, 2, 3])
     model.cuda()
+
+    def hook_fn_backward(m, grad_input, grad_output):
+        def _dfs(grad_input):
+            checksum = 0
+            if isinstance(grad_input, tuple):
+                for grad in grad_input:
+                    checksum += _dfs(grad)
+            elif isinstance(grad_input, torch.cuda.FloatTensor):
+                checksum = torch.sum(grad_input)
+            return checksum
+
+        grad_input_checksum = _dfs(grad_input)
+        grad_output_checksum = _dfs(grad_output)
+
+        with open("debug_backward.log", "a") as f:
+            f.write(f"{m._get_name()} {grad_input_checksum} {grad_output_checksum}\n")
+
+    def dfs(module):
+        for m in module.children():
+            if len(list(m.children())) == 0:
+                m.register_backward_hook(hook_fn_backward)
+            else:
+                dfs(m)
+
+    dfs(model.model_split)
 
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     loss_func = nn.CrossEntropyLoss().cuda()
 
-    state = torch.distributed.fault_tolerance.State(epoch=0, iteration=0, optimizer=optimizer)
-    train(state, args, data_iterator, model, optimizer, loss_func)
+    config = FaultToleranceConfig(
+        num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, checkpoint_interval=100,
+        replica=False, logging=args.logging, logging_compression=args.logging_compression,
+        logging_chunk_freq=args.logging_chunk_freq,
+        logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
+        logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
+    )
+    fault_tolerance_train(config, train_iter, model, optimizer,
+                          data_loader, loss_func, reset_data_iterator_func=reset_data_iterator)
 
 
 if __name__ == '__main__':
