@@ -24,7 +24,7 @@ class PipelineParallelBert(BertForPreTraining):
 
         self.bert_sequential = nn.Sequential(
             self.bert.embeddings,
-            *(self.bert.layer),
+            *(self.bert.encoder.layer),
             self.bert.pooler,
             self.cls
             )
