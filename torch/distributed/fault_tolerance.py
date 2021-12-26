@@ -155,7 +155,7 @@ def recovery(config, ts, model, optimizer):
             # 5. hijack get_rank() 
             get_rank_bck = distributed_c10d.get_rank
             distributed_c10d.get_rank = lambda group=None: peer_failure_worker
-            logger.info(f"Rank {get_rank_bck()} changes the rank to {get_rank()} {distributed_c10d.get_rank()}")
+            logger.info(f"Rank {get_rank_bck()} changes the rank to {distributed_c10d.get_rank()}")
 
             # 6. download the same set of logging files as the failure worker
             if not need_recovery:
@@ -537,7 +537,6 @@ def get_logging_files_for_parallel_recovery(config, ts, consensus_value, peer_fa
             distributed_c10d._logging_mask[peer] = True
             peer_logging_mask[peer] = True
 
-    rank = get_rank()
     logging_files = []
     for i, chunk in enumerate(range(ts, consensus_value, config.logging_chunk_freq)):
         logging_files.append([])
