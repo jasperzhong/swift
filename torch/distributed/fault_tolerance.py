@@ -155,7 +155,7 @@ def recovery(config, ts, model, optimizer):
             # 5. hijack get_rank() 
             get_rank_bck = distributed_c10d.get_rank
             distributed_c10d.get_rank = lambda group=None: peer_failure_worker
-            logger.info(f"Rank {get_rank_bck()} changes the rank to {get_rank()}")
+            logger.info(f"Rank {get_rank_bck()} changes the rank to {get_rank()} {distributed_c10d.get_rank()}")
 
             # 6. download the same set of logging files as the failure worker
             if not need_recovery:
