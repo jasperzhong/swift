@@ -70,11 +70,12 @@ def _set_recovery_mask(config, ts, consensus_value):
 
 
 class FaultToleranceConfig:
-    def __init__(self, num_iteration, batch_size, checkpoint_interval, replica=False, logging=False,
+    def __init__(self, num_iteration, batch_size, num_microbatches, checkpoint_interval, replica=False, logging=False,
                  parallel_recovery=False, logging_compression=None, logging_chunk_freq=None, logging_dfs=None,
                  logging_bucket=None, logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
         self.num_iteration = num_iteration
         self.batch_size = batch_size
+        self.num_microbatches = num_microbatches
         self.checkpoint_interval = checkpoint_interval
         self.replica = replica
         self.logging = logging
@@ -199,7 +200,8 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
         optimizer_defaults = optimizer.defaults
         optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
 
-    optimizer = DistributedOptimizer(optimizer, model.named_parameters())
+    optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
+                                     backward_passes_per_step=config.num_microbatches)
 
     # peer failure worker broadcast its parameters and optimizer states
     # to other group members
