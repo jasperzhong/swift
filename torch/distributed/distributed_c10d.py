@@ -3078,5 +3078,6 @@ def _open_logging_file(filename, consensus_value):
     valid_keys = list(filter(lambda x: int(x.split(":")[0]) < consensus_value, keys))
     if _logging_parallel_recovery:
         valid_keys = valid_keys[_logging_group_rank::_logging_group_size]
+    logger.info(f"valid keys: {valid_keys}")
 
     return f, iter(valid_keys)
