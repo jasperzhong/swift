@@ -144,7 +144,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
 
 
 def DistributedOptimizer(optimizer, named_parameters=None,
-                         backward_passes_per_step=1):
+                         backward_passes_per_step=1, comm_group=None):
     """
     An optimizer that wraps another torch.optim.Optimizer, using an all_reduce to
     average gradient values before applying gradients to model weights.
@@ -175,13 +175,14 @@ def DistributedOptimizer(optimizer, named_parameters=None,
                                   allows accumulating gradients over multiple
                                   mini-batches before executing averaging and
                                   applying them.
+        comm_group: communication group 
     """
     # We dynamically create a new class that inherits from the optimizer that was passed in.
     # The goal is to override the `step()` method with an all_reduce implementation.
     cls = type("DistributedOptimizer", (optimizer.__class__,),
                dict(_DistributedOptimizer.__dict__))
     return cls(optimizer.param_groups, named_parameters,
-               backward_passes_per_step)
+               backward_passes_per_step, comm_group)
 
 
 def broadcast_parameters(params, root_rank, comm_group=None):

@@ -77,6 +77,14 @@ _logging_cnt = {}
 
 _logging_thread = None
 
+_logging_parallel_recovery = False
+
+_logging_group_diff = None
+
+_logging_group_rank = None
+
+_logging_group_size = None
+
 # Some reduce ops are not supported by complex numbers and will result in an error.
 # We currently provide complex support to the distributed API by viewing
 # complex tensors as real (torch.view_as_real), meaning that calling
@@ -856,6 +864,7 @@ def isend(tensor,
     global _logging_gpu_tensor_queue
     global _logging_recovery_mask
     global _logging_mask
+    global _logging_parallel_recovery
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
@@ -872,11 +881,17 @@ def isend(tensor,
             f = file_info_list[idx].file_object
             f.close()
             del _logging_recovery_mask[dst]
+            if _logging_parallel_recovery:
+                logger.info("parallel recovery finishes")
+                _logging_parallel_recovery = False
             break
         return
 
     if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
         _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
+
+    if _logging and _logging_parallel_recovery:
+        dst += _logging_group_diff
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
@@ -908,6 +923,7 @@ def irecv(tensor,
     """
     global _logging
     global _logging_gpu_tensor_queue
+    global _logging_parallel_recovery
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
@@ -939,6 +955,9 @@ def irecv(tensor,
             _logging_recovery_mask[src][0] += 1
             if idx == len(file_info_list):
                 del _logging_recovery_mask[src]
+                if _logging_parallel_recovery:
+                    logger.info("parallel recovery finishes")
+                    _logging_parallel_recovery = False
                 break
             continue
 
@@ -955,6 +974,9 @@ def irecv(tensor,
         for ts_value, dst, logging_tensor in _logging_gpu_tensor_queue:
             stash(ts_value, dst, logging_tensor)
         _logging_gpu_tensor_queue.clear()
+
+    if _logging and _logging_parallel_recovery:
+        dst += _logging_group_diff
 
     if src is None:
         return pg.recv_anysource([tensor], tag)
@@ -986,6 +1008,7 @@ def send(tensor,
     global _logging_gpu_tensor_queue
     global _logging_recovery_mask
     global _logging_mask
+    global _logging_parallel_recovery
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
@@ -1002,11 +1025,17 @@ def send(tensor,
             f = file_info_list[idx].file_object
             f.close()
             del _logging_recovery_mask[dst]
+            if _logging_parallel_recovery:
+                logger.info("parallel recovery finishes")
+                _logging_parallel_recovery = False
             break
         return
 
     if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
         _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
+
+    if _logging and _logging_parallel_recovery:
+        dst += _logging_group_diff
 
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
@@ -1039,6 +1068,7 @@ def recv(tensor,
     global _logging
     global _logging_gpu_tensor_queue
     global _logging_recovery_mask
+    global _logging_parallel_recovery
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
@@ -1048,7 +1078,6 @@ def recv(tensor,
         pg = _get_default_group()
     else:
         pg = group
-
 
     # read from the log data
     while _logging and _logging_recovery_mask.get(src) is not None:
@@ -1071,6 +1100,9 @@ def recv(tensor,
             _logging_recovery_mask[src][0] += 1
             if idx == len(file_info_list):
                 del _logging_recovery_mask[src]
+                if _logging_parallel_recovery:
+                    logger.info("parallel recovery finishes")
+                    _logging_parallel_recovery = False
                 break
             continue
 
@@ -1083,11 +1115,13 @@ def recv(tensor,
             f.write(f"{_ts} {torch.sum(tensor)}\n")
         return
 
-
     if _logging and _logging_gpu_tensor_queue:
         for ts_value, dst, logging_tensor in _logging_gpu_tensor_queue:
             stash(ts_value, dst, logging_tensor)
         _logging_gpu_tensor_queue.clear()
+
+    if _logging and _logging_parallel_recovery:
+        dst += _logging_group_diff
 
     if src is None:
         work = pg.recv_anysource([tensor], tag)
@@ -3041,5 +3075,8 @@ def _open_logging_file(filename, consensus_value):
         time.sleep(0.1)
     f = h5py.File(filename, "a")
     keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
-    valid_keys = filter(lambda x: int(x.split(":")[0]) < consensus_value, keys)
-    return f, valid_keys
+    valid_keys = list(filter(lambda x: int(x.split(":")[0]) < consensus_value, keys))
+    if _logging_parallel_recovery:
+        valid_keys = valid_keys[_logging_group_rank::_logging_group_size]
+
+    return f, iter(valid_keys)

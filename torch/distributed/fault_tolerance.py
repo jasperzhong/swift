@@ -135,6 +135,8 @@ def recovery(config, ts, model, optimizer):
             _set_recovery_mask(config, ts, consensus_value)
 
         if failure_workers and config.parallel_recovery:
+            distributed_c10d._logging_parallel_recovery = True
+
             # 1. living workers do checkpoint
             if not need_recovery:
                 filename = _get_checkpoint_path(config)
@@ -144,12 +146,15 @@ def recovery(config, ts, model, optimizer):
             comm = build_communication_group(config)
             group_rank = get_rank(group=comm)
             group_size = get_world_size(group=comm)
+            distributed_c10d._logging_group_rank = group_rank
+            distributed_c10d._logging_group_size = group_size
             logger.info(f"build new communication group ({group_rank} / {group_size})")
 
             # 3. living workers build model and optimizer
             model, optimizer, peer_failure_worker = build_model_and_optimizer(config, model,
                                                                               optimizer, comm,
                                                                               failure_workers)
+            distributed_c10d._logging_group_diff = get_rank() - peer_failure_worker
             # 4. broadcast failure worker's ts
             ts.broadcast(peer_failure_worker)
 
