@@ -72,7 +72,7 @@ class PipelineParallelBert(BertForPreTraining):
         self._output_shapes = []
         input = fake_input_ids
         with torch.no_grad():      
-            for layer in self.model_split:
+            for layer in self.bert_sequential:
                 self._input_shapes.append(input.shape)
                 if isinstance(layer, BertEmbeddings):
                     output = layer(input_ids=fake_input_ids, token_type_ids=fake_segment_ids)
