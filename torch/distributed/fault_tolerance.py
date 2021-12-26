@@ -152,7 +152,7 @@ def recovery(config, ts, model, optimizer):
             # 4. broadcast failure worker's ts
             ts.broadcast(peer_failure_worker)
 
-            # 5. hijack get_rank() 
+            # 5. hijack get_rank()
             get_rank_bck = torch.distributed.get_rank
             torch.distributed.get_rank = lambda group=None: peer_failure_worker
             logger.info(f"Rank {get_rank_bck()} changes the rank to {torch.distributed.get_rank()}")
@@ -165,8 +165,7 @@ def recovery(config, ts, model, optimizer):
                 download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
                                                    daemon=True)
                 download_thread.start()
-
-
+    return ts, model, optimizer
 
 
 def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
@@ -245,7 +244,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     filename = _get_checkpoint_path(config)
     checkpoint(filename, ts, model, optimizer)
     while True:
-        recovery(config, ts, model, optimizer)
+        ts, model, optimizer = recovery(config, ts, model, optimizer)
         data_iterator = reset_data_iterator_func(data_loader, ts)
         checksum(ts, model, optimizer)
         try:

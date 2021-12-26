@@ -29,7 +29,7 @@ from .distributed_c10d import all_reduce, broadcast, get_rank, get_world_size
 
 class _DistributedOptimizer(torch.optim.Optimizer):
     def __init__(self, params, named_parameters,
-                 backward_passes_per_step=1):
+                 backward_passes_per_step=1, comm_group=None):
         super(self.__class__, self).__init__(params)
 
         if named_parameters is not None:
@@ -38,6 +38,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
             named_parameters = []
 
         self.backward_passes_per_step = backward_passes_per_step
+        self.comm_group = comm_group
         self._all_reduce_delay = {v: self.backward_passes_per_step
                                   for _, v in sorted(named_parameters)}
         self._handles = {}
@@ -80,7 +81,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
     def _all_reduce_grad_async(self, p):
         tensor = p.grad
         tensor /= self._size
-        handle = all_reduce(tensor, async_op=True)
+        handle = all_reduce(tensor, async_op=True, group=self.comm_group)
         return handle
 
     def _make_hook(self, p):
