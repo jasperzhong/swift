@@ -17,7 +17,8 @@ from torch._C._distributed_c10d import SwiftInternalError
 from .data_parallel import (DistributedOptimizer, broadcast_optimizer_state,
                             broadcast_parameters)
 from .distributed_c10d import (_failure_handler, all_gather, broadcast,
-                               get_local_world_size, get_rank, get_world_size, new_group)
+                               get_local_world_size, get_rank, get_world_size, new_group,
+                               parallel_recovery_data_parallel_size)
 
 try:
     import boto3
@@ -205,8 +206,9 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
         optimizer_defaults = optimizer.defaults
         optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
 
+    num_microbatches = config.num_microbatches // parallel_recovery_data_parallel_size()
     optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
-                                     backward_passes_per_step=config.num_microbatches)
+                                     backward_passes_per_step=num_microbatches)
 
     # peer failure worker broadcast its parameters and optimizer states
     # to other group members

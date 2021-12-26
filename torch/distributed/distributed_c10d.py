@@ -3081,3 +3081,8 @@ def _open_logging_file(filename, consensus_value):
     logger.info(f"valid keys: {valid_keys}")
 
     return f, iter(valid_keys)
+
+def parallel_recovery_data_parallel_size():
+    if _logging_parallel_recovery:
+        return _logging_group_size
+    return 1
