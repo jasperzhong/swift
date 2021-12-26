@@ -8,7 +8,6 @@ import tarfile
 import tempfile
 import sys
 from io import open
-from benchmarks.distributed.ft.pipeline_bert.main import prepare_model_and_optimizer
 
 import torch
 from torch import nn

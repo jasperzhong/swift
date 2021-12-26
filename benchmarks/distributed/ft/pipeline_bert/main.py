@@ -7,7 +7,6 @@ import time
 import numpy as np
 from model import PipelineParallelBert
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, Dataset
-import modeling
 import h5py
 
 from schedule import (initialize_global_args, is_pipeline_first_stage,
