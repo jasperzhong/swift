@@ -179,6 +179,9 @@ def recovery(config, ts, model, optimizer):
                 download_thread.start()
 
             def _cb(ts):
+                nonlocal model
+                nonlocal optimizer
+
                 # close files
                 for peer, item in distributed_c10d._logging_recovery_mask.items():
                     idx, file_info_list, consensus_value = item
