@@ -102,8 +102,8 @@ class PipelineParallelBert(BertForPreTraining):
                     continue
                 elif isinstance(layer, BertPreTrainingHeads):
                     encoded_layers, pooled_output = input
-                    sequence_output = encoded_layers[-1]
-                    output = layer(sequence_output, pooled_output)
+                    # sequence_output = encoded_layers[-1]
+                    output = layer(encoded_layers, pooled_output)
                     prediction_scores, seq_relationship_score = output
                     print("prediction_scores: {}".format(prediction_scores.shape))
                     print("seq_relationship_score: {}".format(seq_relationship_score.shape))
@@ -159,8 +159,8 @@ class PipelineParallelBert(BertForPreTraining):
                 output = [encoded_layers, pooled_output]
             elif isinstance(layer, BertPreTrainingHeads):
                 encoded_layers, pooled_output = input
-                sequence_output = encoded_layers[-1]
-                output = layer(sequence_output, pooled_output)
+                # sequence_output = encoded_layers[-1]
+                output = layer(encoded_layers, pooled_output)
                 return output
             input = output
         return output
