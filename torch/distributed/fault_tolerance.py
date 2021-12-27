@@ -181,6 +181,7 @@ def recovery(config, ts, model, optimizer):
                 torch.distributed.get_rank = get_rank_bck
                 logger.info(f"Rank {peer_failure_worker} changes the rank back to {torch.distributed.get_rank()}")
                 model.assign_model_split(torch.distributed.get_rank())
+                model.cuda()
                 old_optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
 
                 if not need_recovery:
@@ -224,6 +225,7 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
 
     if global_rank != peer_failure_worker:
         model.assign_model_split(peer_failure_worker)
+        model.cuda()
         optimizer_cls = optimizer.__class__
         optimizer_defaults = optimizer.defaults
         optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)

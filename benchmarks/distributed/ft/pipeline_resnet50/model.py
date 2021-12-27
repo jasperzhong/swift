@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torchvision.models.resnet import Bottleneck, ResNet
 
-from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
+from schedule import get_microbatch_size, \
     get_pipeline_model_parallel_world_size
 
 
@@ -40,6 +40,11 @@ class PipelineParallelResNet50(ResNet):
 
     def assign_model_split(self, rank):
         # assign model split
+
+        # offload previous model split from GPU
+        if hasattr(self, "model_split"):
+            getattr(self, "model_split").cpu()
+
         start = 0
         for i in range(rank):
             start += self.balance[i]
@@ -77,6 +82,9 @@ class PipelineParallelResNet50(ResNet):
 
     def load_state_dict(self, state_dict):
         self.model_split.load_state_dict(state_dict)
+
+    def children(self):
+        return self.model_split.children()
 
     @property
     def input_shape(self):
