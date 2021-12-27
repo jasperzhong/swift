@@ -2,7 +2,7 @@ import torch
 from torch._C import ThroughputBenchmark
 import torch.nn as nn
 import modeling
-from modeling import BertForPreTraining, BertForMaskedLM, BertConfig, BertEmbeddings, BertLayer, BertPooler, BertPreTrainingHeads
+from modeling import BertForPreTraining, BertConfig, BertEmbeddings, BertLayer, BertPooler, BertPreTrainingHeads
 from typing import Optional, Iterable
 from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
     get_pipeline_model_parallel_world_size, is_pipeline_first_stage
