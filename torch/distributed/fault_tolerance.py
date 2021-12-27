@@ -153,9 +153,11 @@ def recovery(config, ts, model, optimizer):
             logger.info(f"build new communication group ({group_rank} / {group_size})")
 
             # 3. living workers build model and optimizer
-            new_model, new_optimizer, peer_failure_worker = build_model_and_optimizer(config, model,
-                                                                                      optimizer, comm,
-                                                                                      failure_workers)
+            optimizer_cls = optimizer.__class__
+            optimizer_defaults = optimizer.defaults
+            model, optimizer, peer_failure_worker = build_model_and_optimizer(config, model,
+                                                                              optimizer, comm,
+                                                                              failure_workers)
             distributed_c10d._logging_group_diff = get_rank() - peer_failure_worker
             # 4. broadcast failure worker's ts
             ts.broadcast(peer_failure_worker)
@@ -179,8 +181,6 @@ def recovery(config, ts, model, optimizer):
                 torch.distributed.get_rank = get_rank_bck
                 logger.info(f"Rank {peer_failure_worker} changes the rank back to {torch.distributed.get_rank()}")
                 model.assign_model_split(torch.distributed.get_rank())
-                optimizer_cls = optimizer.__class__
-                optimizer_defaults = optimizer.defaults
                 old_optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
                 filename = _get_checkpoint_path(config)
                 load_checkpoint(filename, ts, model, optimizer)
@@ -192,7 +192,7 @@ def recovery(config, ts, model, optimizer):
 
             callback = _cb
 
-    return ts, new_model, new_optimizer, consensus_value, callback
+    return ts, model, optimizer, consensus_value, callback
 
 
 def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
