@@ -47,6 +47,8 @@ class PipelineParallelBert(BertForPreTraining):
         print("finish profile")
         if rank is None:
             self.rank = get_pipeline_model_parallel_rank()
+        else:
+            self.rank = rank
 
         # assign model split
         start = 0
