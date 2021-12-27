@@ -148,8 +148,6 @@ class BertEmbeddings(nn.Module):
 
         words_embeddings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
-        print("token_type_ids: {}".format(token_type_ids))
-        print("embeddings: {}".format(self.token_type_embeddings))
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = words_embeddings + position_embeddings + token_type_embeddings
@@ -296,6 +294,8 @@ class LinearActivation(Module):
             init.uniform_(self.bias, -bound, bound)
 
     def forward(self, input):
+        print("input: {}".format(input.shape))
+        print("self.weight: {}".format(self.weight.shape))
         if not self.bias is None:
             return self.biased_act_fn(self.bias, F.linear(input, self.weight, None))
         else:

@@ -100,7 +100,6 @@ def create_pretraining_dataset(args):
                                   num_workers=args.workers, pin_memory=True)
     return train_dataloader
 
-# TODO:
 class pretraining_dataset(Dataset):
 
     def __init__(self, input_file, max_pred_length):
