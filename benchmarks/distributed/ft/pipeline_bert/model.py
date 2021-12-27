@@ -58,7 +58,7 @@ class PipelineParallelBert(BertForPreTraining):
         end = start + self.balance[self.rank]
         self._input_shape = self._input_shapes[start]
         self._output_shape = self._output_shapes[end - 1]
-        self.model_split = self.bert[start:end]
+        self.model_split = self.bert_sequential[start:end]
 
     def _profile(self, shape=[128]):
         """
