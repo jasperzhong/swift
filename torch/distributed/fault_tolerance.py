@@ -179,6 +179,16 @@ def recovery(config, ts, model, optimizer):
                 download_thread.start()
 
             def _cb(ts):
+                # close files
+                for peer, item in distributed_c10d._logging_recovery_mask.items():
+                    idx, file_info_list, consensus_value = item
+                    logger.info(f"close file. src={peer}")
+                    f = file_info_list[idx].file_object
+                    f.close()
+                    logger.info("parallel recovery finishes")
+                distributed_c10d._logging_recovery_mask.clear()
+                distributed_c10d._logging_parallel_recovery = False
+
                 # reload model and optimizer from checkpoint and reset logging mask after recovery
                 torch.distributed.get_rank = get_rank_bck
                 logger.info(f"Rank {peer_failure_worker} changes the rank back to {torch.distributed.get_rank()}")
