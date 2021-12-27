@@ -186,7 +186,7 @@ def recovery(config, ts, model, optimizer):
 
                 if not need_recovery:
                     filename = _get_checkpoint_path(config)
-                    load_checkpoint(filename, ts, model, optimizer)
+                    load_checkpoint(filename, ts, model, old_optimizer)
 
                 distributed_c10d._logging_mask.clear()
                 pairs = groups_to_pairs(config.groups)
