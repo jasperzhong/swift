@@ -145,7 +145,7 @@ class PipelineParallelBert(BertForPreTraining):
                 # sequence_output = encoded_layers[-1]
                 # default not output all encoded layers
                 encoded_layers = encoded_layers[-1:]
-                pooled_output = layer(hidden_states=sequence_output)
+                pooled_output = layer(hidden_states=encoded_layers)
                 output = [encoded_layers, pooled_output]
             elif isinstance(layer, BertPreTrainingHeads):
                 encoded_layers, pooled_output = input
