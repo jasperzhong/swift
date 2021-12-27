@@ -1038,6 +1038,7 @@ def send(tensor,
         dst += _logging_group_diff
 
     if group is None or group is GroupMember.WORLD:
+        logger.info(f"send {dst}")
         default_pg = _get_default_group()
         default_pg.send([tensor], dst, tag).wait()
     else:
