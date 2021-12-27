@@ -269,7 +269,18 @@ class LinearActivation(Module):
         super(LinearActivation, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.act_fn = ACT2FN[act]
+        self.act_fn = nn.Identity()                                                         #
+        self.biased_act_fn = None                                                           #
+        self.bias = None                                                                    #
+        if isinstance(act, str) or (sys.version_info[0] == 2 and isinstance(act, unicode)): # For TorchScript
+            if bias and not 'bias' in act:                                                  # compatibility
+                act = 'bias_' + act                                                         #
+                self.biased_act_fn = ACT2FN[act]                                            #
+
+            else:
+                self.act_fn = ACT2FN[act]
+        else:
+            self.act_fn = act
         self.weight = Parameter(torch.Tensor(out_features, in_features))
         if bias:
             self.bias = Parameter(torch.Tensor(out_features))
@@ -285,7 +296,10 @@ class LinearActivation(Module):
             init.uniform_(self.bias, -bound, bound)
 
     def forward(self, input):
-        return self.act_fn(F.linear(input, self.weight, self.bias))
+        if not self.bias is None:
+            return self.biased_act_fn(self.bias, F.linear(input, self.weight, None))
+        else:
+            return self.act_fn(F.linear(input, self.weight, self.bias))
 
     def extra_repr(self):
         return 'in_features={}, out_features={}, bias={}'.format(
