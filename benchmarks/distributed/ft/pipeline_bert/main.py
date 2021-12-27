@@ -142,6 +142,7 @@ class BertPretrainingCriterion(torch.nn.Module):
         print("vocab_size: {}".format(self.vocab_size))
         print("prediction_score: {}".format(prediction_scores.shape))
         print("masked_lm_label: {}".format(masked_lm_labels.shape))
+        print(prediction_scores.view(-1, 30528))
         masked_lm_loss = self.loss_fn(prediction_scores.view(-1, self.vocab_size), masked_lm_labels.view(-1))
         next_sentence_loss = self.loss_fn(seq_relationship_score.view(-1, 2), next_sentence_labels.view(-1))
         total_loss = masked_lm_loss + next_sentence_loss
@@ -169,7 +170,7 @@ def prepare_model_and_optimizer(args):
                                        total_steps=args.max_steps)
 
     # base on the config file: Vocab size
-    loss_func = BertPretrainingCriterion(3907584)
+    loss_func = BertPretrainingCriterion(30528)
 
     return model, optimizer, lr_scheduler, loss_func
 
