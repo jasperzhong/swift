@@ -3083,6 +3083,8 @@ def _open_logging_file(filename, consensus_value):
     return f, iter(valid_keys)
 
 def parallel_recovery_data_parallel_size():
+    global _logging_recovery_mask
+
     if _logging_parallel_recovery:
         return _logging_group_size
     return 1

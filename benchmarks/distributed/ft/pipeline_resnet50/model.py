@@ -36,6 +36,7 @@ class PipelineParallelResNet50(ResNet):
 
         self._profile()
         self.rank = None
+        self.model_split = None
         self.assign_model_split(rank)
 
     def assign_model_split(self, rank):
@@ -46,8 +47,8 @@ class PipelineParallelResNet50(ResNet):
         self.rank = rank
 
         # offload previous model split from GPU
-        if hasattr(self, "model_split"):
-            getattr(self, "model_split").cpu()
+        if self.model_split is not None:
+            self.model_split.cpu()
 
         start = 0
         for i in range(rank):
