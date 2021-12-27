@@ -176,14 +176,16 @@ def recovery(config, ts, model, optimizer):
                                                    daemon=True)
                 download_thread.start()
 
-            def _cb():
+            def _cb(ts):
                 # reload model and optimizer from checkpoint and reset logging mask after recovery
                 torch.distributed.get_rank = get_rank_bck
                 logger.info(f"Rank {peer_failure_worker} changes the rank back to {torch.distributed.get_rank()}")
                 model.assign_model_split(torch.distributed.get_rank())
                 old_optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
-                filename = _get_checkpoint_path(config)
-                load_checkpoint(filename, ts, model, optimizer)
+
+                if not need_recovery:
+                    filename = _get_checkpoint_path(config)
+                    load_checkpoint(filename, ts, model, optimizer)
 
                 distributed_c10d._logging_mask.clear()
                 pairs = groups_to_pairs(config.groups)
@@ -290,7 +292,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         ts, loss, config.batch_size / iteration_time))
 
                 if ts == consensus_value and cb:
-                    ts, model, optimizer = cb()
+                    ts, model, optimizer = cb(ts)
+                    logger.info(f"parallel recovery restores from iteration {ts}")
                     cb = None
 
             break
