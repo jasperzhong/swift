@@ -43,7 +43,7 @@ class PipelineParallelBert(BertForPreTraining):
             self.balance[-1] += remaining
 
         self._profile()
-
+        print("finish profile")
         if rank is None:
             self.rank = get_pipeline_model_parallel_rank()
 
@@ -79,20 +79,20 @@ class PipelineParallelBert(BertForPreTraining):
                 elif isinstance(layer, BertLayer):
                     hidden_states = input
                     output = layer(hidden_states=hidden_states , attention_mask=extended_attention_mask)
-                    print("layer output shape {}".format(output.shape))
                 elif isinstance(layer, BertPooler):
                     encoded_layers = input
                     # sequence_output = encoded_layers[-1]
                     # default not output all encoded layers
                     encoded_layers = encoded_layers[-1:]
-                    print("pooler input shape {}".format(encoded_layers.shape))
                     pooled_output = layer(hidden_states=encoded_layers)
-                    output = [encoded_layers, pooled_output]
+                    output = torch.stack(encoded_layers, pooled_output)
                 elif isinstance(layer, BertPreTrainingHeads):
-                    encoded_layers, pooled_output = input
+                    encoded_layers, pooled_output = input.split(1)
+                    encoded_layers = encoded_layers[0]
+                    pooled_output = pooled_output[0]
                     sequence_output = encoded_layers[-1]
                     prediction_scores, seq_relationship_score = layer(sequence_output, pooled_output)
-                    output = [prediction_scores, seq_relationship_score]
+                    output = torch.stack(prediction_scores, seq_relationship_score)
                 self._output_shapes.append(output.shape)
                 input = output
             
@@ -141,12 +141,12 @@ class PipelineParallelBert(BertForPreTraining):
                 # default not output all encoded layers
                 encoded_layers = encoded_layers[-1:]
                 pooled_output = layer(hidden_states=sequence_output)
-                output = [encoded_layers, pooled_output]
+                output = torch.stack(encoded_layers, pooled_output)
             elif isinstance(layer, BertPreTrainingHeads):
                 encoded_layers, pooled_output = input
                 sequence_output = encoded_layers[-1]
                 prediction_scores, seq_relationship_score = layer(sequence_output, pooled_output)
-                output = [prediction_scores, seq_relationship_score]
+                output = torch.stack(prediction_scores, seq_relationship_score)
                 
             input = output
         return output

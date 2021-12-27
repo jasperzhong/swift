@@ -94,7 +94,8 @@ def handle_train_dir(args):
 def create_pretraining_dataset(args):
     data_file = handle_train_dir(args)
     train_data = pretraining_dataset(input_file=data_file, max_pred_length=args.max_predictions_per_seq)
-    train_sampler = RandomSampler(train_data)
+    # train_sampler = RandomSampler(train_data)
+    train_sampler = SequentialSampler(train_data)
     train_dataloader = DataLoader(train_data, sampler=train_sampler,
                                   batch_size=args.micro_batch_size,
                                   num_workers=args.workers, pin_memory=True)
