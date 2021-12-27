@@ -188,6 +188,9 @@ def recovery(config, ts, model, optimizer):
                     logger.info("parallel recovery finishes")
                 distributed_c10d._logging_recovery_mask.clear()
                 distributed_c10d._logging_parallel_recovery = False
+                distributed_c10d._logging_group_rank = None
+                distributed_c10d._logging_group_size = None
+                distributed_c10d._logging_group_diff = None
 
                 # reload model and optimizer from checkpoint and reset logging mask after recovery
                 torch.distributed.get_rank = get_rank_bck
@@ -200,6 +203,8 @@ def recovery(config, ts, model, optimizer):
                     filename = _get_checkpoint_path(config)
                     load_checkpoint(filename, ts, model, optimizer)
                 else:
+                    # copy states from DistributedOptimizer
+                    old_optimizer.load_state_dict(optimizer.state_dict())
                     optimizer = old_optimizer
 
                 distributed_c10d._logging_mask.clear()

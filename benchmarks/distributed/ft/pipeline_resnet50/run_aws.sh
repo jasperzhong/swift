@@ -43,4 +43,4 @@ cmd="${cmd} ~/data/ILSVRC2012"
 
 echo $cmd
 
-OMP_NUM_THREADS=4 NCCL_IB_DISABLE=1 LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec gdb -ex 'run' -ex 'bt' -batch --args $cmd
+OMP_NUM_THREADS=4 NCCL_IB_DISABLE=1 LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec $cmd

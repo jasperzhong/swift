@@ -142,6 +142,9 @@ class _DistributedOptimizer(torch.optim.Optimizer):
     def undo(self):
         return super(self.__class__, self).undo()
 
+    def state_dict(self):
+        return super(self.__class__, self).state_dict()
+
 
 def DistributedOptimizer(optimizer, named_parameters=None,
                          backward_passes_per_step=1, comm_group=None):
