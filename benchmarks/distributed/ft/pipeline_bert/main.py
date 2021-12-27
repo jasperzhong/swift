@@ -220,7 +220,6 @@ def main():
 
     model, optimizer, lr_scheduler, loss_func = prepare_model_and_optimizer(args)
     model.cuda()
-    optimizer.cuda()
     loss_func.cuda()
     # TODO: lr_scheduler
 
