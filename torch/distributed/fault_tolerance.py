@@ -181,6 +181,7 @@ def recovery(config, ts, model, optimizer):
             def _cb(ts):
                 nonlocal model
                 nonlocal optimizer
+                nonlocal old_optimizer
 
                 # close files
                 for peer, item in distributed_c10d._logging_recovery_mask.items():
