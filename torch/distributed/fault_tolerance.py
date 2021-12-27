@@ -300,6 +300,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
         except SwiftInternalError as e:
             logger.info("catch an error: " + str(e))
             _failure_handler()
+            # force data iterators' workers to exit
+            del data_iterator
 
     teardown(config)
 

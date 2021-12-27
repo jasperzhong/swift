@@ -1266,6 +1266,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         # Normal exit when last reference is gone / iterator is depleted.
         # See (1) and the second half of the note.
         if not self._shutdown:
+            print("shutdown data_iterator")
             self._shutdown = True
             try:
                 # Normal exit when last reference is gone / iterator is depleted.
