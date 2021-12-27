@@ -62,9 +62,9 @@ class PipelineParallelBert(BertForPreTraining):
         get each layer's input/output shape by running one forward pass
         """
         micro_batch_size = get_microbatch_size()
-        fake_input_ids = torch.randint(1, 10, tuple([micro_batch_size] + shape))
-        fake_segment_ids = torch.randint(1, 10, tuple([micro_batch_size] + shape))
-        fake_input_mask = torch.randint(1, 10, tuple([micro_batch_size] + shape))
+        fake_input_ids = torch.randint(1, 2, tuple([micro_batch_size] + shape))
+        fake_segment_ids = torch.randint(1, 2, tuple([micro_batch_size] + shape))
+        fake_input_mask = torch.randint(1, 2, tuple([micro_batch_size] + shape))
         extended_attention_mask = fake_input_mask.unsqueeze(1).unsqueeze(2)
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         
@@ -76,17 +76,17 @@ class PipelineParallelBert(BertForPreTraining):
                 self._input_shapes.append(input.shape)
                 if isinstance(layer, BertEmbeddings):
                     output = layer(input_ids=fake_input_ids, token_type_ids=fake_segment_ids)
-                if isinstance(layer, BertLayer):
+                elif isinstance(layer, BertLayer):
                     hidden_states = input
                     output = layer(hidden_states=hidden_states , attention_mask=extended_attention_mask)
-                if isinstance(layer, BertPooler):
+                elif isinstance(layer, BertPooler):
                     encoded_layers = input
                     sequence_output = encoded_layers[-1]
                     # default not output all encoded layers
                     encoded_layers = encoded_layers[-1:]
                     pooled_output = layer(hidden_states=sequence_output)
                     output = [encoded_layers, pooled_output]
-                if isinstance(layer, BertPreTrainingHeads):
+                elif isinstance(layer, BertPreTrainingHeads):
                     encoded_layers, pooled_output = input
                     sequence_output = encoded_layers[-1]
                     prediction_scores, seq_relationship_score = layer(sequence_output, pooled_output)
@@ -130,17 +130,17 @@ class PipelineParallelBert(BertForPreTraining):
             if isinstance(layer, BertEmbeddings):
                 input_ids = input
                 output = layer(input_ids=input_ids, token_type_ids=token_type_ids)
-            if isinstance(layer, BertLayer):
+            elif isinstance(layer, BertLayer):
                 hidden_states = input
                 output = layer(hidden_states=hidden_states , attention_mask=extended_attention_mask)
-            if isinstance(layer, BertPooler):
+            elif isinstance(layer, BertPooler):
                 encoded_layers = input
                 sequence_output = encoded_layers[-1]
                 # default not output all encoded layers
                 encoded_layers = encoded_layers[-1:]
                 pooled_output = layer(hidden_states=sequence_output)
                 output = [encoded_layers, pooled_output]
-            if isinstance(layer, BertPreTrainingHeads):
+            elif isinstance(layer, BertPreTrainingHeads):
                 encoded_layers, pooled_output = input
                 sequence_output = encoded_layers[-1]
                 prediction_scores, seq_relationship_score = layer(sequence_output, pooled_output)

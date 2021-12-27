@@ -148,6 +148,8 @@ class BertEmbeddings(nn.Module):
 
         words_embeddings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
+        print("token_type_ids: {}".format(token_type_ids))
+        print("embeddings: {}".format(self.token_type_embeddings))
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = words_embeddings + position_embeddings + token_type_embeddings
