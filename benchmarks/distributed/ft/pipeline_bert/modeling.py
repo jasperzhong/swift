@@ -269,7 +269,7 @@ class LinearActivation(Module):
         super(LinearActivation, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.act_fn = act
+        self.act_fn = ACT2FN[act]
         self.weight = Parameter(torch.Tensor(out_features, in_features))
         if bias:
             self.bias = Parameter(torch.Tensor(out_features))
