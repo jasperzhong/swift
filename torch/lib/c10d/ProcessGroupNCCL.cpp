@@ -1257,11 +1257,11 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::pointToPoint(
     PostProcess post,
     const char* profilingTitle) {
 
+  LOG(ERROR) << profilingTitle << " key = " << key << " size = " << tensors[0].sizes();
   const auto devices = getDeviceList(tensors);
   const auto key = getKeySendRecv(rank_, peer);
   int p2pRank = rank_ <= peer ? 0 : 1;
   auto isSendRecvSelf = rank_ == peer;
-  LOG(ERROR) << profilingTitle << " key = " << key << " size = " << tensors[0].sizes();
   auto& ncclComms = getNCCLComm(key, devices, opType, p2pRank, isSendRecvSelf);
 
 
