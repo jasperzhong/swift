@@ -977,7 +977,7 @@ def irecv(tensor,
         _logging_gpu_tensor_queue.clear()
 
     if _logging and _logging_parallel_recovery:
-        dst += _logging_group_diff
+        src += _logging_group_diff
 
     logger.info(f"irecv {src}")
     if src is None:
@@ -1124,9 +1124,8 @@ def recv(tensor,
         _logging_gpu_tensor_queue.clear()
 
     if _logging and _logging_parallel_recovery:
-        dst += _logging_group_diff
+        src += _logging_group_diff
 
-    logger.info(f"recv {src}")
     if src is None:
         work = pg.recv_anysource([tensor], tag)
         work.wait()
@@ -1137,6 +1136,7 @@ def recv(tensor,
             return _get_global_rank(pg, src_rank)
     else:
         if group is None or group is GroupMember.WORLD:
+            logger.info(f"recv {src} size: {tensor.size()}")
             pg.recv([tensor], src, tag).wait()
         else:
             group_src_rank = _get_group_rank(pg, src)
