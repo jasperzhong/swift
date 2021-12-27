@@ -309,7 +309,6 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 loss = train_iter(model, optimizer, data_iterator, loss_func)
                 iteration_time = time.time() - start
                 ts += 1
-                checksum(ts, model, optimizer)
 
                 if ts % config.print_freq == 0:
                     logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f}".format(
@@ -317,9 +316,12 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
                 if ts == consensus_value and cb:
                     ts, model, optimizer = cb(ts)
-                    logger.info(f"parallel recovery restores from iteration {ts}")
+                    del data_iterator
                     data_iterator = reset_data_iterator_func(data_loader, ts)
+                    logger.info(f"parallel recovery restores from iteration {ts}")
                     cb = None
+
+                checksum(ts, model, optimizer)
 
             break
         except SwiftInternalError as e:
