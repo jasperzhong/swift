@@ -112,6 +112,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
 
     if is_pipeline_last_stage():
         prediction_scores, seq_relationship_score = output_tensor
+        print(prediction_scores.shape)
         output_tensor = loss_func(prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels)
         output_tensor /= get_num_microbatches()
         loss += output_tensor.item()

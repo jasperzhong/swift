@@ -71,7 +71,7 @@ class PipelineParallel(nn.Module):
         self._output_shapes = []
         input = fake_input
         with torch.no_grad():
-            for layer in self.resnet50_sequential:
+            for layer in self.module:
                 self._input_shapes.append(input.shape)
                 output = layer(input)
                 self._output_shapes.append(output.shape)

@@ -524,7 +524,9 @@ class BertPreTrainingHeads(nn.Module):
 
     def forward(self, sequence_output, pooled_output):
         prediction_scores = self.predictions(sequence_output)
+        print("prediction_scores: {}".format(prediction_scores.shape))
         seq_relationship_score = self.seq_relationship(pooled_output)
+        print("seq_relationship_score: {}".format(seq_relationship_score.shape))
         out = [prediction_scores, seq_relationship_score]
         return out
 

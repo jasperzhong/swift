@@ -59,7 +59,6 @@ class PipelineParallelBert(BertForPreTraining):
         self._input_shape = self._input_shapes[start]
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.bert_sequential[start:end]
-        print(self.model_split)
 
     def _profile(self, shape=[128]):
         """
@@ -119,27 +118,26 @@ class PipelineParallelBert(BertForPreTraining):
     def output_shape(self):
         return self._output_shape
 
-    def forward(self, input, token_type_ids, attention_mask):
-        # We create a 3D attention mask from a 2D tensor mask.
-        # Sizes are [batch_size, 1, 1, to_seq_length]
-        # So we can broadcast to [batch_size, num_heads, from_seq_length, to_seq_length]
-        # this attention mask is more simple than the triangular masking of causal attention
-        # used in OpenAI GPT, we just need to prepare the broadcast dimension here.
-        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-        
-        # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
-        # masked positions, this operation will create a tensor which is 0.0 for
-        # positions we want to attend and -10000.0 for masked positions.
-        # Since we are adding it to the raw scores before the softmax, this is
-        # effectively the same as removing these entirely.
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-        
+    def forward(self, input, token_type_ids, attention_mask):      
         for layer in self.model_split:    
             if isinstance(layer, BertEmbeddings):
                 input_ids = input
                 output = layer(input_ids=input_ids, token_type_ids=token_type_ids)
             elif isinstance(layer, BertLayer):
                 hidden_states = input
+                # We create a 3D attention mask from a 2D tensor mask.
+                # Sizes are [batch_size, 1, 1, to_seq_length]
+                # So we can broadcast to [batch_size, num_heads, from_seq_length, to_seq_length]
+                # this attention mask is more simple than the triangular masking of causal attention
+                # used in OpenAI GPT, we just need to prepare the broadcast dimension here.
+                extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+                
+                # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
+                # masked positions, this operation will create a tensor which is 0.0 for
+                # positions we want to attend and -10000.0 for masked positions.
+                # Since we are adding it to the raw scores before the softmax, this is
+                # effectively the same as removing these entirely.
+                extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
                 output = layer(hidden_states=hidden_states , attention_mask=extended_attention_mask)
             elif isinstance(layer, BertPooler):
                 encoded_layers = input
@@ -152,6 +150,6 @@ class PipelineParallelBert(BertForPreTraining):
                 encoded_layers, pooled_output = input
                 sequence_output = encoded_layers[-1]
                 output = layer(sequence_output, pooled_output)
-                
+                return output
             input = output
         return output
