@@ -125,6 +125,7 @@ def recovery(config, ts, model, optimizer):
                     f"(iteration = {consensus_value+1} while the consensus value is {consensus_value})!")
         optimizer.undo()
 
+    old_optimizer = optimizer
     if config.replica:
         broadcast_parameters(model.state_dict(), 0)
         optimizer.clear()
@@ -159,6 +160,7 @@ def recovery(config, ts, model, optimizer):
                                                                               optimizer, comm,
                                                                               failure_workers)
             distributed_c10d._logging_group_diff = get_rank() - peer_failure_worker
+
             # 4. broadcast failure worker's ts
             ts.broadcast(peer_failure_worker)
 
@@ -183,16 +185,17 @@ def recovery(config, ts, model, optimizer):
                 model.assign_model_split(torch.distributed.get_rank())
                 model.cuda()
 
-                old_optimizer = optimizer
                 if not need_recovery:
-                    old_optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
+                    optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
                     filename = _get_checkpoint_path(config)
-                    load_checkpoint(filename, ts, model, old_optimizer)
+                    load_checkpoint(filename, ts, model, optimizer)
+                else:
+                    optimizer = old_optimizer
 
                 distributed_c10d._logging_mask.clear()
                 pairs = groups_to_pairs(config.groups)
                 set_logging_mask(pairs)
-                return ts, model, old_optimizer
+                return ts, model, optimizer
 
             callback = _cb
 
@@ -232,8 +235,8 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
         optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
 
     num_microbatches = config.num_microbatches // parallel_recovery_data_parallel_size()
-    optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
-                                     backward_passes_per_step=num_microbatches)
+    distributed_optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
+                                                 backward_passes_per_step=num_microbatches)
 
     # peer failure worker broadcast its parameters and optimizer states
     # to other group members
@@ -241,7 +244,7 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
     broadcast_optimizer_state(optimizer, peer_failure_worker, comm_group=comm)
     logger.info(f"Rank {peer_failure_worker} broadcast its parameters and optimizer states")
 
-    return model, optimizer, peer_failure_worker
+    return model, distributed_optimizer, peer_failure_worker
 
 
 def build_communication_group(config):
@@ -297,6 +300,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 if ts == consensus_value and cb:
                     ts, model, optimizer = cb(ts)
                     logger.info(f"parallel recovery restores from iteration {ts}")
+                    logger.info(f"optimizer type: {type(optimizer)}")
                     cb = None
 
             break
