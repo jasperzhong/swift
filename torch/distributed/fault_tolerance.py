@@ -310,7 +310,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 if ts == consensus_value and cb:
                     ts, model, optimizer = cb(ts)
                     logger.info(f"parallel recovery restores from iteration {ts}")
-                    logger.info(f"optimizer type: {type(optimizer)}")
+                    data_iterator = reset_data_iterator_func(data_loader, ts)
                     cb = None
 
             break
