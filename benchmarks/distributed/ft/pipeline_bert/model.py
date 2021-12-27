@@ -85,14 +85,17 @@ class PipelineParallelBert(BertForPreTraining):
                     # default not output all encoded layers
                     encoded_layers = encoded_layers[-1:]
                     pooled_output = layer(hidden_states=encoded_layers)
-                    output = torch.stack((encoded_layers, pooled_output))
+                    output = [encoded_layers, pooled_output]
+                    self._output_shapes.append(len(output))
+                    continue
                 elif isinstance(layer, BertPreTrainingHeads):
                     encoded_layers, pooled_output = input.split(1)
                     encoded_layers = encoded_layers[0]
                     pooled_output = pooled_output[0]
                     sequence_output = encoded_layers[-1]
-                    prediction_scores, seq_relationship_score = layer(sequence_output, pooled_output)
-                    output = torch.stack((prediction_scores, seq_relationship_score))
+                    output = layer(sequence_output, pooled_output)
+                    self._output_shapes.append(len(output))
+                    return
                 self._output_shapes.append(output.shape)
                 input = output
             
