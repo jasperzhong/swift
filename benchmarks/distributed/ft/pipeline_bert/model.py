@@ -89,9 +89,7 @@ class PipelineParallelBert(BertForPreTraining):
                     self._output_shapes.append(len(output))
                     continue
                 elif isinstance(layer, BertPreTrainingHeads):
-                    encoded_layers, pooled_output = input.split(1)
-                    encoded_layers = encoded_layers[0]
-                    pooled_output = pooled_output[0]
+                    encoded_layers, pooled_output = input
                     sequence_output = encoded_layers[-1]
                     output = layer(sequence_output, pooled_output)
                     self._output_shapes.append(len(output))
