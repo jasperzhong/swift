@@ -285,10 +285,7 @@ class LinearActivation(Module):
             init.uniform_(self.bias, -bound, bound)
 
     def forward(self, input):
-        if not self.bias is None:
-            return self.biased_act_fn(self.bias, F.linear(input, self.weight, None))
-        else:
-            return self.act_fn(F.linear(input, self.weight, self.bias))
+        return self.act_fn(F.linear(input, self.weight, self.bias))
 
     def extra_repr(self):
         return 'in_features={}, out_features={}, bias={}'.format(
