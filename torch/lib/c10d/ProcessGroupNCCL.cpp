@@ -1256,14 +1256,16 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::pointToPoint(
     PreProcess pre,
     PostProcess post,
     const char* profilingTitle) {
+  LOG(ERROR) << "enter p2p";
 
-  LOG(ERROR) << profilingTitle << " key = " << key << " size = " << tensors[0].sizes();
   const auto devices = getDeviceList(tensors);
   const auto key = getKeySendRecv(rank_, peer);
   int p2pRank = rank_ <= peer ? 0 : 1;
   auto isSendRecvSelf = rank_ == peer;
+  LOG(ERROR) << profilingTitle << " key = " << key
+             << " size = " << tensors[0].sizes();
   auto& ncclComms = getNCCLComm(key, devices, opType, p2pRank, isSendRecvSelf);
-
+  LOG(ERROR) << "get comm";
 
   // First let NCCL streams wait for input tensors allocation streams
   syncStreams(devices, ncclEvents_[key], ncclStreams_[key]);
