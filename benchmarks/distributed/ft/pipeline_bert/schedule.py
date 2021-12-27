@@ -103,7 +103,12 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     batch = [t.cuda() for t in data]
     input_ids, segment_ids, input_mask, masked_lm_labels, next_sentence_labels = batch
 
-    output_tensor = model(input_ids, segment_ids, input_mask)
+    if is_pipeline_first_stage():
+        assert input_tensor is None
+        output_tensor = model(input_ids, segment_ids, input_mask)
+    else:
+        assert input_tensor is not None
+        output_tensor = model(input_tensor, segment_ids, input_mask)
 
     if is_pipeline_last_stage():
         prediction_scores, seq_relationship_score = output_tensor
