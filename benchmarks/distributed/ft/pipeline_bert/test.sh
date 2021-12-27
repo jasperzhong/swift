@@ -9,8 +9,8 @@ cmd="python3 -m torch.distributed.run \
 	--rdzv_id=1234 --rdzv_backend=c10d \
 	--rdzv_endpoint=$MASTER_IP \
 	BertTest.py \
-	--micro-batch-size 16 \
-	--global-batch-size 128 \
+	--micro-batch-size 4 \
+	--global-batch-size 32 \
 	--seed 2021 \
 	-p 5 \
 	/home/gmsheng/data/bert" 
