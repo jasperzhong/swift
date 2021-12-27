@@ -17,8 +17,8 @@ from torch._C._distributed_c10d import SwiftInternalError
 from .data_parallel import (DistributedOptimizer, broadcast_optimizer_state,
                             broadcast_parameters)
 from .distributed_c10d import (_failure_handler, all_gather, broadcast,
-                               get_local_world_size, get_rank, get_world_size, new_group,
-                               parallel_recovery_data_parallel_size)
+                               get_local_world_size, get_rank, get_world_size,
+                               new_group, parallel_recovery_data_parallel_size)
 
 try:
     import boto3
@@ -116,6 +116,7 @@ def teardown(config):
 
 
 def recovery(config, ts, model, optimizer):
+    callback = None
     consensus_value, need_undo, failure_workers = ts.sync()
     logger.info(f"failure workers: {failure_workers}")
 
@@ -152,9 +153,9 @@ def recovery(config, ts, model, optimizer):
             logger.info(f"build new communication group ({group_rank} / {group_size})")
 
             # 3. living workers build model and optimizer
-            model, optimizer, peer_failure_worker = build_model_and_optimizer(config, model,
-                                                                              optimizer, comm,
-                                                                              failure_workers)
+            new_model, new_optimizer, peer_failure_worker = build_model_and_optimizer(config, model,
+                                                                                      optimizer, comm,
+                                                                                      failure_workers)
             distributed_c10d._logging_group_diff = get_rank() - peer_failure_worker
             # 4. broadcast failure worker's ts
             ts.broadcast(peer_failure_worker)
@@ -172,7 +173,26 @@ def recovery(config, ts, model, optimizer):
                 download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
                                                    daemon=True)
                 download_thread.start()
-    return ts, model, optimizer
+
+            def _cb():
+                # reload model and optimizer from checkpoint and reset logging mask after recovery
+                torch.distributed.get_rank = get_rank_bck
+                logger.info(f"Rank {peer_failure_worker} changes the rank back to {torch.distributed.get_rank()}")
+                model.assign_model_split(torch.distributed.get_rank())
+                optimizer_cls = optimizer.__class__
+                optimizer_defaults = optimizer.defaults
+                old_optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
+                filename = _get_checkpoint_path(config)
+                load_checkpoint(filename, ts, model, optimizer)
+
+                distributed_c10d._logging_mask.clear()
+                pairs = groups_to_pairs(config.groups)
+                set_logging_mask(pairs)
+                return ts, model, old_optimizer
+
+            callback = _cb
+
+    return ts, new_model, new_optimizer, consensus_value, callback
 
 
 def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
@@ -253,7 +273,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     filename = _get_checkpoint_path(config)
     checkpoint(filename, ts, model, optimizer)
     while True:
-        ts, model, optimizer = recovery(config, ts, model, optimizer)
+        ts, model, optimizer, consensus_value, cb = recovery(config, ts, model, optimizer)
         data_iterator = reset_data_iterator_func(data_loader, ts)
         checksum(ts, model, optimizer)
         try:
@@ -268,6 +288,10 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 if ts % config.print_freq == 0:
                     logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f}".format(
                         ts, loss, config.batch_size / iteration_time))
+
+                if ts == consensus_value and cb:
+                    ts, model, optimizer = cb()
+                    cb = None
 
             break
         except SwiftInternalError as e:
