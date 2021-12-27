@@ -16,6 +16,7 @@
 #include <c10/util/Logging.h>
 #include <c10d/ParamCommsUtils.hpp>
 #include <torch/csrc/cuda/nccl.h>
+#include <iostream>
 
 #include <c10d/Utils.hpp>
 namespace c10d {
@@ -1261,6 +1262,8 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::pointToPoint(
   int p2pRank = rank_ <= peer ? 0 : 1;
   auto isSendRecvSelf = rank_ == peer;
   auto& ncclComms = getNCCLComm(key, devices, opType, p2pRank, isSendRecvSelf);
+
+  std::cout << profilingTitle << " my_rank = " << rank_ << " peer = " << peer << " size = " << tensors[0].sizes();
 
   // First let NCCL streams wait for input tensors allocation streams
   syncStreams(devices, ncclEvents_[key], ncclStreams_[key]);
