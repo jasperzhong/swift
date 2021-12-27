@@ -94,6 +94,8 @@ class PipelineParallelBert(BertForPreTraining):
                     # default not output all encoded layers
                     # encoded_layers = encoded_layers[-1:]
                     pooled_output = layer(hidden_states=encoded_layers)
+                    print("pooled_output: {}".format(pooled_output.shape))
+                    print("encoded_layers: {}".format(encoded_layers.shape))
                     output = [encoded_layers, pooled_output]
                     self._output_shapes.append(len(output))
                     input = output
