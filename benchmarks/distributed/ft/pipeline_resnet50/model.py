@@ -11,7 +11,6 @@ class PipelineParallelResNet50(ResNet):
         super(PipelineParallelResNet50, self).__init__(
             Bottleneck, [3, 4, 6, 3], num_classes=1000, *args, **kwargs
         )
-        self.rank = rank
 
         self.resnet50_sequential = nn.Sequential(
             self.conv1, self.bn1, self.relu, self.maxpool, self.layer1, self.layer2,
@@ -36,7 +35,8 @@ class PipelineParallelResNet50(ResNet):
             self.balance[-1] += remaining
 
         self._profile()
-        self.assign_model_split(self.rank)
+        self.rank = None
+        self.assign_model_split(rank)
 
     def assign_model_split(self, rank):
         # assign model split
