@@ -44,7 +44,7 @@ class PipelineParallelBert(BertForPreTraining):
             self.balance[-1] += remaining
 
         self._profile()
-        print("finish profile")
+
         if rank is None:
             self.rank = get_pipeline_model_parallel_rank()
         else:
@@ -142,7 +142,7 @@ class PipelineParallelBert(BertForPreTraining):
                 output = layer(hidden_states=hidden_states , attention_mask=extended_attention_mask)
             elif isinstance(layer, BertPooler):
                 encoded_layers = input
-                sequence_output = encoded_layers[-1]
+                # sequence_output = encoded_layers[-1]
                 # default not output all encoded layers
                 encoded_layers = encoded_layers[-1:]
                 pooled_output = layer(hidden_states=sequence_output)
