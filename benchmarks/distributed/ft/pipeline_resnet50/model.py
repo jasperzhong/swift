@@ -40,6 +40,10 @@ class PipelineParallelResNet50(ResNet):
 
     def assign_model_split(self, rank):
         # assign model split
+        if rank == self.rank:
+            return
+
+        self.rank = rank
 
         # offload previous model split from GPU
         if hasattr(self, "model_split"):

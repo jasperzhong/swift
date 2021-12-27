@@ -182,9 +182,10 @@ def recovery(config, ts, model, optimizer):
                 logger.info(f"Rank {peer_failure_worker} changes the rank back to {torch.distributed.get_rank()}")
                 model.assign_model_split(torch.distributed.get_rank())
                 model.cuda()
-                old_optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
 
+                old_optimizer = optimizer
                 if not need_recovery:
+                    old_optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
                     filename = _get_checkpoint_path(config)
                     load_checkpoint(filename, ts, model, old_optimizer)
 
