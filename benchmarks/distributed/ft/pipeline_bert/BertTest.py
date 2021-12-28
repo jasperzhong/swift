@@ -242,7 +242,7 @@ def main():
             batch = next(data_iter)
             batch = [t.cuda() for t in batch]
             input_ids, segment_ids, input_mask, masked_lm_labels, next_sentence_labels = batch
-            prediction_scores, seq_relationship_score = model(input_ids=input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
+            prediction_scores, seq_relationship_score = model(input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
             loss = loss_func(prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels)
             loss += loss / args.micro_batch_size
             loss.backward()
