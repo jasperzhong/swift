@@ -886,6 +886,7 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
     OpType opType,
     int p2pRank,
     bool isSendRecvSelf) {
+  LOG(ERROR) << "gg1";
   // Sanity check
   if (devicesKey.empty()) {
     throw std::runtime_error(
@@ -893,10 +894,12 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
         "the GPU devices are not known");
   }
 
+  LOG(ERROR) << "gg2";
   for (auto& device : devices) {
     usedDeviceIdxs_.insert(device.index());
   }
 
+  LOG(ERROR) << "gg3";
   {
     std::lock_guard<std::mutex> lock(mutex_);
     if (devNCCLCommMap_.find(devicesKey) != devNCCLCommMap_.end()) {
@@ -904,11 +907,13 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
       return devNCCLCommMap_[devicesKey];
     }
   }
+  LOG(ERROR) << "gg4";
 
   // NCCL communicator not cached, create a new entry
   std::vector<std::shared_ptr<NCCLComm>> ncclComms;
   ncclComms.resize(devices.size());
 
+  LOG(ERROR) << "gg5";
   // Create the unique NCCL ID and broadcast it
   ncclUniqueId ncclID;
 
@@ -917,12 +922,14 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
     C10D_NCCL_CHECK(ncclGetUniqueId(&ncclID));
   }
 
+  LOG(ERROR) << "gg6";
   // For point-to-point communication on the same process, don't need broadcast.
   if (!isSendRecvSelf) {
     // Broadcast so that each process can have a unique NCCL ID
     broadcastUniqueNCCLID(&ncclID, opType, devicesKey, p2pRank);
   }
 
+  LOG(ERROR) << "gg7";
   if (rank_ == 0 && !hasInitFailureFlag_) {
     std::lock_guard<std::mutex> lock(store_mutex_);
     std::vector<uint8_t> value = {0};
@@ -930,10 +937,12 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
     hasInitFailureFlag_ = true;
   }
 
+  LOG(ERROR) << "gg8";
   at::cuda::OptionalCUDAGuard gpuGuard;
 
   std::vector<at::cuda::CUDAStream> streamVal;
   streamVal.reserve(devices.size());
+  LOG(ERROR) << "gg9";
 
   // [Group Start/End Note] This is used to ensure that nccl communicator will
   // be created before communication primitives are called. Let's look at this
@@ -955,8 +964,10 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
     C10D_NCCL_CHECK(ncclGroupEnd());
   }
 
+  LOG(ERROR) << "gg10";
   // [Note 1] Create the NCCL communicators for each GPU
   C10D_NCCL_CHECK(ncclGroupStart());
+  LOG(ERROR) << "gg11";
 
   for (size_t i = 0; i < devices.size(); ++i) {
     // GPU world size and GPU rank
@@ -986,13 +997,16 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
         at::cuda::getStreamFromPool(options_->is_high_priority_stream));
   }
 
+  LOG(ERROR) << "gg12";
   // [Note 2 ]
   C10D_NCCL_CHECK(ncclGroupEnd());
+  LOG(ERROR) << "gg13";
 
   // See [Group Start/End Note]
   for (size_t i = 0; i < ncclActiveGroupCounter_; ++i) {
     C10D_NCCL_CHECK(ncclGroupStart());
   }
+  LOG(ERROR) << "gg14";
 
   ncclStreams_.emplace(devicesKey, std::move(streamVal));
 
@@ -1004,6 +1018,7 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
       std::piecewise_construct,
       std::make_tuple(devicesKey),
       std::make_tuple(devices.size()));
+  LOG(ERROR) << "gg15";
 
   // Hold the lock before modifying the cache.
   std::lock_guard<std::mutex> lock(mutex_);
@@ -1013,6 +1028,7 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
 
   // Move the NCCL resource to cache
   devNCCLCommMap_.emplace(devicesKey, std::move(ncclComms));
+  LOG(ERROR) << "gg16";
   return devNCCLCommMap_[devicesKey];
 }
 
