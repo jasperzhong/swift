@@ -198,7 +198,7 @@ def train_iter(model, optimizer, data_iterator, loss_func):
 
 def main():
     torch.backends.cudnn.benchmark = True
-    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.deterministic = False
 
     args.world_size = int(os.environ['WORLD_SIZE'])
     args.rank = int(os.environ['RANK'])

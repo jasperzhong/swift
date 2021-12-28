@@ -161,9 +161,9 @@ def prepare_model_and_optimizer(args):
 
     modeling.ACT2FN["bias_gelu"] = modeling.bias_gelu_training
     
-    model = BertForPreTraining(config)
+    # model = BertForPreTraining(config)
     
-    # model = PipelineParallelBert(rank=torch.distributed.get_rank(), balance=None)
+    model = PipelineParallelBert(rank=torch.distributed.get_rank(), balance=None)
     
     # num = 0
     # for i, j in zip(iter(model.parameters()), iter(model1.parameters())):
@@ -213,7 +213,7 @@ def train_iter(model, optimizer, data_iterator, loss_func):
 
 def main():
     torch.backends.cudnn.benchmark = True
-    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.deterministic = False
 
     args.world_size = int(os.environ['WORLD_SIZE'])
     args.rank = int(os.environ['RANK'])
