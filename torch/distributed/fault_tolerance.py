@@ -186,7 +186,7 @@ def recovery(config, ts, model, optimizer):
                 # close files
                 for peer, item in distributed_c10d._logging_recovery_mask.items():
                     idx, file_info_list, consensus_value = item
-                    logger.info(f"close file. src={peer}")
+                    logger.info(f"close file in cb. src={peer}")
                     f = file_info_list[idx].file_object
                     f.close()
                     logger.info("parallel recovery finishes")
@@ -321,6 +321,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                     data_iterator = reset_data_iterator_func(data_loader, ts)
                     logger.info(f"parallel recovery restores from iteration {ts}")
                     cb = None
+                    logger.info(f"parallel_recovery_data_parallel_size: {torch.distributed.parallel_recovery_data_parallel_size()}")
 
                 checksum(ts, model, optimizer)
 
