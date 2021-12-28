@@ -212,8 +212,8 @@ def recovery(config, ts, model, optimizer):
                     optimizer = old_optimizer
 
                 distributed_c10d._logging_mask.clear()
-                pairs = groups_to_pairs(config.groups)
-                set_logging_mask(pairs)
+                # pairs = groups_to_pairs(config.groups)
+                # set_logging_mask(pairs)
                 return ts, model, optimizer
 
             callback = _cb
