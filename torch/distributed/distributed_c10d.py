@@ -893,7 +893,6 @@ def isend(tensor,
     if _logging and _logging_parallel_recovery:
         dst += _logging_group_diff
 
-    logger.info(f"isend {dst}")
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
         return default_pg.send([tensor], dst, tag)
@@ -979,7 +978,6 @@ def irecv(tensor,
     if _logging and _logging_parallel_recovery:
         src += _logging_group_diff
 
-    logger.info(f"irecv {src}")
     if src is None:
         return pg.recv_anysource([tensor], tag)
     else:
@@ -1039,7 +1037,6 @@ def send(tensor,
     if _logging and _logging_parallel_recovery:
         dst += _logging_group_diff
 
-    logger.info(f"send {dst}")
     if group is None or group is GroupMember.WORLD:
         default_pg = _get_default_group()
         default_pg.send([tensor], dst, tag).wait()
@@ -1136,7 +1133,6 @@ def recv(tensor,
             return _get_global_rank(pg, src_rank)
     else:
         if group is None or group is GroupMember.WORLD:
-            logger.info(f"recv {src} size: {tensor.size()}")
             pg.recv([tensor], src, tag).wait()
         else:
             group_src_rank = _get_group_rank(pg, src)

@@ -12,7 +12,6 @@
 #include <fcntl.h>
 #include <algorithm>
 #include <system_error>
-#include <iostream>
 
 namespace c10d {
 
@@ -480,7 +479,6 @@ void TCPStoreMasterDaemon::deleteP2PHandler(int socket) {
   for (auto&& pair : tcpStore_) {
     if (isPairP2PKey(pair.first)) {
       needs_removing.push_back(pair.first);
-      std::cout << "delete " << pair.first << std::endl;
     }
   }
   for (auto&& key : needs_removing) {
@@ -757,9 +755,7 @@ std::vector<uint8_t> TCPStore::get(const std::string& key) {
 }
 
 std::vector<uint8_t> TCPStore::getHelper_(const std::string& key) {
-  std::cout << "wait " << key << std::endl;
   waitHelper_({key}, timeout_);
-  std::cout << "send get request for " << key << std::endl;
   tcputil::sendValue<QueryType>(storeSocket_, QueryType::GET);
   tcputil::sendString(storeSocket_, key);
   return tcputil::recvVector<uint8_t>(storeSocket_);
@@ -869,7 +865,6 @@ void TCPStore::waitHelper_(
   for (size_t i = 0; i < nkeys; i++) {
     tcputil::sendString(storeSocket_, keys[i], (i != (nkeys - 1)));
   }
-  std::cout << "send wait request for " << keys[0];
   auto waitResponse = tcputil::recvValue<WaitResponseType>(storeSocket_);
   if (waitResponse != WaitResponseType::STOP_WAITING) {
     throw std::runtime_error("Stop_waiting response is expected");

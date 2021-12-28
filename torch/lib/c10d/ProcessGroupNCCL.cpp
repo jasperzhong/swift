@@ -883,12 +883,9 @@ void ProcessGroupNCCL::broadcastUniqueNCCLID(
     store_->set(storeKey, vec);
   } else {
     std::lock_guard<std::mutex> lock(store_mutex_);
-    LOG(ERROR) << "try to get " << storeKey;
     auto vec = store_->get(storeKey);
-    LOG(ERROR) << "vec.size() = " << vec.size();
     TORCH_CHECK(vec.size() == NCCL_UNIQUE_ID_BYTES);
     std::memcpy(ncclID, vec.data(), vec.size());
-    LOG(ERROR) << "memcpy done";
   }
 }
 
@@ -1268,8 +1265,6 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::pointToPoint(
     PreProcess pre,
     PostProcess post,
     const char* profilingTitle) {
-  LOG(ERROR) << "enter p2p";
-
   const auto devices = getDeviceList(tensors);
   const auto key = getKeySendRecv(rank_, peer);
   int p2pRank = rank_ <= peer ? 0 : 1;
@@ -1277,7 +1272,6 @@ c10::intrusive_ptr<ProcessGroup::Work> ProcessGroupNCCL::pointToPoint(
   LOG(ERROR) << profilingTitle << " key = " << key
              << " size = " << tensors[0].sizes();
   auto& ncclComms = getNCCLComm(key, devices, opType, p2pRank, isSendRecvSelf);
-  LOG(ERROR) << "get comm";
 
   // First let NCCL streams wait for input tensors allocation streams
   syncStreams(devices, ncclEvents_[key], ncclStreams_[key]);
