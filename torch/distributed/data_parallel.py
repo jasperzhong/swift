@@ -151,7 +151,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
         # remove all handles
         for handle in self._hook_handles:
             handle.remove()
-
+        print("hook handles removed")
         super(self.__class__, self).__del__()
 
 

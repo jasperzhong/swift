@@ -26,7 +26,7 @@ try:
 except ImportError:
     pass
 
-logger = logging.getLogger(__name__)
+logger = logging.getlogger(__name__)
 
 
 def _need_recovery(groups, failure_workers):
@@ -35,7 +35,7 @@ def _need_recovery(groups, failure_workers):
         if rank in group:
             for failure_worker in failure_workers:
                 if failure_worker in group:
-                    return True
+                    return true
     return False
 
 
@@ -67,14 +67,14 @@ class FileInfo:
 def _set_recovery_mask(config, ts, consensus_value):
     logging_files = get_logging_files(config, ts, consensus_value)
     logger.info(f"logging_files: {logging_files}")
-    download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
+    download_thread = threading.thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
     download_thread.start()
 
 
-class FaultToleranceConfig:
+class FaultToleranceconfig:
     def __init__(self, num_iteration, batch_size, num_microbatches, checkpoint_interval, replica=False, logging=False,
                  parallel_recovery=False, logging_compression=None, logging_chunk_freq=None, logging_dfs=None,
-                 logging_bucket=None, logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
+                 logging_bucket=none, logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
         self.num_iteration = num_iteration
         self.batch_size = batch_size
         self.num_microbatches = num_microbatches
@@ -122,7 +122,7 @@ def recovery(config, ts, model, optimizer):
     logger.info(f"failure workers: {failure_workers}")
 
     if need_undo:
-        logger.info(f"[Rank {get_rank()}] undo update is needed"
+        logger.info(f"[rank {get_rank()}] undo update is needed"
                     f"(iteration = {consensus_value+1} while the consensus value is {consensus_value})!")
         optimizer.undo()
 
@@ -168,7 +168,7 @@ def recovery(config, ts, model, optimizer):
             # 5. hijack get_rank()
             get_rank_bck = torch.distributed.get_rank
             torch.distributed.get_rank = lambda group=None: peer_failure_worker
-            logger.info(f"Rank {get_rank_bck()} changes the rank to {torch.distributed.get_rank()}")
+            logger.info(f"rank {get_rank_bck()} changes the rank to {torch.distributed.get_rank()}")
 
             # 6. download the same set of logging files as the failure worker
             if not need_recovery:
@@ -200,7 +200,7 @@ def recovery(config, ts, model, optimizer):
 
                 # reload model and optimizer from checkpoint and reset logging mask after recovery
                 torch.distributed.get_rank = get_rank_bck
-                logger.info(f"Rank {peer_failure_worker} changes the rank back to {torch.distributed.get_rank()}")
+                logger.info(f"rank {peer_failure_worker} changes the rank back to {torch.distributed.get_rank()}")
                 model.assign_model_split(torch.distributed.get_rank())
                 model.cuda()
 
@@ -215,8 +215,8 @@ def recovery(config, ts, model, optimizer):
                     del optimizer
                     optimizer = old_optimizer
 
-                # destroy communication group
-                destroy_process_group(comm)
+                # # destroy communication group
+                # destroy_process_group(comm)
 
                 distributed_c10d._logging_mask.clear()
                 # pairs = groups_to_pairs(config.groups)
