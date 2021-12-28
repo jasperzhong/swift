@@ -165,8 +165,12 @@ def prepare_model_and_optimizer(args):
     
     model1 = PipelineParallelBert(rank=torch.distributed.get_rank(), balance=None)
     
+    num = 0
     for i, j in zip(iter(model.parameters()), iter(model1.parameters())):
+        num += 1
+        print("layer {}".format(num))
         print(torch.allclose(i, j, atol=torch.finfo(torch.float).resolution))
+        print(torch.sum(torch.abs(i - j)))
 
     # base on the NVIDIA example: 5e-5
     optimizer = optim.Adam(model.parameters(), lr=5e-5)
