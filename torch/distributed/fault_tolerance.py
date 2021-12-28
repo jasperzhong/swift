@@ -204,19 +204,18 @@ def recovery(config, ts, model, optimizer):
                 model.assign_model_split(torch.distributed.get_rank())
                 model.cuda()
 
+                optimizer.remove_hooks()
                 if not need_recovery:
-                    del optimizer
                     optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
                     filename = _get_checkpoint_path(config)
                     load_checkpoint(filename, ts, model, optimizer)
                 else:
                     # copy states from DistributedOptimizer
                     old_optimizer.load_state_dict(optimizer.state_dict())
-                    del optimizer
                     optimizer = old_optimizer
 
-                # # destroy communication group
-                # destroy_process_group(comm)
+                # destroy communication group
+                destroy_process_group(comm)
 
                 distributed_c10d._logging_mask.clear()
                 # pairs = groups_to_pairs(config.groups)

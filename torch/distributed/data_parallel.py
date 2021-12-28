@@ -147,12 +147,11 @@ class _DistributedOptimizer(torch.optim.Optimizer):
     def state_dict(self):
         return super(self.__class__, self).state_dict()
 
-    def __del__(self):
+    def remove_hooks(self):
         # remove all handles
         for handle in self._hook_handles:
             handle.remove()
         print("hook handles removed")
-        super(self.__class__, self).__del__()
 
 
 def DistributedOptimizer(optimizer, named_parameters=None,
