@@ -97,13 +97,9 @@ class PipelineParallelBert(BertForPreTraining):
                 input = output
             
             
-    def parameters(self, recursive=True):
-        params = []
-        for layer in self.model_split:
-            params.extend(list(layer.parameters()))
-
-        for param in params:
-            yield param
+    def parameters(self, recurse=True):
+        return self.model_split.parameters(recurse=recurse)
+        
 
     @property
     def input_shape(self):
