@@ -226,10 +226,12 @@ def main():
     model.cuda()
     loss_func.cuda()
     
+    print(args.global_batch_size)
+    print(args.micro_batch_size)
     for i in range(args.benchmark_iters):
         start = time.time()
         optimizer.zero_grad()
-        for _ in args.global_batch_size / args.micro_batch_size:
+        for _ in range(args.global_batch_size // args.micro_batch_size):
             batch = next(data_iter)
             batch = [t.cuda() for t in batch]
             input_ids, segment_ids, input_mask, masked_lm_labels, next_sentence_labels = batch
