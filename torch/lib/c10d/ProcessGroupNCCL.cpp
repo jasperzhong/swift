@@ -1,6 +1,7 @@
 #include <c10/util/Optional.h>
 #include <c10d/ProcessGroupNCCL.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <exception>
 #include <map>
@@ -23,6 +24,10 @@ namespace c10d {
 constexpr const char* const kNCCLAbortedCommStoreKey = "NCCLABORTEDCOMM";
 
 namespace {
+
+// I don't want to use a global variable...
+// but it is the simplest way to achieve our goal
+std::atomic_bool watchdog_thread_flag(false);
 
 constexpr int kBytes = 8;
 
@@ -466,8 +471,12 @@ ProcessGroupNCCL::ProcessGroupNCCL(
   }
 
 #ifdef ENABLE_NCCL_ERROR_CHECKING
-  ncclCommWatchdogThread_ =
-      std::thread(&ProcessGroupNCCL::ncclCommWatchdog, this);
+  // for multiple NCCL groups, only one watchdog thread will be launched
+  if (!watchdog_thread_flag) {
+    ncclCommWatchdogThread_ =
+        std::thread(&ProcessGroupNCCL::ncclCommWatchdog, this);
+    watchdog_thread_flag = true;
+  }
 #endif
 
   if (asyncErrorHandling_) {
