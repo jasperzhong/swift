@@ -301,7 +301,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     checkpoint(filename, ts, model, optimizer)
     while True:
         ts, model, optimizer, consensus_value, cb = recovery(config, ts, model, optimizer)
-        data_iterator = reset_data_iterator_func(data_loader, ts)
+        data_iterator = reset_data_iterator_func(data_loader, consensus_value)
         checksum(ts, model, optimizer)
         try:
             logger.info(f"start from iteration {ts}")
@@ -317,12 +317,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
                 if ts == consensus_value and cb:
                     ts, model, optimizer = cb(ts)
-                    del data_iterator
-                    data_iterator = reset_data_iterator_func(data_loader, ts)
                     logger.info(f"parallel recovery restores from iteration {ts}")
                     cb = None
-                    logger.info(f"parallel_recovery_data_parallel_size: {torch.distributed.parallel_recovery_data_parallel_size()}")
-                    logger.info(f"logging_mask: {distributed_c10d._logging_mask}")
 
                 checksum(ts, model, optimizer)
 
