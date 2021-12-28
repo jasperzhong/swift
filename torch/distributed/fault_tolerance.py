@@ -18,7 +18,8 @@ from .data_parallel import (DistributedOptimizer, broadcast_optimizer_state,
                             broadcast_parameters)
 from .distributed_c10d import (_failure_handler, all_gather, broadcast,
                                get_local_world_size, get_rank, get_world_size,
-                               new_group, parallel_recovery_data_parallel_size)
+                               new_group, parallel_recovery_data_parallel_size,
+                               destroy_process_group)
 
 try:
     import boto3
@@ -182,6 +183,9 @@ def recovery(config, ts, model, optimizer):
                 nonlocal model
                 nonlocal optimizer
                 nonlocal old_optimizer
+
+                # destroy communication group
+                destroy_process_group(comm)
 
                 # close files
                 for peer, item in distributed_c10d._logging_recovery_mask.items():
