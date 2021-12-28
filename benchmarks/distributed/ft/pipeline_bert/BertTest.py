@@ -7,6 +7,7 @@ import modeling
 import numpy as np
 from benchmarks.distributed.ft.pipeline_bert.modeling import BertForPreTraining, BertConfig
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, Dataset
+from model import PipelineParallelBert
 import h5py
 
 from schedule import (initialize_global_args, is_pipeline_first_stage,
@@ -161,6 +162,11 @@ def prepare_model_and_optimizer(args):
     modeling.ACT2FN["bias_gelu"] = modeling.bias_gelu_training
     
     model = BertForPreTraining(config)
+    
+    model_seq = PipelineParallelBert(
+        rank=torch.distributed.get_rank(),
+        balance=None
+        )
 
     # base on the NVIDIA example: 5e-5
     optimizer = optim.Adam(model.parameters(), lr=5e-5)
@@ -231,13 +237,14 @@ def main():
     for i in range(args.benchmark_iters):
         start = time.time()
         optimizer.zero_grad()
+        loss = 0
         for _ in range(args.global_batch_size // args.micro_batch_size):
             batch = next(data_iter)
             batch = [t.cuda() for t in batch]
             input_ids, segment_ids, input_mask, masked_lm_labels, next_sentence_labels = batch
             prediction_scores, seq_relationship_score = model(input_ids=input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
             loss = loss_func(prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels)
-            loss /= args.global_batch_size
+            loss += loss / args.micro_batch_size
             loss.backward()
         optimizer.step()
         end = time.time()
