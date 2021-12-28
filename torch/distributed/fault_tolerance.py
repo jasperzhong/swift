@@ -26,7 +26,7 @@ try:
 except ImportError:
     pass
 
-logger = logging.getlogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def _need_recovery(groups, failure_workers):
@@ -35,7 +35,7 @@ def _need_recovery(groups, failure_workers):
         if rank in group:
             for failure_worker in failure_workers:
                 if failure_worker in group:
-                    return true
+                    return True
     return False
 
 
@@ -67,14 +67,14 @@ class FileInfo:
 def _set_recovery_mask(config, ts, consensus_value):
     logging_files = get_logging_files(config, ts, consensus_value)
     logger.info(f"logging_files: {logging_files}")
-    download_thread = threading.thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
+    download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
     download_thread.start()
 
 
 class FaultToleranceconfig:
     def __init__(self, num_iteration, batch_size, num_microbatches, checkpoint_interval, replica=False, logging=False,
                  parallel_recovery=False, logging_compression=None, logging_chunk_freq=None, logging_dfs=None,
-                 logging_bucket=none, logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
+                 logging_bucket=None, logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
         self.num_iteration = num_iteration
         self.batch_size = batch_size
         self.num_microbatches = num_microbatches
