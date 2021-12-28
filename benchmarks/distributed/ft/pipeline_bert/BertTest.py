@@ -163,10 +163,10 @@ def prepare_model_and_optimizer(args):
     
     model = BertForPreTraining(config)
     
-    model_seq = PipelineParallelBert(
-        rank=torch.distributed.get_rank(),
-        balance=None
-        )
+    model1 = PipelineParallelBert(rank=torch.distributed.get_rank(), balance=None)
+    
+    for i, j in zip(iter(model.parameters()), iter(model1.parameters())):
+        torch.allclose(i, j, atol=torch.finfo(torch.float).resolution)
 
     # base on the NVIDIA example: 5e-5
     optimizer = optim.Adam(model.parameters(), lr=5e-5)
