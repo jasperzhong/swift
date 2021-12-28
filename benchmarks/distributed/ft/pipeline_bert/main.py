@@ -157,7 +157,7 @@ def prepare_model_and_optimizer(args):
     model = PipelineParallelBert(
         rank=torch.distributed.get_rank(),
         balance=None,
-        checkpoint_acivations=args.checkpoint_acivations
+        checkpoint_acivations=args.checkpoint_activations
         )
 
     # base on the NVIDIA example: 5e-5
