@@ -71,7 +71,7 @@ def _set_recovery_mask(config, ts, consensus_value):
     download_thread.start()
 
 
-class FaultToleranceconfig:
+class FaultToleranceConfig:
     def __init__(self, num_iteration, batch_size, num_microbatches, checkpoint_interval, replica=False, logging=False,
                  parallel_recovery=False, logging_compression=None, logging_chunk_freq=None, logging_dfs=None,
                  logging_bucket=None, logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
