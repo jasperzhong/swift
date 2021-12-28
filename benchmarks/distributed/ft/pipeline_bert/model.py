@@ -151,11 +151,11 @@ class PipelineParallelBert(BertForPreTraining):
 
     def forward_checkpoint_activations(self, input, token_type_ids, attention_mask):
         self.flag = False
-        return checkpoint.checkpoint(self, input, token_type_ids, attention_mask)
+        return checkpoint.checkpoint(self.forward_impl, input, token_type_ids, attention_mask)
 
     def forward(self, input, token_type_ids, attention_mask):      
         if self._checkpoint_activations:
-            return self.forward_checkpoint_activations(self.forward_impl, input, token_type_ids, attention_mask)
+            return self.forward_checkpoint_activations(input, token_type_ids, attention_mask)
         else:
             self.flag = True
             return self.forward_impl(input, token_type_ids, attention_mask)
