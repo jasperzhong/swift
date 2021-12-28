@@ -118,6 +118,9 @@ def _failure_handler():
     destroy_process_group()
 
     if _logging:
+        for ts_value, dst, logging_tensor in _logging_gpu_tensor_queue:
+            stash(ts_value, dst, logging_tensor)
+        _logging_gpu_tensor_queue.clear()
         _logging_cpu_tensor_queue.put("flush")
 
     logger.info("start to re-init")
@@ -3032,7 +3035,6 @@ def flush_objects_to_dfs(config):
         if key not in logging_pairs_to_files:
             logging_pairs_to_files[key] = []
             need_create_new_file = True
-            logger.info(f"logging_mask in flush: {_logging_mask}")
 
         if ts_value % config.logging_chunk_freq == 0:
             idx = ts_value // config.logging_chunk_freq
