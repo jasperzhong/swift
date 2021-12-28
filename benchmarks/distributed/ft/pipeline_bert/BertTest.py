@@ -186,17 +186,14 @@ def prepare_model_and_optimizer(args):
     return model, optimizer, lr_scheduler, loss_func
 
 
-def reset_data_iterator(data_loader, ts):
+def reset_data_iterator(data_loader):
     if args.seed is not None:
         random.seed(args.seed)
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
     data_iterator = iter(data_loader)
-    for _ in range(ts):
-        if is_pipeline_first_stage() or is_pipeline_last_stage():
-            for _ in range(get_num_microbatches()):
-                next(data_iterator)
+
     return data_iterator
 
 
@@ -230,7 +227,7 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = create_pretraining_dataset(args)
-    data_iter = iter(data_loader)
+    data_iter = reset_data_iterator(data_loader=data_loader)
 
     model, optimizer, lr_scheduler, loss_func = prepare_model_and_optimizer(args)
     model.cuda()

@@ -7,6 +7,7 @@ from typing import Optional, Iterable
 from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
     get_pipeline_model_parallel_world_size, is_pipeline_first_stage
 from torch.onnx.symbolic_opset9 import tensor
+from torch.utils import checkpoint
 
 # Prepare model config
 config = BertConfig.from_json_file('./bert_config.json')
@@ -18,7 +19,7 @@ if config.vocab_size % 8 != 0:
 modeling.ACT2FN["bias_gelu"] = modeling.bias_gelu_training
 
 class PipelineParallelBert(BertForPreTraining):
-    def __init__(self, rank=None, balance=None, *args, **kwargs):
+    def __init__(self, rank=None, balance=None, checkpoint_acivations=0, *args, **kwargs):
         super(PipelineParallelBert, self).__init__(
             config=config
         )
@@ -59,6 +60,9 @@ class PipelineParallelBert(BertForPreTraining):
         self._input_shape = self._input_shapes[start]
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.bert_sequential[start:end]
+
+        self._checkpoint_activations = checkpoint_acivations == 1
+        self.flag = checkpoint_acivations == 1
 
     def _profile(self, shape=[128]):
         """
@@ -113,7 +117,7 @@ class PipelineParallelBert(BertForPreTraining):
     def output_shape(self):
         return self._output_shape
 
-    def forward(self, input, token_type_ids, attention_mask):      
+    def forward_impl(self, input, token_type_ids, attention_mask):      
         for layer in self.model_split:    
             if isinstance(layer, BertEmbeddings):
                 input_ids = input
@@ -144,3 +148,14 @@ class PipelineParallelBert(BertForPreTraining):
                 return output
             input = output
         return output
+
+    def forward_checkpoint_activations(self, input, token_type_ids, attention_mask):
+        self.flag = False
+        return checkpoint.checkpoint(self, input, token_type_ids, attention_mask)
+
+    def forward(self, input, token_type_ids, attention_mask):      
+        if self._checkpoint_activations and self.flag:
+            return self.forward_checkpoint_activations(self, input, token_type_ids, attention_mask)
+        else:
+            self.flag = True
+            return self.forward_impl(input, token_type_ids, attention_mask)

@@ -64,6 +64,8 @@ parser.add_argument('--logging-s3-bucket', default=None, type=str,
 parser.add_argument('--logging-group-size', default=None, type=int,
                     help='group size for logging')
 # addition
+parser.add_argument("--checkpoint_activations", default=0, type=int, 
+                    help="Whether to perform checkpoint activations.")
 parser.add_argument("--warmup_proportion", default=0.01, type=float, 
                     help="Proportion of training to perform linear learning rate warmup for. "
                     "E.g., 0.1 = 10%% of training.")
@@ -154,7 +156,8 @@ def prepare_model_and_optimizer(args):
 
     model = PipelineParallelBert(
         rank=torch.distributed.get_rank(),
-        balance=None
+        balance=None,
+        checkpoint_acivations=args.checkpoint_acivations
         )
 
     # base on the NVIDIA example: 5e-5
