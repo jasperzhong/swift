@@ -46,6 +46,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
         self._requires_update = set()
         self._should_sync = True
         self._size = get_world_size()
+        self._hook_handles = []
         if self._size > 1:
             print("DistributedOptimizer registers hooks")
             self._register_hooks()
@@ -75,7 +76,8 @@ class _DistributedOptimizer(torch.optim.Optimizer):
                     self._requires_update.add(p)
                     p_tmp = p.expand_as(p)
                     grad_acc = p_tmp.grad_fn.next_functions[0][0]
-                    grad_acc.register_hook(self._make_hook(p))
+                    handle = grad_acc.register_hook(self._make_hook(p))
+                    self._hook_handles.append(handle)
                     self._grad_accs.append(grad_acc)
 
     def _all_reduce_grad_async(self, p):
@@ -144,6 +146,13 @@ class _DistributedOptimizer(torch.optim.Optimizer):
 
     def state_dict(self):
         return super(self.__class__, self).state_dict()
+
+    def __del__(self):
+        # remove all handles
+        for handle in self._hook_handles:
+            handle.remove()
+
+        super(self.__class__, self).__del__()
 
 
 def DistributedOptimizer(optimizer, named_parameters=None,
