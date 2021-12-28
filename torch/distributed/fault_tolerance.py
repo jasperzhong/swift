@@ -322,6 +322,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                     logger.info(f"parallel recovery restores from iteration {ts}")
                     cb = None
                     logger.info(f"parallel_recovery_data_parallel_size: {torch.distributed.parallel_recovery_data_parallel_size()}")
+                    logger.info(f"logging_mask: {distributed_c10d._logging_mask}")
 
                 checksum(ts, model, optimizer)
 

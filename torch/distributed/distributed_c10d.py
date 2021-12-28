@@ -3032,6 +3032,7 @@ def flush_objects_to_dfs(config):
         if key not in logging_pairs_to_files:
             logging_pairs_to_files[key] = []
             need_create_new_file = True
+            logger.info(f"logging_mask in flush: {_logging_mask}")
 
         if ts_value % config.logging_chunk_freq == 0:
             idx = ts_value // config.logging_chunk_freq
