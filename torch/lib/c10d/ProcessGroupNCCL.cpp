@@ -874,9 +874,12 @@ void ProcessGroupNCCL::broadcastUniqueNCCLID(
     store_->set(storeKey, vec);
   } else {
     std::lock_guard<std::mutex> lock(store_mutex_);
+    LOG(ERROR) << "try to get " << storeKey;
     auto vec = store_->get(storeKey);
+    LOG(ERROR) << "vec.size() = " << vec.size();
     TORCH_CHECK(vec.size() == NCCL_UNIQUE_ID_BYTES);
     std::memcpy(ncclID, vec.data(), vec.size());
+    LOG(ERROR) << "memcpy done";
   }
 }
 

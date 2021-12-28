@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <algorithm>
 #include <system_error>
+#include <iostream>
 
 namespace c10d {
 
@@ -479,6 +480,7 @@ void TCPStoreMasterDaemon::deleteP2PHandler(int socket) {
   for (auto&& pair : tcpStore_) {
     if (isPairP2PKey(pair.first)) {
       needs_removing.push_back(pair.first);
+      std::cout << "delete " << pair.first << std::endl;
     }
   }
   for (auto&& key : needs_removing) {
