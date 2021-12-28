@@ -161,9 +161,9 @@ def prepare_model_and_optimizer(args):
 
     modeling.ACT2FN["bias_gelu"] = modeling.bias_gelu_training
     
-    # model = BertForPreTraining(config)
+    model = BertForPreTraining(config)
     
-    model = PipelineParallelBert(rank=torch.distributed.get_rank(), balance=None)
+    # model = PipelineParallelBert(rank=torch.distributed.get_rank(), balance=None)
     
     # num = 0
     # for i, j in zip(iter(model.parameters()), iter(model1.parameters())):
@@ -241,15 +241,15 @@ def main():
     for i in range(args.benchmark_iters):
         start = time.time()
         optimizer.zero_grad()
-        loss = 0
+        total_loss =0
         for _ in range(args.global_batch_size // args.micro_batch_size):
             batch = next(data_iter)
             batch = [t.cuda() for t in batch]
             input_ids, segment_ids, input_mask, masked_lm_labels, next_sentence_labels = batch
             prediction_scores, seq_relationship_score = model(input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
             loss = loss_func(prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels)
-            loss += loss / args.micro_batch_size
             loss.backward()
+            total_loss += loss.item() / args.micro_batch_size
         optimizer.step()
         end = time.time()
         iteration_time = end - start

@@ -2,7 +2,7 @@ import torch
 from torch._C import ThroughputBenchmark
 import torch.nn as nn
 import modeling
-from modeling import BertForPreTraining, BertConfig, BertEmbeddings, BertLayer, BertPooler, BertPreTrainingHeads
+from modeling import BertForPreTraining, BertConfig, BertEmbeddings, BertLayer, BertPooler, BertPreTrainingHeads, BertLayerNorm
 from typing import Optional, Iterable
 from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
     get_pipeline_model_parallel_world_size, is_pipeline_first_stage
@@ -100,6 +100,10 @@ class PipelineParallelBert(BertForPreTraining):
     def parameters(self, recurse=True):
         return self.model_split.parameters(recurse=recurse)
         
+    def children(self):
+        if not hasattr(self, 'model_split'):
+            return super(PipelineParallelBert, self).children()
+        return self.model_split.children()
 
     @property
     def input_shape(self):
