@@ -214,8 +214,8 @@ def recovery(config, ts, model, optimizer):
                     old_optimizer.load_state_dict(optimizer.state_dict())
                     optimizer = old_optimizer
 
-                # destroy communication group
-                destroy_process_group(comm)
+                # # destroy communication group
+                # destroy_process_group(comm)
 
                 distributed_c10d._logging_mask.clear()
                 # pairs = groups_to_pairs(config.groups)
