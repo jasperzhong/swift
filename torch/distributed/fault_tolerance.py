@@ -205,12 +205,14 @@ def recovery(config, ts, model, optimizer):
                 model.cuda()
 
                 if not need_recovery:
+                    del optimizer
                     optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
                     filename = _get_checkpoint_path(config)
                     load_checkpoint(filename, ts, model, optimizer)
                 else:
                     # copy states from DistributedOptimizer
                     old_optimizer.load_state_dict(optimizer.state_dict())
+                    del optimizer
                     optimizer = old_optimizer
 
                 # destroy communication group
