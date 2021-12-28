@@ -184,8 +184,6 @@ def recovery(config, ts, model, optimizer):
                 nonlocal optimizer
                 nonlocal old_optimizer
 
-                # destroy communication group
-                destroy_process_group(comm)
 
                 # close files
                 for peer, item in distributed_c10d._logging_recovery_mask.items():
@@ -214,6 +212,9 @@ def recovery(config, ts, model, optimizer):
                     # copy states from DistributedOptimizer
                     old_optimizer.load_state_dict(optimizer.state_dict())
                     optimizer = old_optimizer
+
+                # destroy communication group
+                destroy_process_group(comm)
 
                 distributed_c10d._logging_mask.clear()
                 # pairs = groups_to_pairs(config.groups)
