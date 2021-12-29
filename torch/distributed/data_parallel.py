@@ -48,7 +48,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
         self._size = get_world_size(comm_group)
         self._hook_handles = []
         if self._size > 1:
-            print("DistributedOptimizer registers hooks")
+            print(f"DistributedOptimizer registers hooks when size = {self._size} ")
             self._register_hooks()
         else:
             print("there is no need to register hooks when world size == 1")
@@ -343,9 +343,9 @@ def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", comm_gr
     broadcast_parameters(params, root_rank, comm_group)
 
     # Broadcast and cleanup for non-tensor parameters
-    scalars = broadcast_object(scalars, root_rank, comm_group=comm_group)
-    for key, p in scalars.items():
-        callbacks[key](p)
+    # scalars = broadcast_object(scalars, root_rank, comm_group=comm_group)
+    # for key, p in scalars.items():
+    #     callbacks[key](p)
 
 
 def broadcast_object(obj, root_rank=0, name=None, comm_group=None):
