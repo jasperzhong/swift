@@ -98,28 +98,27 @@ def get_microbatch_size():
 
 # TODO:
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
-    # all need to get the data
-    data = next(data_iterator)
-    batch = [t.cuda() for t in data]
-    input_ids, segment_ids, input_mask, masked_lm_labels, next_sentence_labels = batch
+    if is_pipeline_first_stage() or is_pipeline_last_stage():
+        data = next(data_iterator)
+        images, labels = data
+        images, labels = images.cuda(), labels.cuda()
 
     if is_pipeline_first_stage():
         assert input_tensor is None
-        output_tensor = model(input_ids, segment_ids, input_mask)
-    else:
-        assert input_tensor is not None
-        output_tensor = model(input_tensor, segment_ids, input_mask)
+        input_tensor = images
+
+    output_tensor = model(input_tensor)
 
     if is_pipeline_last_stage():
-        prediction_scores, seq_relationship_score = output_tensor
-        output_tensor = loss_func(prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels)
+        output_tensor = loss_func(output_tensor, labels)
         output_tensor /= get_num_microbatches()
         loss += output_tensor.item()
-        
+
     return output_tensor
 
 
 def backward_step(input_tensor, output_tensor, output_tensor_grad):
+    global _cnt
     if input_tensor is not None:
         input_tensor.retain_grad()
 
@@ -128,6 +127,16 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad):
     input_tensor_grad = None
     if input_tensor is not None:
         input_tensor_grad = input_tensor.grad
+
+    with open("debug_backward.log", "a") as f:
+        input_tensor_checksum = 0 if input_tensor is None else torch.sum(input_tensor)
+        output_tensor_checksum = 0 if output_tensor is None else torch.sum(output_tensor)
+        output_tensor_grad_checksum = 0 if output_tensor_grad is None else torch.sum(output_tensor_grad)
+        input_tensor_grad_checksum = 0 if input_tensor_grad is None else torch.sum(input_tensor_grad)
+        rng_state = torch.random.get_rng_state()
+        rng_state_checksum = torch.sum(rng_state.type(torch.float32))
+        f.write(f"{_cnt} {input_tensor_checksum} {output_tensor_checksum} {output_tensor_grad_checksum} {input_tensor_grad_checksum} {rng_state_checksum}\n")
+        _cnt += 1
 
     return input_tensor_grad
 
