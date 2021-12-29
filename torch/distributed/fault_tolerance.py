@@ -266,6 +266,7 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
     # peer failure worker broadcast its parameters and optimizer states
     # to other group members
     logger.info(f"Rank {peer_failure_worker} broadcast its parameters and optimizer states")
+    # FIXME: hang when group size = 2
     broadcast_parameters(model.state_dict(), peer_failure_worker, comm_group=comm)
     broadcast_optimizer_state(optimizer, peer_failure_worker, comm_group=comm)
 
@@ -307,7 +308,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     checkpoint(filename, ts, model, optimizer)
     while True:
         ts, model, optimizer, consensus_value, cb = recovery(config, ts, model, optimizer)
-        data_iterator = reset_data_iterator_func(data_loader, consensus_value)
+        data_iterator = reset_data_iterator_func(data_loader, ts)
         checksum(ts, model, optimizer)
         try:
             logger.info(f"start from iteration {ts}")
@@ -323,6 +324,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
                 if ts == consensus_value and cb:
                     ts, model, optimizer = cb(ts)
+                    del data_iterator
+                    data_iterator = reset_data_iterator_func(data_loader, ts)
                     logger.info(f"parallel recovery restores from iteration {ts}")
                     cb = None
 
