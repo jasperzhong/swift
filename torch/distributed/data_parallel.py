@@ -260,7 +260,7 @@ def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", comm_gr
     # an error.
     if len(state_dict['state']) == 0:
         return
-    
+
     print("broadcast optimizer states")
 
     params = []
