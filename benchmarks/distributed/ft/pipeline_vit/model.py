@@ -14,10 +14,10 @@ class PipelineParallelViT(ViT):
             image_size=224, 
             patch_size=32, 
             num_classes=1000, 
-            dim=1024, # base 768 ; large 1024 ; huge 1280 
-            depth=24, # base 12 ; large 24 ; huge 36 
-            heads=16, # base 12 ; large 16 ; huge 16
-            mlp_dim=4096, # base 3072 ; large 4096 ; huge 5120
+            dim=768, # base 768 ; large 1024 ; huge 1280 
+            depth=12, # base 12 ; large 24 ; huge 36 
+            heads=12, # base 12 ; large 16 ; huge 16
+            mlp_dim=3072, # base 3072 ; large 4096 ; huge 5120
             pool = 'cls', 
             channels = 3, 
             dim_head = 64, 
