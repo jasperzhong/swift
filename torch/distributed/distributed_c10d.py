@@ -1327,7 +1327,6 @@ def broadcast(tensor,
         work = default_pg.broadcast([tensor], opts)
     else:
         group_src_rank = _get_group_rank(group, src)
-        logger.info(f"broadcast group_src_rank = {group_src_rank}")
         opts.rootRank = group_src_rank
         work = group.broadcast([tensor], opts)
     if async_op:

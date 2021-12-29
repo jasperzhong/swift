@@ -628,7 +628,6 @@ def get_logging_files_for_parallel_recovery(config, ts, consensus_value, peer_fa
 
 
 def checkpoint(filename, ts, model, optimizer):
-    logger.info("save checkpoint")
     if os.path.exists(filename):
         ckpt = torch.load(filename)
         if ts <= ckpt['ts']:

@@ -45,7 +45,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
         self._grad_accs = []
         self._requires_update = set()
         self._should_sync = True
-        self._size = get_world_size()
+        self._size = get_world_size(comm_group)
         self._hook_handles = []
         if self._size > 1:
             print("DistributedOptimizer registers hooks")
@@ -368,7 +368,7 @@ def broadcast_object(obj, root_rank=0, name=None, comm_group=None):
     if name is None:
         name = type(obj).__name__
 
-    if get_rank() == root_rank:
+    if get_rank(comm_group) == root_rank:
         b = io.BytesIO()
         cloudpickle.dump(obj, b)
         t = torch.ByteTensor(bytearray(b.getvalue())).cuda()
@@ -381,7 +381,7 @@ def broadcast_object(obj, root_rank=0, name=None, comm_group=None):
 
     broadcast_parameters([(name + '.t', t)], root_rank, comm_group)
 
-    if get_rank() != root_rank:
+    if get_rank(comm_group) != root_rank:
         buf = io.BytesIO(t.cpu().numpy().tobytes())
         obj = cloudpickle.load(buf)
 
