@@ -261,8 +261,6 @@ def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", comm_gr
     if len(state_dict['state']) == 0:
         return
 
-    print("broadcast optimizer states")
-
     params = []
     scalars = {}
     callbacks = {}
@@ -343,9 +341,9 @@ def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", comm_gr
     broadcast_parameters(params, root_rank, comm_group)
 
     # Broadcast and cleanup for non-tensor parameters
-    # scalars = broadcast_object(scalars, root_rank, comm_group=comm_group)
-    # for key, p in scalars.items():
-    #     callbacks[key](p)
+    scalars = broadcast_object(scalars, root_rank, comm_group=comm_group)
+    for key, p in scalars.items():
+        callbacks[key](p)
 
 
 def broadcast_object(obj, root_rank=0, name=None, comm_group=None):

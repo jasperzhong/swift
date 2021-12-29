@@ -184,7 +184,6 @@ def recovery(config, ts, model, optimizer):
                 nonlocal optimizer
                 nonlocal old_optimizer
 
-
                 # close files
                 for peer, item in distributed_c10d._logging_recovery_mask.items():
                     idx, file_info_list, consensus_value = item
@@ -261,15 +260,14 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
 
     num_microbatches = config.num_microbatches // parallel_recovery_data_parallel_size()
     distributed_optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
-                                                 backward_passes_per_step=num_microbatches)
+                                                 backward_passes_per_step=num_microbatches,
+                                                 comm_group=comm)
 
     # peer failure worker broadcast its parameters and optimizer states
     # to other group members
     logger.info(f"Rank {peer_failure_worker} broadcast its parameters and optimizer states")
     broadcast_parameters(model.state_dict(), peer_failure_worker, comm_group=comm)
-    logger.info("broadcast parameters done")
     broadcast_optimizer_state(distributed_optimizer, peer_failure_worker, comm_group=comm)
-    logger.info("broadcast optimizer states done")
 
     return model, distributed_optimizer, peer_failure_worker
 
