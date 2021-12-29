@@ -218,7 +218,6 @@ def broadcast_parameters(params, root_rank, comm_group=None):
 
     # Run synchronous broadcasts.
     for name, p in params:
-        print(f"broadcast {name} {p.data.size()}")
         broadcast(p, root_rank, group=comm_group)
 
 
@@ -261,6 +260,8 @@ def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", comm_gr
     # an error.
     if len(state_dict['state']) == 0:
         return
+    
+    print("broadcast optimizer states")
 
     params = []
     scalars = {}
