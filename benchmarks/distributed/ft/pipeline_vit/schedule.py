@@ -2,9 +2,13 @@ import torch
 
 _GLOBAL_ARGS = None
 
+_cnt = 0
+
+
 def initialize_global_args(args):
     global _GLOBAL_ARGS
     _GLOBAL_ARGS = args
+
 
 def is_pipeline_last_stage():
     return get_pipeline_model_parallel_rank() == \
@@ -43,7 +47,6 @@ def get_microbatch_size():
     return _GLOBAL_ARGS.micro_batch_size
 
 
-# TODO:
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
