@@ -218,7 +218,7 @@ def broadcast_parameters(params, root_rank, comm_group=None):
 
     # Run synchronous broadcasts.
     for name, p in params:
-        print(f"broadcast {name} {p.data.sizes()}")
+        print(f"broadcast {name} {p.data.size()}")
         broadcast(p, root_rank, group=comm_group)
 
 
