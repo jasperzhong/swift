@@ -267,7 +267,7 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
     # to other group members
     logger.info(f"Rank {peer_failure_worker} broadcast its parameters and optimizer states")
     broadcast_parameters(model.state_dict(), peer_failure_worker, comm_group=comm)
-    broadcast_optimizer_state(distributed_optimizer, peer_failure_worker, comm_group=comm)
+    # broadcast_optimizer_state(distributed_optimizer, peer_failure_worker, comm_group=comm)
 
     return model, distributed_optimizer, peer_failure_worker
 
