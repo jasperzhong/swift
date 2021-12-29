@@ -338,12 +338,12 @@ def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", comm_gr
                     callbacks[key] = _create_state_callback(pid, name)
 
     # Synchronized broadcast of all parameters
-    broadcast_parameters(params, root_rank, comm_group)
+    broadcast_parameters(params, root_rank, comm_group=comm_group)
 
     # Broadcast and cleanup for non-tensor parameters
-    scalars = broadcast_object(scalars, root_rank, comm_group=comm_group)
-    for key, p in scalars.items():
-        callbacks[key](p)
+    # scalars = broadcast_object(scalars, root_rank, comm_group=comm_group)
+    # for key, p in scalars.items():
+    #     callbacks[key](p)
 
 
 def broadcast_object(obj, root_rank=0, name=None, comm_group=None):
@@ -371,13 +371,13 @@ def broadcast_object(obj, root_rank=0, name=None, comm_group=None):
         cloudpickle.dump(obj, b)
         t = torch.ByteTensor(bytearray(b.getvalue())).cuda()
         sz = torch.IntTensor([t.shape[0]]).cuda()
-        broadcast_parameters([(name + '.sz', sz)], root_rank, comm_group)
+        broadcast_parameters([(name + '.sz', sz)], root_rank, comm_group=comm_group)
     else:
         sz = torch.IntTensor([0]).cuda()
-        broadcast_parameters([(name + '.sz', sz)], root_rank, comm_group)
+        broadcast_parameters([(name + '.sz', sz)], root_rank, comm_group=comm_group)
         t = torch.ByteTensor(sz.cpu().tolist()[0]).cuda()
 
-    broadcast_parameters([(name + '.t', t)], root_rank, comm_group)
+    broadcast_parameters([(name + '.t', t)], root_rank, comm_group=comm_group)
 
     if get_rank(comm_group) != root_rank:
         buf = io.BytesIO(t.cpu().numpy().tobytes())
