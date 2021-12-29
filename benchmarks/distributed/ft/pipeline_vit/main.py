@@ -129,7 +129,7 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = get_data_loader(args)
-    model = PipelineParallelViT(balance=[4, 2, 2, 3])
+    model = PipelineParallelViT()
     model.cuda()
 
     optimizer = optim.Adam(model.parameters(), lr=3e-3, weight_decay=0.3)
