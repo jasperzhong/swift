@@ -172,11 +172,20 @@ def recovery(config, ts, model, optimizer):
             logger.info(f"rank {get_rank_bck()} changes the rank to {torch.distributed.get_rank()}")
 
             # 6. download the same set of logging files as the failure worker
+            enable_logging_on_disabled_worker = False
             if not need_recovery:
                 logging_files = get_logging_files_for_parallel_recovery(config, ts, consensus_value,
                                                                         peer_failure_worker)
                 logger.info(f"logging_files: {logging_files}")
                 if logging_files:
+                    if not distributed_c10d._logging:
+                        enable_logging_on_disabled_worker = True
+                        logger.info(f"enable logging on device {torch.cuda.current_device()}")
+                        distributed_c10d._logging_compression = config.logging_compression
+                        distributed_c10d._logging = True
+                        distributed_c10d._logging_dfs_client = DFSClient.create(logging_dfs=config.logging_dfs,
+                                                                                logging_bucket=config.logging_bucket)
+
                     download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
                                                        daemon=True)
                     download_thread.start()
@@ -185,6 +194,7 @@ def recovery(config, ts, model, optimizer):
                 nonlocal model
                 nonlocal optimizer
                 nonlocal old_optimizer
+                nonlocal enable_logging_on_disabled_worker
 
                 # close files
                 for peer, item in distributed_c10d._logging_recovery_mask.items():
@@ -217,6 +227,13 @@ def recovery(config, ts, model, optimizer):
 
                 # # destroy communication group
                 # destroy_process_group(comm)
+
+                # disable logging
+                if enable_logging_on_disabled_worker:
+                    enable_logging_on_disabled_worker = False
+                    distributed_c10d._logging_compression = None
+                    distributed_c10d._logging = False
+                    distributed_c10d._logging_dfs_client = None
 
                 distributed_c10d._logging_mask.clear()
                 # pairs = groups_to_pairs(config.groups)

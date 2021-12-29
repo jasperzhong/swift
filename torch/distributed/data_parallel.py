@@ -218,7 +218,6 @@ def broadcast_parameters(params, root_rank, comm_group=None):
 
     # Run synchronous broadcasts.
     for name, p in params:
-        print(name)
         broadcast(p, root_rank, group=comm_group)
 
 
