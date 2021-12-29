@@ -147,20 +147,21 @@ def recovery(config, ts, model, optimizer):
                 checkpoint(filename, ts, model, optimizer)
 
             # 2. all workers build new comm group
-            comm = build_communication_group(config)
+            peer_failure_worker = get_peer_failure_worker(config, failure_workers)
+            comm = build_communication_group(config, peer_failure_worker)
             group_rank = get_rank(group=comm)
             group_size = get_world_size(group=comm)
             distributed_c10d._logging_group_rank = group_rank
             distributed_c10d._logging_group_size = group_size
+            distributed_c10d._logging_group_diff = get_rank() - peer_failure_worker
             logger.info(f"build new communication group ({group_rank} / {group_size})")
 
             # 3. living workers build model and optimizer
             optimizer_cls = optimizer.__class__
             optimizer_defaults = optimizer.defaults
-            model, optimizer, peer_failure_worker = build_model_and_optimizer(config, model,
-                                                                              optimizer, comm,
-                                                                              failure_workers)
-            distributed_c10d._logging_group_diff = get_rank() - peer_failure_worker
+            model, optimizer = build_model_and_optimizer(config, model,
+                                                         optimizer, comm,
+                                                         peer_failure_worker)
 
             # 4. broadcast failure worker's ts
             ts.broadcast(peer_failure_worker)
@@ -226,9 +227,8 @@ def recovery(config, ts, model, optimizer):
     return ts, model, optimizer, consensus_value, callback
 
 
-def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
+def get_peer_failure_worker(config, failure_workers):
     global_rank = get_rank()
-
     # find which group the failure worker belongs to
     failure_group = None
     for group in config.groups:
@@ -251,6 +251,11 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
         if peer_failure_worker:
             break
 
+    return peer_failure_worker
+
+
+def build_model_and_optimizer(config, model, optimizer, comm, peer_failure_worker):
+    global_rank = get_rank()
     if global_rank != peer_failure_worker:
         model.assign_model_split(peer_failure_worker)
         model.cuda()
@@ -265,19 +270,19 @@ def build_model_and_optimizer(config, model, optimizer, comm, failure_workers):
 
     # peer failure worker broadcast its parameters and optimizer states
     # to other group members
-    logger.info(f"Rank {peer_failure_worker} broadcast its parameters and optimizer states")
     broadcast_parameters(model.state_dict(), peer_failure_worker, comm_group=comm)
-    # broadcast_optimizer_state(distributed_optimizer, peer_failure_worker, comm_group=comm)
+    broadcast_optimizer_state(distributed_optimizer, peer_failure_worker, comm_group=comm)
+    logger.info(f"Rank {peer_failure_worker} broadcast its parameters and optimizer states")
 
-    return model, distributed_optimizer, peer_failure_worker
+    return model, distributed_optimizer
 
 
-def build_communication_group(config):
+def build_communication_group(config, peer_failure_worker):
     data_parallel_groups = list(zip(*config.groups))
     rank = get_rank()
     for group in data_parallel_groups:
         if rank in group:
-            return new_group(group)
+            return new_group(group, group_name="src_group_rank_%d" % peer_failure_worker)
 
 
 def checksum(ts, model, optimizer):

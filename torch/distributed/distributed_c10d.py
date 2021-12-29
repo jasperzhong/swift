@@ -2849,7 +2849,7 @@ def monitored_barrier(group=GroupMember.WORLD, timeout=None, wait_all_ranks=Fals
     return group_to_use.monitored_barrier(timeout, wait_all_ranks=wait_all_ranks)
 
 
-def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=None):
+def new_group(ranks=None, timeout=default_pg_timeout, backend=None, group_name=None, pg_options=None):
     """
     Creates a new distributed group.
 
@@ -2949,6 +2949,7 @@ def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=N
                                    backend,
                                    default_store,
                                    pg_options=pg_options,
+                                   group_name=group_name,
                                    timeout=timeout)
 
     # Create the global rank to group rank mapping
