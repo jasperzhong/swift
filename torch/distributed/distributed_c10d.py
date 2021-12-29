@@ -658,7 +658,7 @@ def _new_process_group_helper(world_size,
 
     if not group_name:
         group_name = str(_group_count)
-        _group_count += 1
+    _group_count += 1
 
     if group_name in _pg_names.values():
         raise RuntimeError("The specified group name has already been "
