@@ -648,3 +648,4 @@ def load_checkpoint(filename, ts, model, optimizer):
     model.load_state_dict(checkpoint['model'])
     optimizer.load_state_dict(checkpoint['optimizer'])
     logger.info(f"load checkpoint from iteration {ts}")
+    logger.info(f"len(state) = {len(optimizer.state_dict()['state'])}")
