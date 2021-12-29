@@ -338,7 +338,7 @@ def broadcast_optimizer_state(optimizer, root_rank, prefix="Parameter.", comm_gr
                     callbacks[key] = _create_state_callback(pid, name)
 
     # Synchronized broadcast of all parameters
-    broadcast_parameters(params, root_rank, comm_group=comm_group)
+    # broadcast_parameters(params, root_rank, comm_group=comm_group)
 
     # Broadcast and cleanup for non-tensor parameters
     # scalars = broadcast_object(scalars, root_rank, comm_group=comm_group)
