@@ -11,18 +11,18 @@ from torch.utils import checkpoint
 class PipelineParallelViT(ViT):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
         super(PipelineParallelViT, self).__init__(
-            image_size, 
-            patch_size, 
-            num_classes, 
-            dim, 
-            depth, 
-            heads, 
-            mlp_dim, 
+            image_size=224, 
+            patch_size=32, 
+            num_classes=1000, 
+            dim=1024, # base 768 ; large 1024 ; huge 1280 
+            depth=24, # base 12 ; large 24 ; huge 36 
+            heads=16, # base 12 ; large 16 ; huge 16
+            mlp_dim=4096, # base 3072 ; large 4096 ; huge 5120
             pool = 'cls', 
             channels = 3, 
             dim_head = 64, 
-            dropout = 0., 
-            emb_dropout = 0.
+            dropout = 0.1, 
+            emb_dropout = 0.1
         )
 
         self.vit_sequential = nn.Sequential(
