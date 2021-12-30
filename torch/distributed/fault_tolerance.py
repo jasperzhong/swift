@@ -107,13 +107,18 @@ def teardown(config):
         distributed_c10d._logging_thread.join()
 
 
-def recovery(config, ts, model, optimizer):
+def recovery(config, ts, model, optimizer, lr_scheduler=None):
     consensus_value, need_undo, failure_workers = ts.sync()
     logger.info(f"failure workers: {failure_workers}")
 
     if need_undo:
         logger.info(f"[Rank {get_rank()}] undo update is needed"
                     f"(iteration = {consensus_value+1} while the consensus value is {consensus_value})!")
+        # lr_scheduler undo()
+        # lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=consensus_value-2)
+        # lr_scheduler.step()
+        # undo lr first
+        lr_scheduler.undo(consensus_value)
         optimizer.undo()
 
     if config.replica:
@@ -428,26 +433,28 @@ def get_logging_files(config, ts, consensus_value):
     return logging_files
 
 
-def checkpoint(config, ts, model, optimizer):
+def checkpoint(config, ts, model, optimizer, lr_scheduler):
     logger.info("save checkpoint")
     if os.path.exists(config.checkpoint_path):
         ckpt = torch.load(config.checkpoint_path)
         if ts <= ckpt['ts']:
             logger.info("checkpoint aborted because there is already a newer checkpoint")
-            load_checkpoint(config, ts, model, optimizer)
+            load_checkpoint(config, ts, model, optimizer, lr_scheduler)
             return
-
+    
     torch.save({
         'ts': ts._value,
         'model': model.state_dict(),
-        'optimizer': optimizer.state_dict()
+        'optimizer': optimizer.state_dict(),
+        'lr_scheduler': lr_scheduler.state_dict()
     }, config.checkpoint_path)
     logger.info(f"save checkpoint in iteration {ts}")
 
 
-def load_checkpoint(config, ts, model, optimizer):
+def load_checkpoint(config, ts, model, optimizer, lr_scheduler):
     checkpoint = torch.load(config.checkpoint_path)
     ts._value = checkpoint['ts']
     model.load_state_dict(checkpoint['model'])
     optimizer.load_state_dict(checkpoint['optimizer'])
+    lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
     logger.info(f"load checkpoint from iteration {ts}")
