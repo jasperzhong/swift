@@ -85,6 +85,10 @@ _logging_group_rank = None
 
 _logging_group_size = None
 
+_logging_rng_state_fd = None
+
+_logging_rng_state_cnt = 0
+
 # Some reduce ops are not supported by complex numbers and will result in an error.
 # We currently provide complex support to the distributed API by viewing
 # complex tensors as real (torch.view_as_real), meaning that calling
@@ -1070,6 +1074,32 @@ def recv(tensor,
     global _logging_gpu_tensor_queue
     global _logging_recovery_mask
     global _logging_parallel_recovery
+    global _logging_rng_state_fd
+    global _logging_rng_state_cnt
+
+    if tensor is None:
+        if _logging: 
+            if _logging_parallel_recovery:
+                if _logging_rng_state_fd is None:
+                    peer_failure_worker = get_rank() - _logging_group_diff
+                    filename = "rng_state_%d.h5" % (peer_failure_worker)
+                    while not os.path.exists(filename):
+                        time.sleep(0.1)
+                    _logging_rng_state_fd = h5py.File(filename, "r")
+                    _logging_rng_state_cnt = 0
+                    logger.info(f"read {filename}")
+                dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
+                rng_state_tensor = np.empty(dest.shape, dest.dtype)
+                torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
+                _logging_rng_state_cnt += 1
+            else:
+                if _logging_rng_state_fd is None:
+                    _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
+                rng_state = torch.cuda.random.get_rng_state().numpy()
+                _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
+                _logging_rng_state_fd.flush()
+                _logging_rng_state_cnt += 1
+        return
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
@@ -3025,6 +3055,18 @@ def flush_objects_to_dfs(config):
                     logger.info(f"put {path} on dfs")
             logging_pairs_to_files.clear()
             continue
+        elif item == "gc":
+            # garbage collection
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    # if file is not closed
+                    if file:
+                        file.close()
+                    os.remove(file)
+            logging_pairs_to_files.clear()
+            logger.info("remove outdated logging files")
+            continue
+
 
         ts_value, dst, tensor, event = item
         key = '%d:%d' % (get_rank(), dst)

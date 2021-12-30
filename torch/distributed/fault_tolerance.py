@@ -1,6 +1,7 @@
 import getpass
 import logging
 import os
+import re
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -141,10 +142,24 @@ def recovery(config, ts, model, optimizer):
         if failure_workers and config.parallel_recovery:
             distributed_c10d._logging_parallel_recovery = True
 
+            enable_logging_on_disabled_worker = False
+            if not distributed_c10d._logging:
+                enable_logging_on_disabled_worker = True
+                logger.info(f"enable logging on device {torch.cuda.current_device()}")
+                distributed_c10d._logging_compression = config.logging_compression
+                distributed_c10d._logging = True
+                distributed_c10d._logging_dfs_client = DFSClient.create(logging_dfs=config.logging_dfs,
+                                                                        logging_bucket=config.logging_bucket)
+
             # 1. living workers do checkpoint
             if not need_recovery:
                 filename = _get_checkpoint_path(config)
-                checkpoint(filename, ts, model, optimizer)
+                # do not do gc here
+                checkpoint(filename, ts, model, optimizer, garbage_collection=False)
+            else:
+                filename = "rng_state_%d.h5" % (get_rank())
+                distributed_c10d._logging_dfs_client.upload(dfs_path=filename, local_path=filename)
+                logger.info(f"put {filename} on dfs")
 
             # 2. all workers build new comm group
             peer_failure_worker = get_peer_failure_worker(config, failure_workers)
@@ -172,23 +187,24 @@ def recovery(config, ts, model, optimizer):
             logger.info(f"rank {get_rank_bck()} changes the rank to {torch.distributed.get_rank()}")
 
             # 6. download the same set of logging files as the failure worker
-            enable_logging_on_disabled_worker = False
             if not need_recovery:
+                filename = "rng_state_%d.h5" % (peer_failure_worker)
+                while True:
+                    dfs_files = distributed_c10d._logging_dfs_client.ls()
+                    if filename in dfs_files:
+                        distributed_c10d._logging_dfs_client.download(dfs_path=filename, local_path=filename)
+                        break
+                    time.sleep(0.1)
+                logger.info(f"download {filename}")
+
                 logging_files = get_logging_files_for_parallel_recovery(config, ts, consensus_value,
                                                                         peer_failure_worker)
                 logger.info(f"logging_files: {logging_files}")
                 if logging_files:
-                    if not distributed_c10d._logging:
-                        enable_logging_on_disabled_worker = True
-                        logger.info(f"enable logging on device {torch.cuda.current_device()}")
-                        distributed_c10d._logging_compression = config.logging_compression
-                        distributed_c10d._logging = True
-                        distributed_c10d._logging_dfs_client = DFSClient.create(logging_dfs=config.logging_dfs,
-                                                                                logging_bucket=config.logging_bucket)
-
                     download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
                                                        daemon=True)
                     download_thread.start()
+
 
             def _cb(ts):
                 nonlocal model
@@ -648,7 +664,7 @@ def get_logging_files_for_parallel_recovery(config, ts, consensus_value, peer_fa
     return logging_files
 
 
-def checkpoint(filename, ts, model, optimizer):
+def checkpoint(filename, ts, model, optimizer, garbage_collection=True):
     if os.path.exists(filename):
         ckpt = torch.load(filename)
         if ts <= ckpt['ts']:
@@ -662,6 +678,20 @@ def checkpoint(filename, ts, model, optimizer):
         'optimizer': optimizer.state_dict()
     }, filename)
     logger.info(f"save checkpoint in iteration {ts}")
+
+    # garbage collection, remove all logging files
+    # note that there is no need to close those files
+    # because they are already outdated
+    if distributed_c10d._logging and garbage_collection:
+        distributed_c10d._logging_gpu_tensor_queue.clear()
+        distributed_c10d._logging_cpu_tensor_queue.put("gc")
+
+        distributed_c10d._logging_rng_state_fd.close()
+        distributed_c10d._logging_rng_state_fd = None
+        distributed_c10d._logging_rng_state_cnt = 0
+        if os.path.exists("rng_state_%d.h5" % (get_rank())):
+            os.remove("rng_state_%d.h5" % (get_rank()))
+            logger.info("remove outdated rng_state file")
 
 
 def load_checkpoint(filename, ts, model, optimizer):
