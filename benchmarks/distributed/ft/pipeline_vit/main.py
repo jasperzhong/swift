@@ -124,7 +124,7 @@ def get_lr_scheduler(optimizer, total_iters, args):
     warm_up_with_cosine_lr = lambda iter: iter / args.warm_up_iters if iter <= args.warm_up_iters \
                             else 0.5 * ( math.cos((iter - args.warm_up_iters) /(total_iters - args.warm_up_iters) * math.pi) + 1)
 
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=warm_up_with_cosine_lr, verbose=False)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=warm_up_with_cosine_lr)
     return scheduler
 
 def main():
