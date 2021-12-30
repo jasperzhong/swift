@@ -152,10 +152,16 @@ def recovery(config, ts, model, optimizer):
                                                                         logging_bucket=config.logging_bucket)
 
             # 1. living workers do checkpoint
+            logging_cnt_state_cnt_bck = distributed_c10d._logging_rng_state_cnt
             if not need_recovery:
                 filename = _get_checkpoint_path(config)
                 # do not do gc here
                 checkpoint(filename, ts, model, optimizer, garbage_collection=False)
+
+                # close its own rng state file
+                if distributed_c10d._logging_rng_state_fd is not None:
+                    distributed_c10d._logging_rng_state_fd.close()
+                    distributed_c10d._logging_rng_state_fd = None
             else:
                 filename = "rng_state_%d.h5" % (get_rank())
                 distributed_c10d._logging_dfs_client.upload(dfs_path=filename, local_path=filename)
@@ -205,7 +211,6 @@ def recovery(config, ts, model, optimizer):
                                                        daemon=True)
                     download_thread.start()
 
-
             def _cb(ts):
                 nonlocal model
                 nonlocal optimizer
@@ -250,6 +255,13 @@ def recovery(config, ts, model, optimizer):
                     distributed_c10d._logging_compression = None
                     distributed_c10d._logging = False
                     distributed_c10d._logging_dfs_client = None
+
+                # close its own rng state file
+                if distributed_c10d._logging_rng_state_fd is not None:
+                    distributed_c10d._logging_rng_state_fd.close()
+                    distributed_c10d._logging_rng_state_fd = None
+
+                distributed_c10d._logging_rng_state_cnt = logging_rng_state_cnt_bck
 
                 distributed_c10d._logging_mask.clear()
                 # pairs = groups_to_pairs(config.groups)
@@ -686,10 +698,6 @@ def checkpoint(filename, ts, model, optimizer, garbage_collection=True):
         distributed_c10d._logging_gpu_tensor_queue.clear()
         distributed_c10d._logging_cpu_tensor_queue.put("gc")
 
-        if distributed_c10d._logging_rng_state_fd is not None:
-            distributed_c10d._logging_rng_state_fd.close()
-            distributed_c10d._logging_rng_state_fd = None
-        distributed_c10d._logging_rng_state_cnt = 0
         if os.path.exists("rng_state_%d" % (get_rank())):
             os.remove("rng_state_%d.h5" % (get_rank()))
             logger.info("remove outdated rng_state file")

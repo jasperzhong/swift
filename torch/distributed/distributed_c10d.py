@@ -1086,12 +1086,12 @@ def recv(tensor,
                     while not os.path.exists(filename):
                         time.sleep(0.1)
                     _logging_rng_state_fd = h5py.File(filename, "r")
-                    _logging_rng_state_cnt = 0
+                    _logging_rng_state_cnt = _logging_group_rank
                     logger.info(f"read {filename}")
                 dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
                 rng_state_tensor = np.empty(dest.shape, dest.dtype)
                 torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
-                _logging_rng_state_cnt += 1
+                _logging_rng_state_cnt += _logging_group_size
             else:
                 if _logging_rng_state_fd is None:
                     _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
