@@ -147,7 +147,7 @@ def checksum(ts, model, optimizer):
 
 
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
-                          reset_data_iterator_func):
+                          lr_scheduler, reset_data_iterator_func):
     setup(config)
 
     ts = Timestamp(0)
@@ -161,7 +161,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
             logger.info(f"start from iteration {ts}")
             for _ in range(ts, config.num_iteration):
                 start = time.time()
-                loss = train_iter(model, optimizer, data_iterator, loss_func)
+                loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
                 iteration_time = time.time() - start
                 ts += 1
                 checksum(ts, model, optimizer)

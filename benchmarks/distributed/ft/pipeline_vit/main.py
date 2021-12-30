@@ -106,7 +106,7 @@ def reset_data_iterator(data_loader, ts):
     return data_iterator
 
 
-def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler):
+def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
     start = time.time()
     optimizer.zero_grad()
     loss = pipedream_flush_schedule(
@@ -115,7 +115,8 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler):
     # gradient clipping
     torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
     optimizer.step()
-    lr_scheduler.step()
+    if lr_scheduler is not None:
+        lr_scheduler.step()
     iteration_time = time.time() - start
     return loss
 
@@ -155,14 +156,15 @@ def main():
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
-        num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, checkpoint_interval=100,
+        num_iteration=total_iters, batch_size=args.global_batch_size, checkpoint_interval=100,
         replica=False, logging=args.logging, logging_compression=args.logging_compression,
         logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
     fault_tolerance_train(config, train_iter, model, optimizer,
-                          data_loader, loss_func, reset_data_iterator_func=reset_data_iterator)
+                          data_loader, loss_func, lr_scheduler,
+                          reset_data_iterator_func=reset_data_iterator)
 
 
 if __name__ == '__main__':
