@@ -1077,28 +1077,29 @@ def recv(tensor,
     global _logging_rng_state_fd
     global _logging_rng_state_cnt
 
+    if _logging:
+        if _logging_parallel_recovery:
+            if _logging_rng_state_fd is None:
+                peer_failure_worker = get_rank() - _logging_group_diff
+                filename = "rng_state_%d.h5" % (peer_failure_worker)
+                while not os.path.exists(filename):
+                    time.sleep(0.1)
+                _logging_rng_state_fd = h5py.File(filename, "r")
+                _logging_rng_state_cnt = _logging_group_rank
+                logger.info(f"read {filename}")
+            dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
+            rng_state_tensor = np.empty(dest.shape, dest.dtype)
+            torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
+            _logging_rng_state_cnt += _logging_group_size
+        else:
+            if _logging_rng_state_fd is None:
+                _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
+            rng_state = torch.cuda.random.get_rng_state().numpy()
+            _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
+            _logging_rng_state_fd.flush()
+            _logging_rng_state_cnt += 1
+
     if tensor is None:
-        if _logging: 
-            if _logging_parallel_recovery:
-                if _logging_rng_state_fd is None:
-                    peer_failure_worker = get_rank() - _logging_group_diff
-                    filename = "rng_state_%d.h5" % (peer_failure_worker)
-                    while not os.path.exists(filename):
-                        time.sleep(0.1)
-                    _logging_rng_state_fd = h5py.File(filename, "r")
-                    _logging_rng_state_cnt = _logging_group_rank
-                    logger.info(f"read {filename}")
-                dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
-                rng_state_tensor = np.empty(dest.shape, dest.dtype)
-                torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
-                _logging_rng_state_cnt += _logging_group_size
-            else:
-                if _logging_rng_state_fd is None:
-                    _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
-                rng_state = torch.cuda.random.get_rng_state().numpy()
-                _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
-                _logging_rng_state_fd.flush()
-                _logging_rng_state_cnt += 1
         return
 
     _check_single_tensor(tensor, "tensor")
@@ -3067,7 +3068,6 @@ def flush_objects_to_dfs(config):
             logger.info("remove outdated logging files")
             continue
 
-
         ts_value, dst, tensor, event = item
         key = '%d:%d' % (get_rank(), dst)
         file = None
@@ -3125,6 +3125,7 @@ def _open_logging_file(filename, consensus_value):
     logger.info(f"{filename} valid keys: {valid_keys}")
 
     return f, iter(valid_keys)
+
 
 def parallel_recovery_data_parallel_size():
     global _logging_group_size
