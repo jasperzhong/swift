@@ -4,7 +4,8 @@ import os
 import random
 import time
 from benchmarks.distributed.ft.pipeline_vit.model import PipelineParallelViT
-
+from torch.optim import lr_scheduler
+import math
 import numpy as np
 from schedule import (get_num_microbatches, initialize_global_args,
                       is_pipeline_first_stage, is_pipeline_last_stage,
@@ -26,8 +27,13 @@ parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=300, type=int, metavar='N',
                     help='number of total epochs to run')
+# lr scheduler
 parser.add_argument('--lr', '--learning-rate', default=3e-3, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
+parser.add_argument('--lr-min', '--learning-rate-min', default=0, type=float,
+                    help='min of learning rate (defalut 0)')
+parser.add_argument('--warm-up-iters', default=10000, type=float,
+                    help='warm up iterations')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
@@ -60,6 +66,7 @@ parser.add_argument('--logging-s3-bucket', default=None, type=str,
                     help='s3 bucket if using s3 as logging store')
 parser.add_argument('--logging-group-size', default=None, type=int,
                     help='group size for logging')
+
 args = parser.parse_args()
 initialize_global_args(args)
 
@@ -99,16 +106,25 @@ def reset_data_iterator(data_loader, ts):
     return data_iterator
 
 
-def train_iter(model, optimizer, data_iterator, loss_func):
+def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler):
     start = time.time()
     optimizer.zero_grad()
     loss = pipedream_flush_schedule(
         data_iterator, model, loss_func)
     torch.cuda.synchronize()
+    # gradient clipping
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
     optimizer.step()
+    lr_scheduler.step()
     iteration_time = time.time() - start
     return loss
 
+def get_lr_scheduler(optimizer, total_iters, args):
+    warm_up_with_cosine_lr = lambda iter: iter / args.warm_up_iters if iter <= args.warm_up_iters \
+                            else 0.5 * ( math.cos((iter - args.warm_up_iters) /(total_iters - args.warm_up_iters) * math.pi) + 1)
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR( optimizer, lr_lambda=warm_up_with_cosine_lr)
+    return scheduler
 
 def main():
     torch.backends.cudnn.benchmark = True
@@ -132,8 +148,10 @@ def main():
     model = PipelineParallelViT()
     model.cuda()
 
+    micro_batch_num = args.global_batch_size // args.micro_batch_size
+    total_iters = args.epochs * (len(data_loader) / micro_batch_num)
     optimizer = optim.Adam(model.parameters(), lr=3e-3, weight_decay=0.3)
-    # TODO: Cosine LR scheduler
+    lr_scheduler = get_lr_scheduler(optimizer, total_iters, args)
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
