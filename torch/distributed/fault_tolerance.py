@@ -150,6 +150,9 @@ def checksum(ts, model, optimizer):
     with open("debug.log", "a") as f:
         f.write(f"{ts} {model_sum} {optimizer_sum}\n")
 
+def _get_checkpoint_path():
+    rank = get_rank()
+    return "swift" + str(rank) + ".ckpt"
 
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
                           lr_scheduler, reset_data_iterator_func):
@@ -157,7 +160,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
     ts = Timestamp(0)
     distributed_c10d._ts = ts
-    checkpoint(config, ts, model, optimizer, lr_scheduler)
+    checkpoint(_get_checkpoint_path(), ts, model, optimizer, lr_scheduler)
     while True:
         recovery(config, ts, model, optimizer)
         data_iterator = reset_data_iterator_func(data_loader, ts)

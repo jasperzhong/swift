@@ -26,8 +26,9 @@ class PipelineParallelViT(ViT):
         )
 
         self.vit_sequential = nn.Sequential(
-            self.embedding,
-            self.dropout,
+            nn.Sequential(
+                self.embedding,
+                self.dropout),
             *(self.transformer.layers),
             self.to_latent,
             self.mlp_head
