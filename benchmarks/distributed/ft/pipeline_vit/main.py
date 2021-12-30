@@ -151,6 +151,7 @@ def main():
 
     micro_batch_num = args.global_batch_size // args.micro_batch_size
     total_iters = args.epochs * (len(data_loader) // micro_batch_num)
+    print("total iterations: {}".format(total_iters))
     optimizer = optim.Adam(model.parameters(), lr=3e-3, weight_decay=0.3)
     lr_scheduler = get_lr_scheduler(optimizer, total_iters, args)
     loss_func = nn.CrossEntropyLoss().cuda()

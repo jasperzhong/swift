@@ -167,17 +167,19 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
         data_iterator = reset_data_iterator_func(data_loader, ts)
         checksum(ts, model, optimizer)
         try:
+            iter_time_avg = 0
             logger.info(f"start from iteration {ts}")
             for _ in range(ts, config.num_iteration):
                 start = time.time()
                 loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
                 iteration_time = time.time() - start
+                iter_time_avg += iteration_time
                 ts += 1
                 checksum(ts, model, optimizer)
 
                 if ts % config.print_freq == 0 and is_pipeline_last_stage():
-                    logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f}".format(
-                        ts, loss, config.batch_size / iteration_time))
+                    logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {}".format(
+                        ts, loss, config.batch_size / iteration_time), iter_time_avg / ts)
 
             break
         except SwiftInternalError as e:
