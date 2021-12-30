@@ -161,7 +161,7 @@ class _LRScheduler(object):
         for i, data in enumerate(zip(self.optimizer.param_groups, values)):
             param_group, lr = data
             param_group['lr'] = lr
-            self.print_lr(self.verbose, i, lr, epoch)
+            # self.print_lr(self.verbose, i, lr, epoch)
 
         self._last_lr = [group['lr'] for group in self.optimizer.param_groups]
 
