@@ -929,8 +929,8 @@ def irecv(tensor,
     global _logging
     global _logging_gpu_tensor_queue
     global _logging_parallel_recovery
-    global _logging_parallel_recovery
     global _logging_rng_state_fd
+    global _logging_rng_state_cnt
 
     if _logging:
         if _logging_parallel_recovery:
