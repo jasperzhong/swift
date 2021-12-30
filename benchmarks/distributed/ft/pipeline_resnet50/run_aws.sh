@@ -9,7 +9,7 @@ ENABLE_LOGGING=${1:-0}
 LOGGING_GROUP_SIZE=${2:-${NPROC_PER_NODE}}
 PARALLEL_RECOVERY=${3:-0}
 
-rm -rf logging*.h5
+rm -rf *.h5
 rm -rf *.log
 rm -rf *.ckpt
 aws s3 rm s3://yczhong-swift/ --recursive --include='*.h5'
