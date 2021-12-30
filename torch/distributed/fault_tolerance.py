@@ -152,7 +152,7 @@ def recovery(config, ts, model, optimizer):
                                                                         logging_bucket=config.logging_bucket)
 
             # 1. living workers do checkpoint
-            logging_cnt_state_cnt_bck = distributed_c10d._logging_rng_state_cnt
+            logging_rng_state_cnt_bck = distributed_c10d._logging_rng_state_cnt
             if not need_recovery:
                 filename = _get_checkpoint_path(config)
                 # do not do gc here
