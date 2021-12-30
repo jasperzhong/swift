@@ -5,6 +5,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Queue
+from benchmarks.distributed.ft.pipeline_resnet50.schedule import is_pipeline_last_stage
 
 from hdfs import InsecureClient
 
@@ -174,7 +175,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 ts += 1
                 checksum(ts, model, optimizer)
 
-                if ts % config.print_freq == 0:
+                if ts % config.print_freq == 0 and is_pipeline_last_stage():
                     logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f}".format(
                         ts, loss, config.batch_size / iteration_time))
 
