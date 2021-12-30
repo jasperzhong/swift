@@ -686,10 +686,11 @@ def checkpoint(filename, ts, model, optimizer, garbage_collection=True):
         distributed_c10d._logging_gpu_tensor_queue.clear()
         distributed_c10d._logging_cpu_tensor_queue.put("gc")
 
-        distributed_c10d._logging_rng_state_fd.close()
-        distributed_c10d._logging_rng_state_fd = None
+        if distributed_c10d._logging_rng_state_fd is not None:
+            distributed_c10d._logging_rng_state_fd.close()
+            distributed_c10d._logging_rng_state_fd = None
         distributed_c10d._logging_rng_state_cnt = 0
-        if os.path.exists("rng_state_%d.h5" % (get_rank())):
+        if os.path.exists("rng_state_%d" % (get_rank())):
             os.remove("rng_state_%d.h5" % (get_rank()))
             logger.info("remove outdated rng_state file")
 
