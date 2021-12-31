@@ -78,16 +78,6 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad):
     if input_tensor is not None:
         input_tensor_grad = input_tensor.grad
 
-    with open("debug_backward.log", "a") as f:
-        input_tensor_checksum = 0 if input_tensor is None else torch.sum(input_tensor)
-        output_tensor_checksum = 0 if output_tensor is None else torch.sum(output_tensor)
-        output_tensor_grad_checksum = 0 if output_tensor_grad is None else torch.sum(output_tensor_grad)
-        input_tensor_grad_checksum = 0 if input_tensor_grad is None else torch.sum(input_tensor_grad)
-        rng_state = torch.random.get_rng_state()
-        rng_state_checksum = torch.sum(rng_state.type(torch.float32))
-        f.write(f"{_cnt} {input_tensor_checksum} {output_tensor_checksum} {output_tensor_grad_checksum} {input_tensor_grad_checksum} {rng_state_checksum}\n")
-        _cnt += 1
-
     return input_tensor_grad
 
 
