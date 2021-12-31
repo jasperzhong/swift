@@ -38,7 +38,7 @@ class PipelineParallelViT(nn.Module):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
         super(PipelineParallelViT, self).__init__()
         # patch_size=14, embed_dim=1280, depth=32, num_heads=16, representation_size=1280
-        self.vit = create_model("vit_huge_patch14_224_in21k", pretrain=True, num_classes=100)
+        self.vit = create_model("vit_huge_patch14_224_in21k", pretrained=True, num_classes=100)
         self.vit_sequential = nn.Sequential(
             Embeddings(
                 self.vit.patch_embed,
