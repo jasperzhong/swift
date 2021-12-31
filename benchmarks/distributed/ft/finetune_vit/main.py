@@ -3,7 +3,6 @@ import logging
 import os
 import random
 import time
-from benchmarks.distributed.ft.pipeline_vit.model import PipelineParallelViT
 from torch.optim import lr_scheduler
 import math
 import numpy as np
