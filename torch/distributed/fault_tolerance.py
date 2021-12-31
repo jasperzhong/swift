@@ -318,7 +318,7 @@ def build_model_and_optimizer(config, model, optimizer, comm, peer_failure_worke
     num_microbatches = config.num_microbatches // parallel_recovery_data_parallel_size()
     distributed_optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
                                                  backward_passes_per_step=num_microbatches,
-                                                 comm_group=comm)
+                                                 comm_group=comm, average=False)
 
     # peer failure worker broadcast its parameters and optimizer states
     # to other group members

@@ -29,7 +29,7 @@ from .distributed_c10d import all_reduce, broadcast, get_rank, get_world_size
 
 class _DistributedOptimizer(torch.optim.Optimizer):
     def __init__(self, params, named_parameters,
-                 backward_passes_per_step=1, comm_group=None):
+                 backward_passes_per_step=1, comm_group=None, average=True):
         super(self.__class__, self).__init__(params)
 
         if named_parameters is not None:
@@ -47,6 +47,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
         self._should_sync = True
         self._size = get_world_size(comm_group)
         self._hook_handles = []
+        self._average = average
         if self._size > 1:
             print(f"DistributedOptimizer registers hooks when size = {self._size} ")
             self._register_hooks()
@@ -82,7 +83,8 @@ class _DistributedOptimizer(torch.optim.Optimizer):
 
     def _all_reduce_grad_async(self, p):
         tensor = p.grad
-        tensor /= self._size
+        if self._average:
+            tensor /= self._size
         handle = all_reduce(tensor, async_op=True, group=self.comm_group)
         return handle
 
@@ -155,7 +157,7 @@ class _DistributedOptimizer(torch.optim.Optimizer):
 
 
 def DistributedOptimizer(optimizer, named_parameters=None,
-                         backward_passes_per_step=1, comm_group=None):
+                         backward_passes_per_step=1, comm_group=None, average=True):
     """
     An optimizer that wraps another torch.optim.Optimizer, using an all_reduce to
     average gradient values before applying gradients to model weights.
@@ -187,13 +189,14 @@ def DistributedOptimizer(optimizer, named_parameters=None,
                                   mini-batches before executing averaging and
                                   applying them.
         comm_group: communication group 
+        average: average the gradient
     """
     # We dynamically create a new class that inherits from the optimizer that was passed in.
     # The goal is to override the `step()` method with an all_reduce implementation.
     cls = type("DistributedOptimizer", (optimizer.__class__,),
                dict(_DistributedOptimizer.__dict__))
     return cls(optimizer.param_groups, named_parameters,
-               backward_passes_per_step, comm_group)
+               backward_passes_per_step, comm_group, average)
 
 
 def broadcast_parameters(params, root_rank, comm_group=None):
