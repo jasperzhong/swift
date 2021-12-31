@@ -267,7 +267,7 @@ def recovery(config, ts, model, optimizer):
                     distributed_c10d._logging_rng_state_fd.close()
                     distributed_c10d._logging_rng_state_fd = None
 
-                distributed_c10d._logging_rng_state_cnt = logging_rng_state_cnt_bck
+                distributed_c10d._logging_rng_state_cnt = logging_rng_state_cnt_bck + 1
 
                 distributed_c10d._logging_mask.clear()
                 # pairs = groups_to_pairs(config.groups)
