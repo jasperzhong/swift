@@ -39,7 +39,6 @@ class Cls(nn.Module):
 class PipelineParallelViT(nn.Module):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
         super(PipelineParallelViT, self).__init__()
-        # patch_size=14, embed_dim=1280, depth=32, num_heads=16, representation_size=1280
         self.vit = create_model("vit_base_patch32_224_in21k", pretrained=True, num_classes=100, img_size=384)
         self.vit_sequential = nn.Sequential(
             Embeddings(
@@ -85,6 +84,7 @@ class PipelineParallelViT(nn.Module):
         self._input_shape = self._input_shapes[start]
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.vit_sequential[start:end]
+        print(self._input_shapes)
 
     def _profile(self, shape=[3, 384, 384]):
         """
