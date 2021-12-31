@@ -7,24 +7,28 @@ from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
     get_pipeline_model_parallel_world_size, is_pipeline_first_stage
 from torch.onnx.symbolic_opset9 import tensor
 from torch.utils import checkpoint
+import math
 
-class Embeddings(nn.Module):
-    def __init__(self, patch_embed, cls_token, dist_token, pos_embed, pos_drop):
+class Tokens(nn.Module):
+    def __init__(self, cls_token, dist_token):
         super().__init__()
-        self.patch_embed = patch_embed
         self.cls_token = cls_token
         self.dist_token = dist_token
-        self.pos_embed = pos_embed
-        self.pos_drop = pos_drop
     def forward(self, x):
-        x = self.patch_embed(x)
         cls_token = self.cls_token.expand(x.shape[0], -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
         if self.dist_token is None:
             x = torch.cat((cls_token, x), dim=1)
         else:
             x = torch.cat((cls_token, self.dist_token.expand(x.shape[0], -1, -1), x), dim=1)
-        x = self.pos_drop(x + self.pos_embed)
         return x
+
+class PosEmb(nn.Module):
+    def __init__(self, pos_embed, pos_drop):
+        super().__init__()
+        self.pos_embed = pos_embed
+        self.pos_drop = pos_drop
+    def forward(self, x):
+        return self.pos_drop(x + self.pos_embed)
 
 class Cls(nn.Module):
     def __init__(self, pre_logits, head):
@@ -41,10 +45,11 @@ class PipelineParallelViT(nn.Module):
         super(PipelineParallelViT, self).__init__()
         self.vit = create_model("vit_base_patch32_224_in21k", pretrained=True, num_classes=100, img_size=384)
         self.vit_sequential = nn.Sequential(
-            Embeddings(
-                self.vit.patch_embed,
+            self.vit.patch_embed,
+            Tokens(
                 self.vit.cls_token,
-                self.vit.dist_token,
+                self.vit.dist_token),
+            PosEmb(
                 self.vit.pos_embed,
                 self.vit.pos_drop),
             *(self.vit.blocks),
