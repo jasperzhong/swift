@@ -70,6 +70,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
         output_tensor = loss_func(output_tensor, labels)
         output_tensor /= get_num_microbatches()
         loss += output_tensor.item()
+        end = time.time()
         elap = end - start
         print("loss func time is : {}".format(elap))
     # end = time.time()
