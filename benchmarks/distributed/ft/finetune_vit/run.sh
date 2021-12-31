@@ -13,8 +13,8 @@ cmd="python3 -m torch.distributed.run \
 	--rdzv_id=1234 --rdzv_backend=c10d \
 	--rdzv_endpoint=$MASTER_IP \
 	main.py \
-	--micro-batch-size 16 \
-	--global-batch-size 512 \
+	--micro-batch-size 8 \
+	--global-batch-size 256 \
 	--seed 2021 \
 	-p 5 \
 	~/data/" 
