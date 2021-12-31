@@ -72,8 +72,8 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
         loss += output_tensor.item()
         elap = end - start
         print("loss func time is : {}".format(elap))
-    end = time.time()
-    elap = end - start
+    # end = time.time()
+    # elap = end - start
     # print("rank{} forward time is : {}".format(get_rank(),elap))
     return output_tensor
 
