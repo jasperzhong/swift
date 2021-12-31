@@ -168,7 +168,7 @@ def recovery(config, ts, model, optimizer):
             else:
                 filename = "rng_state_%d.h5" % (get_rank())
                 f = h5py.File(filename, "r")
-                logging_rng_state_cnt_bck = sorted(f.keys(), lambda x: int(x))[-1]
+                logging_rng_state_cnt_bck = sorted(f.keys(), key=lambda x: int(x))[-1]
                 f.close()
                 distributed_c10d._logging_dfs_client.upload(dfs_path=filename, local_path=filename)
                 logger.info(f"put {filename} on dfs")
