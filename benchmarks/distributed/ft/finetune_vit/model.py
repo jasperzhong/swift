@@ -77,9 +77,9 @@ class PipelineParallelViT(nn.Module):
         
         if balance is not None:
             assert len(balance) == get_pipeline_model_parallel_world_size(), \
-                "The number of `balance` does not match the number of pipeline stages"
+                "The number of `balance` {}does not match the number of pipeline stages".format(len(balance))
             assert sum(balance) == len(self.vit_sequential), \
-                "The summation of `balance` does not match the number of layers"
+                "The summation of `balance` {} does not match the number of layers {}".format(sum(balance), len(self.vit_sequential))
             self.balance = balance
         else:
             print("vit seq len: {}".format(len(self.vit_sequential)))
