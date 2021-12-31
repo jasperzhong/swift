@@ -10,6 +10,7 @@ from torch.utils import checkpoint
 
 class Embeddings(nn.Module):
     def __init__(self, patch_embed, cls_token, dist_token, pos_embed, pos_drop):
+        super().__init__()
         self.patch_embed = patch_embed
         self.cls_token = cls_token
         self.dist_token = dist_token
@@ -27,6 +28,7 @@ class Embeddings(nn.Module):
 
 class Cls(nn.Module):
     def __init__(self, pre_logits, head):
+        super().__init__()
         self.pre_logits = pre_logits
         self.head = head
     def forward(self ,x):
