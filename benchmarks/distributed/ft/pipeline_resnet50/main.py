@@ -132,7 +132,7 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = get_data_loader(args)
-    model = PipelineParallelResNet50(rank=args.rank, balance=None)
+    model = PipelineParallelResNet50(rank=args.rank, balance=[4, 2, 2, 3])
     model.cuda()
 
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
