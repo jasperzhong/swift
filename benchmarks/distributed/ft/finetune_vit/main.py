@@ -9,6 +9,7 @@ import numpy as np
 from schedule import (get_num_microbatches, initialize_global_args,
                       is_pipeline_first_stage, is_pipeline_last_stage,
                       pipedream_flush_schedule)
+from model import PipelineParallelViT
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, RandomSampler, DistributedSampler, SequentialSampler
 import torch
