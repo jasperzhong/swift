@@ -1,5 +1,7 @@
 import torch
+import time
 
+from torch.distributed.distributed_c10d import get_rank
 _GLOBAL_ARGS = None
 
 _cnt = 0
@@ -48,6 +50,7 @@ def get_microbatch_size():
 
 
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
+    start = time.time()
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
         images, labels = data
@@ -63,7 +66,9 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
         output_tensor = loss_func(output_tensor, labels)
         output_tensor /= get_num_microbatches()
         loss += output_tensor.item()
-
+    end = time.time()
+    elap = end - start
+    print("rank{} forward time is : {}".format(get_rank(),elap))
     return output_tensor
 
 
