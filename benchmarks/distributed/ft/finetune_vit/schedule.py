@@ -73,6 +73,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
 
 
 def backward_step(input_tensor, output_tensor, output_tensor_grad):
+    start = time.time()
     global _cnt
     if input_tensor is not None:
         input_tensor.retain_grad()
@@ -82,7 +83,9 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad):
     input_tensor_grad = None
     if input_tensor is not None:
         input_tensor_grad = input_tensor.grad
-
+    end = time.time()
+    elap = end - start
+    print("rank{} backward time is : {}".format(get_rank(),elap))
     return input_tensor_grad
 
 
