@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NNODES=1
+NNODES=2
 NPROC_PER_NODE=4
 MASTER_IP=10.28.1.27
 MASTER_PORT=1234
@@ -13,8 +13,8 @@ cmd="python3 -m torch.distributed.run \
 	--rdzv_id=1234 --rdzv_backend=c10d \
 	--rdzv_endpoint=$MASTER_IP \
 	main.py \
-	--micro-batch-size 64 \
-	--global-batch-size 4096 \
+	--micro-batch-size 16 \
+	--global-batch-size 512 \
 	--seed 2021 \
 	-p 5 \
 	~/data/" 
