@@ -2,7 +2,7 @@ import torch
 from torch._C import ThroughputBenchmark
 import torch.nn as nn
 from typing import Optional, Iterable
-from timm.models import create_models
+from timm.models import create_model
 from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
     get_pipeline_model_parallel_world_size, is_pipeline_first_stage
 from torch.onnx.symbolic_opset9 import tensor
@@ -38,7 +38,7 @@ class PipelineParallelViT(nn.Module):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
         super(PipelineParallelViT, self).__init__()
         # patch_size=14, embed_dim=1280, depth=32, num_heads=16, representation_size=1280
-        self.vit = create_models("vit_huge_patch14_224_in21k", pretrain=True, num_classes=100)
+        self.vit = create_model("vit_huge_patch14_224_in21k", pretrain=True, num_classes=100)
         self.vit_sequential = nn.Sequential(
             Embeddings(
                 self.vit.patch_embed,
