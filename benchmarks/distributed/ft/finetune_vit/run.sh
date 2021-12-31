@@ -13,10 +13,10 @@ cmd="python3 -m torch.distributed.run \
 	--rdzv_id=1234 --rdzv_backend=c10d \
 	--rdzv_endpoint=$MASTER_IP \
 	main.py \
-	--micro-batch-size 16 \
-	--global-batch-size 512 \
+	--micro-batch-size 64 \
+	--global-batch-size 4096 \
 	--seed 2021 \
 	-p 5 \
-	~/data/CIFAR100" 
+	~/data/ILSVRC2012" 
 
 OMP_NUM_THREADS=8 NCCL_IB_DISABLE=1 LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec $cmd
