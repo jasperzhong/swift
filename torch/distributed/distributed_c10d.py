@@ -944,6 +944,7 @@ def irecv(tensor,
                 logger.info(f"read {filename}")
             dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
             rng_state_tensor = np.empty(dest.shape, dest.dtype)
+            dest.read_direct(rng_state_tensor)
             torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
             _logging_rng_state_cnt += _logging_group_size
         else:
@@ -1113,6 +1114,7 @@ def recv(tensor,
                 logger.info(f"read {filename}")
             dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
             rng_state_tensor = np.empty(dest.shape, dest.dtype)
+            dest.read_direct(rng_state_tensor)
             torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
             _logging_rng_state_cnt += _logging_group_size
         else:
