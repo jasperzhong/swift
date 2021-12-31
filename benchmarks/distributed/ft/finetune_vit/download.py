@@ -11,7 +11,7 @@ transform_train = transforms.Compose([
 
 trainset = datasets.CIFAR100(root="~/data/",
                             train=True,
-                            download=True,
+                            download=False,
                             transform=transform_train)
 
 train_sampler = RandomSampler(trainset)
