@@ -84,7 +84,9 @@ class PipelineParallelViT(nn.Module):
         self._input_shape = self._input_shapes[start]
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.vit_sequential[start:end]
-        print(self._input_shapes)
+        
+        if self.rank == 0 or self.rank == 7:
+            print("Rank {} model split {}".format(self.rank, self.model_split))
 
     def _profile(self, shape=[3, 384, 384]):
         """
