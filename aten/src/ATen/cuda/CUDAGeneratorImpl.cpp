@@ -4,6 +4,7 @@
 #include <c10/core/StreamGuard.h>
 #include <c10/cuda/CUDAFunctions.h>
 #include <ATen/Utils.h>
+#include <iostream>
 
 namespace at {
 namespace cuda {
@@ -202,6 +203,7 @@ void CUDAGeneratorImpl::set_state(const c10::TensorImpl& new_state) {
   if (!no_philox_seed) {
     memcpy(&philox_offset, new_rng_state + states_size + seed_size, offset_size);
   }
+  std::cout << "read philox_offset = " << philox_offset << std::endl;
   this->set_philox_offset_per_thread(static_cast<uint64_t>(philox_offset));
 }
 
@@ -212,6 +214,7 @@ void CUDAGeneratorImpl::set_state(const c10::TensorImpl& new_state) {
  */
 void CUDAGeneratorImpl::set_philox_offset_per_thread(uint64_t offset) {
   at::cuda::assertNotCapturing("Cannot call CUDAGeneratorImpl::set_philox_offset_per_thread");
+  std::cout << "set philox_offset = " << offset << std::endl;
   // see Note [Why enforce RNG offset % 4 == 0?]
   TORCH_CHECK(offset % 4 == 0, "offset must be a multiple of 4");
   philox_offset_per_thread_ = offset;
