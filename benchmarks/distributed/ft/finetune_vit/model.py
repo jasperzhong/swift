@@ -40,12 +40,27 @@ class Cls(nn.Module):
         x = self.head(x)
         return x
 
+class norm(nn.Module):
+    def __init__(self, flatten, norm):
+        super().__init__()
+        self.flatten = flatten
+        self.norm = norm
+    def forward(self ,x):
+        if self.flatten:
+            x = x.flatten(2).transpose(1, 2)  # BCHW -> BNC
+        x = self.norm(x)
+        return x
+
 class PipelineParallelViT(nn.Module):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
         super(PipelineParallelViT, self).__init__()
         self.vit = create_model("vit_base_patch32_224_in21k", pretrained=True, num_classes=100, img_size=384)
         self.vit_sequential = nn.Sequential(
-            self.vit.patch_embed,
+            self.vit.patch_embed.proj,
+            norm(
+               self.vit.patch_embed.flatten,
+               self.vit.patch_embed.norm
+            ),
             Tokens(
                 self.vit.cls_token,
                 self.vit.dist_token),
