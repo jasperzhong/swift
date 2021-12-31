@@ -114,7 +114,7 @@ def train_iter(model, optimizer, data_iterator, loss_func):
 
 
 def main():
-    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.deterministic = True
 
     args.world_size = int(os.environ['WORLD_SIZE'])
@@ -132,7 +132,7 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = get_data_loader(args)
-    model = PipelineParallelResNet50(rank=args.rank, balance=[4, 2, 2, 3])
+    model = PipelineParallelResNet50(rank=args.rank, balance=None)
     model.cuda()
 
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
