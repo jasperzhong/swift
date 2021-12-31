@@ -1,13 +1,12 @@
 import getpass
 import logging
 import os
-import re
 import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Queue
 
-from hdfs import InsecureClient
+import h5py
 
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
@@ -18,14 +17,18 @@ from torch._C._distributed_c10d import SwiftInternalError
 from .data_parallel import (DistributedOptimizer, broadcast_optimizer_state,
                             broadcast_parameters)
 from .distributed_c10d import (_failure_handler, all_gather, broadcast,
-                               get_local_world_size, get_rank, get_world_size,
-                               new_group, parallel_recovery_data_parallel_size,
-                               destroy_process_group)
+                               destroy_process_group, get_local_world_size,
+                               get_rank, get_world_size, new_group,
+                               parallel_recovery_data_parallel_size)
 
 try:
     import boto3
 except ImportError:
-    pass
+    try:
+        from hdfs import InsecureClient
+    except ImportError:
+        raise ImportError("lack of boto3 or hdfs")
+
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +167,9 @@ def recovery(config, ts, model, optimizer):
                     distributed_c10d._logging_rng_state_fd = None
             else:
                 filename = "rng_state_%d.h5" % (get_rank())
+                f = h5py.File(filename, "r")
+                logging_rng_state_cnt_bck = sorted(f.keys(), lambda x: int(x))[-1]
+                f.close()
                 distributed_c10d._logging_dfs_client.upload(dfs_path=filename, local_path=filename)
                 logger.info(f"put {filename} on dfs")
 
