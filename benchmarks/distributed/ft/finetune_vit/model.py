@@ -62,9 +62,11 @@ class PipelineParallelViT(nn.Module):
                 "The summation of `balance` does not match the number of layers"
             self.balance = balance
         else:
+            print("vit seq len: {}".format(len(self.vit_sequential)))
             num_layers_per_stage = len(self.vit_sequential) // \
                 get_pipeline_model_parallel_world_size()
             self.balance = [num_layers_per_stage] * get_pipeline_model_parallel_world_size()
+            print("num_layers_per_stage: {}".format(num_layers_per_stage))
             remaining = len(self.vit_sequential) - num_layers_per_stage * len(self.balance)
             self.balance[-1] += remaining
 
