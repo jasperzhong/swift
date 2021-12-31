@@ -50,12 +50,15 @@ def get_microbatch_size():
 
 
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
-    start = time.time()
+    
     if is_pipeline_first_stage() or is_pipeline_last_stage():
+        start = time.time()
         data = next(data_iterator)
         images, labels = data
         images, labels = images.cuda(), labels.cuda()
-
+        end = time.time()
+        elap = end - start
+        print("rank{} load data time is : {}".format(get_rank(),elap))
     if is_pipeline_first_stage():
         assert input_tensor is None
         input_tensor = images
@@ -63,12 +66,15 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     output_tensor = model(input_tensor)
 
     if is_pipeline_last_stage():
+        start = time.time()
         output_tensor = loss_func(output_tensor, labels)
         output_tensor /= get_num_microbatches()
         loss += output_tensor.item()
+        elap = end - start
+        print("loss func time is : {}".format(elap))
     end = time.time()
     elap = end - start
-    print("rank{} forward time is : {}".format(get_rank(),elap))
+    # print("rank{} forward time is : {}".format(get_rank(),elap))
     return output_tensor
 
 
