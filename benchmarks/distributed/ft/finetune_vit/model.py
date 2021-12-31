@@ -84,7 +84,7 @@ class PipelineParallelViT(nn.Module):
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.vit_sequential[start:end]
 
-    def _profile(self, shape=):
+    def _profile(self, shape=[3, 384, 384]):
         """
         get each layer's input/output shape by running one forward pass
         """
