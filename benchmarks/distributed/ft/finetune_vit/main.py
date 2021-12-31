@@ -97,7 +97,7 @@ def get_data_loader(args):
     train_loader = DataLoader(trainset,
                               sampler=train_sampler,
                               batch_size=args.micro_batch_size,
-                              num_workers=32,
+                              num_workers=64,
                               pin_memory=True)
     test_loader = DataLoader(testset,
                              sampler=test_sampler,
