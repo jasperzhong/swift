@@ -55,8 +55,6 @@ parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
-parser.add_argument('--test-batch-size', type=int,
-                    default=256, help='Training batch size.')
 parser.add_argument('--logging', default=False, action="store_true",
                     help='whether to enable logging.')
 parser.add_argument('--logging-chunk-freq', type=int,
@@ -105,7 +103,7 @@ def get_data_loader(args):
                               drop_last=True)
     test_loader = DataLoader(testset,
                              sampler=test_sampler,
-                             batch_size=args.test_batch_size,
+                             batch_size=args.micro_batch_size,
                              num_workers=8,
                              pin_memory=True) if testset is not None else None
     return train_loader, test_loader
