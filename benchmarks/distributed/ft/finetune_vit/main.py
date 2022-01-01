@@ -6,7 +6,7 @@ import time
 from torch.optim import lr_scheduler
 import math
 import numpy as np
-from schedule import (get_num_microbatches, initialize_global_args,
+from schedule import (ToTensor, get_num_microbatches, initialize_global_args,
                       is_pipeline_first_stage, is_pipeline_last_stage,
                       pipedream_flush_schedule)
 from model import PipelineParallelViT
@@ -85,7 +85,8 @@ def get_data_loader(args):
 
     trainset = datasets.CIFAR100(root=args.data,
                                 train=True,
-                                download=False)
+                                download=False,
+                                transform=transforms.ToTensor())
     testset = datasets.CIFAR100(root=args.data,
                                 train=False,
                                 download=False,
