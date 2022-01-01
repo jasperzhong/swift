@@ -275,6 +275,16 @@ def recovery(config, ts, model, optimizer):
                 return ts, model, optimizer
 
             callback = _cb
+        else:
+            distributed_c10d._logging_in_recovery = True
+
+            def _cb(ts):
+                nonlocal model
+                nonlocal optimizer
+                distributed_c10d._logging_in_recovery = False
+                return ts, model, optimizer
+
+            callback = _cb
 
     return ts, model, optimizer, consensus_value, callback
 

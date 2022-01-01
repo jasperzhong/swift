@@ -77,6 +77,8 @@ _logging_cnt = {}
 
 _logging_thread = None
 
+_logging_in_recovery = False
+
 _logging_parallel_recovery = False
 
 _logging_group_diff = None
@@ -947,7 +949,7 @@ def irecv(tensor,
             dest.read_direct(rng_state_tensor)
             torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
             _logging_rng_state_cnt += _logging_group_size
-        else:
+        elif not _logging_in_recovery:
             if _logging_rng_state_fd is None:
                 _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
             rng_state = torch.cuda.random.get_rng_state().numpy()
@@ -1117,7 +1119,7 @@ def recv(tensor,
             dest.read_direct(rng_state_tensor)
             torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
             _logging_rng_state_cnt += _logging_group_size
-        else:
+        elif not _logging_in_recovery:
             if _logging_rng_state_fd is None:
                 _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
             rng_state = torch.cuda.random.get_rng_state().numpy()
