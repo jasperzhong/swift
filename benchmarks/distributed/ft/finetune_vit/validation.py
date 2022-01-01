@@ -56,7 +56,10 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
     labels = None
     for _ in range(test_iters):
         with torch.no_grad():
-            loss, output_tensor = forward(data_iter, model, loss_func, eval_losses, all_preds, all_label)
+            if is_pipeline_last_stage():
+                eval_losses, all_preds, all_label = forward(data_iter, model, loss_func, eval_losses, all_preds, all_label)
+            else:
+                loss, output_tensor = forward(data_iter, model, loss_func, eval_losses, all_preds, all_label)
     if is_pipeline_last_stage():
         all_preds, all_label = all_preds[0], all_label[0]
         accuracy = simple_accuracy(all_preds, all_label)
@@ -71,6 +74,9 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
 def forward(data_iterator, model, loss_func, eval_losses, all_preds, all_label):
     loss = 0
     input_tensor = recv_forward(model.input_shape)
+    if is_pipeline_last_stage():
+        eval_losses, all_preds, all_label = forward_step(data_iterator, model, input_tensor, loss_func, loss, eval_losses, all_preds, all_label)
+        return eval_losses, all_preds, all_label
     output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss, eval_losses, all_preds, all_label)
     send_forward(output_tensor)
     print("forward:{}".format(all_preds))
@@ -119,5 +125,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss, eval_losse
             all_label[0] = np.append(
                 all_label[0], labels.detach().cpu().numpy(), axis=0
             )
+        
+        return eval_losses, all_preds, all_label
 
     return output_tensor
