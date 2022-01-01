@@ -141,9 +141,13 @@ def recovery(config, ts, model, optimizer):
             filename = _get_checkpoint_path(config)
             load_checkpoint(filename, ts, model, optimizer)
             _set_recovery_mask(config, ts, consensus_value)
+            # recovery starts
+            distributed_c10d._logging_in_recovery = True
 
         if failure_workers and config.parallel_recovery:
             distributed_c10d._logging_parallel_recovery = True
+            # recovery starts
+            distributed_c10d._logging_in_recovery = True
 
             enable_logging_on_disabled_worker = False
             if not distributed_c10d._logging:
@@ -223,6 +227,9 @@ def recovery(config, ts, model, optimizer):
                 nonlocal old_optimizer
                 nonlocal enable_logging_on_disabled_worker
 
+                # recovery is over
+                distributed_c10d._logging_in_recovery = False
+
                 # close files
                 for peer, item in distributed_c10d._logging_recovery_mask.items():
                     idx, file_info_list, consensus_value = item
@@ -276,11 +283,11 @@ def recovery(config, ts, model, optimizer):
 
             callback = _cb
         else:
-            distributed_c10d._logging_in_recovery = True
-
             def _cb(ts):
                 nonlocal model
                 nonlocal optimizer
+
+                # recovery is over
                 distributed_c10d._logging_in_recovery = False
                 return ts, model, optimizer
 
