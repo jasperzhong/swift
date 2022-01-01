@@ -56,7 +56,7 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
     labels = None
     for _ in range(test_iters):
         with torch.no_grad():
-            loss, output_tensor, labels = forward(data_iter, model, loss_func, eval_losses, all_preds, all_label)
+            loss, output_tensor = forward(data_iter, model, loss_func, eval_losses, all_preds, all_label)
     if is_pipeline_last_stage():
         all_preds, all_label = all_preds[0], all_label[0]
         accuracy = simple_accuracy(all_preds, all_label)
