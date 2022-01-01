@@ -122,8 +122,8 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
 
     if is_pipeline_last_stage():
         preds = output_tensor
-        print(labels)
-        print(preds)
+        print(labels.shape)
+        print(preds.shape)
         output_tensor = loss_func(output_tensor, labels)
         loss += output_tensor.item()
         
