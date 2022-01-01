@@ -41,7 +41,7 @@ class AverageMeter(object):
 def simple_accuracy(preds, labels):
     return (preds == labels).mean()
 
-def fault_tolerance_val(model, test_loader, loss_func):
+def fault_tolerance_val(config, model, test_loader, loss_func):
     # Validation!
     eval_losses = AverageMeter()
 
@@ -57,8 +57,8 @@ def fault_tolerance_val(model, test_loader, loss_func):
     for i in range(test_iters):
         with torch.no_grad():
             if is_pipeline_last_stage():
-                output_tensor, loss, labels = forward(data_iter, model, loss_func)
-                eval_losses.update(loss)
+                output_tensor, loss, labels = forward(config, data_iter, model, loss_func)
+                eval_losses.update(loss, config.test_batch_size)
                 preds = torch.argmax(output_tensor, dim=-1)
                 if len(all_preds) == 0:
                     all_preds.append(preds.detach().cpu().numpy())
@@ -71,7 +71,7 @@ def fault_tolerance_val(model, test_loader, loss_func):
                         all_label[0], labels.detach().cpu().numpy(), axis=0
                     )
             else:
-                loss, output_tensor = forward(data_iter, model, loss_func)
+                loss, output_tensor = forward(config, data_iter, model, loss_func)
     if is_pipeline_last_stage():
         all_preds, all_label = all_preds[0], all_label[0]
         accuracy = simple_accuracy(all_preds, all_label)
@@ -83,9 +83,10 @@ def fault_tolerance_val(model, test_loader, loss_func):
 
         return accuracy
 
-def forward(data_iterator, model, loss_func):
+def forward(config, data_iterator, model, loss_func):
+    shape = (config.test_batch_size, *model.input_shape[1:])
     loss = 0
-    input_tensor = recv_forward(model.input_shape)
+    input_tensor = recv_forward(shape)
     if is_pipeline_last_stage():
         output_tensor, loss, labels = forward_step(data_iterator, model, input_tensor, loss_func, loss)
         return output_tensor, loss, labels

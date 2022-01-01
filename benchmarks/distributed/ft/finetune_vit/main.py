@@ -55,6 +55,8 @@ parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
+parser.add_argument('--test-batch-size', type=int,
+                    default=256, help='Test batch size.')
 parser.add_argument('--logging', default=False, action="store_true",
                     help='whether to enable logging.')
 parser.add_argument('--logging-chunk-freq', type=int,
@@ -103,7 +105,7 @@ def get_data_loader(args):
                               drop_last=True)
     test_loader = DataLoader(testset,
                              sampler=test_sampler,
-                             batch_size=args.micro_batch_size,
+                             batch_size=args.test_batch_size,
                              num_workers=8,
                              pin_memory=True,
                              drop_last=True)
@@ -188,16 +190,19 @@ def main():
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
-        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, checkpoint_interval=10,
+        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, test_batch_size=args.test_batch_size, checkpoint_interval=10,
         replica=False, logging=args.logging, logging_compression=args.logging_compression,
         logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
+    start = time.time()
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, lr_scheduler,
                           reset_data_iterator_func=reset_data_iterator, fault_tolerance_val=fault_tolerance_val, test_loader=test_loader)
 
+    end = time.time()
+    print("Training time is {}".format(end - start))
 
 if __name__ == '__main__':
     main()
