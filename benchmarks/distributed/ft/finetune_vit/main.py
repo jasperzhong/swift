@@ -182,15 +182,13 @@ def main():
     iters_per_epoch = len(data_loader) // num_micro_batches
     print("iters per epoch:{}".format(iters_per_epoch))
 
-    test_iters = len(test_loader)
-    print("test iters:{}".format(test_iters))
 
     optimizer = optim.SGD(model.parameters(), lr=3e-2, momentum=0.9)
     lr_scheduler = get_lr_scheduler(optimizer, total_iters, args)
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
-        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, test_iters=test_iters, batch_size=args.global_batch_size, checkpoint_interval=10,
+        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, checkpoint_interval=10,
         replica=False, logging=args.logging, logging_compression=args.logging_compression,
         logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,

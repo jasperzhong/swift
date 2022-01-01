@@ -41,13 +41,13 @@ class AverageMeter(object):
 def simple_accuracy(preds, labels):
     return (preds == labels).mean()
 
-def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
+def fault_tolerance_val(model, test_loader, loss_func):
     # Validation!
     eval_losses = AverageMeter()
 
-    test_iters = config.test_iters
+    test_iters = len(test_loader)
+    print("test iters:{}".format(test_iters))
     logger.info("***** Running Validation *****")
-    logger.info(" epoch {}".format(epoch) )
 
     model.eval()
     all_preds, all_label = [], []
