@@ -105,7 +105,8 @@ def get_data_loader(args):
                              sampler=test_sampler,
                              batch_size=args.micro_batch_size,
                              num_workers=8,
-                             pin_memory=True) if testset is not None else None
+                             pin_memory=True,
+                             drop_last=True)
     return train_loader, test_loader
 
 

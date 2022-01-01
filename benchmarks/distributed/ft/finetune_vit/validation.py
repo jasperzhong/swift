@@ -60,11 +60,9 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
                 output_tensor, loss, labels = forward(data_iter, model, loss_func)
                 eval_losses.update(loss)
                 preds = torch.argmax(output_tensor, dim=-1)
-
                 if len(all_preds) == 0:
                     all_preds.append(preds.detach().cpu().numpy())
                     all_label.append(labels.detach().cpu().numpy())
-                    print(all_preds)
                 else:
                     all_preds[0] = np.append(
                         all_preds[0], preds.detach().cpu().numpy(), axis=0
