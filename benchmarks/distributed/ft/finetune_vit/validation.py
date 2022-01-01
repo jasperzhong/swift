@@ -83,18 +83,17 @@ def get_transform_func():
     )
     return transform
 
-def forward_step(data_iterator, model, input_tensor, loss_func, loss, labels, eval_losses, all_preds, all_label):
+def forward_step(data_iterator, model, input_tensor, loss_func, loss, eval_losses, all_preds, all_label):
     transforms = get_transform_func()
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
-        images, label = data
+        images, labels = data
 
         if is_pipeline_first_stage():
             images = images.cuda()
             images = transforms(images)
         elif is_pipeline_last_stage():
-            label = label.cuda()
-            labels = label
+            labels = labels.cuda()
 
     if is_pipeline_first_stage():
         assert input_tensor is None
