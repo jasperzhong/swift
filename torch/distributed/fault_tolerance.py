@@ -174,12 +174,16 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                     logger.info(f"start from iteration {ts}") 
                     iter_time_avg = 0         
                     model.train()
+                    num = 0
                     for _ in range(ts, config.num_iteration):
+                        if num >= config.iters_per_epoch:
+                            raise StopIteration
                         start = time.time()
                         loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
                         iteration_time = time.time() - start
                         iter_time_avg += iteration_time
                         ts += 1
+                        num += 1
                         checksum(ts, model, optimizer)
 
                         if ts % config.print_freq == 0 and is_pipeline_last_stage():
