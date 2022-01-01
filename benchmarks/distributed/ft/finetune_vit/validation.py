@@ -57,7 +57,7 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
     for _ in range(test_iters):
         with torch.no_grad():
             if is_pipeline_last_stage():
-                output_tensor, loss, labels = forward(data_iter, model, loss_func, eval_losses, all_preds, all_label)
+                output_tensor, loss, labels = forward(data_iter, model, loss_func)
                 eval_losses.update(loss)
                 preds = torch.argmax(output_tensor, dim=-1)
 
@@ -73,7 +73,7 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
                         all_label[0], labels.detach().cpu().numpy(), axis=0
                     )
             else:
-                loss, output_tensor = forward(data_iter, model, loss_func, eval_losses, all_preds, all_label)
+                loss, output_tensor = forward(data_iter, model, loss_func)
     if is_pipeline_last_stage():
         all_preds, all_label = all_preds[0], all_label[0]
         accuracy = simple_accuracy(all_preds, all_label)
