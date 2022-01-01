@@ -73,6 +73,7 @@ def forward(data_iterator, model, loss_func, eval_losses, all_preds, all_label):
     input_tensor = recv_forward(model.input_shape)
     output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss, eval_losses, all_preds, all_label)
     send_forward(output_tensor)
+    print("forward:{}".foramt(all_preds))
     return loss, output_tensor
     
 def get_transform_func():
@@ -110,6 +111,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss, eval_losse
         if len(all_preds) == 0:
             all_preds.append(preds.detach().cpu().numpy())
             all_label.append(labels.detach().cpu().numpy())
+            print(all_preds)
         else:
             all_preds[0] = np.append(
                 all_preds[0], preds.detach().cpu().numpy(), axis=0
