@@ -103,7 +103,7 @@ def get_data_loader(args):
                               drop_last=True)
     test_loader = DataLoader(testset,
                              sampler=test_sampler,
-                             batch_size=256,
+                             batch_size=args.micro_batch_size,
                              num_workers=8,
                              pin_memory=True,
                              drop_last=True)
