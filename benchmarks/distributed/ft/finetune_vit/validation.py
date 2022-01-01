@@ -54,7 +54,7 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
     
     data_iter = iter(test_loader)
     labels = None
-    for _ in test_iters:
+    for _ in range(test_iters):
         with torch.no_grad():
             loss, output_tensor = forward(data_iter, model, loss_func, labels)
             if is_pipeline_last_stage():
