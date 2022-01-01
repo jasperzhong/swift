@@ -170,9 +170,9 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
         checksum(ts, model, optimizer)
         try:
             while True:
-                try:          
+                try:
+                    logger.info(f"start from iteration {ts}")          
                     for _ in range(ts, config.num_iteration):
-                        logger.info(f"start from iteration {ts}")
                         iter_time_avg = 0
                         model.train()
                         start = time.time()
