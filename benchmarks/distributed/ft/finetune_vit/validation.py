@@ -61,27 +61,27 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
                 eval_losses.update(loss)
                 preds = torch.argmax(output_tensor, dim=-1)
 
-            if len(all_preds) == 0:
-                all_preds.append(preds.detach().cpu().numpy())
-                all_label.append(labels.detach().cpu().numpy())
-            else:
-                all_preds[0] = np.append(
-                    all_preds[0], preds.detach().cpu().numpy(), axis=0
-                )
-                all_label[0] = np.append(
-                    all_label[0], labels.detach().cpu().numpy(), axis=0
-                )
+                if len(all_preds) == 0:
+                    all_preds.append(preds.detach().cpu().numpy())
+                    all_label.append(labels.detach().cpu().numpy())
+                else:
+                    all_preds[0] = np.append(
+                        all_preds[0], preds.detach().cpu().numpy(), axis=0
+                    )
+                    all_label[0] = np.append(
+                        all_label[0], labels.detach().cpu().numpy(), axis=0
+                    )
         
 
-    all_preds, all_label = all_preds[0], all_label[0]
-    accuracy = simple_accuracy(all_preds, all_label)
+                all_preds, all_label = all_preds[0], all_label[0]
+                accuracy = simple_accuracy(all_preds, all_label)
 
-    logger.info("\n")
-    logger.info("Validation Results")
-    logger.info("Valid Loss: %2.5f" % eval_losses.avg)
-    logger.info("Valid Accuracy: %2.5f" % accuracy)
+                logger.info("\n")
+                logger.info("Validation Results")
+                logger.info("Valid Loss: %2.5f" % eval_losses.avg)
+                logger.info("Valid Accuracy: %2.5f" % accuracy)
 
-    return accuracy
+                return accuracy
 
 def forward(data_iterator, model, loss_func, labels):
     loss = 0
