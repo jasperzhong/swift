@@ -49,10 +49,17 @@ def get_microbatch_size():
     global _GLOBAL_ARGS
     return _GLOBAL_ARGS.micro_batch_size
 
+class ToTensor(torch.nn.Module):
+    def __init__(self, transform):
+        super().__init__()
+        self.totensor = transform
+    def forward(self, x):
+        return self.totensor(x)
+
 def get_transform_func():
     transform = nn.Sequential(
         transforms.RandomResizedCrop((384, 384), scale=(0.05, 1.0)),
-        transforms.ToTensor(),
+        ToTensor(transforms.ToTensor()),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     )
     return transform
