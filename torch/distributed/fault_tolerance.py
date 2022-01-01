@@ -337,30 +337,6 @@ def build_model_and_optimizer(config, model, optimizer, comm, peer_failure_worke
                                                  backward_passes_per_step=num_microbatches,
                                                  comm_group=comm, average=False)
 
-    def hook_fn_backward(m, grad_input, grad_output):
-        def _dfs(grad_input):
-            checksum = 0
-            if isinstance(grad_input, tuple):
-                for grad in grad_input:
-                    checksum += _dfs(grad)
-            elif isinstance(grad_input, torch.cuda.FloatTensor):
-                checksum = torch.sum(grad_input)
-            return checksum
-
-        grad_input_checksum = _dfs(grad_input)
-        grad_output_checksum = _dfs(grad_output)
-
-        with open("debug_backward.log", "a") as f:
-            f.write(f"{m._get_name()} {grad_input_checksum} {grad_output_checksum}\n")
-
-    def dfs(module):
-        for m in module.children():
-            if len(list(m.children())) == 0:
-                m.register_backward_hook(hook_fn_backward)
-            else:
-                dfs(m)
-
-    dfs(model.model_split)
 
     # peer failure worker broadcast its parameters and optimizer states
     # to other group members
