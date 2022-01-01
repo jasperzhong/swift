@@ -56,7 +56,7 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
     labels = None
     for _ in range(test_iters):
         with torch.no_grad():
-            loss, output_tensor = forward(data_iter, model, loss_func, labels)
+            loss, output_tensor, labels = forward(data_iter, model, loss_func, labels)
             if is_pipeline_last_stage():
                 eval_losses.update(loss)
                 preds = torch.argmax(output_tensor, dim=-1)
@@ -88,7 +88,7 @@ def forward(data_iterator, model, loss_func, labels):
     input_tensor = recv_forward(model.input_shape)
     output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss, labels)
     send_forward(output_tensor)
-    return loss, output_tensor
+    return loss, output_tensor, labels
     
 def get_transform_func():
     transform = nn.Sequential(
@@ -102,14 +102,14 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss, labels):
     transforms = get_transform_func()
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
-        images, labels = data
+        images, label = data
 
         if is_pipeline_first_stage():
             images = images.cuda()
             images = transforms(images)
         elif is_pipeline_last_stage():
-            labels = labels.cuda()
-            labels = labels
+            label = label.cuda()
+            labels = label
 
     if is_pipeline_first_stage():
         assert input_tensor is None
