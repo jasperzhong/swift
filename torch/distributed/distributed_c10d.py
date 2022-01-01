@@ -1107,7 +1107,7 @@ def recv(tensor,
     global _logging_rng_state_cnt
     global _logging_in_recovery
 
-    if _logging and _logging_in_recovery
+    if _logging and _logging_in_recovery:
         # on recovery
         if _logging_rng_state_fd is None:
             peer_failure_worker = get_rank() - _logging_group_diff
