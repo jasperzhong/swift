@@ -170,8 +170,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
         data_iterator = reset_data_iterator_func(data_loader, ts)
         epoch = ts._value // config.iters_per_epoch
         curr_iter = ts % config.iters_per_epoch
-        num_epochs = config.num_iterations // config.iters_per_epoch
-        left_iters = config.num_iterations % config.iters_per_epoch
+        num_epochs = config.num_iteration // config.iters_per_epoch
+        left_iters = config.num_iteration % config.iters_per_epoch
         checksum(ts, model, optimizer)
         try:
             iter_time_avg = 0
@@ -193,7 +193,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 fault_tolerance_val(config, e, model, test_loader, loss_func)
 
             if left_iters != 0:
-                for _ in range(ts, config.num_iterations):
+                for _ in range(ts, config.num_iteration):
                     start = time.time()
                     loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
                     iteration_time = time.time() - start
