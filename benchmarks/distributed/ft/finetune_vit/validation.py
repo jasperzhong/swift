@@ -73,18 +73,19 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
                     )
         
 
-                all_preds, all_label = all_preds[0], all_label[0]
-                accuracy = simple_accuracy(all_preds, all_label)
+    all_preds, all_label = all_preds[0], all_label[0]
+    accuracy = simple_accuracy(all_preds, all_label)
 
-                logger.info("\n")
-                logger.info("Validation Results")
-                logger.info("Valid Loss: %2.5f" % eval_losses.avg)
-                logger.info("Valid Accuracy: %2.5f" % accuracy)
+    logger.info("\n")
+    logger.info("Validation Results")
+    logger.info("Valid Loss: %2.5f" % eval_losses.avg)
+    logger.info("Valid Accuracy: %2.5f" % accuracy)
 
-                return accuracy
+    return accuracy
 
 def forward(data_iterator, model, loss_func, labels):
     loss = 0
+    labels = labels
     input_tensor = recv_forward(model.input_shape)
     output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss, labels)
     send_forward(output_tensor)
