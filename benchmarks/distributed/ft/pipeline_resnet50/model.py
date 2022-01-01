@@ -1,9 +1,9 @@
+from resnet import Bottleneck, ResNet
+from schedule import (get_microbatch_size,
+                      get_pipeline_model_parallel_world_size)
+
 import torch
 import torch.nn as nn
-from torchvision.models.resnet import Bottleneck, ResNet
-
-from schedule import get_microbatch_size, \
-    get_pipeline_model_parallel_world_size
 
 
 class PipelineParallelResNet50(ResNet):
