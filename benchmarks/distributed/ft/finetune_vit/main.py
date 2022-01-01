@@ -179,7 +179,7 @@ def main():
     iters_per_epoch = len(data_loader) // num_micro_batches
     print("iters per epoch:{}".format(iters_per_epoch))
 
-    test_iters = len(test_loader) // num_micro_batches
+    test_iters = len(test_loader)
     print("test iters:{}".format(test_iters))
 
     optimizer = optim.SGD(model.parameters(), lr=3e-2, momentum=0.9)

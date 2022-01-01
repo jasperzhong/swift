@@ -15,6 +15,7 @@ cmd="python3 -m torch.distributed.run \
 	main.py \
 	--micro-batch-size 32 \
 	--global-batch-size 512 \
+	--warm-up-iters 0 \
 	--seed 2021 \
 	-p 20 \
 	~/data/" 
