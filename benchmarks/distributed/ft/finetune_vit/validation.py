@@ -90,7 +90,6 @@ def forward(data_iterator, model, loss_func):
     input_tensor = recv_forward(model.input_shape)
     if is_pipeline_last_stage():
         output_tensor, loss, labels = forward_step(data_iterator, model, input_tensor, loss_func, loss)
-        print("forward output:{} loss {} lables".format(output_tensor, loss, len(labels)))
         return output_tensor, loss, labels
     else:
         output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss)
