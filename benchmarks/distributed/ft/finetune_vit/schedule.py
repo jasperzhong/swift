@@ -71,7 +71,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
         data = next(data_iterator)
         images, labels = data
         images, labels = images.cuda(), labels.cuda()
-        if is_pipeline_first_stage:
+        if is_pipeline_first_stage():
             images = transforms(images)
         end = time.time()
         elap = end - start
