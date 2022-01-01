@@ -33,7 +33,7 @@ parser.add_argument('--lr', '--learning-rate', default=3e-3, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('--lr-min', '--learning-rate-min', default=0, type=float,
                     help='min of learning rate (defalut 0)')
-parser.add_argument('--warm-up-iters', default=10000, type=float,
+parser.add_argument('--warm-up-iters', default=500, type=float,
                     help='warm up iterations')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
@@ -147,6 +147,7 @@ def validate_iter(model, data_iterator, loss_func):
     return
 
 def get_lr_scheduler(optimizer, total_iters, args):
+
     warm_up_with_cosine_lr = lambda iter: iter / args.warm_up_iters if iter <= args.warm_up_iters \
                             else 0.5 * ( math.cos((iter - args.warm_up_iters) /(total_iters - args.warm_up_iters) * math.pi) + 1)
 
