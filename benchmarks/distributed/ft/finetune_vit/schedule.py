@@ -69,15 +69,13 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
         images, labels = data
-        start = time.time()
+
         if is_pipeline_first_stage():
             images = images.cuda()
             images = transforms(images)
         elif is_pipeline_last_stage():
             labels = labels.cuda()
-        end = time.time()
-        elap = end - start
-        print("rank{} load data time is : {}".format(get_rank(),elap))
+
     if is_pipeline_first_stage():
         assert input_tensor is None
         input_tensor = images
@@ -88,14 +86,12 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
         output_tensor = loss_func(output_tensor, labels)
         output_tensor /= get_num_microbatches()
         loss += output_tensor.item()
-    # end = time.time()
-    # elap = end - start
-    # print("rank{} forward time is : {}".format(get_rank(),elap))
+
     return output_tensor
 
 
 def backward_step(input_tensor, output_tensor, output_tensor_grad):
-    # start = time.time()
+
     global _cnt
     if input_tensor is not None:
         input_tensor.retain_grad()
@@ -105,9 +101,7 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad):
     input_tensor_grad = None
     if input_tensor is not None:
         input_tensor_grad = input_tensor.grad
-    # end = time.time()
-    # elap = end - start
-    # print("rank{} backward time is : {}".format(get_rank(),elap))
+
     return input_tensor_grad
 
 

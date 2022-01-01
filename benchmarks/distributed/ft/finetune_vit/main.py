@@ -6,6 +6,7 @@ import time
 from torch.optim import lr_scheduler
 import math
 import numpy as np
+from validation import fault_tolerance_val
 from schedule import (ToTensor, get_num_microbatches, initialize_global_args,
                       is_pipeline_first_stage, is_pipeline_last_stage,
                       pipedream_flush_schedule)
@@ -39,7 +40,7 @@ parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
 parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)',
                     dest='weight_decay')
-parser.add_argument('-p', '--print-freq', default=100, type=int,
+parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
@@ -103,7 +104,7 @@ def get_data_loader(args):
     test_loader = DataLoader(testset,
                              sampler=test_sampler,
                              batch_size=args.micro_batch_size,
-                             num_workers=4,
+                             num_workers=8,
                              pin_memory=True) if testset is not None else None
     return train_loader, test_loader
 
@@ -136,6 +137,14 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
     iteration_time = time.time() - start
     return loss
 
+def validate_iter(model, data_iterator, loss_func):
+    start = time.time()
+    loss = pipedream_flush_schedule(
+        data_iterator, model, loss_func)
+    torch.cuda.synchronize()
+    iteration_time = time.time() - start
+    return
+
 def get_lr_scheduler(optimizer, total_iters, args):
     cosine_lr = lambda iter: 0.5 * ( math.cos((iter - args.warm_up_iters) /(total_iters - args.warm_up_iters) * math.pi) + 1)
 
@@ -161,19 +170,24 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader, test_loader = get_data_loader(args)
-    model = PipelineParallelViT()
+    model = PipelineParallelViT(balance=[1,3,3,3,3,2,2,1])
     model.cuda()
 
-    micro_batch_num = args.global_batch_size // args.micro_batch_size
-    total_iters = args.epochs * (len(data_loader) // micro_batch_num)
+    total_iters = args.benchmark_iters
     print("total iterations: {}".format(total_iters))
-    # lr rate???
-    optimizer = optim.SGD(model.parameters(), lr=3e-3, momentum=0.9)
+    num_micro_batches = args.global_batch_size // args.micro_batch_size
+    iters_per_epoch = len(data_loader) // num_micro_batches
+    print("iters per epoch:{}".format(iters_per_epoch))
+
+    test_iters = len(test_loader) // num_micro_batches
+    print("test iters:{}".format(test_iters))
+
+    optimizer = optim.SGD(model.parameters(), lr=3e-2, momentum=0.9)
     lr_scheduler = get_lr_scheduler(optimizer, total_iters, args)
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
-        num_iteration=total_iters, batch_size=args.global_batch_size, checkpoint_interval=10,
+        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, test_iters=test_iters, batch_size=args.global_batch_size, checkpoint_interval=10,
         replica=False, logging=args.logging, logging_compression=args.logging_compression,
         logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
@@ -181,7 +195,7 @@ def main():
     )
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, lr_scheduler,
-                          reset_data_iterator_func=reset_data_iterator)
+                          reset_data_iterator_func=reset_data_iterator, fault_tolerance_val=fault_tolerance_val, test_loader=test_loader)
 
 
 if __name__ == '__main__':

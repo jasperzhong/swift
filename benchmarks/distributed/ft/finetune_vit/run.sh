@@ -16,7 +16,7 @@ cmd="python3 -m torch.distributed.run \
 	--micro-batch-size 32 \
 	--global-batch-size 512 \
 	--seed 2021 \
-	-p 5 \
+	-p 20 \
 	~/data/" 
 
 OMP_NUM_THREADS=8 NCCL_IB_DISABLE=1 exec $cmd
