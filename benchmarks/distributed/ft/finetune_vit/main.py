@@ -85,8 +85,7 @@ def get_data_loader(args):
 
     trainset = datasets.CIFAR100(root=args.data,
                                 train=True,
-                                download=False,
-                                transform=transform_train)
+                                download=False)
     testset = datasets.CIFAR100(root=args.data,
                                 train=False,
                                 download=False,

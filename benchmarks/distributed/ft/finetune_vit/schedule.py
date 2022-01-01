@@ -1,6 +1,7 @@
 import torch
 import time
-
+import torch.nn as nn
+from torchvision import datasets, transforms
 from torch.distributed.distributed_c10d import get_rank
 _GLOBAL_ARGS = None
 
@@ -48,14 +49,23 @@ def get_microbatch_size():
     global _GLOBAL_ARGS
     return _GLOBAL_ARGS.micro_batch_size
 
+def get_transform_func():
+    transform = nn.Sequential(
+        transforms.RandomResizedCrop((384, 384), scale=(0.05, 1.0)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+    )
+    return transform
 
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
-    
+    transforms = get_transform_func()
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         start = time.time()
         data = next(data_iterator)
         images, labels = data
         images, labels = images.cuda(), labels.cuda()
+        if is_pipeline_first_stage:
+            images = transforms(images)
         end = time.time()
         elap = end - start
         print("rank{} load data time is : {}".format(get_rank(),elap))
