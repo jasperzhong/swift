@@ -147,7 +147,8 @@ def validate_iter(model, data_iterator, loss_func):
     return
 
 def get_lr_scheduler(optimizer, total_iters, args):
-    cosine_lr = lambda iter: 0.5 * ( math.cos((iter - args.warm_up_iters) /(total_iters - args.warm_up_iters) * math.pi) + 1)
+    warm_up_with_cosine_lr = lambda iter: iter / args.warm_up_iters if iter <= args.warm_up_iters \
+                            else 0.5 * ( math.cos((iter - args.warm_up_iters) /(total_iters - args.warm_up_iters) * math.pi) + 1)
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=cosine_lr)
     return scheduler
