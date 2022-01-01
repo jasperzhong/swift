@@ -135,6 +135,22 @@ def main():
     model = PipelineParallelResNet50(rank=args.rank, balance=[4, 2, 2, 3])
     model.cuda()
 
+    def hook_fn_forward(m, x, y):
+        def _dfs(tensors):
+            checksum = 0
+            if isinstance(tensors, tuple):
+                for t in tensors:
+                    checksum += _dfs(t)
+            elif isinstance(tensors, torch.cuda.FloatTensor):
+                checksum = torch.sum(tensors)
+            return checksum
+
+        input_checksum = _dfs(x)
+        output_checksum = _dfs(y)
+
+        with open("debug_forward_module.log", "a") as f:
+            f.write(f"{m._get_name()} {input_checksum} {output_checksum}\n")
+
     def hook_fn_backward(m, grad_input, grad_output):
         def _dfs(grad_input):
             checksum = 0
@@ -155,6 +171,7 @@ def main():
         for m in module.children():
             if len(list(m.children())) == 0:
                 m.register_backward_hook(hook_fn_backward)
+                m.register_forward_hook(hook_fn_forward)
             else:
                 dfs(m)
 
