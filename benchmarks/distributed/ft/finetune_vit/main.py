@@ -161,7 +161,7 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader, test_loader = get_data_loader(args)
-    model = PipelineParallelViT(balance=[1,3,3,3,3,2,2,1])
+    model = PipelineParallelViT()
     model.cuda()
 
     micro_batch_num = args.global_batch_size // args.micro_batch_size

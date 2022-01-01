@@ -58,7 +58,7 @@ class ToTensor(torch.nn.Module):
 
 def get_transform_func():
     transform = nn.Sequential(
-        transforms.RandomResizedCrop((384, 384), scale=(0.05, 1.0)),
+        transforms.RandomResizedCrop((224, 224), scale=(0.05, 1.0)),
         # ToTensor(transforms.ToTensor()),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     )
@@ -67,12 +67,14 @@ def get_transform_func():
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     transforms = get_transform_func()
     if is_pipeline_first_stage() or is_pipeline_last_stage():
-        start = time.time()
         data = next(data_iterator)
         images, labels = data
-        images, labels = images.cuda(), labels.cuda()
+        start = time.time()
         if is_pipeline_first_stage():
+            images = images.cuda()
             images = transforms(images)
+        elif is_pipeline_last_stage():
+            labels = labels.cuda()
         end = time.time()
         elap = end - start
         print("rank{} load data time is : {}".format(get_rank(),elap))
