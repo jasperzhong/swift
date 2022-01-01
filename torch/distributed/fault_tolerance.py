@@ -168,7 +168,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     while True:
         recovery(config, ts, model, optimizer)
         data_iterator = reset_data_iterator_func(data_loader, ts)
-        epoch = ts // config.iters_per_epoch
+        epoch = ts._value // config.iters_per_epoch
         curr_iter = ts % config.iters_per_epoch
         num_epochs = config.num_iterations // config.iters_per_epoch
         left_iters = config.num_iterations % config.iters_per_epoch
