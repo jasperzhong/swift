@@ -57,7 +57,21 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
     for _ in range(test_iters):
         with torch.no_grad():
             if is_pipeline_last_stage():
-                eval_losses, all_preds, all_label = forward(data_iter, model, loss_func, eval_losses, all_preds, all_label)
+                output_tensor, loss, labels = forward(data_iter, model, loss_func, eval_losses, all_preds, all_label)
+                eval_losses.update(loss)
+                preds = torch.argmax(output_tensor, dim=-1)
+
+                if len(all_preds) == 0:
+                    all_preds.append(preds.detach().cpu().numpy())
+                    all_label.append(labels.detach().cpu().numpy())
+                    print(all_preds)
+                else:
+                    all_preds[0] = np.append(
+                        all_preds[0], preds.detach().cpu().numpy(), axis=0
+                    )
+                    all_label[0] = np.append(
+                        all_label[0], labels.detach().cpu().numpy(), axis=0
+                    )
             else:
                 loss, output_tensor = forward(data_iter, model, loss_func, eval_losses, all_preds, all_label)
     if is_pipeline_last_stage():
@@ -71,15 +85,16 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
 
         return accuracy
 
-def forward(data_iterator, model, loss_func, eval_losses, all_preds, all_label):
+def forward(data_iterator, model, loss_func):
     loss = 0
     input_tensor = recv_forward(model.input_shape)
     if is_pipeline_last_stage():
-        eval_losses, all_preds, all_label = forward_step(data_iterator, model, input_tensor, loss_func, loss, eval_losses, all_preds, all_label)
-        return eval_losses, all_preds, all_label
-    output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss, eval_losses, all_preds, all_label)
+        output_tensor, loss, labels = forward_step(data_iterator, model, input_tensor, loss_func, loss)
+        print("forward output:{} loss {} lables".format(output_tensor, loss, labels))
+        return output_tensor, loss, labels
+    else:
+        output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss)
     send_forward(output_tensor)
-    print("forward:{}".format(all_preds))
     return loss, output_tensor
     
 def get_transform_func():
@@ -90,7 +105,7 @@ def get_transform_func():
     )
     return transform
 
-def forward_step(data_iterator, model, input_tensor, loss_func, loss, eval_losses, all_preds, all_label):
+def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     transforms = get_transform_func()
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
@@ -111,21 +126,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss, eval_losse
     if is_pipeline_last_stage():
         output_tensor = loss_func(output_tensor, labels)
         loss += output_tensor.item()
-        eval_losses.update(loss)
-        preds = torch.argmax(output_tensor, dim=-1)
-
-        if len(all_preds) == 0:
-            all_preds.append(preds.detach().cpu().numpy())
-            all_label.append(labels.detach().cpu().numpy())
-            print(all_preds)
-        else:
-            all_preds[0] = np.append(
-                all_preds[0], preds.detach().cpu().numpy(), axis=0
-            )
-            all_label[0] = np.append(
-                all_label[0], labels.detach().cpu().numpy(), axis=0
-            )
         
-        return eval_losses, all_preds, all_label
+        return output_tensor, loss, labels
 
     return output_tensor
