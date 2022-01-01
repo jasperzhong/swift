@@ -73,7 +73,7 @@ def forward(data_iterator, model, loss_func, eval_losses, all_preds, all_label):
     input_tensor = recv_forward(model.input_shape)
     output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss, eval_losses, all_preds, all_label)
     send_forward(output_tensor)
-    print("forward:{}".foramt(all_preds))
+    print("forward:{}".format(all_preds))
     return loss, output_tensor
     
 def get_transform_func():
