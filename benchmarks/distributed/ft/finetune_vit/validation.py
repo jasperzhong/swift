@@ -86,7 +86,7 @@ def fault_tolerance_val(config, epoch, model, test_loader, loss_func):
 def forward(data_iterator, model, loss_func, labels):
     loss = 0
     input_tensor = recv_forward(model.input_shape)
-    output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss, lbs=labels)
+    output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss, labels)
     send_forward(output_tensor)
     return loss, output_tensor
     
@@ -98,7 +98,7 @@ def get_transform_func():
     )
     return transform
 
-def forward_step(data_iterator, model, input_tensor, loss_func, loss, lbs=None):
+def forward_step(data_iterator, model, input_tensor, loss_func, loss, *args):
     transforms = get_transform_func()
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
@@ -109,7 +109,6 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss, lbs=None):
             images = transforms(images)
         elif is_pipeline_last_stage():
             labels = labels.cuda()
-            lbs = labels
 
     if is_pipeline_first_stage():
         assert input_tensor is None
