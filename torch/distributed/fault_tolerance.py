@@ -179,6 +179,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
             # for _ in range(ts, config.num_iteration):
             for e in range(epoch, num_epochs):
                 for _ in range(curr_iter, config.iters_per_epoch):
+                    data_iterator = iter(data_loader)
                     start = time.time()
                     loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
                     iteration_time = time.time() - start
