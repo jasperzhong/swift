@@ -42,7 +42,8 @@ def get_pipeline_model_parallel_prev_rank():
 
 def get_num_microbatches():
     global _GLOBAL_ARGS
-    return _GLOBAL_ARGS.global_batch_size // _GLOBAL_ARGS.micro_batch_size
+    return _GLOBAL_ARGS.global_batch_size // _GLOBAL_ARGS.micro_batch_size // \
+        torch.distributed.parallel_recovery_data_parallel_size()
 
 
 def get_microbatch_size():
