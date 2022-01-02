@@ -39,6 +39,8 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 def simple_accuracy(preds, labels):
+    print("preds:{}".format(preds))
+    print("labels:{}".format(labels))
     return (preds == labels).mean()
 
 def fault_tolerance_val(config, model, test_loader, loss_func):
@@ -53,7 +55,7 @@ def fault_tolerance_val(config, model, test_loader, loss_func):
     all_preds, all_label = [], []
     
     data_iter = iter(test_loader)
-    labels = None
+
     for i in range(test_iters):
         with torch.no_grad():
             if is_pipeline_last_stage():
