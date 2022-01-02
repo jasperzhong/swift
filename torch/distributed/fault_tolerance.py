@@ -131,7 +131,8 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
         logger.info(f"[rank {get_rank()}] undo update is needed"
                     f"(iteration = {consensus_value+1} while the consensus value is {consensus_value})!")
         if lr_scheduler:
-            lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=consensus_value)
+            lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=consensus_value)
         optimizer.undo()
 
     old_optimizer = optimizer
@@ -402,8 +403,6 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
                         iteration_time = time.time() - start
                         iter_time_avg += iteration_time
-                        ts += 1
-                        num += 1
 
                         if ts % config.print_freq == 0 and is_pipeline_last_stage():
                             if lr_scheduler:
@@ -412,6 +411,9 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             else:
                                 logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} ".format(
                                     ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value))
+
+                        ts += 1
+                        num += 1
 
                         if ts == consensus_value and cb:
                             ts, model, optimizer = cb(ts)
