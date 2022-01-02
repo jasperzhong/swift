@@ -76,7 +76,7 @@ def fault_tolerance_val(config, model, test_loader, loss_func):
 
                 top1 = compute_accuracy(output_tensor.detach(), labels)
 
-                accu.update(top1, config.test_batch_sizes)
+                accu.update(top1, config.test_batch_size)
                 # preds = torch.argmax(output_tensor, dim=-1)
                 # if len(all_preds) == 0:
                 #     all_preds.append(preds.detach().cpu().numpy())
