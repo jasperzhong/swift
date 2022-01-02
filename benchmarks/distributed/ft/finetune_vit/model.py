@@ -54,7 +54,7 @@ class norm(nn.Module):
 class PipelineParallelViT(nn.Module):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
         super(PipelineParallelViT, self).__init__()
-        self.vit = create_model("vit_base_patch32_224_in21k", pretrained=True, num_classes=100, img_size=224)
+        self.vit = create_model("vit_base_patch16_224_in21k", pretrained=True, num_classes=100, img_size=224)
         self.vit_sequential = nn.Sequential(
             self.vit.patch_embed.proj,
             norm(

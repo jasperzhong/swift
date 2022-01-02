@@ -3,10 +3,10 @@ import logging
 import os
 import random
 import time
-from torch.optim import lr_scheduler
 import math
 import numpy as np
 from validation import fault_tolerance_val
+from lr_scheduler import WarmupCosineSchedule
 from schedule import (ToTensor, get_num_microbatches, initialize_global_args,
                       is_pipeline_first_stage, is_pipeline_last_stage,
                       pipedream_flush_schedule)

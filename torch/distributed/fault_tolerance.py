@@ -197,6 +197,9 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                     fault_tolerance_val(config, model, test_loader, loss_func)
                     data_iterator = reset_data_iterator_func(data_loader, 0)
 
+            logger.info("Finish Training for {} iterations".format(ts))
+            fault_tolerance_val(config, model, test_loader, loss_func)
+            
             break
         except SwiftInternalError as e:
             logger.info("catch an error: " + str(e))
