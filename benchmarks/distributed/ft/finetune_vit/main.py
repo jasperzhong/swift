@@ -80,11 +80,6 @@ def get_data_loader(args):
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
     ])
-    transform_test = transforms.Compose([
-        transforms.Resize((384, 384)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-    ])
 
     trainset = datasets.CIFAR100(root=args.data,
                                 train=True,

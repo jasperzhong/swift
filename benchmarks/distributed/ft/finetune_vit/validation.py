@@ -49,11 +49,6 @@ def compute_accuracy(output, target, topk=(1,)):
     return [correct[:min(k, maxk)].reshape(-1).float().sum(0) * 100. / batch_size for k in topk]
 
 
-def simple_accuracy(preds, labels):
-    print("preds:{}".format(preds))
-    print("labels:{}".format(labels))
-    return (preds == labels).mean()
-
 def fault_tolerance_val(config, model, test_loader, loss_func):
     # Validation!
     eval_losses = AverageMeter()
@@ -64,7 +59,6 @@ def fault_tolerance_val(config, model, test_loader, loss_func):
     logger.info("***** Running Validation *****")
 
     model.eval()
-    all_preds, all_label = [], []
     
     data_iter = iter(test_loader)
 
@@ -77,22 +71,10 @@ def fault_tolerance_val(config, model, test_loader, loss_func):
                 top1 = compute_accuracy(output_tensor.detach(), labels)
 
                 accu.update(top1[0].item(), config.test_batch_size)
-                # preds = torch.argmax(output_tensor, dim=-1)
-                # if len(all_preds) == 0:
-                #     all_preds.append(preds.detach().cpu().numpy())
-                #     all_label.append(labels.detach().cpu().numpy())
-                # else:
-                #     all_preds[0] = np.append(
-                #         all_preds[0], preds.detach().cpu().numpy(), axis=0
-                #     )
-                #     all_label[0] = np.append(
-                #         all_label[0], labels.detach().cpu().numpy(), axis=0
-                #     )
+
             else:
                 loss, output_tensor = forward(config, data_iter, model, loss_func)
     if is_pipeline_last_stage():
-        # all_preds, all_label = all_preds[0], all_label[0]
-        # accuracy = simple_accuracy(all_preds, all_label)
 
         logger.info("\n")
         logger.info("Validation Results")
@@ -116,7 +98,6 @@ def forward(config, data_iterator, model, loss_func):
 def get_transform_func():
     transform = nn.Sequential(
         transforms.Resize((224, 224)),
-        # ToTensor(transforms.ToTensor()),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     )
     return transform
