@@ -97,13 +97,13 @@ def get_data_loader(args):
     train_loader = DataLoader(trainset,
                               sampler=train_sampler,
                               batch_size=args.micro_batch_size,
-                              num_workers=8,
+                              num_workers=args.workers,
                               pin_memory=True,
                               drop_last=True)
     test_loader = DataLoader(testset,
                              sampler=test_sampler,
                              batch_size=args.test_batch_size,
-                             num_workers=8,
+                             num_workers=args.workers,
                              pin_memory=True,
                              drop_last=True)
     return train_loader, test_loader
