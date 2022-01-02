@@ -372,8 +372,10 @@ def checksum(ts, model, optimizer):
                 if 'momentum_buffer' in state:
                     optimizer_sum += torch.sum(state['momentum_buffer'])
 
+    rng_state = torch.cuda.random.get_rng_state()
+    rng_state_checksum = torch.sum(rng_state.type(torch.float32))
     with open("debug.log", "a") as f:
-        f.write(f"{ts} {model_sum} {optimizer_sum}\n")
+        f.write(f"{ts} {model_sum} {optimizer_sum} {rng_state_checksum}\n")
 
 
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
