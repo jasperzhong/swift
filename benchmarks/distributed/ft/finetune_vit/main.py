@@ -44,7 +44,7 @@ parser.add_argument('-p', '--print-freq', default=10, type=int,
 parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--img-size', default=224, type=int,
-                    help='seed for initializing training. ')
+                    help='input size')
 parser.add_argument('--benchmark-iters', default=10000, type=int, metavar='N',
                     help='number of total iterations to run for benchmark')
 parser.add_argument('--master_ip', default=None, type=str,

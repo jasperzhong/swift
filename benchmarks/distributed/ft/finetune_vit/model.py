@@ -3,10 +3,10 @@ from torch._C import ThroughputBenchmark
 import torch.nn as nn
 from typing import Optional, Iterable
 from timm.models import create_model
+import schedule
 from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
     get_pipeline_model_parallel_world_size, is_pipeline_first_stage
 from torch.onnx.symbolic_opset9 import tensor
-from schedule import _GLOBAL_ARGS
 from torch.utils import checkpoint
 import math
 
@@ -55,7 +55,7 @@ class norm(nn.Module):
 class PipelineParallelViT(nn.Module):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
         super(PipelineParallelViT, self).__init__()
-        self.vit = create_model("vit_base_patch32_224_in21k", pretrained=True, num_classes=100, img_size=224)
+        self.vit = create_model("vit_base_patch32_224_in21k", pretrained=True, num_classes=100, img_size=schedule._GLOBAL_ARGS.img_size)
         self.vit_sequential = nn.Sequential(
             self.vit.patch_embed.proj,
             norm(
@@ -109,13 +109,10 @@ class PipelineParallelViT(nn.Module):
         self.model_split = self.vit_sequential[start:end]
 
 
-    def _profile(self, shape=None):
+    def _profile(self, shape=[3, schedule._GLOBAL_ARGS.img_size, schedule._GLOBAL_ARGS.img_size]):
         """
         get each layer's input/output shape by running one forward pass
         """
-        global _GLOBAL_ARGS
-        if shape is None:
-            shape=[3, _GLOBAL_ARGS.img_size, _GLOBAL_ARGS.img_size]
         micro_batch_size = get_microbatch_size()
         fake_input = torch.randn(tuple([micro_batch_size] + shape))
         
