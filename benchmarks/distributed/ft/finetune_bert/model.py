@@ -41,8 +41,8 @@ class PipelineParallelBert(nn.Module):
                     cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(get_pipeline_model_parallel_rank())))
 
         self.bert_sequential = nn.Sequential(
-            self.bert.embeddings,
-            *(self.bert.encoder.layer),
+            self.bert.bert.embeddings,
+            *(self.bert.bert.encoder.layer),
             # it seems that is doesn't need pooler
             # self.bert.pooler,
             QA_Outputs(self.bert.qa_outputs)
