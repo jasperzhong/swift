@@ -2,13 +2,62 @@ import torch
 
 _GLOBAL_ARGS = None
 
-_cnt = 0
+from torch.optim.optimizer import Optimizer
+from torch.optim.lr_scheduler import _LRScheduler
 
+
+class LRScheduler(_LRScheduler):
+    def __init__(self, optimizer, last_epoch=-1):
+        # Check if using mixed precision training
+        self.mixed_training = False
+        base_optimizer = optimizer
+ 
+        # Check that optimizer param is valid
+        if not isinstance(optimizer, Optimizer):
+            raise TypeError('{} is not an Optimizer'.format(
+                type(optimizer).__name__))
+
+        super(LRScheduler, self).__init__(base_optimizer, last_epoch)
+
+    def step(self, epoch=None):
+        # Set the current training step
+        # ('epoch' is used to be consistent with _LRScheduler)
+        self.last_epoch = epoch if epoch is not None else self.last_epoch + 1
+
+        for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
+            param_group['lr'] = lr
+
+class PolyWarmUpScheduler(LRScheduler):
+    """
+    Applies a warm up period to the learning rate.
+    """
+
+    def __init__(self, optimizer, warmup, total_steps, degree=0.5, last_epoch=-1):
+        self.warmup = warmup
+        self.total_steps = total_steps
+        self.degree = degree
+        super(PolyWarmUpScheduler, self).__init__(optimizer, last_epoch)
+
+    def step(self, epoch=None):
+        param_group = self.optimizer.param_groups[0]
+        if 'step' in param_group:
+            self.last_epoch = param_group['step'] + 1
+        else:
+            self.last_epoch = 1
+
+        for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
+            param_group['lr'] = lr
+
+    def get_lr(self):
+        progress = self.last_epoch / self.total_steps
+        if progress < self.warmup:
+            return [base_lr * progress / self.warmup for base_lr in self.base_lrs]
+        else:
+            return [base_lr * ((1.0 - progress) ** self.degree) for base_lr in self.base_lrs]
 
 def initialize_global_args(args):
     global _GLOBAL_ARGS
     _GLOBAL_ARGS = args
-
 
 def is_pipeline_last_stage():
     return get_pipeline_model_parallel_rank() == \
@@ -39,8 +88,7 @@ def get_pipeline_model_parallel_prev_rank():
 
 def get_num_microbatches():
     global _GLOBAL_ARGS
-    return _GLOBAL_ARGS.global_batch_size // _GLOBAL_ARGS.micro_batch_size // \
-        torch.distributed.parallel_recovery_data_parallel_size()
+    return _GLOBAL_ARGS.global_batch_size // _GLOBAL_ARGS.micro_batch_size
 
 
 def get_microbatch_size():
@@ -48,28 +96,30 @@ def get_microbatch_size():
     return _GLOBAL_ARGS.micro_batch_size
 
 
+# TODO:
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
-    if is_pipeline_first_stage() or is_pipeline_last_stage():
-        data = next(data_iterator)
-        images, labels = data
-        images, labels = images.cuda(), labels.cuda()
+    # all need to get the data
+    data = next(data_iterator)
+    batch = [t.cuda() for t in data]
+    input_ids, segment_ids, input_mask, masked_lm_labels, next_sentence_labels = batch
 
     if is_pipeline_first_stage():
         assert input_tensor is None
-        input_tensor = images
-
-    output_tensor = model(input_tensor)
+        output_tensor = model(input_ids, segment_ids, input_mask)
+    else:
+        assert input_tensor is not None
+        output_tensor = model(input_tensor, segment_ids, input_mask)
 
     if is_pipeline_last_stage():
-        output_tensor = loss_func(output_tensor, labels)
+        prediction_scores, seq_relationship_score = output_tensor
+        output_tensor = loss_func(prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels)
         output_tensor /= get_num_microbatches()
         loss += output_tensor.item()
-
+        
     return output_tensor
 
 
 def backward_step(input_tensor, output_tensor, output_tensor_grad):
-    global _cnt
     if input_tensor is not None:
         input_tensor.retain_grad()
 
@@ -78,16 +128,6 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad):
     input_tensor_grad = None
     if input_tensor is not None:
         input_tensor_grad = input_tensor.grad
-
-    with open("debug_backward.log", "a") as f:
-        input_tensor_checksum = 0 if input_tensor is None else torch.sum(input_tensor)
-        output_tensor_checksum = 0 if output_tensor is None else torch.sum(output_tensor)
-        output_tensor_grad_checksum = 0 if output_tensor_grad is None else torch.sum(output_tensor_grad)
-        input_tensor_grad_checksum = 0 if input_tensor_grad is None else torch.sum(input_tensor_grad)
-        rng_state = torch.cuda.random.get_rng_state()
-        rng_state_checksum = torch.sum(rng_state.type(torch.float32))
-        f.write(f"{_cnt} {input_tensor_checksum} {output_tensor_checksum} {output_tensor_grad_checksum} {input_tensor_grad_checksum} {rng_state_checksum}\n")
-        _cnt += 1
 
     return input_tensor_grad
 
@@ -106,18 +146,16 @@ def recv_forward(shape, dtype=torch.float32):
     input_tensor = None
     if not is_pipeline_first_stage():
         input_tensor = torch.empty(shape, requires_grad=True, device=torch.cuda.current_device(), dtype=dtype)
-
-    torch.distributed.recv(input_tensor, get_pipeline_model_parallel_prev_rank())
-    return input_tensor
+        torch.distributed.recv(input_tensor, get_pipeline_model_parallel_prev_rank())
+        return input_tensor
 
 
 def recv_backward(shape, dtype=torch.float32):
     output_tensor_grad = None
     if not is_pipeline_last_stage():
         output_tensor_grad = torch.empty(shape, requires_grad=True, device=torch.cuda.current_device(), dtype=dtype)
-
-    torch.distributed.recv(output_tensor_grad, get_pipeline_model_parallel_next_rank())
-    return output_tensor_grad
+        torch.distributed.recv(output_tensor_grad, get_pipeline_model_parallel_next_rank())
+        return output_tensor_grad
 
 
 def send_forward_recv_backward(output_tensor, dtype=torch.float32):
@@ -134,8 +172,6 @@ def send_forward_recv_backward(output_tensor, dtype=torch.float32):
             req.wait()
 
         torch.cuda.synchronize()
-    else:
-        torch.distributed.recv(output_tensor_grad, get_pipeline_model_parallel_next_rank())
 
     return output_tensor_grad
 
@@ -154,8 +190,6 @@ def send_backward_recv_forward(input_tensor_grad, dtype=torch.float32):
             req.wait()
 
         torch.cuda.synchronize()
-    else:
-        torch.distributed.recv(input_tensor, get_pipeline_model_parallel_next_rank())
 
     return input_tensor
 
