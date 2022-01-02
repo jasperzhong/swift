@@ -388,7 +388,7 @@ def _is_punctuation(char):
     return False
 
 args = schedule._GLOBAL_ARGS
-tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", do_lower_case=args.do_lower_case)
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", do_lower_case=True)
 
 def get_tokenizer():
     global tokenizer
