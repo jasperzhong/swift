@@ -93,7 +93,7 @@ def get_data_loader(args):
     testset = datasets.CIFAR100(root=args.data,
                                 train=False,
                                 download=False,
-                                transform=transform_test)
+                                transform=transforms.ToTensor())
 
     train_sampler = RandomSampler(trainset)
     test_sampler = SequentialSampler(testset)
