@@ -1,22 +1,26 @@
 import argparse
 import logging
+import math
 import os
 import random
 import time
-import math
+
 import numpy as np
-from validation import fault_tolerance_val
-from schedule import (ToTensor, get_num_microbatches, initialize_global_args,
-                      is_pipeline_first_stage, is_pipeline_last_stage,
-                      pipedream_flush_schedule)
-from model import PipelineParallelViT
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader, RandomSampler, DistributedSampler, SequentialSampler
 import torch
 import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributed.fault_tolerance import FaultToleranceConfig, fault_tolerance_train
+from torch.distributed.fault_tolerance import (FaultToleranceConfig,
+                                               fault_tolerance_train)
+from torch.utils.data import (DataLoader, RandomSampler,
+                              SequentialSampler)
+from torchvision import datasets, transforms
+
+from model import PipelineParallelViT
+from schedule import (get_num_microbatches, initialize_global_args,
+                      is_pipeline_first_stage, is_pipeline_last_stage,
+                      pipedream_flush_schedule)
+from validation import fault_tolerance_val
 
 logging.basicConfig(level=logging.INFO)
 
@@ -77,9 +81,9 @@ initialize_global_args(args)
 
 def get_data_loader(args):
     trainset = datasets.CIFAR100(root=args.data,
-                                train=True,
-                                download=False,
-                                transform=transforms.ToTensor())
+                                 train=True,
+                                 download=False,
+                                 transform=transforms.ToTensor())
     testset = datasets.CIFAR100(root=args.data,
                                 train=False,
                                 download=False,
@@ -130,13 +134,15 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
     iteration_time = time.time() - start
     return loss
 
+
 def get_lr_scheduler(optimizer, total_iters, args):
 
-    warm_up_with_cosine_lr = lambda iter: iter / args.warm_up_iters if iter <= args.warm_up_iters \
-                            else 0.5 * ( math.cos((iter - args.warm_up_iters) /(total_iters - args.warm_up_iters) * math.pi) + 1)
+    def warm_up_with_cosine_lr(iter): return iter / args.warm_up_iters if iter <= args.warm_up_iters \
+        else 0.5 * (math.cos((iter - args.warm_up_iters) / (total_iters - args.warm_up_iters) * math.pi) + 1)
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=warm_up_with_cosine_lr)
     return scheduler
+
 
 def main():
     torch.backends.cudnn.benchmark = True
@@ -157,7 +163,8 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader, test_loader = get_data_loader(args)
-    model = PipelineParallelViT(balance=[1,3,3,3,3,2,2,1])
+    model = PipelineParallelViT(balance=[4, 6, 5, 3])
+    # model = PipelineParallelViT(balance=[1,3,3,3,3,2,2,1])
     model.cuda()
 
     total_iters = args.benchmark_iters
@@ -166,15 +173,14 @@ def main():
     iters_per_epoch = len(data_loader) // num_micro_batches
     print("iters per epoch:{}".format(iters_per_epoch))
 
-
     optimizer = optim.SGD(model.parameters(), lr=3e-2, momentum=0.9)
     lr_scheduler = get_lr_scheduler(optimizer, total_iters, args)
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
-        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, test_batch_size=args.test_batch_size, checkpoint_interval=10,
-        replica=False, logging=args.logging, logging_compression=args.logging_compression,
-        logging_chunk_freq=args.logging_chunk_freq,
+        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(), 
+        checkpoint_interval=10, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery, 
+        logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
@@ -185,6 +191,7 @@ def main():
 
     end = time.time()
     print("Training time is {}".format(end - start))
+
 
 if __name__ == '__main__':
     main()

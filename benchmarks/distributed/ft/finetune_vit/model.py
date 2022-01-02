@@ -1,14 +1,18 @@
+import math
+from typing import Iterable, Optional
+
 import torch
-from torch._C import ThroughputBenchmark
 import torch.nn as nn
-from typing import Optional, Iterable
 from timm.models import create_model
-import schedule
-from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
-    get_pipeline_model_parallel_world_size, is_pipeline_first_stage
+from torch._C import ThroughputBenchmark
 from torch.onnx.symbolic_opset9 import tensor
 from torch.utils import checkpoint
-import math
+
+import schedule
+from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
+                      get_pipeline_model_parallel_world_size,
+                      is_pipeline_first_stage)
+
 
 class Tokens(nn.Module):
     def __init__(self, cls_token, dist_token):
@@ -41,7 +45,7 @@ class Cls(nn.Module):
         x = self.head(x)
         return x
 
-class norm(nn.Module):
+class Norm(nn.Module):
     def __init__(self, flatten, norm):
         super().__init__()
         self.flatten = flatten
@@ -58,7 +62,7 @@ class PipelineParallelViT(nn.Module):
         self.vit = create_model("vit_base_patch32_224_in21k", pretrained=True, num_classes=100, img_size=schedule._GLOBAL_ARGS.img_size)
         self.vit_sequential = nn.Sequential(
             self.vit.patch_embed.proj,
-            norm(
+            Norm(
                self.vit.patch_embed.flatten,
                self.vit.patch_embed.norm
             ),
@@ -93,11 +97,23 @@ class PipelineParallelViT(nn.Module):
 
         self._profile()
 
-        if rank is None:
-            self.rank = get_pipeline_model_parallel_rank()
-        else:
-            self.rank = rank
+        self.rank = None
+        self.model_split = None
 
+        if rank is None:
+            rank = get_pipeline_model_parallel_rank()
+        self.assign_model_split(rank)
+        
+    def assign_model_split(self, rank):
+        # assign model split
+        if rank == self.rank:
+            return
+
+        self.rank = rank
+
+        # offload previous model split from GPU
+        if self.model_split is not None:
+            self.model_split.cpu()
         # assign model split
         start = 0
         for i in range(self.rank):
@@ -131,12 +147,15 @@ class PipelineParallelViT(nn.Module):
     def parameters(self, recurse=True):
         return self.model_split.parameters(recurse=recurse)
 
+    def named_parameters(self, prefix='', recurse=True):
+        return self.model_split.named_parameters(prefix=prefix, recurse=recurse)
+
     def state_dict(self):
         return self.model_split.state_dict()
 
     def load_state_dict(self, state_dict):
         self.model_split.load_state_dict(state_dict)
-        
+
     def children(self):
         if not hasattr(self, 'model_split'):
             return super(PipelineParallelViT, self).children()

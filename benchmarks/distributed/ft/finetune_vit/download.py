@@ -9,7 +9,7 @@ transform_train = transforms.Compose([
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
     ])
 
-trainset = datasets.CIFAR100(root="~/data/",
+trainset = datasets.CIFAR100(root="~/data/CIFAR100",
                             train=True,
                             download=False,
                             transform=transform_train)

@@ -96,13 +96,12 @@ def _set_recovery_mask(config, ts, consensus_value):
 
 
 class FaultToleranceConfig:
-    def __init__(self, num_iteration, iters_per_epoch, batch_size, num_microbatches, test_batch_size, checkpoint_interval, replica=False, logging=False,
+    def __init__(self, num_iteration, iters_per_epoch, batch_size, num_microbatches, checkpoint_interval, replica=False, logging=False,
                  parallel_recovery=False, logging_compression=None, logging_chunk_freq=None, logging_dfs=None, logging_bucket=None,
                  logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
         self.num_iteration = num_iteration
         self.iters_per_epoch = iters_per_epoch
         self.batch_size = batch_size
-        self.test_batch_size = test_batch_size
         self.num_microbatches = num_microbatches
         self.checkpoint_interval = checkpoint_interval
         self.replica = replica
@@ -403,7 +402,7 @@ def _get_checkpoint_path():
     return "swift" + str(rank) + ".ckpt"
 
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
-                          lr_scheduler, reset_data_iterator_func, fault_tolerance_val, test_loader):
+                          lr_scheduler, reset_data_iterator_func, fault_tolerance_val=None, test_loader=None):
     setup(config)
 
     ts = Timestamp(0)
@@ -434,8 +433,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         
 
                         if ts % config.print_freq == 0 and is_pipeline_last_stage():
-                            logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} lr: {}".format(
-                                ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))
+                            logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {}".format(
+                                ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value))
 
                         if ts == consensus_value and cb:
                             ts, model, optimizer = cb(ts)
@@ -447,12 +446,13 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
-                    logger.info("start validation at iteration: {}".format(ts))
-                    fault_tolerance_val(config, model, test_loader, loss_func)
-                    data_iterator = reset_data_iterator_func(data_loader, 0)
-
-            logger.info("Finish Training for {} iterations".format(ts))
-            fault_tolerance_val(config, model, test_loader, loss_func)
+                    if fault_tolerance_val:
+                        logger.info("start validation at iteration: {}".format(ts))
+                        fault_tolerance_val(config, model, test_loader, loss_func)
+                        data_iterator = reset_data_iterator_func(data_loader, 0)
+            if fault_tolerance_val:
+                logger.info("Finish Training for {} iterations".format(ts))
+                fault_tolerance_val(config, model, test_loader, loss_func)
             
             break
         except SwiftInternalError as e:
