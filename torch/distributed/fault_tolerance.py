@@ -33,14 +33,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-def _need_recovery(groups, failure_workers):
-    rank = get_rank()
-    for group in groups:
-        if rank in group:
-            for failure_worker in failure_workers:
-                if failure_worker in group:
-                    return True
-    return False
 
 def _need_recovery(groups, failure_workers):
     rank = get_rank()
@@ -51,17 +43,6 @@ def _need_recovery(groups, failure_workers):
                     return True
     return False
 
-def _download_logging_files(logging_files):
-    client = distributed_c10d._logging_dfs_client
-    for i in range(len(logging_files)):
-        while logging_files[i]:
-            dfs_files = client.ls()
-            for file in logging_files[i]:
-                if file in dfs_files:
-                    client.download(dfs_path=file, local_path=file)
-                    logger.info(f"download {file} from dfs")
-                    logging_files[i].remove(file)
-            time.sleep(0.1)
 
 def _download_logging_files(logging_files):
     client = distributed_c10d._logging_dfs_client
@@ -363,7 +344,6 @@ def build_model_and_optimizer(config, model, optimizer, comm, peer_failure_worke
                                                  backward_passes_per_step=num_microbatches,
                                                  comm_group=comm, average=False)
 
-
     # peer failure worker broadcast its parameters and optimizer states
     # to other group members
     broadcast_parameters(model.state_dict(), peer_failure_worker, comm_group=comm)
@@ -397,9 +377,6 @@ def checksum(ts, model, optimizer):
     with open("debug.log", "a") as f:
         f.write(f"{ts} {model_sum} {optimizer_sum}\n")
 
-def _get_checkpoint_path():
-    rank = get_rank()
-    return "swift" + str(rank) + ".ckpt"
 
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
                           lr_scheduler, reset_data_iterator_func, fault_tolerance_val=None, test_loader=None):
@@ -418,7 +395,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
         try:
             while True:
                 try:
-                    logger.info(f"start from iteration {ts}")          
+                    logger.info(f"start from iteration {ts}")
                     model.train()
                     num = 0
                     for _ in range(ts, config.num_iteration):
@@ -430,7 +407,6 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         iter_time_avg += iteration_time
                         ts += 1
                         num += 1
-                        
 
                         if ts % config.print_freq == 0 and is_pipeline_last_stage():
                             logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {}".format(
@@ -442,7 +418,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             data_iterator = reset_data_iterator_func(data_loader, ts)
                             logger.info(f"parallel recovery restores from iteration {ts}")
                             cb = None
-                        
+
                         checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
@@ -453,7 +429,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
             if fault_tolerance_val:
                 logger.info("Finish Training for {} iterations".format(ts))
                 fault_tolerance_val(config, model, test_loader, loss_func)
-            
+
             break
         except SwiftInternalError as e:
             logger.info("catch an error: " + str(e))
