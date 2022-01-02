@@ -105,6 +105,10 @@ parser.add_argument("--max_seq_length", default=384, type=int,
                              "longer than this will be truncated, and sequences shorter than this will be padded.")
 parser.add_argument("--doc_stride", default=128, type=int,
                         help="When splitting up a long document into chunks, how much stride to take between chunks.")
+parser.add_argument("--eval_script",
+                        help="Script to evaluate squad predictions",
+                        default="evaluate-v1.1.py",
+                        type=str)
 
 args = parser.parse_args()
 initialize_global_args(args)
