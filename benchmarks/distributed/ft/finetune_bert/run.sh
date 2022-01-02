@@ -17,7 +17,7 @@ cmd="python3 -m torch.distributed.run \
 	--seed 2021 \
 	-p 5 \
 	--do_lower_case \
-	~/data/squad/v1.1/train-v1.1.json \
-	--predict-file ~/data/squad/v1.1/dev-v1.1.json" 
+	/home/gmsheng/data/squad/v1.1/train-v1.1.json \
+	--predict-file /home/gmsheng/data/squad/v1.1/dev-v1.1.json" 
 
 OMP_NUM_THREADS=8 NCCL_IB_DISABLE=1 LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec $cmd
