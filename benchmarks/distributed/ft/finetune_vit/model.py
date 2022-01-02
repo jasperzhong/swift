@@ -54,7 +54,7 @@ class norm(nn.Module):
 class PipelineParallelViT(nn.Module):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
         super(PipelineParallelViT, self).__init__()
-        self.vit = create_model("vit_base_patch16_224_in21k", pretrained=True, num_classes=100, img_size=224)
+        self.vit = create_model("vit_base_patch32_224_in21k", pretrained=True, num_classes=100, img_size=224)
         self.vit_sequential = nn.Sequential(
             self.vit.patch_embed.proj,
             norm(
@@ -106,9 +106,7 @@ class PipelineParallelViT(nn.Module):
         self._input_shape = self._input_shapes[start]
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.vit_sequential[start:end]
-        
-        if self.rank == 0 or self.rank == 7:
-            print("Rank {} model split {}".format(self.rank, self.model_split))
+
 
     def _profile(self, shape=[3, 224, 224]):
         """
