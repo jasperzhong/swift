@@ -189,7 +189,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
                         if ts % config.print_freq == 0 and is_pipeline_last_stage():
                             logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} lr: {}".format(
-                                ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value, lr_scheduler.get_lr()))
+                                ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))
                     
                     break
                 except StopIteration as e:
