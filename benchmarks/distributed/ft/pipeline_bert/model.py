@@ -1,13 +1,17 @@
+from typing import Iterable, Optional
+
 import torch
-from torch._C import ThroughputBenchmark
 import torch.nn as nn
-import modeling
-from modeling import BertForPreTraining, BertConfig, BertEmbeddings, BertLayer, BertPooler, BertPreTrainingHeads, BertLayerNorm
-from typing import Optional, Iterable
-from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
-    get_pipeline_model_parallel_world_size, is_pipeline_first_stage
+from torch._C import ThroughputBenchmark
 from torch.onnx.symbolic_opset9 import tensor
 from torch.utils import checkpoint
+
+import modeling
+from modeling import (BertConfig, BertEmbeddings, BertForPreTraining,
+                      BertLayer, BertPooler,
+                      BertPreTrainingHeads)
+from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
+                      get_pipeline_model_parallel_world_size)
 
 # Prepare model config
 config = BertConfig.from_json_file('./bert_config.json')
@@ -17,6 +21,7 @@ if config.vocab_size % 8 != 0:
     config.vocab_size += 8 - (config.vocab_size % 8)
 
 modeling.ACT2FN["bias_gelu"] = modeling.bias_gelu_training
+
 
 class PipelineParallelBert(BertForPreTraining):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
@@ -29,8 +34,8 @@ class PipelineParallelBert(BertForPreTraining):
             *(self.bert.encoder.layer),
             self.bert.pooler,
             self.cls
-            )
-        
+        )
+
         if balance is not None:
             assert len(balance) == get_pipeline_model_parallel_world_size(), \
                 "The number of `balance` does not match the number of pipeline stages"
@@ -46,10 +51,23 @@ class PipelineParallelBert(BertForPreTraining):
 
         self._profile()
 
+        self.rank = None
+        self.model_split = None
+
         if rank is None:
-            self.rank = get_pipeline_model_parallel_rank()
-        else:
-            self.rank = rank
+            rank = get_pipeline_model_parallel_rank()
+        self.assign_model_split(rank)
+
+    def assign_model_split(self, rank):
+        # assign model split
+        if rank == self.rank:
+            return
+
+        self.rank = rank
+
+        # offload previous model split from GPU
+        if self.model_split is not None:
+            self.model_split.cpu()
 
         # assign model split
         start = 0
@@ -74,14 +92,14 @@ class PipelineParallelBert(BertForPreTraining):
         self._input_shapes = []
         self._output_shapes = []
         input = fake_input_ids
-        with torch.no_grad():      
+        with torch.no_grad():
             for layer in self.bert_sequential:
                 self._input_shapes.append(input.shape if isinstance(input, torch.Tensor) else len(input))
                 if isinstance(layer, BertEmbeddings):
                     output = layer(input_ids=fake_input_ids, token_type_ids=fake_segment_ids)
                 elif isinstance(layer, BertLayer):
                     hidden_states = input
-                    output = layer(hidden_states=hidden_states , attention_mask=extended_attention_mask)
+                    output = layer(hidden_states=hidden_states, attention_mask=extended_attention_mask)
                 elif isinstance(layer, BertPooler):
                     encoded_layers = input
                     pooled_output = layer(hidden_states=encoded_layers)
@@ -96,11 +114,19 @@ class PipelineParallelBert(BertForPreTraining):
                     return
                 self._output_shapes.append(output.shape)
                 input = output
-            
-            
+
     def parameters(self, recurse=True):
         return self.model_split.parameters(recurse=recurse)
-        
+
+    def named_parameters(self, prefix='', recurse=True):
+        return self.model_split.named_parameters(prefix=prefix, recurse=recurse)
+
+    def state_dict(self):
+        return self.model_split.state_dict()
+
+    def load_state_dict(self, state_dict):
+        self.model_split.load_state_dict(state_dict)
+
     def children(self):
         if not hasattr(self, 'model_split'):
             return super(PipelineParallelBert, self).children()
@@ -114,8 +140,8 @@ class PipelineParallelBert(BertForPreTraining):
     def output_shape(self):
         return self._output_shape
 
-    def forward(self, input, token_type_ids, attention_mask):      
-        for layer in self.model_split:    
+    def forward(self, input, token_type_ids, attention_mask):
+        for layer in self.model_split:
             if isinstance(layer, BertEmbeddings):
                 input_ids = input
                 output = layer(input_ids=input_ids, token_type_ids=token_type_ids)
@@ -127,14 +153,14 @@ class PipelineParallelBert(BertForPreTraining):
                 # this attention mask is more simple than the triangular masking of causal attention
                 # used in OpenAI GPT, we just need to prepare the broadcast dimension here.
                 extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-                
+
                 # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
                 # masked positions, this operation will create a tensor which is 0.0 for
                 # positions we want to attend and -10000.0 for masked positions.
                 # Since we are adding it to the raw scores before the softmax, this is
                 # effectively the same as removing these entirely.
                 extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-                output = layer(hidden_states=hidden_states , attention_mask=extended_attention_mask)
+                output = layer(hidden_states=hidden_states, attention_mask=extended_attention_mask)
             elif isinstance(layer, BertPooler):
                 encoded_layers = input
                 pooled_output = layer(hidden_states=encoded_layers)

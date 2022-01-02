@@ -4,24 +4,24 @@ import os
 import random
 import time
 
-import numpy as np
-from model import PipelineParallelBert
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, Dataset
 import h5py
-
-from schedule import (initialize_global_args, is_pipeline_first_stage,
-                      is_pipeline_last_stage, pipedream_flush_schedule,
-                      get_num_microbatches, PolyWarmUpScheduler)
+import numpy as np
 import torch
 import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
+from torch.distributed.fault_tolerance import (FaultToleranceConfig,
+                                               fault_tolerance_train)
+from torch.utils.data import (DataLoader, Dataset, SequentialSampler)
 
-from torch.distributed.fault_tolerance import FaultToleranceConfig, fault_tolerance_train
+from model import PipelineParallelBert
+from schedule import (PolyWarmUpScheduler, get_num_microbatches,
+                      initialize_global_args, is_pipeline_first_stage,
+                      is_pipeline_last_stage, pipedream_flush_schedule)
 
 logging.basicConfig(level=logging.INFO)
 
-## Required parameters
+# Required parameters
 parser = argparse.ArgumentParser(
     description='Pipeline Parallel ResNet50 Arguments')
 parser.add_argument('data', metavar='DIR', help='path to dataset')
@@ -53,6 +53,8 @@ parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
 parser.add_argument('--logging', default=False, action="store_true",
                     help='whether to enable logging.')
+parser.add_argument('--parallel-recovery', default=False, action="store_true",
+                    help='whether to enable parallel recovery.')
 parser.add_argument('--logging-chunk-freq', type=int,
                     default=10, help='chunk logging files every N iterations.')
 parser.add_argument('--logging-compression', default=None, type=str,
@@ -64,34 +66,37 @@ parser.add_argument('--logging-s3-bucket', default=None, type=str,
 parser.add_argument('--logging-group-size', default=None, type=int,
                     help='group size for logging')
 # addition
-parser.add_argument("--checkpoint_activations", default=0, type=int, 
+parser.add_argument("--checkpoint_activations", default=0, type=int,
                     help="Whether to perform checkpoint activations.")
-parser.add_argument("--warmup_proportion", default=0.01, type=float, 
+parser.add_argument("--warmup_proportion", default=0.01, type=float,
                     help="Proportion of training to perform linear learning rate warmup for. "
                     "E.g., 0.1 = 10%% of training.")
-parser.add_argument("--max_predictions_per_seq", default=80, type=int, 
+parser.add_argument("--max_predictions_per_seq", default=80, type=int,
                     help="The maximum total of masked tokens in input sequence")
-parser.add_argument("--max_steps", default=1000, type=float, 
+parser.add_argument("--max_steps", default=1000, type=float,
                     help="Total number of training steps to perform.")
 
 args = parser.parse_args()
 initialize_global_args(args)
 
+
 def handle_train_dir(args):
     train_dir = os.path.join(args.data, 'train')
     files = [os.path.join(train_dir, f) for f in os.listdir(train_dir) if
-                         os.path.isfile(os.path.join(train_dir, f)) and 'training' in f]
+             os.path.isfile(os.path.join(train_dir, f)) and 'training' in f]
     files.sort()
     num_files = len(files)
     # random.Random(args.seed + epoch).shuffle(files)
     f_start_id = 0
     if torch.distributed.is_initialized() and torch.distributed.get_world_size() > num_files:
         remainder = torch.distributed.get_world_size() % num_files
-        data_file = files[(f_start_id*torch.distributed.get_world_size()+torch.distributed.get_rank() + remainder*f_start_id)%num_files]
+        data_file = files[(f_start_id * torch.distributed.get_world_size() +
+                           torch.distributed.get_rank() + remainder * f_start_id) % num_files]
     else:
-        data_file = files[(f_start_id*torch.distributed.get_world_size()+torch.distributed.get_rank())%num_files]
+        data_file = files[(f_start_id * torch.distributed.get_world_size() + torch.distributed.get_rank()) % num_files]
 
     return data_file
+
 
 def create_pretraining_dataset(args):
     data_file = handle_train_dir(args)
@@ -102,6 +107,7 @@ def create_pretraining_dataset(args):
                                   batch_size=args.micro_batch_size,
                                   num_workers=args.workers, pin_memory=True)
     return train_dataloader
+
 
 class pretraining_dataset(Dataset):
 
@@ -135,16 +141,19 @@ class pretraining_dataset(Dataset):
         return [input_ids, segment_ids, input_mask,
                 masked_lm_labels, next_sentence_labels]
 
+
 class BertPretrainingCriterion(torch.nn.Module):
     def __init__(self, vocab_size):
         super(BertPretrainingCriterion, self).__init__()
         self.loss_fn = torch.nn.CrossEntropyLoss(ignore_index=-1)
         self.vocab_size = vocab_size
+
     def forward(self, prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels):
         masked_lm_loss = self.loss_fn(prediction_scores.view(-1, self.vocab_size), masked_lm_labels.view(-1))
         next_sentence_loss = self.loss_fn(seq_relationship_score.view(-1, 2), next_sentence_labels.view(-1))
         total_loss = masked_lm_loss + next_sentence_loss
         return total_loss
+
 
 def get_input_shape(data_loader: DataLoader):
     data_iter = iter(data_loader)
@@ -157,14 +166,14 @@ def prepare_model_and_optimizer(args):
     model = PipelineParallelBert(
         rank=torch.distributed.get_rank(),
         balance=None
-        )
+    )
 
     # base on the NVIDIA example: 5e-5
     optimizer = optim.Adam(model.parameters(), lr=5e-5)
 
-    # TODO: args      
-    lr_scheduler = PolyWarmUpScheduler(optimizer, 
-                                       warmup=args.warmup_proportion, 
+    # TODO: args
+    lr_scheduler = PolyWarmUpScheduler(optimizer,
+                                       warmup=args.warmup_proportion,
                                        total_steps=args.max_steps)
 
     # base on the config file: Vocab size
@@ -200,7 +209,7 @@ def train_iter(model, optimizer, data_iterator, loss_func):
 
 def main():
     torch.backends.cudnn.benchmark = True
-    torch.backends.cudnn.deterministic = False
+    torch.backends.cudnn.deterministic = True
 
     args.world_size = int(os.environ['WORLD_SIZE'])
     args.rank = int(os.environ['RANK'])
@@ -225,9 +234,9 @@ def main():
     # TODO: lr_scheduler
 
     config = FaultToleranceConfig(
-        num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, checkpoint_interval=100,
-        replica=False, logging=args.logging, logging_compression=args.logging_compression,
-        logging_chunk_freq=args.logging_chunk_freq,
+        num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
+        checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
+        logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
