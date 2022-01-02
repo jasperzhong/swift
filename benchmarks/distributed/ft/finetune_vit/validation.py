@@ -38,6 +38,17 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+
+def compute_accuracy(output, target, topk=(1,)):
+    """Computes the accuracy over the k top predictions for the specified values of k"""
+    maxk = min(max(topk), output.size()[1])
+    batch_size = target.size(0)
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+    correct = pred.eq(target.reshape(1, -1).expand_as(pred))
+    return [correct[:min(k, maxk)].reshape(-1).float().sum(0) * 100. / batch_size for k in topk]
+
+
 def simple_accuracy(preds, labels):
     print("preds:{}".format(preds))
     print("labels:{}".format(labels))
@@ -46,6 +57,7 @@ def simple_accuracy(preds, labels):
 def fault_tolerance_val(config, model, test_loader, loss_func):
     # Validation!
     eval_losses = AverageMeter()
+    accu = AverageMeter()
 
     test_iters = len(test_loader)
     print("test iters:{}".format(test_iters))
@@ -61,29 +73,33 @@ def fault_tolerance_val(config, model, test_loader, loss_func):
             if is_pipeline_last_stage():
                 output_tensor, loss, labels = forward(config, data_iter, model, loss_func)
                 eval_losses.update(loss, config.test_batch_size)
-                preds = torch.argmax(output_tensor, dim=-1)
-                if len(all_preds) == 0:
-                    all_preds.append(preds.detach().cpu().numpy())
-                    all_label.append(labels.detach().cpu().numpy())
-                else:
-                    all_preds[0] = np.append(
-                        all_preds[0], preds.detach().cpu().numpy(), axis=0
-                    )
-                    all_label[0] = np.append(
-                        all_label[0], labels.detach().cpu().numpy(), axis=0
-                    )
+
+                top1 = compute_accuracy(output_tensor.detach(), labels)
+
+                accu.update(top1, config.test_batch_sizes)
+                # preds = torch.argmax(output_tensor, dim=-1)
+                # if len(all_preds) == 0:
+                #     all_preds.append(preds.detach().cpu().numpy())
+                #     all_label.append(labels.detach().cpu().numpy())
+                # else:
+                #     all_preds[0] = np.append(
+                #         all_preds[0], preds.detach().cpu().numpy(), axis=0
+                #     )
+                #     all_label[0] = np.append(
+                #         all_label[0], labels.detach().cpu().numpy(), axis=0
+                #     )
             else:
                 loss, output_tensor = forward(config, data_iter, model, loss_func)
     if is_pipeline_last_stage():
-        all_preds, all_label = all_preds[0], all_label[0]
-        accuracy = simple_accuracy(all_preds, all_label)
+        # all_preds, all_label = all_preds[0], all_label[0]
+        # accuracy = simple_accuracy(all_preds, all_label)
 
         logger.info("\n")
         logger.info("Validation Results")
         logger.info("Valid Loss: %2.5f" % eval_losses.avg)
-        logger.info("Valid Accuracy: %2.5f" % accuracy)
+        logger.info("Valid Accuracy: %2.5f" % accu.avg)
 
-        return accuracy
+        return accu.avg
 
 def forward(config, data_iterator, model, loss_func):
     shape = (config.test_batch_size, *model.input_shape[1:])
