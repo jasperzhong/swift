@@ -40,7 +40,7 @@ if [[ $ENABLE_LOGGING -eq 1 ]];then
 	cmd="${cmd} ${LOGGING_ARGS}"
 fi
 
-cmd="${cmd} ~/data/ILSVRC2012"
+cmd="${cmd} ~/data/CIFAR100"
 
 echo $cmd
 
