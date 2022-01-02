@@ -49,6 +49,8 @@ parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
+
+# logging
 parser.add_argument('--logging', default=False, action="store_true",
                     help='whether to enable logging.')
 parser.add_argument('--parallel-recovery', default=False, action="store_true",

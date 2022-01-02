@@ -62,8 +62,11 @@ parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
 parser.add_argument('--test-batch-size', type=int,
                     default=256, help='Test batch size.')
+# logging
 parser.add_argument('--logging', default=False, action="store_true",
                     help='whether to enable logging.')
+parser.add_argument('--parallel-recovery', default=False, action="store_true",
+                    help='whether to enable parallel recovery.')
 parser.add_argument('--logging-chunk-freq', type=int,
                     default=10, help='chunk logging files every N iterations.')
 parser.add_argument('--logging-compression', default=None, type=str,
