@@ -381,7 +381,6 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     setup(config)
 
     ts = Timestamp(0)
-    epoch = 0
     distributed_c10d._ts = ts
     filename = _get_checkpoint_path(config)
     checkpoint(filename, ts, model, optimizer)
@@ -395,7 +394,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 try:
                     logger.info(f"start from iteration {ts}")
                     model.train()
-                    num = 0
+                    num = ts % config.iters_per_epoch
                     for _ in range(ts, config.num_iteration):
                         if num >= config.iters_per_epoch:
                             raise StopIteration
@@ -403,6 +402,9 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
                         iteration_time = time.time() - start
                         iter_time_avg += iteration_time
+
+                        ts += 1
+                        num += 1
 
                         if ts % config.print_freq == 0 and is_pipeline_last_stage():
                             if lr_scheduler:
@@ -412,8 +414,6 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} ".format(
                                     ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value))
 
-                        ts += 1
-                        num += 1
 
                         if ts == consensus_value and cb:
                             ts, model, optimizer = cb(ts)
