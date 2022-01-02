@@ -6,6 +6,7 @@ from timm.models import create_model
 from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
     get_pipeline_model_parallel_world_size, is_pipeline_first_stage
 from torch.onnx.symbolic_opset9 import tensor
+from schedule import _GLOBAL_ARGS
 from torch.utils import checkpoint
 import math
 
@@ -108,7 +109,7 @@ class PipelineParallelViT(nn.Module):
         self.model_split = self.vit_sequential[start:end]
 
 
-    def _profile(self, shape=[3, 384, 384]):
+    def _profile(self, shape=[3, _GLOBAL_ARGS.img_size, _GLOBAL_ARGS.img_size]):
         """
         get each layer's input/output shape by running one forward pass
         """

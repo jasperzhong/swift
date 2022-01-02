@@ -9,7 +9,7 @@ import random
 import numpy as np
 
 from datetime import timedelta
-
+from schedule import _GLOBAL_ARGS
 import torch
 import torch.distributed as dist
 
@@ -97,7 +97,7 @@ def forward(config, data_iterator, model, loss_func):
     
 def get_transform_func():
     transform = nn.Sequential(
-        transforms.Resize((384, 384)),
+        transforms.Resize((_GLOBAL_ARGS.img_size, _GLOBAL_ARGS.img_size)),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     )
     return transform

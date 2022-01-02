@@ -6,7 +6,6 @@ import time
 import math
 import numpy as np
 from validation import fault_tolerance_val
-from lr_scheduler import WarmupCosineSchedule
 from schedule import (ToTensor, get_num_microbatches, initialize_global_args,
                       is_pipeline_first_stage, is_pipeline_last_stage,
                       pipedream_flush_schedule)
@@ -44,6 +43,8 @@ parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
+parser.add_argument('--img-size', default=224, type=int,
+                    help='seed for initializing training. ')
 parser.add_argument('--benchmark-iters', default=10000, type=int, metavar='N',
                     help='number of total iterations to run for benchmark')
 parser.add_argument('--master_ip', default=None, type=str,
@@ -75,12 +76,6 @@ initialize_global_args(args)
 
 
 def get_data_loader(args):
-    transform_train = transforms.Compose([
-        transforms.RandomResizedCrop((384, 384), scale=(0.05, 1.0)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-    ])
-
     trainset = datasets.CIFAR100(root=args.data,
                                 train=True,
                                 download=False,
@@ -134,14 +129,6 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
         lr_scheduler.step()
     iteration_time = time.time() - start
     return loss
-
-def validate_iter(model, data_iterator, loss_func):
-    start = time.time()
-    loss = pipedream_flush_schedule(
-        data_iterator, model, loss_func)
-    torch.cuda.synchronize()
-    iteration_time = time.time() - start
-    return
 
 def get_lr_scheduler(optimizer, total_iters, args):
 
