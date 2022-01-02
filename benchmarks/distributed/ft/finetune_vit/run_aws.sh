@@ -23,7 +23,7 @@ cmd="python3 -m torch.distributed.run \
 	--global-batch-size 512 \
 	--img-size 224 \
 	--seed 42 \
-	-p 20 \
+	-p 1 \
 	-j 4" 
 
 LOGGING_ARGS="

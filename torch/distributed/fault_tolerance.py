@@ -130,11 +130,8 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     if need_undo:
         logger.info(f"[rank {get_rank()}] undo update is needed"
                     f"(iteration = {consensus_value+1} while the consensus value is {consensus_value})!")
-        # lr_scheduler undo()
-        # lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=consensus_value-2)
-        # lr_scheduler.step()
-        # undo lr first
-        lr_scheduler.undo(consensus_value)
+        if lr_scheduler:
+            lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=consensus_value)
         optimizer.undo()
 
     old_optimizer = optimizer
