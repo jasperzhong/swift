@@ -57,6 +57,7 @@ class ToTensor(torch.nn.Module):
         return self.totensor(x)
 
 def get_transform_func():
+    global _GLOBAL_ARGS
     transform = nn.Sequential(
         transforms.RandomResizedCrop((_GLOBAL_ARGS.img_size, _GLOBAL_ARGS.img_size), scale=(0.05, 1.0)),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])

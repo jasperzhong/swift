@@ -109,10 +109,13 @@ class PipelineParallelViT(nn.Module):
         self.model_split = self.vit_sequential[start:end]
 
 
-    def _profile(self, shape=[3, _GLOBAL_ARGS.img_size, _GLOBAL_ARGS.img_size]):
+    def _profile(self, shape=None):
         """
         get each layer's input/output shape by running one forward pass
         """
+        global _GLOBAL_ARGS
+        if shape is None:
+            shape=[3, _GLOBAL_ARGS.img_size, _GLOBAL_ARGS.img_size]
         micro_batch_size = get_microbatch_size()
         fake_input = torch.randn(tuple([micro_batch_size] + shape))
         

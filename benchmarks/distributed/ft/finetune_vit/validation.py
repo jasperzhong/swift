@@ -96,6 +96,7 @@ def forward(config, data_iterator, model, loss_func):
     return loss, output_tensor
     
 def get_transform_func():
+    global _GLOBAL_ARGS
     transform = nn.Sequential(
         transforms.Resize((_GLOBAL_ARGS.img_size, _GLOBAL_ARGS.img_size)),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
