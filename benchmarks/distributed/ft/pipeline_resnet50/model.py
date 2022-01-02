@@ -1,16 +1,17 @@
+from resnet import Bottleneck, ResNet
+from schedule import (get_microbatch_size,
+                      get_pipeline_model_parallel_world_size)
+
 import torch
 import torch.nn as nn
-from torchvision.models.resnet import Bottleneck, ResNet
-
-from schedule import get_microbatch_size, get_pipeline_model_parallel_rank, \
-    get_pipeline_model_parallel_world_size
 
 
 class PipelineParallelResNet50(ResNet):
-    def __init__(self, balance=None, *args, **kwargs):
+    def __init__(self, rank, balance=None, *args, **kwargs):
         super(PipelineParallelResNet50, self).__init__(
             Bottleneck, [3, 4, 6, 3], num_classes=1000, *args, **kwargs
         )
+
         self.resnet50_sequential = nn.Sequential(
             self.conv1, self.bn1, self.relu, self.maxpool, self.layer1, self.layer2,
             self.layer3,
@@ -34,15 +35,26 @@ class PipelineParallelResNet50(ResNet):
             self.balance[-1] += remaining
 
         self._profile()
+        self.rank = None
+        self.model_split = None
+        self.assign_model_split(rank)
 
-        self.rank = get_pipeline_model_parallel_rank()
-
+    def assign_model_split(self, rank):
         # assign model split
+        if rank == self.rank:
+            return
+
+        self.rank = rank
+
+        # offload previous model split from GPU
+        if self.model_split is not None:
+            self.model_split.cpu()
+
         start = 0
-        for i in range(self.rank):
+        for i in range(rank):
             start += self.balance[i]
 
-        end = start + self.balance[self.rank]
+        end = start + self.balance[rank]
         self._input_shape = self._input_shapes[start]
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.resnet50_sequential[start:end]
@@ -67,11 +79,17 @@ class PipelineParallelResNet50(ResNet):
     def parameters(self, recurse=True):
         return self.model_split.parameters(recurse=recurse)
 
+    def named_parameters(self, prefix='', recurse=True):
+        return self.model_split.named_parameters(prefix=prefix, recurse=recurse)
+
     def state_dict(self):
         return self.model_split.state_dict()
 
     def load_state_dict(self, state_dict):
         self.model_split.load_state_dict(state_dict)
+
+    def children(self):
+        return self.model_split.children()
 
     @property
     def input_shape(self):
