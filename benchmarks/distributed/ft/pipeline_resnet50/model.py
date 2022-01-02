@@ -1,6 +1,7 @@
 from resnet import Bottleneck, ResNet
 from schedule import (get_microbatch_size,
-                      get_pipeline_model_parallel_world_size)
+                      get_pipeline_model_parallel_world_size,
+                      get_pipeline_model_parallel_rank)
 
 import torch
 import torch.nn as nn
@@ -35,8 +36,12 @@ class PipelineParallelResNet50(ResNet):
             self.balance[-1] += remaining
 
         self._profile()
+
         self.rank = None
         self.model_split = None
+
+        if rank is None:
+            rank = get_pipeline_model_parallel_rank()
         self.assign_model_split(rank)
 
     def assign_model_split(self, rank):
@@ -50,6 +55,7 @@ class PipelineParallelResNet50(ResNet):
         if self.model_split is not None:
             self.model_split.cpu()
 
+        # assign model split
         start = 0
         for i in range(rank):
             start += self.balance[i]
@@ -89,6 +95,8 @@ class PipelineParallelResNet50(ResNet):
         self.model_split.load_state_dict(state_dict)
 
     def children(self):
+        if not hasattr(self, 'model_split'):
+            return super(PipelineParallelResNet50, self).children()
         return self.model_split.children()
 
     @property
