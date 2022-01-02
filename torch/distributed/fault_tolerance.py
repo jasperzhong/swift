@@ -398,8 +398,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 iteration_time = time.time() - start
                 ts += 1
 
-                if ts % config.print_freq == 0:
-                    logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f}".format(
+                # if ts+1 % config.print_freq == 0 or ts == 1:
+                logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f}".format(
                         ts, loss, config.batch_size / iteration_time))
 
                 if ts == consensus_value and cb:
