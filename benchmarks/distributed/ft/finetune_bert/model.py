@@ -10,8 +10,7 @@ import os
 
 import modeling
 from modeling import (BertConfig, BertEmbeddings, BertForQuestionAnswering,
-                      BertLayer, BertPooler,
-                      BertPreTrainingHeads)
+                      BertLayer)
 from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
                       get_pipeline_model_parallel_world_size)
 

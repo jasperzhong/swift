@@ -16,7 +16,7 @@ from torch.utils.data import (DataLoader, Dataset, SequentialSampler)
 from Squad import read_squad_examples, convert_examples_to_features
 from tokenization import get_tokenizer
 from model import PipelineParallelBert
-from schedule import (PolyWarmUpScheduler, get_num_microbatches,
+from schedule import (get_num_microbatches,
                       initialize_global_args, is_pipeline_first_stage,
                       is_pipeline_last_stage, pipedream_flush_schedule)
 from torch.utils.data import (DataLoader, RandomSampler, 
