@@ -83,6 +83,26 @@ class PipelineParallelBert(BertForPreTraining):
         """
         get each layer's input/output shape by running one forward pass
         """
+        if os.path.exists("profile.txt"):
+            with open("profile.txt", "r") as f:
+                lines = f.readlines()
+            shapes = []
+            for line in lines:
+                line = line.strip('\n')
+                if line:
+                    nums = line.split(" ")
+                    nums = [int(num) for num in nums]
+                    if len(nums) == 1:
+                        nums = nums[0]
+                    else:
+                        nums = tuple(nums)
+                    shapes.append(nums)
+                else:
+                    self._input_shapes = shapes
+                    shapes = []
+            self._output_shapes = shapes
+            return
+
         micro_batch_size = get_microbatch_size()
         fake_input_ids = torch.randint(1, 2, tuple([micro_batch_size] + shape))
         fake_segment_ids = torch.randint(1, 2, tuple([micro_batch_size] + shape))
@@ -115,24 +135,26 @@ class PipelineParallelBert(BertForPreTraining):
                 self._output_shapes.append(output.shape)
                 input = output
 
-        with open("profile.txt", "w") as f:
-            for shape in self._input_shapes:
-                if isinstance(shape, tuple):
-                    f.write(' '.join(str(s) for s in shape) + '\n')
-                elif isinstance(shape, int):
-                    f.write(str(shape) + '\n')
-                else:
-                    raise ValueError("unrecognized type")
+        local_rank = int(os.environ['LOCAL_RANK'])
+        if local_rank == 0:
+            with open("profile.txt", "w") as f:
+                for shape in self._input_shapes:
+                    if isinstance(shape, tuple):
+                        f.write(' '.join(str(s) for s in shape) + '\n')
+                    elif isinstance(shape, int):
+                        f.write(str(shape) + '\n')
+                    else:
+                        raise ValueError("unrecognized type")
 
-            f.write('\n')
+                f.write('\n')
 
-            for shape in self._output_shapes:
-                if isinstance(shape, tuple):
-                    f.write(' '.join(str(s) for s in shape) + '\n')
-                elif isinstance(shape, int):
-                    f.write(str(shape) + '\n')
-                else:
-                    raise ValueError("unrecognized type")
+                for shape in self._output_shapes:
+                    if isinstance(shape, tuple):
+                        f.write(' '.join(str(s) for s in shape) + '\n')
+                    elif isinstance(shape, int):
+                        f.write(str(shape) + '\n')
+                    else:
+                        raise ValueError("unrecognized type")
 
     def parameters(self, recurse=True):
         return self.model_split.parameters(recurse=recurse)
