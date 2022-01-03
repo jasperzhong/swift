@@ -1,17 +1,10 @@
-import math
-from typing import Iterable, Optional
-
 import torch
 import torch.nn as nn
 from timm.models import create_model
-from torch._C import ThroughputBenchmark
-from torch.onnx.symbolic_opset9 import tensor
-from torch.utils import checkpoint
 
 import schedule
 from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
-                      get_pipeline_model_parallel_world_size,
-                      is_pipeline_first_stage)
+                      get_pipeline_model_parallel_world_size)
 
 
 class Tokens(nn.Module):
