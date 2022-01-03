@@ -54,8 +54,11 @@ parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
+# logging
 parser.add_argument('--logging', default=False, action="store_true",
                     help='whether to enable logging.')
+parser.add_argument('--parallel-recovery', default=False, action="store_true",
+                    help='whether to enable parallel recovery.')
 parser.add_argument('--logging-chunk-freq', type=int,
                     default=10, help='chunk logging files every N iterations.')
 parser.add_argument('--logging-compression', default=None, type=str,
@@ -66,6 +69,7 @@ parser.add_argument('--logging-s3-bucket', default=None, type=str,
                     help='s3 bucket if using s3 as logging store')
 parser.add_argument('--logging-group-size', default=None, type=int,
                     help='group size for logging')
+
 
 args = parser.parse_args()
 initialize_global_args(args)
