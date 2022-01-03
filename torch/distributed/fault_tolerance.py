@@ -433,7 +433,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         fault_tolerance_val(config, model, test_loader, loss_func)
                         random.seed(42)
                         np.random.seed(42)
-                        torch.manual_seed(42)
+                        # torch.manual_seed(42)
                         torch.cuda.manual_seed(42)
                         data_iterator = iter(data_loader)
                         # data_iterator = reset_data_iterator_func(data_loader, 0)
