@@ -401,7 +401,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     filename = _get_checkpoint_path(config)
     checkpoint(filename, ts, model, optimizer)
     while True:
-        ts, model, optimizer, lr_scheduler, consensus_value, cb = recovery(config, ts, model, optimizer, lr_scheduler)
+        ts, model, optimizer, consensus_value, cb = recovery(config, ts, model, optimizer)
         data_iterator = reset_data_iterator_func(data_loader, ts)
         iter_time_avg = 0
         checksum(ts, model, optimizer)
