@@ -84,7 +84,7 @@ def fault_tolerance_val(config, model, test_loader, loss_func):
         return accu.avg
 
 def forward(config, data_iterator, model, loss_func):
-    shape = (config.test_batch_size, *model.input_shape[1:])
+    shape = (schedule._GLOBAL_ARGS.img_size, *model.input_shape[1:])
     loss = 0
     input_tensor = recv_forward(shape)
     if is_pipeline_last_stage():
