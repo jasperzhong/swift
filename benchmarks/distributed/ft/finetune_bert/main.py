@@ -4,6 +4,7 @@ import os
 import random
 import time
 
+import math
 import h5py
 import numpy as np
 import torch
@@ -31,7 +32,7 @@ parser.add_argument('data', metavar='DIR', help='path to dataset')
 parser.add_argument('--predict-file', metavar='DIR', help='path to dataset')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=90, type=int, metavar='N',
+parser.add_argument('--epochs', default=3, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
@@ -170,6 +171,14 @@ def train_iter(model, optimizer, data_iterator, loss_func):
     iteration_time = time.time() - start
     return loss
 
+def get_lr_scheduler(optimizer, total_iters, args):
+
+    def warm_up_with_cosine_lr(iter): return iter / args.warm_up_iters if iter <= args.warm_up_iters \
+        else 0.5 * (math.cos((iter - args.warm_up_iters) / (total_iters - args.warm_up_iters) * math.pi) + 1)
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=warm_up_with_cosine_lr)
+    return scheduler
+
 
 def main():
     torch.backends.cudnn.benchmark = True
@@ -198,6 +207,10 @@ def main():
         rank=torch.distributed.get_rank(),
         balance=None
     )    
+    
+    num_micro_batches = get_num_microbatches()
+    num_iterations = args.epochs * (len(data_loader) // num_micro_batches)
+    print("total_iterations: {}".format(num_iterations))
      
     ## TODO: BERT Optimizer
     optimizer = optim.Adam(model.parameters(), lr=5e-5)
@@ -206,7 +219,7 @@ def main():
     # TODO: lr_scheduler
 
     config = FaultToleranceConfig(
-        num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
+        num_iteration=num_iterations, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
         checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
         logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
