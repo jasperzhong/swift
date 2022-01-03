@@ -1,5 +1,8 @@
 import torch
-
+import time
+import torch.nn as nn
+from torchvision import datasets, transforms
+from torch.distributed.distributed_c10d import get_rank
 _GLOBAL_ARGS = None
 
 _cnt = 0
@@ -47,14 +50,30 @@ def get_microbatch_size():
     global _GLOBAL_ARGS
     return _GLOBAL_ARGS.micro_batch_size
 
+class ToTensor(torch.nn.Module):
+    def __init__(self, transform):
+        super().__init__()
+        self.totensor = transform
+    def forward(self, x):
+        return self.totensor(x)
+
+def get_transform_func():
+    global _GLOBAL_ARGS
+    transform = nn.Sequential(
+        transforms.RandomResizedCrop((_GLOBAL_ARGS.img_size, _GLOBAL_ARGS.img_size), scale=(0.05, 1.0)),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+    )
+    return transform
 
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
+    transforms = get_transform_func()
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
         images, labels = data
 
         if is_pipeline_first_stage():
             images = images.cuda()
+            images = transforms(images)
         elif is_pipeline_last_stage():
             labels = labels.cuda()
 
@@ -73,6 +92,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
 
 
 def backward_step(input_tensor, output_tensor, output_tensor_grad):
+
     global _cnt
     if input_tensor is not None:
         input_tensor.retain_grad()
