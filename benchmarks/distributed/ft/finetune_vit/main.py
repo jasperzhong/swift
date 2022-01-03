@@ -113,7 +113,7 @@ def reset_data_iterator(data_loader, ts):
     if args.seed is not None:
         random.seed(args.seed)
         np.random.seed(args.seed)
-        # torch.manual_seed(args.seed)
+        torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
     data_iterator = iter(data_loader)
     for _ in range(ts):
