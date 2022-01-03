@@ -61,7 +61,7 @@ class PipelineParallelViT(nn.Module):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
         super(PipelineParallelViT, self).__init__()
         model_kwargs = dict(
-            patch_size=32, embed_dim=768, depth=12, num_heads=12, num_classes=1000, img_size=schedule._GLOBAL_ARGS.img_size)
+            patch_size=32, embed_dim=768, depth=12, num_heads=12, num_classes=1000, img_size=224)
         self.vit = models._create_vision_transformer("vit_base_patch32_224_in21k", pretrained=False,
                                                      **model_kwargs)
         self.vit_sequential = nn.Sequential(
