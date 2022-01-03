@@ -8,7 +8,8 @@ from queue import Queue
 from benchmarks.distributed.ft.pipeline_resnet50.schedule import is_pipeline_last_stage
 
 import h5py
-
+import numpy as np
+import random
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
 import torch.nn
@@ -430,7 +431,12 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                     if fault_tolerance_val:
                         logger.info("start validation at iteration: {}".format(ts))
                         fault_tolerance_val(config, model, test_loader, loss_func)
-                        data_iterator = reset_data_iterator_func(data_loader, 0)
+                        random.seed(42)
+                        np.random.seed(42)
+                        torch.manual_seed(42)
+                        torch.cuda.manual_seed(42)
+                        data_iterator = iter(data_loader)
+                        # data_iterator = reset_data_iterator_func(data_loader, 0)
             if fault_tolerance_val:
                 logger.info("Finish Training for {} iterations".format(ts))
                 fault_tolerance_val(config, model, test_loader, loss_func)
