@@ -940,7 +940,7 @@ def irecv(tensor,
     global _logging_rng_state_cnt
     global _logging_in_recovery
 
-    if _logging and _logging_in_recovery:
+    if _logging and _logging_in_recovery and _logging_parallel_recovery:
         # on recovery
         if _logging_rng_state_fd is None:
             peer_failure_worker = get_rank() - _logging_group_diff
@@ -960,9 +960,12 @@ def irecv(tensor,
         if _logging_rng_state_fd is None:
             _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
         rng_state = torch.cuda.random.get_rng_state().numpy()
-        _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
-        _logging_rng_state_fd.flush()
-        _logging_rng_state_cnt += 1
+        try:
+            _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
+            _logging_rng_state_fd.flush()
+            _logging_rng_state_cnt += 1
+        except ValueError:
+            pass
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
@@ -1112,7 +1115,7 @@ def recv(tensor,
     global _logging_rng_state_cnt
     global _logging_in_recovery
 
-    if _logging and _logging_in_recovery:
+    if _logging and _logging_in_recovery and _logging_parallel_recovery:
         # on recovery
         if _logging_rng_state_fd is None:
             peer_failure_worker = get_rank() - _logging_group_diff
@@ -1132,9 +1135,12 @@ def recv(tensor,
         if _logging_rng_state_fd is None:
             _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
         rng_state = torch.cuda.random.get_rng_state().numpy()
-        _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
-        _logging_rng_state_fd.flush()
-        _logging_rng_state_cnt += 1
+        try:
+            _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
+            _logging_rng_state_fd.flush()
+            _logging_rng_state_cnt += 1
+        except ValueError:
+            pass
 
     if tensor is None:
         return
@@ -3140,8 +3146,11 @@ def flush_objects_to_dfs(config):
         # key = "{iteration}:{_logging_cnt[dst]}"
         key = f"{ts_value}:{_logging_cnt[dst]}"
         event.synchronize()
-        file.create_dataset(key, data=tensor, compression=_logging_compression)
-        _logging_cnt[dst] += 1
+        try:
+            file.create_dataset(key, data=tensor, compression=_logging_compression)
+            _logging_cnt[dst] += 1
+        except ValueError:
+            pass
 
     for name, files in logging_pairs_to_files.items():
         for file, _ in files:

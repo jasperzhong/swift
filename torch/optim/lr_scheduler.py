@@ -250,6 +250,18 @@ class LambdaLR(_LRScheduler):
         return [base_lr * lmbda(self.last_epoch)
                 for lmbda, base_lr in zip(self.lr_lambdas, self.base_lrs)]
 
+    def undo(self, last_epoch):
+        self.last_epoch = last_epoch
+        self._step_count -= 1
+
+        values = [base_lr * lmbda(self.last_epoch)
+                for lmbda, base_lr in zip(self.lr_lambdas, self.base_lrs)]
+        
+        for i, data in enumerate(zip(self.optimizer.param_groups, values)):
+            param_group, lr = data
+            param_group['lr'] = lr
+
+        self._last_lr = [group['lr'] for group in self.optimizer.param_groups]
 
 class MultiplicativeLR(_LRScheduler):
     """Multiply the learning rate of each parameter group by the factor given
