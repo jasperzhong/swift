@@ -6,7 +6,9 @@ MASTER_IP=10.28.1.27
 MASTER_PORT=1234
 export NCCL_SOCKET_IFNAME=enp94s0
 
-rm -rf logging*.h5
+rm -rf *.h5
+rm -rf *.log
+rm -rf *.ckpt
 
 cmd="python3 -m torch.distributed.run \
 	--nnodes=$NNODES --nproc_per_node=$NPROC_PER_NODE \
