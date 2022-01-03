@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import timm.models.vision_transformer as models
 
-import schedule
 from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
                       get_pipeline_model_parallel_world_size)
 
@@ -134,7 +133,7 @@ class PipelineParallelViT(nn.Module):
         get each layer's input/output shape by running one forward pass
         """
         if shape == None:
-            shape = [3, schedule._GLOBAL_ARGS.img_size, schedule._GLOBAL_ARGS.img_size]
+            shape = [3, 224, 224]
         micro_batch_size = get_microbatch_size()
         fake_input = torch.randn(tuple([micro_batch_size] + shape))
 
