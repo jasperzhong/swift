@@ -207,6 +207,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
             if lr_scheduler:
                 lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
                     optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
+                logger.info(f"reset lr scheduler: lr={lr_scheduler.get_lr()}")
 
             # 5. hijack get_rank()
             get_rank_bck = torch.distributed.get_rank
