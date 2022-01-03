@@ -141,7 +141,7 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
         # gradient clipping
         total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
         with open("total_norm.log", "a") as f:
-            f.write(f"{total_norm}\n"j
+            f.write(f"{total_norm}\n")
         optimizer.step()
     if lr_scheduler is not None:
         lr_scheduler.step()
