@@ -83,29 +83,39 @@ initialize_global_args(args)
 
 
 def get_data_loader(args):
+    transform_train = transforms.Compose([
+        transforms.RandomResizedCrop((args.img_size, args.img_size), scale=(0.05, 1.0)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+    ])
+
+    transform_test = transforms.Compose([
+        transforms.Resize((args.img_size, args.img_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+    ])
+    
     trainset = datasets.CIFAR100(root=args.data,
                                  train=True,
                                  download=False,
-                                 transform=transforms.ToTensor())
+                                 transform=transform_train)
     testset = datasets.CIFAR100(root=args.data,
                                 train=False,
                                 download=False,
-                                transform=transforms.ToTensor())
+                                transform=transform_test)
 
-    train_sampler = RandomSampler(trainset)
-    test_sampler = SequentialSampler(testset)
     train_loader = DataLoader(trainset,
-                              sampler=train_sampler,
                               batch_size=args.micro_batch_size,
                               num_workers=args.workers,
                               pin_memory=True,
-                              drop_last=True)
+                              drop_last=True,
+                              shuffle=True)
     test_loader = DataLoader(testset,
-                             sampler=test_sampler,
                              batch_size=args.test_batch_size,
                              num_workers=args.workers,
                              pin_memory=True,
-                             drop_last=True)
+                             drop_last=True,
+                             shuffle=False)
     return train_loader, test_loader
 
 

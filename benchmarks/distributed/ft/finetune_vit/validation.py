@@ -99,23 +99,13 @@ def forward(config, data_iterator, model, loss_func):
     return loss, output_tensor
 
 
-def get_transform_func():
-    transform = nn.Sequential(
-        transforms.Resize((schedule._GLOBAL_ARGS.img_size, schedule._GLOBAL_ARGS.img_size)),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-    )
-    return transform
-
-
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
-    transforms = get_transform_func()
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
         images, labels = data
 
         if is_pipeline_first_stage():
             images = images.cuda()
-            images = transforms(images)
         elif is_pipeline_last_stage():
             labels = labels.cuda()
 
