@@ -371,8 +371,11 @@ def build_communication_group(config, peer_failure_worker):
 
 def checksum(ts, model, optimizer):
     model_sum = 0
+    grad_sum = 0
     for param in model.parameters():
         model_sum += torch.sum(param)
+        if param.grad is not None:
+            grad_sum += torch.sum(param.grad)
 
     optimizer_sum = 0
     for group in optimizer.param_groups:
@@ -382,10 +385,8 @@ def checksum(ts, model, optimizer):
                 if 'momentum_buffer' in state:
                     optimizer_sum += torch.sum(state['momentum_buffer'])
 
-    rng_state = torch.cuda.random.get_rng_state()
-    rng_state_checksum = torch.sum(rng_state.type(torch.float32))
     with open("debug.log", "a") as f:
-        f.write(f"{ts} {model_sum} {optimizer_sum} {rng_state_checksum}\n")
+        f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
 
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
