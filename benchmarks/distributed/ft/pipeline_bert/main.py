@@ -196,7 +196,7 @@ def reset_data_iterator(data_loader, ts):
     return data_iterator
 
 
-def train_iter(model, optimizer, data_iterator, loss_func):
+def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler):
     start = time.time()
     optimizer.zero_grad()
     loss = pipedream_flush_schedule(
