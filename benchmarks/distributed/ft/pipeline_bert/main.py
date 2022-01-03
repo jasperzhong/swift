@@ -172,14 +172,14 @@ def prepare_model_and_optimizer(args):
     optimizer = optim.Adam(model.parameters(), lr=5e-5)
 
     # TODO: args
-    lr_scheduler = PolyWarmUpScheduler(optimizer,
-                                       warmup=args.warmup_proportion,
-                                       total_steps=args.max_steps)
+    # lr_scheduler = PolyWarmUpScheduler(optimizer,
+    #                                    warmup=args.warmup_proportion,
+    #                                    total_steps=args.max_steps)
 
     # base on the config file: Vocab size
     loss_func = BertPretrainingCriterion(30528)
 
-    return model, optimizer, lr_scheduler, loss_func
+    return model, optimizer, None, loss_func
 
 
 def reset_data_iterator(data_loader, ts):
@@ -247,7 +247,7 @@ def main():
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
     fault_tolerance_train(config, train_iter, model, optimizer,
-                          data_loader, loss_func, reset_data_iterator_func=reset_data_iterator)
+                          data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
 
 
 if __name__ == '__main__':
