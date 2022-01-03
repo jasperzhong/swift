@@ -173,8 +173,8 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader, test_loader = get_data_loader(args)
-    # model = PipelineParallelViT(balance=[4, 6, 5, 3])
-    model = PipelineParallelViT(balance=[1,3,3,3,3,2,2,1])
+    model = PipelineParallelViT(balance=[4, 6, 5, 3])
+    # model = PipelineParallelViT(balance=[1,3,3,3,3,2,2,1])
     model.cuda()
 
     total_iters = args.benchmark_iters
