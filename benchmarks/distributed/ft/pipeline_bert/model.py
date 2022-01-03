@@ -117,12 +117,22 @@ class PipelineParallelBert(BertForPreTraining):
 
         with open("profile.txt", "w") as f:
             for shape in self._input_shapes:
-                f.write(' '.join(str(s) for s in shape) + '\n')
+                if isinstance(shape, tuple):
+                    f.write(' '.join(str(s) for s in shape) + '\n')
+                elif isinstance(shape, int):
+                    f.write(str(shape) + '\n')
+                else:
+                    raise ValueError("unrecognized type")
 
             f.write('\n')
 
             for shape in self._output_shapes:
-                f.write(' '.join(str(s) for s in shape) + '\n')
+                if isinstance(shape, tuple):
+                    f.write(' '.join(str(s) for s in shape) + '\n')
+                elif isinstance(shape, int):
+                    f.write(str(shape) + '\n')
+                else:
+                    raise ValueError("unrecognized type")
 
     def parameters(self, recurse=True):
         return self.model_split.parameters(recurse=recurse)
