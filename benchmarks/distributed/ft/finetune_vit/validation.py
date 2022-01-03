@@ -68,11 +68,11 @@ def fault_tolerance_val(config, model, test_loader, loss_func):
         with torch.no_grad():
             if is_pipeline_last_stage():
                 output_tensor, loss, labels = forward(config, data_iter, model, loss_func)
-                eval_losses.update(loss, config.test_batch_size)
+                eval_losses.update(loss, schedule._GLOBAL_ARGS.test_batch_size)
 
                 top1 = compute_accuracy(output_tensor.detach(), labels)
 
-                accu.update(top1[0].item(), config.test_batch_size)
+                accu.update(top1[0].item(), schedule._GLOBAL_ARGS.test_batch_size)
 
             else:
                 loss, output_tensor = forward(config, data_iter, model, loss_func)
