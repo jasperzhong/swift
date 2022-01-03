@@ -9,6 +9,7 @@ from file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 import os
 
 import modeling
+import time
 from modeling import (BertConfig, BertEmbeddings, BertForQuestionAnswering,
                       BertLayer)
 from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
@@ -37,9 +38,11 @@ class QA_Outputs(nn.Module):
 class PipelineParallelBert(nn.Module):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
         super(PipelineParallelBert, self).__init__()
+        print("start to create model")
+        start = time.time()
         self.bert = modeling.BertForQuestionAnswering.from_pretrained("bert-base-uncased",
                     cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(get_pipeline_model_parallel_rank())))
-
+        print("model initialize time is : {}".format(time.time() - start))
         self.bert_sequential = nn.Sequential(
             self.bert.bert.embeddings,
             *(self.bert.bert.encoder.layer),
