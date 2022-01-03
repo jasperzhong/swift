@@ -167,6 +167,7 @@ class PipelineParallelBert(nn.Module):
                 # Since we are adding it to the raw scores before the softmax, this is
                 # effectively the same as removing these entirely.
                 extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+                print(hidden_states.shape, extended_attention_mask.shape)
                 output = layer(hidden_states=hidden_states, attention_mask=extended_attention_mask)
             elif isinstance(layer, QA_Outputs):
                 sequence_output = input
