@@ -220,7 +220,7 @@ def main():
     
     model.cuda()
     # TODO: choose which scheduler to use
-    args.warmup_iters = args.warmup_proportion * num_iterations
+    args.warm_up_iters = args.warmup_proportion * num_iterations
     lr_scheduler = get_lr_scheduler(optimizer, num_iterations, args)
 
     config = FaultToleranceConfig(
