@@ -41,8 +41,8 @@ class PipelineParallelBert(nn.Module):
                     cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(get_pipeline_model_parallel_rank())))
 
         self.bert_sequential = nn.Sequential(
-            self.bert.embeddings,
-            *(self.bert.encoder.layer),
+            self.bert.bert.embeddings,
+            *(self.bert.bert.encoder.layer),
             # it seems that is doesn't need pooler
             # self.bert.pooler,
             QA_Outputs(self.bert.qa_outputs)
@@ -91,7 +91,7 @@ class PipelineParallelBert(nn.Module):
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.bert_sequential[start:end]
 
-    def _profile(self, shape=[128]):
+    def _profile(self, shape=[384]):
         """
         get each layer's input/output shape by running one forward pass
         """

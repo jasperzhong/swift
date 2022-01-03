@@ -1,3 +1,22 @@
+# coding=utf-8
+# Copyright (c) 2019 NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018 The Google AI Language Team Authors and The HugginFace Inc. team.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""PyTorch BERT model."""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import copy
 import json
 import logging
@@ -8,12 +27,13 @@ import tarfile
 import tempfile
 import sys
 from io import open
-from file_utils import cached_path
+
 import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss
 from torch.utils import checkpoint
 
+from file_utils import cached_path
 
 from torch.nn import Module
 from torch.nn.parameter import Parameter
@@ -94,6 +114,76 @@ def load_tf_weights_in_bert(model, tf_checkpoint_path):
         print("Initialize PyTorch weight {}".format(name))
         pointer.data = torch.from_numpy(array)
     return model
+
+def gelu(x):
+    return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
+
+#used only for triton inference
+def bias_gelu(bias, y):
+    x = bias + y
+    return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
+
+# used specifically for training since torch.nn.functional.gelu breaks ONNX export
+def bias_gelu_training(bias, y):
+    x = bias + y
+    return torch.nn.functional.gelu(x) # Breaks ONNX export
+
+def bias_tanh(bias, y):
+    x = bias + y
+    return torch.tanh(x)
+
+def swish(x):
+    return x * torch.sigmoid(x)
+
+#torch.nn.functional.gelu(x) # Breaks ONNX export
+ACT2FN = {"gelu": gelu, "bias_gelu": bias_gelu, "bias_tanh": bias_tanh, "relu": torch.nn.functional.relu, "swish": swish}
+
+class LinearActivation(Module):
+    r"""Fused Linear and activation Module.
+    """
+    __constants__ = ['bias']
+
+    def __init__(self, in_features, out_features, act='gelu', bias=True):
+        super(LinearActivation, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.act_fn = nn.Identity()                                                         #
+        self.biased_act_fn = None                                                           #
+        self.bias = None                                                                    #
+        if isinstance(act, str) or (sys.version_info[0] == 2 and isinstance(act, unicode)): # For TorchScript
+            if bias and not 'bias' in act:                                                  # compatibility
+                act = 'bias_' + act                                                         #
+                self.biased_act_fn = ACT2FN[act]                                            #
+
+            else:
+                self.act_fn = ACT2FN[act]
+        else:
+            self.act_fn = act
+        self.weight = Parameter(torch.Tensor(out_features, in_features))
+        if bias:
+            self.bias = Parameter(torch.Tensor(out_features))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in)
+            init.uniform_(self.bias, -bound, bound)
+
+    def forward(self, input):
+        if not self.bias is None:
+            return self.biased_act_fn(self.bias, F.linear(input, self.weight, None))
+        else:
+            return self.act_fn(F.linear(input, self.weight, self.bias))
+
+    def extra_repr(self):
+        return 'in_features={}, out_features={}, bias={}'.format(
+            self.in_features, self.out_features, self.bias is not None
+        )
+
 
 class BertConfig(object):
     """Configuration class to store the configuration of a `BertModel`.
@@ -184,12 +274,11 @@ class BertConfig(object):
         """Serializes this instance to a JSON string."""
         return json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
 
-# Non-Fused Layer Norm
-class BertLayerNorm(nn.Module):
+class BertNonFusedLayerNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-12):
         """Construct a layernorm module in the TF style (epsilon inside the square root).
         """
-        super(BertLayerNorm, self).__init__()
+        super(BertNonFusedLayerNorm, self).__init__()
         self.weight = nn.Parameter(torch.ones(hidden_size))
         self.bias = nn.Parameter(torch.zeros(hidden_size))
         self.variance_epsilon = eps
@@ -201,6 +290,45 @@ class BertLayerNorm(nn.Module):
         s = s.mean(-1, keepdim=True)
         x = (x - u) / torch.sqrt(s + self.variance_epsilon)
         return self.weight * x + self.bias
+
+try:
+    import apex
+    #apex.amp.register_half_function(apex.normalization.fused_layer_norm, 'FusedLayerNorm')
+    import apex.normalization
+    from apex.normalization.fused_layer_norm import FusedLayerNormAffineFunction
+    #apex.amp.register_float_function(apex.normalization.FusedLayerNorm, 'forward')
+    #BertLayerNorm = apex.normalization.FusedLayerNorm
+    APEX_IS_AVAILABLE = True
+except ImportError:
+    print("Better speed can be achieved with apex installed from https://www.github.com/nvidia/apex.")
+    #BertLayerNorm = BertNonFusedLayerNorm
+    APEX_IS_AVAILABLE = False
+class BertLayerNorm(Module):
+    def __init__(self, hidden_size, eps=1e-12):
+        super(BertLayerNorm, self).__init__()
+        self.shape = torch.Size((hidden_size,))
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.bias = nn.Parameter(torch.zeros(hidden_size))
+        self.apex_enabled = APEX_IS_AVAILABLE
+
+    @torch.jit.unused
+    def fused_layer_norm(self, x):
+        return FusedLayerNormAffineFunction.apply(
+                    x, self.weight, self.bias, self.shape, self.eps)
+
+
+    def forward(self, x):
+        if self.apex_enabled and not torch.jit.is_scripting():
+            x = self.fused_layer_norm(x)
+        else:
+            u = x.mean(-1, keepdim=True)
+            s = (x - u)
+            s = s * s
+            s = s.mean(-1, keepdim=True)
+            x = (x - u) / torch.sqrt(s + self.eps)
+            x = self.weight * x + self.bias
+        return x
 
 class BertEmbeddings(nn.Module):
     """Construct the embeddings from word, position and token_type embeddings.
@@ -230,6 +358,7 @@ class BertEmbeddings(nn.Module):
         embeddings = self.dropout(embeddings)
         return embeddings
 
+
 class BertSelfAttention(nn.Module):
     def __init__(self, config):
         super(BertSelfAttention, self).__init__()
@@ -240,7 +369,7 @@ class BertSelfAttention(nn.Module):
         self.num_attention_heads = config.num_attention_heads
         self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
-
+        
         self.query = nn.Linear(config.hidden_size, self.all_head_size)
         self.key = nn.Linear(config.hidden_size, self.all_head_size)
         self.value = nn.Linear(config.hidden_size, self.all_head_size)
@@ -285,6 +414,7 @@ class BertSelfAttention(nn.Module):
         context_layer = torch.reshape(context_layer, new_context_layer_shape)
         return context_layer
 
+
 class BertSelfOutput(nn.Module):
     def __init__(self, config):
         super(BertSelfOutput, self).__init__()
@@ -310,74 +440,6 @@ class BertAttention(nn.Module):
         attention_output = self.output(self_output, input_tensor)
         return attention_output
 
-def gelu(x):
-    return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
-
-#used only for triton inference
-def bias_gelu(bias, y):
-    x = bias + y
-    return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
-
-# used specifically for training since torch.nn.functional.gelu breaks ONNX export
-def bias_gelu_training(bias, y):
-    x = bias + y
-    return torch.nn.functional.gelu(x) # Breaks ONNX export
-
-def bias_tanh(bias, y):
-    x = bias + y
-    return torch.tanh(x)
-
-def swish(x):
-    return x * torch.sigmoid(x)
-
-#torch.nn.functional.gelu(x) # Breaks ONNX export
-ACT2FN = {"gelu": gelu, "bias_gelu": bias_gelu, "bias_tanh": bias_tanh, "relu": torch.nn.functional.relu, "swish": swish}
-
-class LinearActivation(Module):
-    r"""Fused Linear and activation Module.
-    """
-    __constants__ = ['bias']
-
-    def __init__(self, in_features, out_features, act='gelu', bias=True):
-        super(LinearActivation, self).__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-        self.act_fn = nn.Identity()                                                         #
-        self.biased_act_fn = None                                                           #
-        self.bias = None                                                                    #
-        if isinstance(act, str) or (sys.version_info[0] == 2 and isinstance(act, unicode)): # For TorchScript
-            if bias and not 'bias' in act:                                                  # compatibility
-                act = 'bias_' + act                                                         #
-                self.biased_act_fn = ACT2FN[act]                                            #
-
-            else:
-                self.act_fn = ACT2FN[act]
-        else:
-            self.act_fn = act
-        self.weight = Parameter(torch.Tensor(out_features, in_features))
-        if bias:
-            self.bias = Parameter(torch.Tensor(out_features))
-        else:
-            self.register_parameter('bias', None)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
-        if self.bias is not None:
-            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
-            bound = 1 / math.sqrt(fan_in)
-            init.uniform_(self.bias, -bound, bound)
-
-    def forward(self, input):
-        if not self.bias is None:
-            return self.biased_act_fn(self.bias, F.linear(input, self.weight, None))
-        else:
-            return self.act_fn(F.linear(input, self.weight, self.bias))
-
-    def extra_repr(self):
-        return 'in_features={}, out_features={}, bias={}'.format(
-            self.in_features, self.out_features, self.bias is not None
-        )
 
 class BertIntermediate(nn.Module):
     def __init__(self, config):
@@ -401,6 +463,7 @@ class BertOutput(nn.Module):
         hidden_states = self.dropout(hidden_states)
         hidden_states = self.LayerNorm(hidden_states + input_tensor)
         return hidden_states
+
 
 class BertLayer(nn.Module):
     def __init__(self, config):
@@ -630,6 +693,7 @@ class BertPreTrainedModel(nn.Module):
             raise RuntimeError('Error(s) in loading state_dict for {}:\n\t{}'.format(
                                model.__class__.__name__, "\n\t".join(error_msgs)))
         return model
+
 
 class BertModel(BertPreTrainedModel):
     """BERT model ("Bidirectional Embedding Representations from a Transformer").
