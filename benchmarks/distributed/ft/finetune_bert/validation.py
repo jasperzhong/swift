@@ -52,10 +52,10 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
     for _ in range(test_iters):
         with torch.no_grad():
             if is_pipeline_last_stage():
-                results = forward()
+                results = forward(config, eval_dataloader, model, eval_features)
                 all_results.extend(results)
             else:
-                forward()
+                forward(config, eval_dataloader, model, eval_features)
                 
     output_prediction_file = os.path.join(args.output_dir, "predictions.json")
     output_nbest_file = os.path.join(args.output_dir, "nbest_predictions.json")

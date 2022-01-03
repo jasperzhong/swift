@@ -5,6 +5,7 @@ import random
 import time
 
 import math
+from torch.optim import lr_scheduler
 import h5py
 import numpy as np
 import torch
@@ -76,7 +77,7 @@ parser.add_argument('--logging-group-size', default=None, type=int,
 # addition
 parser.add_argument("--checkpoint_activations", default=0, type=int,
                     help="Whether to perform checkpoint activations.")
-parser.add_argument("--warmup_proportion", default=0.01, type=float,
+parser.add_argument("--warmup_proportion", default=0.1, type=float,
                     help="Proportion of training to perform linear learning rate warmup for. "
                     "E.g., 0.1 = 10%% of training.")
 parser.add_argument("--max_predictions_per_seq", default=80, type=int,
@@ -215,10 +216,12 @@ def main():
     print("total_iterations: {}".format(num_iterations))
      
     ## TODO: BERT Optimizer
-    optimizer = optim.Adam(model.parameters(), lr=5e-5)
-     
+    optimizer = optim.Adam(model.parameters(), lr=5e-5, betas=(0.9, 0.999), weight_decay=0.01)
+    
     model.cuda()
-    # TODO: lr_scheduler
+    # TODO: choose which scheduler to use
+    args.warmup_iters = args.warmup_proportion * num_iterations
+    lr_scheduler = get_lr_scheduler(optimizer, num_iterations, args)
 
     config = FaultToleranceConfig(
         num_iteration=num_iterations, iters_per_epoch=iters_per_epoch,batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
@@ -229,8 +232,9 @@ def main():
     )
 
     start = time.time()
+    # Doesn't need loss_func here.
     fault_tolerance_train(config, train_iter, model, optimizer,
-                          data_loader, loss_func=None, lr_scheduler=None,
+                          data_loader, loss_func=None, lr_scheduler=lr_scheduler,
                           reset_data_iterator_func=reset_data_iterator, fault_tolerance_val=fault_tolerance_val, test_loader=None)
 
     end = time.time()
