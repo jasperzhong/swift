@@ -1,48 +1,102 @@
 import torch
 import torch.nn as nn
+import timm.models.vision_transformer as models
 
 import schedule
 from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
                       get_pipeline_model_parallel_world_size)
-from vit import ViT
 
 
-class PipelineParallelViT(ViT):
+class Tokens(nn.Module):
+    def __init__(self, cls_token, dist_token):
+        super().__init__()
+        self.cls_token = cls_token
+        self.dist_token = dist_token
+
+    def forward(self, x):
+        cls_token = self.cls_token.expand(x.shape[0], -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
+        if self.dist_token is None:
+            x = torch.cat((cls_token, x), dim=1)
+        else:
+            x = torch.cat((cls_token, self.dist_token.expand(x.shape[0], -1, -1), x), dim=1)
+        return x
+
+
+class PosEmb(nn.Module):
+    def __init__(self, pos_embed, pos_drop):
+        super().__init__()
+        self.pos_embed = pos_embed
+        self.pos_drop = pos_drop
+
+    def forward(self, x):
+        return self.pos_drop(x + self.pos_embed)
+
+
+class Cls(nn.Module):
+    def __init__(self, pre_logits, head):
+        super().__init__()
+        self.pre_logits = pre_logits
+        self.head = head
+
+    def forward(self, x):
+        x = self.pre_logits(x[:, 0])
+        x = self.head(x)
+        return x
+
+
+class Norm(nn.Module):
+    def __init__(self, flatten, norm):
+        super().__init__()
+        self.flatten = flatten
+        self.norm = norm
+
+    def forward(self, x):
+        if self.flatten:
+            x = x.flatten(2).transpose(1, 2)  # BCHW -> BNC
+        x = self.norm(x)
+        return x
+
+
+class PipelineParallelViT(nn.Module):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
-        super(PipelineParallelViT, self).__init__(
-            image_size=224, 
-            patch_size=32, 
-            num_classes=1000, 
-            dim=768, # base 768 ; large 1024 ; huge 1280 
-            depth=12, # base 12 ; large 24 ; huge 36 
-            heads=12, # base 12 ; large 16 ; huge 16
-            mlp_dim=3072, # base 3072 ; large 4096 ; huge 5120
-            pool = 'cls', 
-            channels = 3, 
-            dim_head = 64, 
-            dropout = 0.1, 
-            emb_dropout = 0.1
+        super(PipelineParallelViT, self).__init__()
+        model_kwargs = dict(
+            patch_size=32, embed_dim=768, depth=12, num_heads=12, num_classes=1000, img_size=schedule._GLOBAL_ARGS.img_size)
+        self.vit = models._create_vision_transformer("vit_base_patch32_224_in21k", pretrained=False,
+                                                     **model_kwargs)
+        self.vit_sequential = nn.Sequential(
+            self.vit.patch_embed.proj,
+            Norm(
+                self.vit.patch_embed.flatten,
+                self.vit.patch_embed.norm
+            ),
+            Tokens(
+                self.vit.cls_token,
+                self.vit.dist_token),
+            PosEmb(
+                self.vit.pos_embed,
+                self.vit.pos_drop),
+            *(self.vit.blocks),
+            self.vit.norm,
+            Cls(
+                self.vit.pre_logits,
+                self.vit.head
+            )
         )
 
-        self.vit_sequential = nn.Sequential(
-            nn.Sequential(
-                self.embedding,
-                self.dropout),
-            *(self.transformer.layers),
-            self.to_latent,
-            self.mlp_head
-            )
-        
         if balance is not None:
             assert len(balance) == get_pipeline_model_parallel_world_size(), \
-                "The number of `balance` does not match the number of pipeline stages"
+                "The number of `balance` {}does not match the number of pipeline stages".format(len(balance))
             assert sum(balance) == len(self.vit_sequential), \
-                "The summation of `balance` does not match the number of layers"
+                "The summation of `balance` {} does not match the number of layers {}".format(
+                    sum(balance), len(self.vit_sequential))
             self.balance = balance
         else:
+            print("vit seq len: {}".format(len(self.vit_sequential)))
             num_layers_per_stage = len(self.vit_sequential) // \
                 get_pipeline_model_parallel_world_size()
             self.balance = [num_layers_per_stage] * get_pipeline_model_parallel_world_size()
+            print("num_layers_per_stage: {}".format(num_layers_per_stage))
             remaining = len(self.vit_sequential) - num_layers_per_stage * len(self.balance)
             self.balance[-1] += remaining
 
@@ -111,7 +165,6 @@ class PipelineParallelViT(ViT):
             return super(PipelineParallelViT, self).children()
         return self.model_split.children()
 
-
     @property
     def input_shape(self):
         return self._input_shape
@@ -120,5 +173,5 @@ class PipelineParallelViT(ViT):
     def output_shape(self):
         return self._output_shape
 
-    def forward(self, x):      
+    def forward(self, x):
         return self.model_split(x)
