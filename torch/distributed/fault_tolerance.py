@@ -347,6 +347,7 @@ def build_model_and_optimizer(config, model, optimizer, comm, peer_failure_worke
         optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
 
     num_microbatches = config.num_microbatches // parallel_recovery_data_parallel_size()
+    logger.info(f"Rank {global_rank}'s num_microbatches = {num_microbatches}'")
     distributed_optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
                                                  backward_passes_per_step=num_microbatches,
                                                  comm_group=comm, average=False)
