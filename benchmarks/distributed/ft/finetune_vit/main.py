@@ -133,15 +133,17 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
         optimizer.synchronize()
         # gradient clipping should be right after gradient synchronization
         total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+        total_norm_2 = torch.nn.utils.clip_grad_norm_(model.parameters(), 1e10)
         with open("total_norm.log", "a") as f:
-            f.write(f"{total_norm}\t recovery\n")
+            f.write(f"{total_norm}\t{total_norm_2}\trecovery\n")
         with optimizer.skip_synchronize():
             optimizer.step()
     else:
         # gradient clipping
         total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+        total_norm_2 = torch.nn.utils.clip_grad_norm_(model.parameters(), 1e10)
         with open("total_norm.log", "a") as f:
-            f.write(f"{total_norm}\n")
+            f.write(f"{total_norm}\t{total_norm_2}\n")
         optimizer.step()
     if lr_scheduler is not None:
         lr_scheduler.step()
