@@ -130,12 +130,14 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     if need_undo:
         logger.info(f"[rank {get_rank()}] undo update is needed"
                     f"(iteration = {consensus_value+1} while the consensus value is {consensus_value})!")
+
         if lr_scheduler:
             lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-                optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=consensus_value)
+                optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=consensus_value - 1)
         optimizer.undo()
 
     old_optimizer = optimizer
+    old_lr_scheduler = lr_scheduler
     if config.replica:
         broadcast_parameters(model.state_dict(), 0)
         optimizer.clear()
@@ -202,6 +204,10 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
             # 4. broadcast failure worker's ts
             ts.broadcast(peer_failure_worker)
 
+            if lr_scheduler:
+                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
+
             # 5. hijack get_rank()
             get_rank_bck = torch.distributed.get_rank
             torch.distributed.get_rank = lambda group=None: peer_failure_worker
@@ -230,6 +236,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                 nonlocal model
                 nonlocal optimizer
                 nonlocal old_optimizer
+                nonlocal old_lr_scheduler
                 nonlocal enable_logging_on_disabled_worker
 
                 # recovery is over
@@ -284,21 +291,22 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                 distributed_c10d._logging_mask.clear()
                 # pairs = groups_to_pairs(config.groups)
                 # set_logging_mask(pairs)
-                return ts, model, optimizer
+                return ts, model, optimizer, old_lr_scheduler
 
             callback = _cb
         else:
             def _cb(ts):
                 nonlocal model
                 nonlocal optimizer
+                nonlocal old_lr_scheduler
 
                 # recovery is over
                 distributed_c10d._logging_in_recovery = False
-                return ts, model, optimizer
+                return ts, model, optimizer, old_lr_scheduler
 
             callback = _cb
 
-    return ts, model, optimizer, consensus_value, callback
+    return ts, model, optimizer, lr_scheduler, consensus_value, callback
 
 
 def get_peer_failure_worker(config, failure_workers):
@@ -387,7 +395,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     filename = _get_checkpoint_path(config)
     checkpoint(filename, ts, model, optimizer)
     while True:
-        ts, model, optimizer, consensus_value, cb = recovery(config, ts, model, optimizer)
+        ts, model, optimizer, lr_scheduler, consensus_value, cb = recovery(config, ts, model, optimizer, lr_scheduler)
         data_iterator = reset_data_iterator_func(data_loader, ts)
         iter_time_avg = 0
         checksum(ts, model, optimizer)
@@ -416,9 +424,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} ".format(
                                     ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value))
 
-
                         if ts == consensus_value and cb:
-                            ts, model, optimizer = cb(ts)
+                            ts, model, optimizer, lr_scheduler = cb(ts)
                             del data_iterator
                             data_iterator = reset_data_iterator_func(data_loader, ts)
                             logger.info(f"parallel recovery restores from iteration {ts}")
