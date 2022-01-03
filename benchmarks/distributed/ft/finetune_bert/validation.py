@@ -40,7 +40,7 @@ def create_val_dataloader():
 
     return eval_dataloader, eval_features, eval_examples
 
-def fault_tolerance_val(model, eval_dataloader, eval_features, eval_examples):
+def fault_tolerance_val(config, model, eval_loader, loss_func):
     args = schedule._GLOBAL_ARGS
     eval_dataloader, eval_features, eval_examples = create_val_dataloader()
     model.eval()

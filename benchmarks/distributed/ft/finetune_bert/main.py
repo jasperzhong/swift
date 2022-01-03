@@ -22,6 +22,7 @@ from schedule import (get_num_microbatches,
                       is_pipeline_last_stage, pipedream_flush_schedule)
 from torch.utils.data import (DataLoader, RandomSampler, 
                               SequentialSampler,TensorDataset)
+from validation import fault_tolerance_val
 
 logging.basicConfig(level=logging.INFO)
 
@@ -209,7 +210,8 @@ def main():
     )    
     
     num_micro_batches = get_num_microbatches()
-    num_iterations = args.epochs * (len(data_loader) // num_micro_batches)
+    iters_per_epoch = len(data_loader) // num_micro_batches
+    num_iterations = args.epochs * iters_per_epoch
     print("total_iterations: {}".format(num_iterations))
      
     ## TODO: BERT Optimizer
@@ -219,14 +221,20 @@ def main():
     # TODO: lr_scheduler
 
     config = FaultToleranceConfig(
-        num_iteration=num_iterations, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
+        num_iteration=num_iterations, iters_per_epoch=iters_per_epoch,batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
         checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
         logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
+
+    start = time.time()
     fault_tolerance_train(config, train_iter, model, optimizer,
-                          data_loader, loss_func=None, reset_data_iterator_func=reset_data_iterator)
+                          data_loader, loss_func=None, lr_scheduler=None,
+                          reset_data_iterator_func=reset_data_iterator, fault_tolerance_val=fault_tolerance_val, test_loader=None)
+
+    end = time.time()
+    print("Training time is {}".format(end - start))
 
 
 if __name__ == '__main__':

@@ -20,6 +20,7 @@ from .distributed_c10d import (_failure_handler, all_gather, broadcast,
                                destroy_process_group, get_local_world_size,
                                get_rank, get_world_size, new_group,
                                parallel_recovery_data_parallel_size)
+from schedule import is_pipeline_last_stage
 
 try:
     import boto3
@@ -95,10 +96,11 @@ def _set_recovery_mask(config, ts, consensus_value):
 
 
 class FaultToleranceConfig:
-    def __init__(self, num_iteration, batch_size, num_microbatches, checkpoint_interval, replica=False, logging=False,
-                 parallel_recovery=False, logging_compression=None, logging_chunk_freq=None, logging_dfs=None,
-                 logging_bucket=None, logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
+    def __init__(self, num_iteration, iters_per_epoch, batch_size, num_microbatches, checkpoint_interval, replica=False, logging=False,
+                 parallel_recovery=False, logging_compression=None, logging_chunk_freq=None, logging_dfs=None, logging_bucket=None,
+                 logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
         self.num_iteration = num_iteration
+        self.iters_per_epoch = iters_per_epoch
         self.batch_size = batch_size
         self.num_microbatches = num_microbatches
         self.checkpoint_interval = checkpoint_interval
@@ -390,9 +392,8 @@ def checksum(ts, model, optimizer):
     with open("debug.log", "a") as f:
         f.write(f"{ts} {model_sum} {optimizer_sum}\n")
 
-
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
-                          reset_data_iterator_func):
+                          lr_scheduler, reset_data_iterator_func, fault_tolerance_val=None, test_loader=None):
     setup(config)
 
     ts = Timestamp(0)
@@ -400,29 +401,52 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     filename = _get_checkpoint_path(config)
     checkpoint(filename, ts, model, optimizer)
     while True:
-        ts, model, optimizer, consensus_value, cb = recovery(config, ts, model, optimizer)
+        ts, model, optimizer, lr_scheduler, consensus_value, cb = recovery(config, ts, model, optimizer, lr_scheduler)
         data_iterator = reset_data_iterator_func(data_loader, ts)
+        iter_time_avg = 0
         checksum(ts, model, optimizer)
         try:
-            logger.info(f"start from iteration {ts}")
-            for _ in range(ts, config.num_iteration):
-                start = time.time()
-                loss = train_iter(model, optimizer, data_iterator, loss_func)
-                iteration_time = time.time() - start
-                ts += 1
+            while True:
+                try:
+                    logger.info(f"start from iteration {ts}")
+                    model.train()
+                    num = ts % config.iters_per_epoch
+                    for _ in range(ts, config.num_iteration):
+                        if num >= config.iters_per_epoch:
+                            raise StopIteration
+                        start = time.time()
+                        loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
+                        iteration_time = time.time() - start
+                        iter_time_avg += iteration_time
 
-                # if ts+1 % config.print_freq == 0 or ts == 1:
-                logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f}".format(
-                        ts, loss, config.batch_size / iteration_time))
+                        ts += 1
+                        num += 1
 
-                if ts == consensus_value and cb:
-                    ts, model, optimizer = cb(ts)
-                    del data_iterator
-                    data_iterator = reset_data_iterator_func(data_loader, ts)
-                    logger.info(f"parallel recovery restores from iteration {ts}")
-                    cb = None
+                        if ts % config.print_freq == 0 and is_pipeline_last_stage():
+                            if lr_scheduler:
+                                logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} lr: {}".format(
+                                    ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))
+                            else:
+                                logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} ".format(
+                                    ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value))
 
-                checksum(ts, model, optimizer)
+                        if ts == consensus_value and cb:
+                            ts, model, optimizer, lr_scheduler = cb(ts)
+                            del data_iterator
+                            data_iterator = reset_data_iterator_func(data_loader, ts)
+                            logger.info(f"parallel recovery restores from iteration {ts}")
+                            cb = None
+
+                        checksum(ts, model, optimizer)
+                    break
+                except StopIteration as e:
+                    if fault_tolerance_val:
+                        logger.info("start validation at iteration: {}".format(ts))
+                        fault_tolerance_val(config, model, test_loader, loss_func)
+                        data_iterator = reset_data_iterator_func(data_loader, 0)
+            if fault_tolerance_val:
+                logger.info("Finish Training for {} iterations".format(ts))
+                fault_tolerance_val(config, model, test_loader, loss_func)
 
             break
         except SwiftInternalError as e:
@@ -432,7 +456,6 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
             del data_iterator
 
     teardown(config)
-
 
 class Timestamp:
     def __init__(self, value):
