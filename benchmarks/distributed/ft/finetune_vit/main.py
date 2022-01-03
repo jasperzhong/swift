@@ -129,7 +129,7 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
     loss = pipedream_flush_schedule(
         data_iterator, model, loss_func)
     torch.cuda.synchronize()
-    if optimizer.__name__ == "DistributedOptimizer":
+    if type(optimizer).__name__ == "DistributedOptimizer":
         optimizer.synchronize()
         # gradient clipping should be right after gradient synchronization
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
