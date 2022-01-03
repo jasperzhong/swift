@@ -207,7 +207,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
             if lr_scheduler:
                 lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
                     optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
-                logger.info(f"reset lr scheduler: lr={lr_scheduler.get_lr()}")
+                logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
 
             # 5. hijack get_rank()
             get_rank_bck = torch.distributed.get_rank
@@ -422,7 +422,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         if ts % config.print_freq == 0 and is_pipeline_last_stage():
                             if lr_scheduler:
                                 logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} lr: {}".format(
-                                    ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value, lr_scheduler.get_lr()))
+                                    ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))
                             else:
                                 logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} ".format(
                                     ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value))
