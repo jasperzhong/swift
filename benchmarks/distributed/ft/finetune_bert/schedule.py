@@ -54,7 +54,8 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
         assert input_tensor is None
         output_tensor = model(input_ids, segment_ids, input_mask)
     elif is_pipeline_last_stage():
-        start_logits, end_logits = model(input_ids, segment_ids, input_mask)
+        assert input_tensor is not None
+        start_logits, end_logits = model(input_tensor, segment_ids, input_mask)
     else:
         assert input_tensor is not None
         output_tensor = model(input_tensor, segment_ids, input_mask)
@@ -164,6 +165,8 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
     # run warmup forward passes
     for _ in range(num_warmup_microbatches):
         input_tensor = recv_forward(model.input_shape)
+        if is_pipeline_last_stage():
+            print("recv shape:"{input_tensor.shape})
         output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss)
         send_forward(output_tensor)
 
