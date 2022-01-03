@@ -165,8 +165,6 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
     # run warmup forward passes
     for _ in range(num_warmup_microbatches):
         input_tensor = recv_forward(model.input_shape)
-        if is_pipeline_last_stage():
-            print("recv shape:".format(input_tensor.shape))
         output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss)
         send_forward(output_tensor)
 
