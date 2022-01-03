@@ -1,17 +1,17 @@
+import os
 from typing import Iterable, Optional
+
+import modeling
+from modeling import (BertConfig, BertEmbeddings, BertForPreTraining,
+                      BertLayer, BertPooler, BertPreTrainingHeads)
+from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
+                      get_pipeline_model_parallel_world_size)
 
 import torch
 import torch.nn as nn
 from torch._C import ThroughputBenchmark
 from torch.onnx.symbolic_opset9 import tensor
 from torch.utils import checkpoint
-
-import modeling
-from modeling import (BertConfig, BertEmbeddings, BertForPreTraining,
-                      BertLayer, BertPooler,
-                      BertPreTrainingHeads)
-from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
-                      get_pipeline_model_parallel_world_size)
 
 # Prepare model config
 config = BertConfig.from_json_file('./bert_config.json')
@@ -114,6 +114,15 @@ class PipelineParallelBert(BertForPreTraining):
                     return
                 self._output_shapes.append(output.shape)
                 input = output
+
+        with open("profile.txt", "w") as f:
+            for shape in self._input_shapes:
+                f.write(' '.join(str(s) for s in shape) + '\n')
+
+            f.write('\n')
+
+            for shape in self._output_shapes:
+                f.write(' '.join(str(s) for s in shape) + '\n')
 
     def parameters(self, recurse=True):
         return self.model_split.parameters(recurse=recurse)
