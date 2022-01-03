@@ -160,7 +160,7 @@ def reset_data_iterator(data_loader, ts):
     return data_iterator
 
 
-def train_iter(model, optimizer, data_iterator, loss_func):
+def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
     start = time.time()
     optimizer.zero_grad()
     loss = pipedream_flush_schedule(
@@ -170,6 +170,8 @@ def train_iter(model, optimizer, data_iterator, loss_func):
     # gradient clipping
     torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
     optimizer.step()
+    if lr_scheduler is not None:
+        lr_scheduler.step()
     iteration_time = time.time() - start
     return loss
 
