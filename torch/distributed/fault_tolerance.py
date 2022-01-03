@@ -5,9 +5,11 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Queue
+from benchmarks.distributed.ft.pipeline_resnet50.schedule import is_pipeline_last_stage
 
 import h5py
-
+import numpy as np
+import random
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
 import torch.nn
@@ -32,14 +34,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-def _need_recovery(groups, failure_workers):
-    rank = get_rank()
-    for group in groups:
-        if rank in group:
-            for failure_worker in failure_workers:
-                if failure_worker in group:
-                    return True
-    return False
 
 def _need_recovery(groups, failure_workers):
     rank = get_rank()
@@ -50,17 +44,6 @@ def _need_recovery(groups, failure_workers):
                     return True
     return False
 
-def _download_logging_files(logging_files):
-    client = distributed_c10d._logging_dfs_client
-    for i in range(len(logging_files)):
-        while logging_files[i]:
-            dfs_files = client.ls()
-            for file in logging_files[i]:
-                if file in dfs_files:
-                    client.download(dfs_path=file, local_path=file)
-                    logger.info(f"download {file} from dfs")
-                    logging_files[i].remove(file)
-            time.sleep(0.1)
 
 def _download_logging_files(logging_files):
     client = distributed_c10d._logging_dfs_client
@@ -95,10 +78,11 @@ def _set_recovery_mask(config, ts, consensus_value):
 
 
 class FaultToleranceConfig:
-    def __init__(self, num_iteration, batch_size, num_microbatches, checkpoint_interval, replica=False, logging=False,
-                 parallel_recovery=False, logging_compression=None, logging_chunk_freq=None, logging_dfs=None,
-                 logging_bucket=None, logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
+    def __init__(self, num_iteration, iters_per_epoch, batch_size, num_microbatches, checkpoint_interval, replica=False, logging=False,
+                 parallel_recovery=False, logging_compression=None, logging_chunk_freq=None, logging_dfs=None, logging_bucket=None,
+                 logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
         self.num_iteration = num_iteration
+        self.iters_per_epoch = iters_per_epoch
         self.batch_size = batch_size
         self.num_microbatches = num_microbatches
         self.checkpoint_interval = checkpoint_interval
@@ -139,7 +123,7 @@ def teardown(config):
         distributed_c10d._logging_thread.join()
 
 
-def recovery(config, ts, model, optimizer):
+def recovery(config, ts, model, optimizer, lr_scheduler=None):
     callback = None
     consensus_value, need_undo, failure_workers = ts.sync()
     logger.info(f"failure workers: {failure_workers}")
@@ -147,9 +131,14 @@ def recovery(config, ts, model, optimizer):
     if need_undo:
         logger.info(f"[rank {get_rank()}] undo update is needed"
                     f"(iteration = {consensus_value+1} while the consensus value is {consensus_value})!")
+
+        if lr_scheduler:
+            lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=consensus_value - 1)
         optimizer.undo()
 
     old_optimizer = optimizer
+    old_lr_scheduler = lr_scheduler
     if config.replica:
         broadcast_parameters(model.state_dict(), 0)
         optimizer.clear()
@@ -216,6 +205,11 @@ def recovery(config, ts, model, optimizer):
             # 4. broadcast failure worker's ts
             ts.broadcast(peer_failure_worker)
 
+            if lr_scheduler:
+                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
+                logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
+
             # 5. hijack get_rank()
             get_rank_bck = torch.distributed.get_rank
             torch.distributed.get_rank = lambda group=None: peer_failure_worker
@@ -244,6 +238,7 @@ def recovery(config, ts, model, optimizer):
                 nonlocal model
                 nonlocal optimizer
                 nonlocal old_optimizer
+                nonlocal old_lr_scheduler
                 nonlocal enable_logging_on_disabled_worker
 
                 # recovery is over
@@ -298,21 +293,22 @@ def recovery(config, ts, model, optimizer):
                 distributed_c10d._logging_mask.clear()
                 # pairs = groups_to_pairs(config.groups)
                 # set_logging_mask(pairs)
-                return ts, model, optimizer
+                return ts, model, optimizer, old_lr_scheduler
 
             callback = _cb
         else:
             def _cb(ts):
                 nonlocal model
                 nonlocal optimizer
+                nonlocal old_lr_scheduler
 
                 # recovery is over
                 distributed_c10d._logging_in_recovery = False
-                return ts, model, optimizer
+                return ts, model, optimizer, old_lr_scheduler
 
             callback = _cb
 
-    return ts, model, optimizer, consensus_value, callback
+    return ts, model, optimizer, lr_scheduler, consensus_value, callback
 
 
 def get_peer_failure_worker(config, failure_workers):
@@ -352,10 +348,10 @@ def build_model_and_optimizer(config, model, optimizer, comm, peer_failure_worke
         optimizer = optimizer_cls(model.parameters(), **optimizer_defaults)
 
     num_microbatches = config.num_microbatches // parallel_recovery_data_parallel_size()
+    logger.info(f"Rank {global_rank}'s num_microbatches = {num_microbatches}'")
     distributed_optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
                                                  backward_passes_per_step=num_microbatches,
                                                  comm_group=comm, average=False)
-
 
     # peer failure worker broadcast its parameters and optimizer states
     # to other group members
@@ -376,8 +372,11 @@ def build_communication_group(config, peer_failure_worker):
 
 def checksum(ts, model, optimizer):
     model_sum = 0
+    grad_sum = 0
     for param in model.parameters():
         model_sum += torch.sum(param)
+        if param.grad is not None:
+            grad_sum += torch.sum(param.grad)
 
     optimizer_sum = 0
     for group in optimizer.param_groups:
@@ -388,11 +387,11 @@ def checksum(ts, model, optimizer):
                     optimizer_sum += torch.sum(state['momentum_buffer'])
 
     with open("debug.log", "a") as f:
-        f.write(f"{ts} {model_sum} {optimizer_sum}\n")
+        f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
 
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
-                          reset_data_iterator_func):
+                          lr_scheduler, reset_data_iterator_func, fault_tolerance_val=None, test_loader=None):
     setup(config)
 
     ts = Timestamp(0)
@@ -400,29 +399,52 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     filename = _get_checkpoint_path(config)
     checkpoint(filename, ts, model, optimizer)
     while True:
-        ts, model, optimizer, consensus_value, cb = recovery(config, ts, model, optimizer)
+        ts, model, optimizer, lr_scheduler, consensus_value, cb = recovery(config, ts, model, optimizer, lr_scheduler)
         data_iterator = reset_data_iterator_func(data_loader, ts)
+        iter_time_avg = 0
         checksum(ts, model, optimizer)
         try:
-            logger.info(f"start from iteration {ts}")
-            for _ in range(ts, config.num_iteration):
-                start = time.time()
-                loss = train_iter(model, optimizer, data_iterator, loss_func)
-                iteration_time = time.time() - start
-                ts += 1
+            while True:
+                try:
+                    logger.info(f"start from iteration {ts}")
+                    model.train()
+                    num = ts % config.iters_per_epoch
+                    for _ in range(ts, config.num_iteration):
+                        if num >= config.iters_per_epoch:
+                            raise StopIteration
+                        start = time.time()
+                        loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
+                        iteration_time = time.time() - start
+                        iter_time_avg += iteration_time
 
-                # if ts+1 % config.print_freq == 0 or ts == 1:
-                logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f}".format(
-                        ts, loss, config.batch_size / iteration_time))
+                        ts += 1
+                        num += 1
 
-                if ts == consensus_value and cb:
-                    ts, model, optimizer = cb(ts)
-                    del data_iterator
-                    data_iterator = reset_data_iterator_func(data_loader, ts)
-                    logger.info(f"parallel recovery restores from iteration {ts}")
-                    cb = None
+                        if ts % config.print_freq == 0 and is_pipeline_last_stage():
+                            if lr_scheduler:
+                                logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} lr: {}".format(
+                                    ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))
+                            else:
+                                logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} ".format(
+                                    ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value))
 
-                checksum(ts, model, optimizer)
+                        if ts == consensus_value and cb:
+                            ts, model, optimizer, lr_scheduler = cb(ts)
+                            del data_iterator
+                            data_iterator = reset_data_iterator_func(data_loader, ts)
+                            logger.info(f"parallel recovery restores from iteration {ts}")
+                            cb = None
+
+                        checksum(ts, model, optimizer)
+                    break
+                except StopIteration as e:
+                    if fault_tolerance_val:
+                        logger.info("start validation at iteration: {}".format(ts))
+                        fault_tolerance_val(config, model, test_loader, loss_func)
+                        data_iterator = reset_data_iterator_func(data_loader, 0)
+            if fault_tolerance_val:
+                logger.info("Finish Training for {} iterations".format(ts))
+                fault_tolerance_val(config, model, test_loader, loss_func)
 
             break
         except SwiftInternalError as e:
