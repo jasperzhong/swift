@@ -109,7 +109,8 @@ def get_data_loader(args):
                               num_workers=args.workers,
                               pin_memory=True,
                               drop_last=True,
-                              shuffle=True)
+                              shuffle=True,
+                              prefetch_factor=4)
     test_loader = DataLoader(testset,
                              batch_size=args.test_batch_size,
                              num_workers=args.workers,
