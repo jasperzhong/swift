@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Iterable, Optional
 
 import modeling
@@ -25,9 +26,11 @@ modeling.ACT2FN["bias_gelu"] = modeling.bias_gelu_training
 
 class PipelineParallelBert(BertForPreTraining):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
+        start = time.time()
         super(PipelineParallelBert, self).__init__(
             config=config
         )
+        print(f"super PipelineParallelBert {time.time() - start}")
 
         self.bert_sequential = nn.Sequential(
             self.bert.embeddings,
