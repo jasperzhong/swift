@@ -91,6 +91,7 @@ class PipelineParallelBert(nn.Module):
         self._output_shape = self._output_shapes[end - 1]
         self.model_split = self.bert_sequential[start:end]
         print(self._input_shapes)
+        print(self._output_shapes)
 
     def _profile(self, shape=[384]):
         """
@@ -112,7 +113,6 @@ class PipelineParallelBert(nn.Module):
                     output = layer(input_ids=fake_input_ids, token_type_ids=fake_segment_ids)
                 elif isinstance(layer, BertLayer):
                     hidden_states = input
-                    print(hidden_states.shape, extended_attention_mask.shape)
                     output = layer(hidden_states=hidden_states, attention_mask=extended_attention_mask)
                 elif isinstance(layer, QA_Outputs):
                     sequence_output = input
@@ -168,6 +168,7 @@ class PipelineParallelBert(nn.Module):
                 # Since we are adding it to the raw scores before the softmax, this is
                 # effectively the same as removing these entirely.
                 extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+                print("start train layer")
                 print(hidden_states.shape, extended_attention_mask.shape)
                 output = layer(hidden_states=hidden_states, attention_mask=extended_attention_mask)
             elif isinstance(layer, QA_Outputs):
