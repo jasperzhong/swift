@@ -415,7 +415,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         if num >= config.iters_per_epoch:
                             raise StopIteration
                         start = time.time()
-                        loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
+                        loss = train_iter(model, optimizer, data_iterator, loss_func)
                         iteration_time = time.time() - start
                         iter_time_avg += iteration_time
 
