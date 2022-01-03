@@ -49,7 +49,9 @@ class PipelineParallelBert(BertForPreTraining):
             remaining = len(self.bert_sequential) - num_layers_per_stage * len(self.balance)
             self.balance[-1] += remaining
 
+        start = time.time()
         self._profile()
+        print(f"profile time {time.time() - start}")
 
         self.rank = None
         self.model_split = None
