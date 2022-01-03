@@ -101,6 +101,7 @@ class PipelineParallelBert(BertForPreTraining):
                     self._input_shapes = shapes
                     shapes = []
             self._output_shapes = shapes
+            print("read shapes from file")
             return
 
         micro_batch_size = get_microbatch_size()

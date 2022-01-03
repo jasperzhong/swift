@@ -226,7 +226,6 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = create_pretraining_dataset(args)
-    input_ids, segment_ids, input_mask = get_input_shape(data_loader)
 
     model, optimizer, lr_scheduler, loss_func = prepare_model_and_optimizer(args)
     model.cuda()
