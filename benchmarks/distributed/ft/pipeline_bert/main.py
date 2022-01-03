@@ -217,11 +217,15 @@ def main():
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
 
+    start = time.time()
     data_loader = create_pretraining_dataset(args)
+    print(f"create data loader time: {time.time() - start} s")
 
+    start = time.time()
     model, optimizer, lr_scheduler, loss_func = prepare_model_and_optimizer(args)
     model.cuda()
     loss_func.cuda()
+    print(f"create model and optimizer time: {time.time() - start} s")
     # TODO: lr_scheduler
 
     total_iters = args.benchmark_iters
