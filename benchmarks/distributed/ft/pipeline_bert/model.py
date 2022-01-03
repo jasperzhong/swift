@@ -111,7 +111,7 @@ class PipelineParallelBert(BertForPreTraining):
                     encoded_layers, pooled_output = input
                     output = layer(encoded_layers, pooled_output)
                     self._output_shapes.append(len(output))
-                    return
+                    break
                 self._output_shapes.append(output.shape)
                 input = output
 
