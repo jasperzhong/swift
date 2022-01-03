@@ -369,7 +369,7 @@ class BertSelfAttention(nn.Module):
         self.num_attention_heads = config.num_attention_heads
         self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
-
+        print("self.all_head_size.shape:{}".format(self.all_head_size.shape))
         self.query = nn.Linear(config.hidden_size, self.all_head_size)
         self.key = nn.Linear(config.hidden_size, self.all_head_size)
         self.value = nn.Linear(config.hidden_size, self.all_head_size)
@@ -387,6 +387,7 @@ class BertSelfAttention(nn.Module):
         return x.permute(0, 2, 3, 1)
 
     def forward(self, hidden_states, attention_mask):
+        print(hidden_states.shape)
         mixed_query_layer = self.query(hidden_states)
         mixed_key_layer = self.key(hidden_states)
         mixed_value_layer = self.value(hidden_states)
