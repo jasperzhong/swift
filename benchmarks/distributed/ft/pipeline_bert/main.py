@@ -15,7 +15,7 @@ from torch.distributed.fault_tolerance import (FaultToleranceConfig,
 from torch.utils.data import (DataLoader, Dataset, SequentialSampler)
 
 from model import PipelineParallelBert
-from schedule import (PolyWarmUpScheduler, get_num_microbatches,
+from schedule import (get_num_microbatches,
                       initialize_global_args, is_pipeline_first_stage,
                       is_pipeline_last_stage, pipedream_flush_schedule)
 
@@ -101,7 +101,6 @@ def handle_train_dir(args):
 def create_pretraining_dataset(args):
     data_file = handle_train_dir(args)
     train_data = pretraining_dataset(input_file=data_file, max_pred_length=args.max_predictions_per_seq)
-    # train_sampler = RandomSampler(train_data)
     train_sampler = SequentialSampler(train_data)
     train_dataloader = DataLoader(train_data, sampler=train_sampler,
                                   batch_size=args.micro_batch_size,
