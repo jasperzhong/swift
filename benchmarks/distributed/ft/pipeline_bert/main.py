@@ -90,10 +90,9 @@ def handle_train_dir(args):
     f_start_id = 0
     if torch.distributed.is_initialized() and torch.distributed.get_world_size() > num_files:
         remainder = torch.distributed.get_world_size() % num_files
-        data_file = files[(f_start_id * torch.distributed.get_world_size() +
-                           torch.distributed.get_rank() + remainder * f_start_id) % num_files]
+        data_file = files[(f_start_id * torch.distributed.get_world_size() + remainder * f_start_id) % num_files]
     else:
-        data_file = files[(f_start_id * torch.distributed.get_world_size() + torch.distributed.get_rank()) % num_files]
+        data_file = files[(f_start_id * torch.distributed.get_world_size()) % num_files]
 
     return data_file
 
@@ -152,12 +151,6 @@ class BertPretrainingCriterion(torch.nn.Module):
         next_sentence_loss = self.loss_fn(seq_relationship_score.view(-1, 2), next_sentence_labels.view(-1))
         total_loss = masked_lm_loss + next_sentence_loss
         return total_loss
-
-
-def get_input_shape(data_loader: DataLoader):
-    data_iter = iter(data_loader)
-    input_ids, segment_ids, input_mask, _, _ = next(data_iter)
-    return input_ids.shape, segment_ids.shape, input_mask.shape
 
 
 def prepare_model_and_optimizer(args):
