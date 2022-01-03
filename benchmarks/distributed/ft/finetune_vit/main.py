@@ -188,6 +188,7 @@ def main():
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
     start = time.time()
+    torch.manual_seed(args.seed)
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, lr_scheduler,
                           reset_data_iterator_func=reset_data_iterator, fault_tolerance_val=fault_tolerance_val, test_loader=test_loader)
