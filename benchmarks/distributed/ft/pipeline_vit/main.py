@@ -54,8 +54,11 @@ parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
+# logging
 parser.add_argument('--logging', default=False, action="store_true",
                     help='whether to enable logging.')
+parser.add_argument('--parallel-recovery', default=False, action="store_true",
+                    help='whether to enable parallel recovery.')
 parser.add_argument('--logging-chunk-freq', type=int,
                     default=10, help='chunk logging files every N iterations.')
 parser.add_argument('--logging-compression', default=None, type=str,
@@ -66,6 +69,7 @@ parser.add_argument('--logging-s3-bucket', default=None, type=str,
                     help='s3 bucket if using s3 as logging store')
 parser.add_argument('--logging-group-size', default=None, type=int,
                     help='group size for logging')
+
 
 args = parser.parse_args()
 initialize_global_args(args)
@@ -112,9 +116,16 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
     loss = pipedream_flush_schedule(
         data_iterator, model, loss_func)
     torch.cuda.synchronize()
-    # gradient clipping
-    torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
-    optimizer.step()
+    if type(optimizer).__name__ == "DistributedOptimizer":
+        optimizer.synchronize()
+        # gradient clipping should be right after gradient synchronization
+        # total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+        with optimizer.skip_synchronize():
+            optimizer.step()
+    else:
+        # gradient clipping
+        # total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+        optimizer.step()
     if lr_scheduler is not None:
         lr_scheduler.step()
     iteration_time = time.time() - start
@@ -146,20 +157,24 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = get_data_loader(args)
-    model = PipelineParallelViT()
+    model = PipelineParallelViT(balance=[4, 6, 5, 3])
     model.cuda()
 
-    micro_batch_num = args.global_batch_size // args.micro_batch_size
-    total_iters = args.epochs * (len(data_loader) // micro_batch_num)
+    total_iters = args.benchmark_iters
+    print("total iterations: {}".format(total_iters))
+    num_micro_batches = args.global_batch_size // args.micro_batch_size
+    iters_per_epoch = len(data_loader) // num_micro_batches
+    print("iters per epoch:{}".format(iters_per_epoch))
+
     print("total iterations: {}".format(total_iters))
     optimizer = optim.Adam(model.parameters(), lr=3e-3, weight_decay=0.3)
     lr_scheduler = get_lr_scheduler(optimizer, total_iters, args)
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
-        num_iteration=total_iters, batch_size=args.global_batch_size, checkpoint_interval=10,
-        replica=False, logging=args.logging, logging_compression=args.logging_compression,
-        logging_chunk_freq=args.logging_chunk_freq,
+        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
+        checkpoint_interval=10, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
+        logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )

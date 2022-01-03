@@ -22,7 +22,7 @@ cmd="python3 -m torch.distributed.run \
 	--micro-batch-size 32 \
 	--global-batch-size 512 \
 	--img-size 224 \
-	--seed 42 \
+	--seed 2021 \
 	-p 1 \
 	-j 4" 
 
