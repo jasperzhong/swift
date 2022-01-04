@@ -147,13 +147,16 @@ def main():
     iters_per_epoch = len(data_loader) // num_micro_batches
     print("iters per epoch:{}".format(iters_per_epoch))
 
-    N, d = args.world_size, args.data_parallel_size
-    ranks = [list(range(i, i+N//d, d)) for i in range(N//d)]
-    comm = torch.distributed.new_group(ranks)
-
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
-    optimizer = DistributedOptimizer(optimizer, model.named_parameters(), 
-                backward_passes_per_step=get_num_microbatches(), comm_group=comm, average=True)
+    if args.data_parallel_size > 1:
+        N, d = args.world_size, args.data_parallel_size
+        ranks = [list(range(i, i+N//d, d)) for i in range(N//d)]
+        comm = torch.distributed.new_group(ranks)
+        optimizer = DistributedOptimizer(optimizer, model.named_parameters(), 
+                    backward_passes_per_step=get_num_microbatches(), comm_group=comm, average=True)
+    elif args.replica:
+        logging.warn(f"Replicas are not available because data-parallel size is {args.data_parallel_size}")
+        args.replica = False
 
     loss_func = nn.CrossEntropyLoss().cuda()
 
