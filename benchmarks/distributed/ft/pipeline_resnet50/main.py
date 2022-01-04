@@ -126,7 +126,7 @@ def main():
     if args.data_parallel_size > num_machines:
         raise ValueError(f"data-parallel size ({args.data_parallel_size}) should not be large than the number of machines ({num_machines})")
     else:
-        args.micro_batch_size /= args.data_parallel_size
+        args.micro_batch_size //= args.data_parallel_size
 
     torch.cuda.set_device(args.local_rank)
     torch.distributed.init_process_group(
