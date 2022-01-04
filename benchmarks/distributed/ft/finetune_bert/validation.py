@@ -91,8 +91,9 @@ def forward_step(eval_dataloader, model, input_tensor, eval_features):
         assert input_tensor is None
         output_tensor = model(input_ids, segment_ids, input_mask)
     elif is_pipeline_last_stage():
+        assert input_tensor is not None
         all_results = []
-        batch_start_logits, batch_end_logits = model(input_ids, segment_ids, input_mask)
+        batch_start_logits, batch_end_logits = model(input_tensor, segment_ids, input_mask)
         for i, example_index in enumerate(example_indices):
                 start_logits = batch_start_logits[i].detach().cpu().tolist()
                 end_logits = batch_end_logits[i].detach().cpu().tolist()
