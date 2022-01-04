@@ -58,6 +58,7 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
                 forward(config, eval_dataloader, model, eval_features)
     
     if is_pipeline_last_stage():
+        print("all_results: {}".format(all_results))
         output_prediction_file = os.path.join(args.output_dir, "predictions.json")
         output_nbest_file = os.path.join(args.output_dir, "nbest_predictions.json")
 
@@ -104,6 +105,7 @@ def forward_step(eval_dataloader, model, input_tensor, eval_features):
                                              start_logits=start_logits,
                                              end_logits=end_logits))
         
+        print("last stage all_results: {}".format(all_results))
         return all_results
     
     else:
