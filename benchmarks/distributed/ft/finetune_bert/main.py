@@ -180,10 +180,10 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
 
 def get_lr_scheduler(optimizer, total_iters, args):
 
-    def warm_up_with_cosine_lr(iter): return iter / args.warm_up_iters if iter <= args.warm_up_iters \
-        else 0.5 * (math.cos((iter - args.warm_up_iters) / (total_iters - args.warm_up_iters) * math.pi) + 1)
+    def warm_up_with_linear_lr(iter): return iter / args.warm_up_iters if iter <= args.warm_up_iters \
+        else (iter - total_iters) / (args.warm_up_iters - total_iters)
 
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=warm_up_with_cosine_lr)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=warm_up_with_linear_lr)
     return scheduler
 
 
