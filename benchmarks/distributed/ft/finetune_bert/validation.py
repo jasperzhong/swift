@@ -36,7 +36,6 @@ def create_val_dataloader():
     eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_example_index)
     # Run prediction for full data
     eval_sampler = SequentialSampler(eval_data)
-    print("sampler len: {}".format(eval_sampler))
     eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=args.test_batch_size, drop_last=True)
 
     return eval_dataloader, eval_features, eval_examples
@@ -60,12 +59,10 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
                 forward(config, data_iter, model, eval_features)
     
     if is_pipeline_last_stage():
-        print("all_results: {}".format(len(all_results)))
         output_prediction_file = os.path.join(args.output_dir, "predictions.json")
         output_nbest_file = os.path.join(args.output_dir, "nbest_predictions.json")
 
         answers, nbest_answers = get_answers(eval_examples, eval_features, all_results, args)
-        print("answers: {}".format(answers))
         with open(output_prediction_file, "w") as f:
             f.write(json.dumps(answers, indent=4) + "\n")
         with open(output_nbest_file, "w") as f:

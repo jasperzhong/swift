@@ -17,7 +17,7 @@ cmd="python3 -m torch.distributed.run \
 	main.py \
 	--micro-batch-size 4 \
 	--global-batch-size 32 \
-	--test-batch-size 123 \
+	--test-batch-size 157 \
 	--seed 2021 \
 	-p 50 \
 	--do_lower_case \
