@@ -331,15 +331,12 @@ class BertLayerNorm(Module):
     #                 x, self.weight, self.bias, self.shape, self.eps)
 
     def forward(self, x):
-        if self.apex_enabled and not torch.jit.is_scripting():
-            x = self.fused_layer_norm(x)
-        else:
-            u = x.mean(-1, keepdim=True)
-            s = (x - u)
-            s = s * s
-            s = s.mean(-1, keepdim=True)
-            x = (x - u) / torch.sqrt(s + self.eps)
-            x = self.weight * x + self.bias
+        u = x.mean(-1, keepdim=True)
+        s = (x - u)
+        s = s * s
+        s = s.mean(-1, keepdim=True)
+        x = (x - u) / torch.sqrt(s + self.eps)
+        x = self.weight * x + self.bias
         return x
 
 
@@ -827,7 +824,7 @@ class BertModel(BertPreTrainedModel):
         self.embeddings = BertEmbeddings(config)
         self.encoder = BertEncoder(config)
         self.pooler = BertPooler(config)
-        self.apply(self.init_bert_weights)
+        # self.apply(self.init_bert_weights)
         self.output_all_encoded_layers = config.output_all_encoded_layers
 
     def forward(self, input_ids, token_type_ids, attention_mask):
