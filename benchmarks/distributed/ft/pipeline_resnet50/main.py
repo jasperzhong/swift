@@ -140,7 +140,7 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = get_data_loader(args)
-    model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=[4, 2, 2, 3])
+    model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=None)
     model.cuda()
 
     total_iters = args.benchmark_iters
