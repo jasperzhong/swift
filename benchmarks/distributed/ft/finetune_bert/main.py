@@ -115,6 +115,9 @@ parser.add_argument("--eval_script",
 parser.add_argument("--max_answer_length", default=30, type=int,
                         help="The maximum length of an answer that can be generated. This is needed because the start "
                              "and end predictions are not conditioned on one another.")
+parser.add_argument('--vocab_file',
+                        type=str, default="./vocab", required=True,
+                        help="Vocabulary mapping/file BERT was pretrainined on")
 
 args = parser.parse_args()
 initialize_global_args(args)

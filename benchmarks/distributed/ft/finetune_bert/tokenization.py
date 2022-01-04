@@ -390,5 +390,6 @@ def _is_punctuation(char):
 def get_tokenizer():
     print("get tokenizer")
     args = schedule._GLOBAL_ARGS
-    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", do_lower_case=True)
+    # tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", do_lower_case=True)
+    tokenizer = BertTokenizer(args.vocab_file, do_lower_case=args.do_lower_case, max_len=512) # for bert large
     return tokenizer
