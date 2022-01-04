@@ -20,6 +20,7 @@ def is_pipeline_first_stage():
 
 
 def get_pipeline_model_parallel_world_size():
+    global _GLOBAL_ARGS
     return torch.distributed.get_world_size() // _GLOBAL_ARGS.data_parallel_size
 
 
