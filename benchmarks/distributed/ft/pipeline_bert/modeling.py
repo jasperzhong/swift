@@ -21,9 +21,11 @@ from torch.nn.parameter import Parameter
 import torch.nn.functional as F
 import torch.nn.init as init
 
+
 class BertConfig(object):
     """Configuration class to store the configuration of a `BertModel`.
     """
+
     def __init__(self,
                  vocab_size_or_config_json_file,
                  hidden_size=768,
@@ -61,7 +63,7 @@ class BertConfig(object):
                 initializing all weight matrices.
         """
         if isinstance(vocab_size_or_config_json_file, str) or (sys.version_info[0] == 2
-                        and isinstance(vocab_size_or_config_json_file, unicode)):
+                                                               and isinstance(vocab_size_or_config_json_file, unicode)):
             with open(vocab_size_or_config_json_file, "r", encoding='utf-8') as reader:
                 json_config = json.loads(reader.read())
             for key, value in json_config.items():
@@ -111,6 +113,8 @@ class BertConfig(object):
         return json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
 
 # Non-Fused Layer Norm
+
+
 class BertLayerNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-12):
         """Construct a layernorm module in the TF style (epsilon inside the square root).
@@ -128,9 +132,11 @@ class BertLayerNorm(nn.Module):
         x = (x - u) / torch.sqrt(s + self.variance_epsilon)
         return self.weight * x + self.bias
 
+
 class BertEmbeddings(nn.Module):
     """Construct the embeddings from word, position and token_type embeddings.
     """
+
     def __init__(self, config):
         super(BertEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
@@ -155,6 +161,7 @@ class BertEmbeddings(nn.Module):
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
+
 
 class BertSelfAttention(nn.Module):
     def __init__(self, config):
@@ -211,6 +218,7 @@ class BertSelfAttention(nn.Module):
         context_layer = torch.reshape(context_layer, new_context_layer_shape)
         return context_layer
 
+
 class BertSelfOutput(nn.Module):
     def __init__(self, config):
         super(BertSelfOutput, self).__init__()
@@ -236,28 +244,38 @@ class BertAttention(nn.Module):
         attention_output = self.output(self_output, input_tensor)
         return attention_output
 
+
 def gelu(x):
     return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
 
-#used only for triton inference
+# used only for triton inference
+
+
 def bias_gelu(bias, y):
     x = bias + y
     return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
 
 # used specifically for training since torch.nn.functional.gelu breaks ONNX export
+
+
 def bias_gelu_training(bias, y):
     x = bias + y
-    return torch.nn.functional.gelu(x) # Breaks ONNX export
+    return torch.nn.functional.gelu(x)  # Breaks ONNX export
+
 
 def bias_tanh(bias, y):
     x = bias + y
     return torch.tanh(x)
 
+
 def swish(x):
     return x * torch.sigmoid(x)
 
-#torch.nn.functional.gelu(x) # Breaks ONNX export
-ACT2FN = {"gelu": gelu, "bias_gelu": bias_gelu, "bias_tanh": bias_tanh, "relu": torch.nn.functional.relu, "swish": swish}
+
+# torch.nn.functional.gelu(x) # Breaks ONNX export
+ACT2FN = {"gelu": gelu, "bias_gelu": bias_gelu, "bias_tanh": bias_tanh,
+          "relu": torch.nn.functional.relu, "swish": swish}
+
 
 class LinearActivation(Module):
     r"""Fused Linear and activation Module.
@@ -271,7 +289,7 @@ class LinearActivation(Module):
         self.act_fn = nn.Identity()                                                         #
         self.biased_act_fn = None                                                           #
         self.bias = None                                                                    #
-        if isinstance(act, str) or (sys.version_info[0] == 2 and isinstance(act, unicode)): # For TorchScript
+        if isinstance(act, str) or (sys.version_info[0] == 2 and isinstance(act, unicode)):  # For TorchScript
             if bias and not 'bias' in act:                                                  # compatibility
                 act = 'bias_' + act                                                         #
                 self.biased_act_fn = ACT2FN[act]                                            #
@@ -305,6 +323,7 @@ class LinearActivation(Module):
             self.in_features, self.out_features, self.bias is not None
         )
 
+
 class BertIntermediate(nn.Module):
     def __init__(self, config):
         super(BertIntermediate, self).__init__()
@@ -328,6 +347,7 @@ class BertOutput(nn.Module):
         hidden_states = self.LayerNorm(hidden_states + input_tensor)
         return hidden_states
 
+
 class BertLayer(nn.Module):
     def __init__(self, config):
         super(BertLayer, self).__init__()
@@ -340,6 +360,7 @@ class BertLayer(nn.Module):
         intermediate_output = self.intermediate(attention_output)
         layer_output = self.output(intermediate_output, attention_output)
         return layer_output
+
 
 class BertEncoder(nn.Module):
     def __init__(self, config):
@@ -363,7 +384,7 @@ class BertEncoder(nn.Module):
         num_layers = len(self.layer)
         chunk_length = math.ceil(math.sqrt(num_layers))
         while l < num_layers:
-            hidden_states = checkpoint.checkpoint(custom(l, l+chunk_length), hidden_states, attention_mask*1)
+            hidden_states = checkpoint.checkpoint(custom(l, l + chunk_length), hidden_states, attention_mask * 1)
             l += chunk_length
 
         return hidden_states
@@ -374,7 +395,7 @@ class BertEncoder(nn.Module):
         if self._checkpoint_activations:
             hidden_states = self.checkpointed_forward(hidden_states, attention_mask)
         else:
-            for i,layer_module in enumerate(self.layer):
+            for i, layer_module in enumerate(self.layer):
                 hidden_states = layer_module(hidden_states, attention_mask)
 
                 if self.output_all_encoded_layers:
@@ -383,6 +404,7 @@ class BertEncoder(nn.Module):
         if not self.output_all_encoded_layers or self._checkpoint_activations:
             all_encoder_layers.append(hidden_states)
         return all_encoder_layers
+
 
 class BertPooler(nn.Module):
     def __init__(self, config):
@@ -395,6 +417,7 @@ class BertPooler(nn.Module):
         first_token_tensor = hidden_states[:, 0]
         pooled_output = self.dense_act(first_token_tensor)
         return pooled_output
+
 
 class BertModel(nn.Module):
     """BERT model ("Bidirectional Embedding Representations from a Transformer").
@@ -433,6 +456,7 @@ class BertModel(nn.Module):
     all_encoder_layers, pooled_output = model(input_ids, token_type_ids, input_mask)
     ```
     """
+
     def __init__(self, config):
         super(BertModel, self).__init__()
         if not isinstance(config, BertConfig):
@@ -443,9 +467,15 @@ class BertModel(nn.Module):
                     self.__class__.__name__, self.__class__.__name__
                 ))
         self.config = config
+        start = time.time()
         self.embeddings = BertEmbeddings(config)
+        print(f"create embeddings {time.time() - start}")
+        start = time.time()
         self.encoder = BertEncoder(config)
+        print(f"create BertEncoder {time.time() - start}")
+        start = time.time()
         self.pooler = BertPooler(config)
+        print(f"create pooler {time.time() - start}")
         # self.apply(self.init_bert_weights)
         self.output_all_encoded_layers = config.output_all_encoded_layers
 
@@ -486,6 +516,7 @@ class BertModel(nn.Module):
         out = [encoded_layers, pooled_output]
         return out
 
+
 class BertPredictionHeadTransform(nn.Module):
     def __init__(self, config):
         super(BertPredictionHeadTransform, self).__init__()
@@ -516,6 +547,7 @@ class BertLMPredictionHead(nn.Module):
         hidden_states = self.decoder(hidden_states) + self.bias
         return hidden_states
 
+
 class BertPreTrainingHeads(nn.Module):
     def __init__(self, config, bert_model_embedding_weights):
         super(BertPreTrainingHeads, self).__init__()
@@ -527,6 +559,7 @@ class BertPreTrainingHeads(nn.Module):
         seq_relationship_score = self.seq_relationship(pooled_output)
         out = [prediction_scores, seq_relationship_score]
         return out
+
 
 class BertForPreTraining(BertModel):
     """BERT model with pre-training heads.
@@ -572,8 +605,9 @@ class BertForPreTraining(BertModel):
     masked_lm_logits_scores, seq_relationship_logits = model(input_ids, token_type_ids, input_mask)
     ```
     """
+
     def __init__(self, config):
-        start = time.time() 
+        start = time.time()
         super(BertForPreTraining, self).__init__(config)
         print(f"super BertForPreTraining {time.time() - start}")
         start = time.time()
