@@ -217,7 +217,7 @@ def main():
     start = time.time()
     model = PipelineParallelBert(
         rank=torch.distributed.get_rank(),
-        balance=None
+        balance=[1, 2, 2, 2, 2, 2, 2, 1]
     )    
     print("create model time : {}".format(time.time() - start))
 
