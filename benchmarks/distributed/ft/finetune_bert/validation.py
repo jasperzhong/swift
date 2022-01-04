@@ -58,10 +58,12 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
                 forward(config, eval_dataloader, model, eval_features)
     
     if is_pipeline_last_stage():
+        print("all_results: {}".format(len(all_results)))
         output_prediction_file = os.path.join(args.output_dir, "predictions.json")
         output_nbest_file = os.path.join(args.output_dir, "nbest_predictions.json")
 
         answers, nbest_answers = get_answers(eval_examples, eval_features, all_results, args)
+        print("answers: {}".format(answers))
         with open(output_prediction_file, "w") as f:
             f.write(json.dumps(answers, indent=4) + "\n")
         with open(output_nbest_file, "w") as f:

@@ -204,17 +204,23 @@ def main():
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
-
+    
+    start = time.time()
     tokenizer = get_tokenizer()
+    print("get token time : {}".format(time.time() - start))
+    start = time.time()
     data_loader = create_train_dataloader(args, tokenizer)
+    print("create dataloader time : {}".format(time.time() - start))
     input_ids, segment_ids, input_mask = get_input_shape(data_loader)
     print(input_ids, segment_ids, input_mask)
     
+    start = time.time()
     model = PipelineParallelBert(
         rank=torch.distributed.get_rank(),
         balance=None
     )    
-    
+    print("create model time : {}".format(time.time() - start))
+
     num_micro_batches = get_num_microbatches()
     iters_per_epoch = len(data_loader) // num_micro_batches
     num_iterations = args.epochs * iters_per_epoch

@@ -71,6 +71,8 @@ def evaluate(dataset, predictions):
 
     exact_match = 100.0 * exact_match / total
     f1 = 100.0 * f1 / total
+    
+    print("predictions: {}".format(predictions))
 
     return {'exact_match': exact_match, 'f1': f1}
 
