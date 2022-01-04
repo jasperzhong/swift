@@ -104,7 +104,7 @@ def reset_data_iterator(data_loader, ts):
     return data_iterator
 
 
-def train_iter(model, optimizer, data_iterator, loss_func):
+def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler):
     start = time.time()
     optimizer.zero_grad()
     loss = pipedream_flush_schedule(
@@ -196,7 +196,7 @@ def main():
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
     fault_tolerance_train(config, train_iter, model, optimizer,
-                          data_loader, loss_func, reset_data_iterator_func=reset_data_iterator)
+                          data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
 
 
 if __name__ == '__main__':
