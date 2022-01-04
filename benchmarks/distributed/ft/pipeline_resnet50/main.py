@@ -6,11 +6,10 @@ import time
 
 import numpy as np
 from numpy.lib.function_base import average
-from benchmarks.distributed.ft.finetune_vit.schedule import get_pipeline_model_parallel_rank
 from model import PipelineParallelResNet50
 from schedule import (get_num_microbatches, initialize_global_args,
                       is_pipeline_first_stage, is_pipeline_last_stage,
-                      pipedream_flush_schedule)
+                      pipedream_flush_schedule, get_pipeline_model_parallel_rank)
 from torch._C import Value
 from torch.autograd import backward
 from torchvision import datasets, transforms
@@ -140,8 +139,6 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = get_data_loader(args)
-    print(f"data_parallel_size = {args.data_parallel_size} world_size = {torch.distributed.get_world_size()} rank = {torch.distributed.get_rank()}")
-    print(f"pipeline rank = {get_pipeline_model_parallel_rank()}")
     model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=None)
     model.cuda()
 
