@@ -44,6 +44,7 @@ class PipelineParallelBert(nn.Module):
         #             cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(get_pipeline_model_parallel_rank())))
         model = modeling.BertForQuestionAnswering(config)
         model.load_state_dict(torch.load("./checkpoint/bert_large_pretrained_amp.pt", map_location='cpu')["model"], strict=False)
+        self.bert = model
         print("model initialize time is : {}".format(time.time() - start))
         self.bert_sequential = nn.Sequential(
             self.bert.bert.embeddings,
