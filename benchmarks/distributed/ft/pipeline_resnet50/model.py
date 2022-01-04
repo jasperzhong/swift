@@ -70,6 +70,8 @@ class PipelineParallelResNet50(ResNet):
         """
         get each layer's input/output shape by running one forward pass
         """
+        micro_batch_size = get_microbatch_size()
+
         if os.path.exists("profile.txt"):
             with open("profile.txt", "r") as f:
                 lines = f.readlines()
@@ -79,10 +81,15 @@ class PipelineParallelResNet50(ResNet):
                 if line:
                     nums = line.split(" ")
                     nums = [int(num) for num in nums]
+                  
                     if len(nums) == 1:
                         nums = nums[0]
                     else:
                         nums = tuple(nums)
+                        if nums[0] != micro_batch_size:
+                            print("The microbatch size in profile.txt is not consistent. Remove profile.txt.")
+                            os.remove("profile.txt")
+                            break
                     shapes.append(nums)
                 else:
                     self._input_shapes = shapes
@@ -91,7 +98,6 @@ class PipelineParallelResNet50(ResNet):
             print("read shapes from file")
             return
 
-        micro_batch_size = get_microbatch_size()
         fake_input = torch.randn(tuple([micro_batch_size] + shape))
 
         self._input_shapes = []
