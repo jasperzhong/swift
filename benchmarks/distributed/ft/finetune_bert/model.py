@@ -16,7 +16,7 @@ from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
                       get_pipeline_model_parallel_world_size)
 
 # Prepare model config
-config = BertConfig.from_json_file('./bert_config.json')
+config = BertConfig.from_json_file('./bert_config_large.json')
 
 # Padding for divisibility by 8
 if config.vocab_size % 8 != 0:
@@ -40,8 +40,10 @@ class PipelineParallelBert(nn.Module):
         super(PipelineParallelBert, self).__init__()
         print("start to create model")
         start = time.time()
-        self.bert = modeling.BertForQuestionAnswering.from_pretrained("bert-base-uncased",
-                    cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(get_pipeline_model_parallel_rank())))
+        # self.bert = modeling.BertForQuestionAnswering.from_pretrained("bert-base-uncased",
+        #             cache_dir=os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(get_pipeline_model_parallel_rank())))
+        model = modeling.BertForQuestionAnswering(config)
+        model.load_state_dict(torch.load("./checkpoint/bert_large_pretrained_amp.pt", map_location='cpu')["model"], strict=False)
         print("model initialize time is : {}".format(time.time() - start))
         self.bert_sequential = nn.Sequential(
             self.bert.bert.embeddings,
