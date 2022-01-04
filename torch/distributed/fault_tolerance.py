@@ -141,7 +141,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     if config.replica:
         comm_group = optimizer.comm_group
         pipeline_parallel_size = get_world_size() // optimizer._size
-        group_src_rank = torch.get_rank() // pipeline_parallel_size * pipeline_parallel_size
+        group_src_rank = get_rank() // pipeline_parallel_size * pipeline_parallel_size
         logger.info(f"group src rank = {group_src_rank}")
         broadcast_parameters(model.state_dict(), group_src_rank, comm_group=comm_group)
         optimizer.clear()
