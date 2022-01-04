@@ -58,7 +58,6 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
                 forward(config, eval_dataloader, model, eval_features)
     
     if is_pipeline_last_stage():
-        print("all_results: {}".format(all_results))
         output_prediction_file = os.path.join(args.output_dir, "predictions.json")
         output_nbest_file = os.path.join(args.output_dir, "nbest_predictions.json")
 
@@ -73,7 +72,7 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
         scores = str(eval_out).strip()
         exact_match = float(scores.split(":")[1].split(",")[0])
         f1 = float(scores.split(":")[2].split("}")[0])
-        print("exact_match: {} F1: ".format(exact_match, f1))
+        print("exact_match: {} F1: {}".format(exact_match, f1))
 
 def forward(config, eval_dataloader, model, eval_features):
     shape = (schedule._GLOBAL_ARGS.test_batch_size, *model.input_shape[1:])
