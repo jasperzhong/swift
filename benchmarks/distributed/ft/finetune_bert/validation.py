@@ -56,22 +56,23 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
                 all_results.extend(results)
             else:
                 forward(config, eval_dataloader, model, eval_features)
-                
-    output_prediction_file = os.path.join(args.output_dir, "predictions.json")
-    output_nbest_file = os.path.join(args.output_dir, "nbest_predictions.json")
-
-    answers, nbest_answers = get_answers(eval_examples, eval_features, all_results, args)
-    with open(output_prediction_file, "w") as f:
-        f.write(json.dumps(answers, indent=4) + "\n")
-    with open(output_nbest_file, "w") as f:
-        f.write(json.dumps(nbest_answers, indent=4) + "\n")
     
-    eval_out = subprocess.check_output([sys.executable, args.eval_script,
-                                              args.predict_file, args.output_dir + "/predictions.json"])
-    scores = str(eval_out).strip()
-    exact_match = float(scores.split(":")[1].split(",")[0])
-    f1 = float(scores.split(":")[2].split("}")[0])
-    print("exact_match: {} F1: ".format(exact_match, f1))
+    if is_pipeline_last_stage():
+        output_prediction_file = os.path.join(args.output_dir, "predictions.json")
+        output_nbest_file = os.path.join(args.output_dir, "nbest_predictions.json")
+
+        answers, nbest_answers = get_answers(eval_examples, eval_features, all_results, args)
+        with open(output_prediction_file, "w") as f:
+            f.write(json.dumps(answers, indent=4) + "\n")
+        with open(output_nbest_file, "w") as f:
+            f.write(json.dumps(nbest_answers, indent=4) + "\n")
+
+        eval_out = subprocess.check_output([sys.executable, args.eval_script,
+                                                    args.predict_file, args.output_dir + "/predictions.json"])
+        scores = str(eval_out).strip()
+        exact_match = float(scores.split(":")[1].split(",")[0])
+        f1 = float(scores.split(":")[2].split("}")[0])
+        print("exact_match: {} F1: ".format(exact_match, f1))
 
 def forward(config, eval_dataloader, model, eval_features):
     shape = (schedule._GLOBAL_ARGS.test_batch_size, *model.input_shape[1:])
