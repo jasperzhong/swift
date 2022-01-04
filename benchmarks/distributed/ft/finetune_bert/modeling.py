@@ -444,10 +444,10 @@ class BertAttention(nn.Module):
 class BertIntermediate(nn.Module):
     def __init__(self, config):
         super(BertIntermediate, self).__init__()
-        self.dense_act = LinearActivation(config.hidden_size, config.intermediate_size, act=config.hidden_act)
+        self.dense = LinearActivation(config.hidden_size, config.intermediate_size, act=config.hidden_act)
 
     def forward(self, hidden_states):
-        hidden_states = self.dense_act(hidden_states)
+        hidden_states = self.dense(hidden_states)
         return hidden_states
 
 
@@ -524,13 +524,13 @@ class BertEncoder(nn.Module):
 class BertPooler(nn.Module):
     def __init__(self, config):
         super(BertPooler, self).__init__()
-        self.dense_act = LinearActivation(config.hidden_size, config.hidden_size, act="tanh")
+        self.dense = LinearActivation(config.hidden_size, config.hidden_size, act="tanh")
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
-        pooled_output = self.dense_act(first_token_tensor)
+        pooled_output = self.dense(first_token_tensor)
         return pooled_output
 
 class BertPreTrainedModel(nn.Module):
