@@ -2,9 +2,6 @@ import torch
 
 _GLOBAL_ARGS = None
 
-_cnt = 0
-
-
 def initialize_global_args(args):
     global _GLOBAL_ARGS
     _GLOBAL_ARGS = args
@@ -42,7 +39,7 @@ def get_pipeline_model_parallel_prev_rank():
 def get_num_microbatches():
     global _GLOBAL_ARGS
     return _GLOBAL_ARGS.global_batch_size // _GLOBAL_ARGS.micro_batch_size // \
-        torch.distributed.parallel_recovery_data_parallel_size()
+        torch.distributed.parallel_recovery_data_parallel_size() // _GLOBAL_ARGS.data_parallel_size
 
 
 def get_microbatch_size():
@@ -75,7 +72,6 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
 
 
 def backward_step(input_tensor, output_tensor, output_tensor_grad):
-    global _cnt
     if input_tensor is not None:
         input_tensor.retain_grad()
 
