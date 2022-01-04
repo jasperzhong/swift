@@ -112,6 +112,9 @@ parser.add_argument("--eval_script",
                         help="Script to evaluate squad predictions",
                         default="evaluate-v1.1.py",
                         type=str)
+parser.add_argument("--max_answer_length", default=30, type=int,
+                        help="The maximum length of an answer that can be generated. This is needed because the start "
+                             "and end predictions are not conditioned on one another.")
 
 args = parser.parse_args()
 initialize_global_args(args)
