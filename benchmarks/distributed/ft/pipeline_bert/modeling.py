@@ -1,12 +1,27 @@
+# coding=utf-8
+# Copyright (c) 2019 NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018 The Google AI Language Team Authors and The HugginFace Inc. team.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""PyTorch BERT model."""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import copy
 import json
 import logging
 import math
 import os
-import shutil
-import tarfile
-import tempfile
-import time
 import sys
 from io import open
 
@@ -15,11 +30,167 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 from torch.utils import checkpoint
 
+# sys.path.append('/workspace/bert/')
+# from file_utils import cached_path
 
 from torch.nn import Module
 from torch.nn.parameter import Parameter
 import torch.nn.functional as F
 import torch.nn.init as init
+
+logger = logging.getLogger(__name__)
+
+PRETRAINED_MODEL_ARCHIVE_MAP = {
+    'bert-base-uncased': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased.tar.gz",
+    'bert-large-uncased': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-large-uncased.tar.gz",
+    'bert-base-cased': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-cased.tar.gz",
+    'bert-large-cased': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-large-cased.tar.gz",
+    'bert-base-multilingual-uncased': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-multilingual-uncased.tar.gz",
+    'bert-base-multilingual-cased': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-multilingual-cased.tar.gz",
+    'bert-base-chinese': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-chinese.tar.gz",
+}
+CONFIG_NAME = 'bert_config.json'
+WEIGHTS_NAME = 'pytorch_model.bin'
+TF_WEIGHTS_NAME = 'model.ckpt'
+
+# def load_tf_weights_in_bert(model, tf_checkpoint_path):
+#     """ Load tf checkpoints in a pytorch model
+#     """
+#     try:
+#         import re
+#         import numpy as np
+#         import tensorflow as tf
+#     except ImportError:
+#         print("Loading a TensorFlow models in PyTorch, requires TensorFlow to be installed. Please see "
+#             "https://www.tensorflow.org/install/ for installation instructions.")
+#         raise
+#     tf_path = os.path.abspath(tf_checkpoint_path)
+#     print("Converting TensorFlow checkpoint from {}".format(tf_path))
+#     # Load weights from TF model
+#     init_vars = tf.train.list_variables(tf_path)
+#     names = []
+#     arrays = []
+#     for name, shape in init_vars:
+#         print("Loading TF weight {} with shape {}".format(name, shape))
+#         array = tf.train.load_variable(tf_path, name)
+#         names.append(name)
+#         arrays.append(array)
+
+#     for name, array in zip(names, arrays):
+#         name = name.split('/')
+#         # adam_v and adam_m are variables used in AdamWeightDecayOptimizer to calculated m and v
+#         # which are not required for using pretrained model
+#         if any(n in ["adam_v", "adam_m"] for n in name):
+#             print("Skipping {}".format("/".join(name)))
+#             continue
+#         pointer = model
+#         for m_name in name:
+#             if re.fullmatch(r'[A-Za-z]+_\d+', m_name):
+#                 l = re.split(r'_(\d+)', m_name)
+#             else:
+#                 l = [m_name]
+#             if l[0] == 'kernel' or l[0] == 'gamma':
+#                 pointer = getattr(pointer, 'weight')
+#             elif l[0] == 'output_bias' or l[0] == 'beta':
+#                 pointer = getattr(pointer, 'bias')
+#             elif l[0] == 'output_weights':
+#                 pointer = getattr(pointer, 'weight')
+#             else:
+#                 pointer = getattr(pointer, l[0])
+#             if len(l) >= 2:
+#                 num = int(l[1])
+#                 pointer = pointer[num]
+#         if m_name[-11:] == '_embeddings':
+#             pointer = getattr(pointer, 'weight')
+#         elif m_name == 'kernel':
+#             array = np.ascontiguousarray(np.transpose(array))
+#         try:
+#             assert pointer.shape == array.shape
+#         except AssertionError as e:
+#             e.args += (pointer.shape, array.shape)
+#             raise
+#         print("Initialize PyTorch weight {}".format(name))
+#         pointer.data = torch.from_numpy(array)
+#     return model
+
+
+def gelu(x):
+    return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
+
+# used only for triton inference
+
+
+def bias_gelu(bias, y):
+    x = bias + y
+    return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
+
+# used specifically for training since torch.nn.functional.gelu breaks ONNX export
+
+
+def bias_gelu_training(bias, y):
+    x = bias + y
+    return torch.nn.functional.gelu(x)  # Breaks ONNX export
+
+
+def bias_tanh(bias, y):
+    x = bias + y
+    return torch.tanh(x)
+
+
+def swish(x):
+    return x * torch.sigmoid(x)
+
+
+# torch.nn.functional.gelu(x) # Breaks ONNX export
+ACT2FN = {"gelu": gelu, "bias_gelu": bias_gelu, "bias_tanh": bias_tanh,
+          "relu": torch.nn.functional.relu, "swish": swish}
+
+
+class LinearActivation(Module):
+    r"""Fused Linear and activation Module.
+    """
+    __constants__ = ['bias']
+
+    def __init__(self, in_features, out_features, act='gelu', bias=True):
+        super(LinearActivation, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.act_fn = nn.Identity()                                                         #
+        self.biased_act_fn = None                                                           #
+        self.bias = None                                                                    #
+        if isinstance(act, str) or (sys.version_info[0] == 2 and isinstance(act, unicode)):  # For TorchScript
+            if bias and not 'bias' in act:                                                  # compatibility
+                act = 'bias_' + act                                                         #
+                self.biased_act_fn = ACT2FN[act]                                            #
+
+            else:
+                self.act_fn = ACT2FN[act]
+        else:
+            self.act_fn = act
+        self.weight = Parameter(torch.Tensor(out_features, in_features))
+        if bias:
+            self.bias = Parameter(torch.Tensor(out_features))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in)
+            init.uniform_(self.bias, -bound, bound)
+
+    def forward(self, input):
+        if not self.bias is None:
+            return self.biased_act_fn(self.bias, F.linear(input, self.weight, None))
+        else:
+            return self.act_fn(F.linear(input, self.weight, self.bias))
+
+    def extra_repr(self):
+        return 'in_features={}, out_features={}, bias={}'.format(
+            self.in_features, self.out_features, self.bias is not None
+        )
 
 
 class BertConfig(object):
@@ -40,6 +211,7 @@ class BertConfig(object):
                  initializer_range=0.02,
                  output_all_encoded_layers=False):
         """Constructs BertConfig.
+
         Args:
             vocab_size_or_config_json_file: Vocabulary size of `inputs_ids` in `BertModel`.
             hidden_size: Size of the encoder layers and the pooler layer.
@@ -112,14 +284,12 @@ class BertConfig(object):
         """Serializes this instance to a JSON string."""
         return json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
 
-# Non-Fused Layer Norm
 
-
-class BertLayerNorm(nn.Module):
+class BertNonFusedLayerNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-12):
         """Construct a layernorm module in the TF style (epsilon inside the square root).
         """
-        super(BertLayerNorm, self).__init__()
+        super(BertNonFusedLayerNorm, self).__init__()
         self.weight = nn.Parameter(torch.ones(hidden_size))
         self.bias = nn.Parameter(torch.zeros(hidden_size))
         self.variance_epsilon = eps
@@ -131,6 +301,46 @@ class BertLayerNorm(nn.Module):
         s = s.mean(-1, keepdim=True)
         x = (x - u) / torch.sqrt(s + self.variance_epsilon)
         return self.weight * x + self.bias
+
+# try:
+#     import apex
+#     #apex.amp.register_half_function(apex.normalization.fused_layer_norm, 'FusedLayerNorm')
+#     import apex.normalization
+#     from apex.normalization.fused_layer_norm import FusedLayerNormAffineFunction
+#     #apex.amp.register_float_function(apex.normalization.FusedLayerNorm, 'forward')
+#     #BertLayerNorm = apex.normalization.FusedLayerNorm
+#     APEX_IS_AVAILABLE = True
+# except ImportError:
+#     print("Better speed can be achieved with apex installed from https://www.github.com/nvidia/apex.")
+#     #BertLayerNorm = BertNonFusedLayerNorm
+#     APEX_IS_AVAILABLE = False
+
+
+class BertLayerNorm(Module):
+    def __init__(self, hidden_size, eps=1e-12):
+        super(BertLayerNorm, self).__init__()
+        self.shape = torch.Size((hidden_size,))
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.bias = nn.Parameter(torch.zeros(hidden_size))
+        # self.apex_enabled = APEX_IS_AVAILABLE
+
+    # @torch.jit.unused
+    # def fused_layer_norm(self, x):
+    #     return FusedLayerNormAffineFunction.apply(
+    #                 x, self.weight, self.bias, self.shape, self.eps)
+
+    def forward(self, x):
+        if self.apex_enabled and not torch.jit.is_scripting():
+            x = self.fused_layer_norm(x)
+        else:
+            u = x.mean(-1, keepdim=True)
+            s = (x - u)
+            s = s * s
+            s = s.mean(-1, keepdim=True)
+            x = (x - u) / torch.sqrt(s + self.eps)
+            x = self.weight * x + self.bias
+        return x
 
 
 class BertEmbeddings(nn.Module):
@@ -245,85 +455,6 @@ class BertAttention(nn.Module):
         return attention_output
 
 
-def gelu(x):
-    return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
-
-# used only for triton inference
-
-
-def bias_gelu(bias, y):
-    x = bias + y
-    return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
-
-# used specifically for training since torch.nn.functional.gelu breaks ONNX export
-
-
-def bias_gelu_training(bias, y):
-    x = bias + y
-    return torch.nn.functional.gelu(x)  # Breaks ONNX export
-
-
-def bias_tanh(bias, y):
-    x = bias + y
-    return torch.tanh(x)
-
-
-def swish(x):
-    return x * torch.sigmoid(x)
-
-
-# torch.nn.functional.gelu(x) # Breaks ONNX export
-ACT2FN = {"gelu": gelu, "bias_gelu": bias_gelu, "bias_tanh": bias_tanh,
-          "relu": torch.nn.functional.relu, "swish": swish}
-
-
-class LinearActivation(Module):
-    r"""Fused Linear and activation Module.
-    """
-    __constants__ = ['bias']
-
-    def __init__(self, in_features, out_features, act='gelu', bias=True):
-        super(LinearActivation, self).__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-        self.act_fn = nn.Identity()                                                         #
-        self.biased_act_fn = None                                                           #
-        self.bias = None                                                                    #
-        if isinstance(act, str) or (sys.version_info[0] == 2 and isinstance(act, unicode)):  # For TorchScript
-            if bias and not 'bias' in act:                                                  # compatibility
-                act = 'bias_' + act                                                         #
-                self.biased_act_fn = ACT2FN[act]                                            #
-
-            else:
-                self.act_fn = ACT2FN[act]
-        else:
-            self.act_fn = act
-        self.weight = Parameter(torch.Tensor(out_features, in_features))
-        if bias:
-            self.bias = Parameter(torch.Tensor(out_features))
-        else:
-            self.register_parameter('bias', None)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
-        if self.bias is not None:
-            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
-            bound = 1 / math.sqrt(fan_in)
-            init.uniform_(self.bias, -bound, bound)
-
-    def forward(self, input):
-        if not self.bias is None:
-            return self.biased_act_fn(self.bias, F.linear(input, self.weight, None))
-        else:
-            return self.act_fn(F.linear(input, self.weight, self.bias))
-
-    def extra_repr(self):
-        return 'in_features={}, out_features={}, bias={}'.format(
-            self.in_features, self.out_features, self.bias is not None
-        )
-
-
 class BertIntermediate(nn.Module):
     def __init__(self, config):
         super(BertIntermediate, self).__init__()
@@ -419,104 +550,6 @@ class BertPooler(nn.Module):
         return pooled_output
 
 
-class BertModel(nn.Module):
-    """BERT model ("Bidirectional Embedding Representations from a Transformer").
-    Params:
-        config: a BertConfig class instance with the configuration to build a new model
-    Inputs:
-        `input_ids`: a torch.LongTensor of shape [batch_size, sequence_length]
-            with the word token indices in the vocabulary(see the tokens preprocessing logic in the scripts
-            `extract_features.py`, `run_classifier.py` and `run_squad.py`)
-        `token_type_ids`: an optional torch.LongTensor of shape [batch_size, sequence_length] with the token
-            types indices selected in [0, 1]. Type 0 corresponds to a `sentence A` and type 1 corresponds to
-            a `sentence B` token (see BERT paper for more details).
-        `attention_mask`: an optional torch.LongTensor of shape [batch_size, sequence_length] with indices
-            selected in [0, 1]. It's a mask to be used if the input sequence length is smaller than the max
-            input sequence length in the current batch. It's the mask that we typically use for attention when
-            a batch has varying length sentences.
-    Outputs: Tuple of (encoded_layers, pooled_output)
-        `encoded_layers`: controled by `output_all_encoded_layers` argument:
-            - `output_all_encoded_layers=True`: outputs a list of the full sequences of encoded-hidden-states at the end
-                of each attention block (i.e. 12 full sequences for BERT-base, 24 for BERT-large), each
-                encoded-hidden-state is a torch.FloatTensor of size [batch_size, sequence_length, hidden_size],
-            - `output_all_encoded_layers=False`: outputs only the full sequence of hidden-states corresponding
-                to the last attention block of shape [batch_size, sequence_length, hidden_size],
-        `pooled_output`: a torch.FloatTensor of size [batch_size, hidden_size] which is the output of a
-            classifier pretrained on top of the hidden state associated to the first character of the
-            input (`CLS`) to train on the Next-Sentence task (see BERT's paper).
-    Example usage:
-    ```python
-    # Already been converted into WordPiece token ids
-    input_ids = torch.LongTensor([[31, 51, 99], [15, 5, 0]])
-    input_mask = torch.LongTensor([[1, 1, 1], [1, 1, 0]])
-    token_type_ids = torch.LongTensor([[0, 0, 1], [0, 1, 0]])
-    config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=768,
-        num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072)
-    model = modeling.BertModel(config=config)
-    all_encoder_layers, pooled_output = model(input_ids, token_type_ids, input_mask)
-    ```
-    """
-
-    def __init__(self, config):
-        super(BertModel, self).__init__()
-        if not isinstance(config, BertConfig):
-            raise ValueError(
-                "Parameter config in `{}(config)` should be an instance of class `BertConfig`. "
-                "To create a model from a Google pretrained model use "
-                "`model = {}.from_pretrained(PRETRAINED_MODEL_NAME)`".format(
-                    self.__class__.__name__, self.__class__.__name__
-                ))
-        self.config = config
-        start = time.time()
-        self.embeddings = BertEmbeddings(config)
-        print(f"create embeddings {time.time() - start}")
-        start = time.time()
-        self.encoder = BertEncoder(config)
-        print(f"create BertEncoder {time.time() - start}")
-        start = time.time()
-        self.pooler = BertPooler(config)
-        print(f"create pooler {time.time() - start}")
-        # self.apply(self.init_bert_weights)
-        self.output_all_encoded_layers = config.output_all_encoded_layers
-
-    def init_bert_weights(self, module):
-        """ Initialize the weights.
-        """
-        if isinstance(module, (nn.Linear, nn.Embedding)):
-            # Slightly different from the TF version which uses truncated_normal for initialization
-            # cf https://github.com/pytorch/pytorch/pull/5617
-            module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
-        elif isinstance(module, BertLayerNorm):
-            module.bias.data.zero_()
-            module.weight.data.fill_(1.0)
-        if isinstance(module, nn.Linear) and module.bias is not None:
-            module.bias.data.zero_()
-
-    def forward(self, input_ids, token_type_ids, attention_mask):
-        # We create a 3D attention mask from a 2D tensor mask.
-        # Sizes are [batch_size, 1, 1, to_seq_length]
-        # So we can broadcast to [batch_size, num_heads, from_seq_length, to_seq_length]
-        # this attention mask is more simple than the triangular masking of causal attention
-        # used in OpenAI GPT, we just need to prepare the broadcast dimension here.
-        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-
-        # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
-        # masked positions, this operation will create a tensor which is 0.0 for
-        # positions we want to attend and -10000.0 for masked positions.
-        # Since we are adding it to the raw scores before the softmax, this is
-        # effectively the same as removing these entirely.
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-
-        embedding_output = self.embeddings(input_ids, token_type_ids)
-        encoded_layers = self.encoder(embedding_output, extended_attention_mask)
-        sequence_output = encoded_layers[-1]
-        pooled_output = self.pooler(sequence_output)
-        if not self.output_all_encoded_layers:
-            encoded_layers = encoded_layers[-1:]
-        out = [encoded_layers, pooled_output]
-        return out
-
-
 class BertPredictionHeadTransform(nn.Module):
     def __init__(self, config):
         super(BertPredictionHeadTransform, self).__init__()
@@ -548,6 +581,26 @@ class BertLMPredictionHead(nn.Module):
         return hidden_states
 
 
+class BertOnlyMLMHead(nn.Module):
+    def __init__(self, config, bert_model_embedding_weights):
+        super(BertOnlyMLMHead, self).__init__()
+        self.predictions = BertLMPredictionHead(config, bert_model_embedding_weights)
+
+    def forward(self, sequence_output):
+        prediction_scores = self.predictions(sequence_output)
+        return prediction_scores
+
+
+class BertOnlyNSPHead(nn.Module):
+    def __init__(self, config):
+        super(BertOnlyNSPHead, self).__init__()
+        self.seq_relationship = nn.Linear(config.hidden_size, 2)
+
+    def forward(self, pooled_output):
+        seq_relationship_score = self.seq_relationship(pooled_output)
+        return seq_relationship_score
+
+
 class BertPreTrainingHeads(nn.Module):
     def __init__(self, config, bert_model_embedding_weights):
         super(BertPreTrainingHeads, self).__init__()
@@ -557,17 +610,261 @@ class BertPreTrainingHeads(nn.Module):
     def forward(self, sequence_output, pooled_output):
         prediction_scores = self.predictions(sequence_output)
         seq_relationship_score = self.seq_relationship(pooled_output)
-        out = [prediction_scores, seq_relationship_score]
-        return out
+        return prediction_scores, seq_relationship_score
 
 
-class BertForPreTraining(BertModel):
+class BertPreTrainedModel(nn.Module):
+    """ An abstract class to handle weights initialization and
+        a simple interface for dowloading and loading pretrained models.
+    """
+
+    def __init__(self, config, *inputs, **kwargs):
+        super(BertPreTrainedModel, self).__init__()
+        if not isinstance(config, BertConfig):
+            raise ValueError(
+                "Parameter config in `{}(config)` should be an instance of class `BertConfig`. "
+                "To create a model from a Google pretrained model use "
+                "`model = {}.from_pretrained(PRETRAINED_MODEL_NAME)`".format(
+                    self.__class__.__name__, self.__class__.__name__
+                ))
+        self.config = config
+
+    def init_bert_weights(self, module):
+        """ Initialize the weights.
+        """
+        if isinstance(module, (nn.Linear, nn.Embedding)):
+            # Slightly different from the TF version which uses truncated_normal for initialization
+            # cf https://github.com/pytorch/pytorch/pull/5617
+            module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+        elif isinstance(module, BertLayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0)
+        if isinstance(module, nn.Linear) and module.bias is not None:
+            module.bias.data.zero_()
+
+    def checkpoint_activations(self, val):
+        def _apply_flag(module):
+            if hasattr(module, "_checkpoint_activations"):
+                module._checkpoint_activations = val
+        self.apply(_apply_flag)
+
+    def enable_apex(self, val):
+        def _apply_flag(module):
+            if hasattr(module, "apex_enabled"):
+                module.apex_enabled = val
+        self.apply(_apply_flag)
+
+    # @classmethod
+    # def from_pretrained(cls, pretrained_model_name_or_path, state_dict=None, cache_dir=None,
+    #                     from_tf=False, *inputs, **kwargs):
+    #     """
+    #     Instantiate a BertPreTrainedModel from a pre-trained model file or a pytorch state dict.
+    #     Download and cache the pre-trained model file if needed.
+
+    #     Params:
+    #         pretrained_model_name_or_path: either:
+    #             - a str with the name of a pre-trained model to load selected in the list of:
+    #                 . `bert-base-uncased`
+    #                 . `bert-large-uncased`
+    #                 . `bert-base-cased`
+    #                 . `bert-large-cased`
+    #                 . `bert-base-multilingual-uncased`
+    #                 . `bert-base-multilingual-cased`
+    #                 . `bert-base-chinese`
+    #             - a path or url to a pretrained model archive containing:
+    #                 . `bert_config.json` a configuration file for the model
+    #                 . `pytorch_model.bin` a PyTorch dump of a BertForPreTraining instance
+    #             - a path or url to a pretrained model archive containing:
+    #                 . `bert_config.json` a configuration file for the model
+    #                 . `model.chkpt` a TensorFlow checkpoint
+    #         from_tf: should we load the weights from a locally saved TensorFlow checkpoint
+    #         cache_dir: an optional path to a folder in which the pre-trained models will be cached.
+    #         state_dict: an optional state dictionnary (collections.OrderedDict object) to use instead of Google pre-trained models
+    #         *inputs, **kwargs: additional input for the specific Bert class
+    #             (ex: num_labels for BertForSequenceClassification)
+    #     """
+    #     if pretrained_model_name_or_path in PRETRAINED_MODEL_ARCHIVE_MAP:
+    #         archive_file = PRETRAINED_MODEL_ARCHIVE_MAP[pretrained_model_name_or_path]
+    #     else:
+    #         archive_file = pretrained_model_name_or_path
+    #     # redirect to the cache, if necessary
+    #     try:
+    #         resolved_archive_file = cached_path(archive_file, cache_dir=cache_dir)
+    #     except EnvironmentError:
+    #         logger.error(
+    #             "Model name '{}' was not found in model name list ({}). "
+    #             "We assumed '{}' was a path or url but couldn't find any file "
+    #             "associated to this path or url.".format(
+    #                 pretrained_model_name_or_path,
+    #                 ', '.join(PRETRAINED_MODEL_ARCHIVE_MAP.keys()),
+    #                 archive_file))
+    #         return None
+    #     if resolved_archive_file == archive_file:
+    #         logger.info("loading archive file {}".format(archive_file))
+    #     else:
+    #         logger.info("loading archive file {} from cache at {}".format(
+    #             archive_file, resolved_archive_file))
+    #     tempdir = None
+    #     if os.path.isdir(resolved_archive_file) or from_tf:
+    #         serialization_dir = resolved_archive_file
+    #     else:
+    #         # Extract archive to temp dir
+    #         tempdir = tempfile.mkdtemp()
+    #         logger.info("extracting archive file {} to temp dir {}".format(
+    #             resolved_archive_file, tempdir))
+    #         with tarfile.open(resolved_archive_file, 'r:gz') as archive:
+    #             archive.extractall(tempdir)
+    #         serialization_dir = tempdir
+    #     # Load config
+    #     config_file = os.path.join(serialization_dir, CONFIG_NAME)
+    #     config = BertConfig.from_json_file(config_file)
+    #     logger.info("Model config {}".format(config))
+    #     # Instantiate model.
+    #     model = cls(config, *inputs, **kwargs)
+    #     if state_dict is None and not from_tf:
+    #         weights_path = os.path.join(serialization_dir, WEIGHTS_NAME)
+    #         state_dict = torch.load(weights_path, map_location='cpu' if not torch.cuda.is_available() else None)
+    #     if tempdir:
+    #         # Clean up temp dir
+    #         shutil.rmtree(tempdir)
+    #     # if from_tf:
+    #     #     # Directly load from a TensorFlow checkpoint
+    #     #     weights_path = os.path.join(serialization_dir, TF_WEIGHTS_NAME)
+    #     #     return load_tf_weights_in_bert(model, weights_path)
+    #     # Load from a PyTorch state_dict
+    #     old_keys = []
+    #     new_keys = []
+    #     for key in state_dict.keys():
+    #         new_key = None
+    #         if 'gamma' in key:
+    #             new_key = key.replace('gamma', 'weight')
+    #         if 'beta' in key:
+    #             new_key = key.replace('beta', 'bias')
+    #         if new_key:
+    #             old_keys.append(key)
+    #             new_keys.append(new_key)
+    #     for old_key, new_key in zip(old_keys, new_keys):
+    #         state_dict[new_key] = state_dict.pop(old_key)
+
+    #     missing_keys = []
+    #     unexpected_keys = []
+    #     error_msgs = []
+    #     # copy state_dict so _load_from_state_dict can modify it
+    #     metadata = getattr(state_dict, '_metadata', None)
+    #     state_dict = state_dict.copy()
+    #     if metadata is not None:
+    #         state_dict._metadata = metadata
+
+    #     def load(module, prefix=''):
+    #         local_metadata = {} if metadata is None else metadata.get(prefix[:-1], {})
+    #         module._load_from_state_dict(
+    #             state_dict, prefix, local_metadata, True, missing_keys, unexpected_keys, error_msgs)
+    #         for name, child in module._modules.items():
+    #             if child is not None:
+    #                 load(child, prefix + name + '.')
+    #     start_prefix = ''
+    #     if not hasattr(model, 'bert') and any(s.startswith('bert.') for s in state_dict.keys()):
+    #         start_prefix = 'bert.'
+    #     load(model, prefix=start_prefix)
+    #     if len(missing_keys) > 0:
+    #         logger.info("Weights of {} not initialized from pretrained model: {}".format(
+    #             model.__class__.__name__, missing_keys))
+    #     if len(unexpected_keys) > 0:
+    #         logger.info("Weights from pretrained model not used in {}: {}".format(
+    #             model.__class__.__name__, unexpected_keys))
+    #     if len(error_msgs) > 0:
+    #         raise RuntimeError('Error(s) in loading state_dict for {}:\n\t{}'.format(
+    #                            model.__class__.__name__, "\n\t".join(error_msgs)))
+    #     return model
+
+
+class BertModel(BertPreTrainedModel):
+    """BERT model ("Bidirectional Embedding Representations from a Transformer").
+
+    Params:
+        config: a BertConfig class instance with the configuration to build a new model
+
+    Inputs:
+        `input_ids`: a torch.LongTensor of shape [batch_size, sequence_length]
+            with the word token indices in the vocabulary(see the tokens preprocessing logic in the scripts
+            `extract_features.py`, `run_classifier.py` and `run_squad.py`)
+        `token_type_ids`: an optional torch.LongTensor of shape [batch_size, sequence_length] with the token
+            types indices selected in [0, 1]. Type 0 corresponds to a `sentence A` and type 1 corresponds to
+            a `sentence B` token (see BERT paper for more details).
+        `attention_mask`: an optional torch.LongTensor of shape [batch_size, sequence_length] with indices
+            selected in [0, 1]. It's a mask to be used if the input sequence length is smaller than the max
+            input sequence length in the current batch. It's the mask that we typically use for attention when
+            a batch has varying length sentences.
+
+    Outputs: Tuple of (encoded_layers, pooled_output)
+        `encoded_layers`: controled by `output_all_encoded_layers` argument:
+            - `output_all_encoded_layers=True`: outputs a list of the full sequences of encoded-hidden-states at the end
+                of each attention block (i.e. 12 full sequences for BERT-base, 24 for BERT-large), each
+                encoded-hidden-state is a torch.FloatTensor of size [batch_size, sequence_length, hidden_size],
+            - `output_all_encoded_layers=False`: outputs only the full sequence of hidden-states corresponding
+                to the last attention block of shape [batch_size, sequence_length, hidden_size],
+        `pooled_output`: a torch.FloatTensor of size [batch_size, hidden_size] which is the output of a
+            classifier pretrained on top of the hidden state associated to the first character of the
+            input (`CLS`) to train on the Next-Sentence task (see BERT's paper).
+
+    Example usage:
+    ```python
+    # Already been converted into WordPiece token ids
+    input_ids = torch.LongTensor([[31, 51, 99], [15, 5, 0]])
+    input_mask = torch.LongTensor([[1, 1, 1], [1, 1, 0]])
+    token_type_ids = torch.LongTensor([[0, 0, 1], [0, 1, 0]])
+
+    config = modeling.BertConfig(vocab_size_or_config_json_file=32000, hidden_size=768,
+        num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072)
+
+    model = modeling.BertModel(config=config)
+    all_encoder_layers, pooled_output = model(input_ids, token_type_ids, input_mask)
+    ```
+    """
+
+    def __init__(self, config):
+        super(BertModel, self).__init__(config)
+        self.embeddings = BertEmbeddings(config)
+        self.encoder = BertEncoder(config)
+        self.pooler = BertPooler(config)
+        self.apply(self.init_bert_weights)
+        self.output_all_encoded_layers = config.output_all_encoded_layers
+
+    def forward(self, input_ids, token_type_ids, attention_mask):
+        # We create a 3D attention mask from a 2D tensor mask.
+        # Sizes are [batch_size, 1, 1, to_seq_length]
+        # So we can broadcast to [batch_size, num_heads, from_seq_length, to_seq_length]
+        # this attention mask is more simple than the triangular masking of causal attention
+        # used in OpenAI GPT, we just need to prepare the broadcast dimension here.
+        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+
+        # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
+        # masked positions, this operation will create a tensor which is 0.0 for
+        # positions we want to attend and -10000.0 for masked positions.
+        # Since we are adding it to the raw scores before the softmax, this is
+        # effectively the same as removing these entirely.
+        extended_attention_mask = extended_attention_mask.to(
+            dtype=self.embeddings.word_embeddings.weight.dtype)  # fp16 compatibility
+        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+
+        embedding_output = self.embeddings(input_ids, token_type_ids)
+        encoded_layers = self.encoder(embedding_output, extended_attention_mask)
+        sequence_output = encoded_layers[-1]
+        pooled_output = self.pooler(sequence_output)
+        if not self.output_all_encoded_layers:
+            encoded_layers = encoded_layers[-1:]
+        return encoded_layers, pooled_output
+
+
+class BertForPreTraining(BertPreTrainedModel):
     """BERT model with pre-training heads.
     This module comprises the BERT model followed by the two pre-training heads:
         - the masked language modeling head, and
         - the next sentence classification head.
+
     Params:
         config: a BertConfig class instance with the configuration to build a new model.
+
     Inputs:
         `input_ids`: a torch.LongTensor of shape [batch_size, sequence_length]
             with the word token indices in the vocabulary(see the tokens preprocessing logic in the scripts
@@ -585,6 +882,7 @@ class BertForPreTraining(BertModel):
         `next_sentence_label`: optional next sentence classification loss: torch.LongTensor of shape [batch_size]
             with indices selected in [0, 1].
             0 => next sentence is the continuation, 1 => next sentence is a random sentence.
+
     Outputs:
         if `masked_lm_labels` and `next_sentence_label` are not `None`:
             Outputs the total_loss which is the sum of the masked language modeling loss and the next
@@ -593,34 +891,32 @@ class BertForPreTraining(BertModel):
             Outputs a tuple comprising
             - the masked language modeling logits of shape [batch_size, sequence_length, vocab_size], and
             - the next sentence classification logits of shape [batch_size, 2].
+
     Example usage:
     ```python
     # Already been converted into WordPiece token ids
     input_ids = torch.LongTensor([[31, 51, 99], [15, 5, 0]])
     input_mask = torch.LongTensor([[1, 1, 1], [1, 1, 0]])
     token_type_ids = torch.LongTensor([[0, 0, 1], [0, 1, 0]])
+
     config = BertConfig(vocab_size_or_config_json_file=32000, hidden_size=768,
         num_hidden_layers=12, num_attention_heads=12, intermediate_size=3072)
+
     model = BertForPreTraining(config)
     masked_lm_logits_scores, seq_relationship_logits = model(input_ids, token_type_ids, input_mask)
     ```
     """
 
     def __init__(self, config):
-        start = time.time()
         super(BertForPreTraining, self).__init__(config)
-        print(f"super BertForPreTraining {time.time() - start}")
-        start = time.time()
         self.bert = BertModel(config)
-        print(f"create BertModel {time.time() - start}")
-        start = time.time()
         self.cls = BertPreTrainingHeads(config, self.bert.embeddings.word_embeddings.weight)
-        print(f"create cls {time.time() - start}")
         # self.apply(self.init_bert_weights)
 
     def forward(self, input_ids, token_type_ids, attention_mask):
         encoded_layers, pooled_output = self.bert(input_ids, token_type_ids, attention_mask)
         sequence_output = encoded_layers[-1]
         prediction_scores, seq_relationship_score = self.cls(sequence_output, pooled_output)
-        out = [prediction_scores, seq_relationship_score]
-        return out
+
+        return prediction_scores, seq_relationship_score
+
