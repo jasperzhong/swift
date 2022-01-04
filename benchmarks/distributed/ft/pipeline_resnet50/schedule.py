@@ -25,15 +25,19 @@ def get_pipeline_model_parallel_rank():
     global _GLOBAL_ARGS
     return torch.distributed.get_rank() % get_pipeline_model_parallel_world_size()
 
+def get_data_parallel_rank():
+    global _GLOBAL_ARGS
+    return torch.distributed.get_rank() // get_pipeline_model_parallel_world_size()
+
 
 def get_pipeline_model_parallel_next_rank():
     return (get_pipeline_model_parallel_rank() + 1) % \
-        get_pipeline_model_parallel_world_size()
+        get_pipeline_model_parallel_world_size() + get_data_parallel_rank() * get_pipeline_model_parallel_world_size()
 
 
 def get_pipeline_model_parallel_prev_rank():
     return (get_pipeline_model_parallel_rank() - 1) % \
-        get_pipeline_model_parallel_world_size()
+        get_pipeline_model_parallel_world_size() + get_data_parallel_rank() * get_pipeline_model_parallel_world_size()
 
 
 def get_num_microbatches():

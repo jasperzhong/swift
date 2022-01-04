@@ -144,10 +144,9 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
         group_src_rank = get_rank() % pipeline_parallel_size
         logger.info(f"group src rank = {group_src_rank}")
         broadcast_parameters(model.state_dict(), group_src_rank, comm_group=comm_group)
-        logger.info(f"Rank {group_src_rank} broadcast its parameters")
         optimizer.clear()
         broadcast_optimizer_state(optimizer, group_src_rank, comm_group=comm_group)
-        logger.info(f"Rank {group_src_rank} broadcast its optimizer states")
+        logger.info(f"Rank {group_src_rank} broadcast its parameters and optimizer states")
     elif config.logging:
         need_recovery = _need_recovery(config.groups, failure_workers)
         if need_recovery:
