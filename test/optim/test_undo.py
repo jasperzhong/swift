@@ -263,6 +263,37 @@ class UndoTestCase(unittest.TestCase):
         print("optimizer sum diff = {:.6f}".format(torch.abs(optimizer_sum_1 - optimizer_sum_2)))
         print("{:.6f} {:.6f}".format(optimizer_sum_1, optimizer_sum_2))
 
+    def test_undo_bertadam_train_resnet50(self):
+        model = resnet50().cuda()
+        optimizer = optim.BertAdam(model.parameters(), lr=0.1, weight_decay=0.01)
+        loss_func = nn.CrossEntropyLoss().cuda()
+
+        size = (32, 3, 224, 224)
+        x = torch.randn(size=size).cuda()
+        y = torch.randint(0, 1000, (32, )).cuda()
+        optimizer.zero_grad()
+        y_hat = model(x)
+        loss = loss_func(y_hat, y)
+        loss.backward()
+        optimizer.step()
+
+        model_sum_1, optimizer_sum_1 = checksum(model, optimizer)
+
+        x = torch.randn(size=size).cuda()
+        y = torch.randint(0, 1000, (32, )).cuda()
+        optimizer.zero_grad()
+        y_hat = model(x)
+        loss = loss_func(y_hat, y)
+        loss.backward()
+        optimizer.step()
+
+        optimizer.undo()
+        model_sum_2, optimizer_sum_2 = checksum(model, optimizer)
+
+        print("model sum diff = {:.6f}".format(torch.abs(model_sum_1 - model_sum_2)))
+        print("optimizer sum diff = {:.6f}".format(torch.abs(optimizer_sum_1 - optimizer_sum_2)))
+        print("{:.6f} {:.6f}".format(optimizer_sum_1, optimizer_sum_2))
+
 
 if __name__ == "__main__":
     unittest.main()

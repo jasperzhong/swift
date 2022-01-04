@@ -5,6 +5,7 @@ from .adagrad import Adagrad as Adagrad
 from .adam import Adam as Adam
 from .adamax import Adamax as Adamax
 from .adamw import AdamW as AdamW
+from .bertadam import BertAdam as BertAdam
 from .asgd import ASGD as ASGD
 from .lbfgs import LBFGS as LBFGS
 from .optimizer import Optimizer as Optimizer
