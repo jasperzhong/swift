@@ -179,12 +179,18 @@ def main():
 
     dfs(model.model_split)
 
+    total_iters = args.benchmark_iters
+    print("total iterations: {}".format(total_iters))
+    num_micro_batches = args.global_batch_size // args.micro_batch_size
+    iters_per_epoch = len(data_loader) // num_micro_batches
+    print("iters per epoch:{}".format(iters_per_epoch))
+
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
-        num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
+        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
+        checkpoint_interval=10, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
         logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
