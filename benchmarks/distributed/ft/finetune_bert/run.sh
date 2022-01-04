@@ -22,6 +22,7 @@ cmd="python3 -m torch.distributed.run \
 	-p 50 \
 	--do_lower_case \
 	/home/gmsheng/data/squad/v1.1/train-v1.1.json \
-	--predict-file /home/gmsheng/data/squad/v1.1/dev-v1.1.json" 
+	--predict-file /home/gmsheng/data/squad/v1.1/dev-v1.1.json
+	--vocab_file ./vocab" 
 
 OMP_NUM_THREADS=8 NCCL_IB_DISABLE=1 LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec $cmd
