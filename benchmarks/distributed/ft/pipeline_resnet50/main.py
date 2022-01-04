@@ -9,7 +9,8 @@ from numpy.lib.function_base import average
 from model import PipelineParallelResNet50
 from schedule import (get_num_microbatches, initialize_global_args,
                       is_pipeline_first_stage, is_pipeline_last_stage,
-                      pipedream_flush_schedule, get_pipeline_model_parallel_rank)
+                      pipedream_flush_schedule, get_pipeline_model_parallel_rank,
+                      get_data_parallel_rank)
 from torch._C import Value
 from torch.autograd import backward
 from torchvision import datasets, transforms
@@ -152,7 +153,7 @@ def main():
     if args.data_parallel_size > 1:
         N, d = args.world_size, args.data_parallel_size
         ranks = [list(range(i, i+N//d, d)) for i in range(N//d)]
-        comm = torch.distributed.new_group(ranks)
+        comm = torch.distributed.new_group(ranks[get_data_parallel_rank()])
         optimizer = DistributedOptimizer(optimizer, model.named_parameters(), 
                     backward_passes_per_step=get_num_microbatches(), comm_group=comm, average=True)
     elif args.replica:
