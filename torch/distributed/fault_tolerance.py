@@ -140,9 +140,10 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     old_optimizer = optimizer
     old_lr_scheduler = lr_scheduler
     if config.replica:
-        broadcast_parameters(model.state_dict(), 0)
+        comm_group = optimizer.comm_group
+        broadcast_parameters(model.state_dict(), 0, comm_group=comm_group)
         optimizer.clear()
-        broadcast_optimizer_state(optimizer, 0)
+        broadcast_optimizer_state(optimizer, 0, comm_group=comm_group)
     elif config.logging:
         need_recovery = _need_recovery(config.groups, failure_workers)
         if need_recovery:

@@ -5,10 +5,14 @@ import random
 import time
 
 import numpy as np
+from numpy.lib.function_base import average
+from benchmarks.distributed.ft.finetune_vit.schedule import get_pipeline_model_parallel_rank
 from model import PipelineParallelResNet50
 from schedule import (get_num_microbatches, initialize_global_args,
                       is_pipeline_first_stage, is_pipeline_last_stage,
                       pipedream_flush_schedule)
+from torch._C import Value
+from torch.autograd import backward
 from torchvision import datasets, transforms
 
 import torch
@@ -17,6 +21,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributed.fault_tolerance import (FaultToleranceConfig,
                                                fault_tolerance_train)
+from torch.distributed.data_parallel import DistributedOptimizer, broadcast_parameters, broadcast_optimizer_state
 
 logging.basicConfig(level=logging.INFO)
 
@@ -44,27 +49,21 @@ parser.add_argument('--master_ip', default=None, type=str,
                     help='master ip for c10d')
 parser.add_argument('--master_port', default=None, type=int,
                     help='master port for c10d')
+
+# Data parallelism 
+parser.add_argument('--data-parallel-size', type=int, default=None,
+                    help='Data-parallel size')
+
 # Pipeline parallelism
 parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
 
-# logging
-parser.add_argument('--logging', default=False, action="store_true",
-                    help='whether to enable logging.')
-parser.add_argument('--parallel-recovery', default=False, action="store_true",
-                    help='whether to enable parallel recovery.')
-parser.add_argument('--logging-chunk-freq', type=int,
-                    default=10, help='chunk logging files every N iterations.')
-parser.add_argument('--logging-compression', default=None, type=str,
-                    help='compression methods for logging')
-parser.add_argument('--logging-dfs', default='hdfs', type=str,
-                    help='distributed filesystem for logging')
-parser.add_argument('--logging-s3-bucket', default=None, type=str,
-                    help='s3 bucket if using s3 as logging store')
-parser.add_argument('--logging-group-size', default=None, type=int,
-                    help='group size for logging')
+# replica
+parser.add_argument('--replica', default=False, action="store_true",
+                    help='whether to enable replication recovery.')
+
 args = parser.parse_args()
 initialize_global_args(args)
 
@@ -122,6 +121,11 @@ def main():
     args.world_size = int(os.environ['WORLD_SIZE'])
     args.rank = int(os.environ['RANK'])
     args.local_rank = int(os.environ['LOCAL_RANK'])
+    args.local_world_size = int(os.environ["LOCAL_WORLD_SIZE"])
+    num_machines = args.world_size // args.local_world_size
+    if args.data_parallel_size > num_machines:
+        raise ValueError(f"data-parallel size ({args.data_parallel_size}) should not be large than the number of machines ({num_machines})")
+
     torch.cuda.set_device(args.local_rank)
     torch.distributed.init_process_group(
         'nccl'
@@ -134,7 +138,7 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = get_data_loader(args)
-    model = PipelineParallelResNet50(rank=args.rank, balance=[4, 2, 2, 3])
+    model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=[4, 2, 2, 3])
     model.cuda()
 
     total_iters = args.benchmark_iters
@@ -143,15 +147,19 @@ def main():
     iters_per_epoch = len(data_loader) // num_micro_batches
     print("iters per epoch:{}".format(iters_per_epoch))
 
+    N, d = args.world_size, args.data_parallel_size
+    ranks = [list(range(i, i+N//d, d)) for i in range(N//d)]
+    comm = torch.distributed.new_group(ranks)
+
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+    optimizer = DistributedOptimizer(optimizer, model.named_parameters(), 
+                backward_passes_per_step=get_num_microbatches(), comm_group=comm, average=True)
+
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=10, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
-        logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
-        logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
-        logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
+        checkpoint_interval=10, replica=args.replica, print_freq=args.print_freq
     )
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)

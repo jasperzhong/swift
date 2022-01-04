@@ -24,7 +24,8 @@ def get_pipeline_model_parallel_world_size():
 
 
 def get_pipeline_model_parallel_rank():
-    return torch.distributed.get_rank()
+    global _GLOBAL_ARGS
+    return torch.distributed.get_rank()  // _GLOBAL_ARGS.data_parallel_size
 
 
 def get_pipeline_model_parallel_next_rank():
@@ -52,7 +53,11 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
         images, labels = data
-        images, labels = images.cuda(), labels.cuda()
+
+        if is_pipeline_first_stage():
+            images = images.cuda()
+        elif is_pipeline_last_stage():
+            labels = labels.cuda()
 
     if is_pipeline_first_stage():
         assert input_tensor is None
@@ -78,17 +83,7 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad):
     input_tensor_grad = None
     if input_tensor is not None:
         input_tensor_grad = input_tensor.grad
-
-    with open("debug_backward.log", "a") as f:
-        input_tensor_checksum = 0 if input_tensor is None else torch.sum(input_tensor)
-        output_tensor_checksum = 0 if output_tensor is None else torch.sum(output_tensor)
-        output_tensor_grad_checksum = 0 if output_tensor_grad is None else torch.sum(output_tensor_grad)
-        input_tensor_grad_checksum = 0 if input_tensor_grad is None else torch.sum(input_tensor_grad)
-        rng_state = torch.cuda.random.get_rng_state()
-        rng_state_checksum = torch.sum(rng_state.type(torch.float32))
-        f.write(f"{_cnt} {input_tensor_checksum} {output_tensor_checksum} {output_tensor_grad_checksum} {input_tensor_grad_checksum} {rng_state_checksum}\n")
-        _cnt += 1
-
+        
     return input_tensor_grad
 
 
