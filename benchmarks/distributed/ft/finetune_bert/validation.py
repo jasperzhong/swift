@@ -46,16 +46,17 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
     model.eval()
     all_results = []
     test_iters = len(eval_dataloader)
+    data_iter = iter(eval_dataloader)
     print("test iters:{}".format(test_iters))
     logger.info("***** Running Validation *****")
     all_results = []
     for _ in range(test_iters):
         with torch.no_grad():
             if is_pipeline_last_stage():
-                results = forward(config, eval_dataloader, model, eval_features)
+                results = forward(config, data_iter, model, eval_features)
                 all_results.extend(results)
             else:
-                forward(config, eval_dataloader, model, eval_features)
+                forward(config, data_iter, model, eval_features)
     
     if is_pipeline_last_stage():
         print("all_results: {}".format(len(all_results)))
@@ -76,17 +77,16 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
         f1 = float(scores.split(":")[2].split("}")[0])
         print("exact_match: {} F1: {}".format(exact_match, f1))
 
-def forward(config, eval_dataloader, model, eval_features):
+def forward(config, data_iter, model, eval_features):
     shape = (schedule._GLOBAL_ARGS.test_batch_size, *model.input_shape[1:])
     input_tensor = recv_forward(shape)
-    output_tensor = forward_step(eval_dataloader, model, input_tensor, eval_features)
+    output_tensor = forward_step(data_iter, model, input_tensor, eval_features)
     send_forward(output_tensor)
     return output_tensor
   
-def forward_step(eval_dataloader, model, input_tensor, eval_features):
+def forward_step(data_iter, model, input_tensor, eval_features):
     # all need to get the data
-    data_iterator = iter(eval_dataloader)
-    data = next(data_iterator)
+    data = next(data_iter)
     batch = [t.cuda() for t in data]
     input_ids, input_mask, segment_ids, example_indices = batch
 
