@@ -152,8 +152,9 @@ def main():
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     if args.data_parallel_size > 1:
         N, d = args.world_size, args.data_parallel_size
-        ranks = [list(range(i, i+N//d, d)) for i in range(N//d)]
-        comm = torch.distributed.new_group(ranks[get_data_parallel_rank()])
+        ranks = [list(range(i, i+N//d, d)) for i in range(N//d)][get_data_parallel_rank()]
+        logging.info(f"ranks: {ranks}")
+        comm = torch.distributed.new_group(ranks)
         optimizer = DistributedOptimizer(optimizer, model.named_parameters(), 
                     backward_passes_per_step=get_num_microbatches(), comm_group=comm, average=True)
     elif args.replica:
