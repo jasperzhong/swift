@@ -52,9 +52,7 @@ class PipelineParallelBert(BertForPreTraining):
             remaining = len(self.bert_sequential) - num_layers_per_stage * len(self.balance)
             self.balance[-1] += remaining
 
-        start = time.time()
         self._profile()
-        print(f"profile time {time.time() - start}")
 
         self.rank = None
         self.model_split = None
@@ -63,7 +61,9 @@ class PipelineParallelBert(BertForPreTraining):
             rank = get_pipeline_model_parallel_rank()
         self.assign_model_split(rank)
 
+        start = time.time()
         self.apply(self.init_bert_weights)
+        print(f"Apply init_bert_weights {time.time() - start}")
 
     def assign_model_split(self, rank):
         # assign model split

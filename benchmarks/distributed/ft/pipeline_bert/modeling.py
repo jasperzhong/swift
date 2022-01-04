@@ -6,6 +6,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+import time
 import sys
 from io import open
 
@@ -572,9 +573,15 @@ class BertForPreTraining(BertModel):
     ```
     """
     def __init__(self, config):
+        start = time.time() 
         super(BertForPreTraining, self).__init__(config)
+        print(f"super BertForPreTraining {time.time() - start}")
+        start = time.time()
         self.bert = BertModel(config)
+        print(f"create BertModel {time.time() - start}")
+        start = time.time()
         self.cls = BertPreTrainingHeads(config, self.bert.embeddings.word_embeddings.weight)
+        print(f"create cls {time.time() - start}")
         # self.apply(self.init_bert_weights)
 
     def forward(self, input_ids, token_type_ids, attention_mask):
