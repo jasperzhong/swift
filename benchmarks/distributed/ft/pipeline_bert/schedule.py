@@ -2,59 +2,6 @@ import torch
 
 _GLOBAL_ARGS = None
 
-from torch.optim.optimizer import Optimizer
-from torch.optim.lr_scheduler import _LRScheduler
-
-
-class LRScheduler(_LRScheduler):
-    def __init__(self, optimizer, last_epoch=-1):
-        # Check if using mixed precision training
-        self.mixed_training = False
-        base_optimizer = optimizer
- 
-        # Check that optimizer param is valid
-        if not isinstance(optimizer, Optimizer):
-            raise TypeError('{} is not an Optimizer'.format(
-                type(optimizer).__name__))
-
-        super(LRScheduler, self).__init__(base_optimizer, last_epoch)
-
-    def step(self, epoch=None):
-        # Set the current training step
-        # ('epoch' is used to be consistent with _LRScheduler)
-        self.last_epoch = epoch if epoch is not None else self.last_epoch + 1
-
-        for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
-            param_group['lr'] = lr
-
-class PolyWarmUpScheduler(LRScheduler):
-    """
-    Applies a warm up period to the learning rate.
-    """
-
-    def __init__(self, optimizer, warmup, total_steps, degree=0.5, last_epoch=-1):
-        self.warmup = warmup
-        self.total_steps = total_steps
-        self.degree = degree
-        super(PolyWarmUpScheduler, self).__init__(optimizer, last_epoch)
-
-    def step(self, epoch=None):
-        param_group = self.optimizer.param_groups[0]
-        if 'step' in param_group:
-            self.last_epoch = param_group['step'] + 1
-        else:
-            self.last_epoch = 1
-
-        for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
-            param_group['lr'] = lr
-
-    def get_lr(self):
-        progress = self.last_epoch / self.total_steps
-        if progress < self.warmup:
-            return [base_lr * progress / self.warmup for base_lr in self.base_lrs]
-        else:
-            return [base_lr * ((1.0 - progress) ** self.degree) for base_lr in self.base_lrs]
-
 def initialize_global_args(args):
     global _GLOBAL_ARGS
     _GLOBAL_ARGS = args
@@ -88,7 +35,8 @@ def get_pipeline_model_parallel_prev_rank():
 
 def get_num_microbatches():
     global _GLOBAL_ARGS
-    return _GLOBAL_ARGS.global_batch_size // _GLOBAL_ARGS.micro_batch_size
+    return _GLOBAL_ARGS.global_batch_size // _GLOBAL_ARGS.micro_batch_size // \
+        torch.distributed.parallel_recovery_data_parallel_size()
 
 
 def get_microbatch_size():

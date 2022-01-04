@@ -1,17 +1,18 @@
+import os
+import time
 from typing import Iterable, Optional
+
+import modeling
+from modeling import (BertConfig, BertEmbeddings, BertForPreTraining,
+                      BertLayer, BertPooler, BertPreTrainingHeads)
+from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
+                      get_pipeline_model_parallel_world_size)
 
 import torch
 import torch.nn as nn
 from torch._C import ThroughputBenchmark
 from torch.onnx.symbolic_opset9 import tensor
 from torch.utils import checkpoint
-
-import modeling
-from modeling import (BertConfig, BertEmbeddings, BertForPreTraining,
-                      BertLayer, BertPooler,
-                      BertPreTrainingHeads)
-from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
-                      get_pipeline_model_parallel_world_size)
 
 # Prepare model config
 config = BertConfig.from_json_file('./bert_config.json')
@@ -25,9 +26,11 @@ modeling.ACT2FN["bias_gelu"] = modeling.bias_gelu_training
 
 class PipelineParallelBert(BertForPreTraining):
     def __init__(self, rank=None, balance=None, *args, **kwargs):
+        start = time.time()
         super(PipelineParallelBert, self).__init__(
             config=config
         )
+        print(f"super PipelineParallelBert {time.time() - start}")
 
         self.bert_sequential = nn.Sequential(
             self.bert.embeddings,
@@ -58,6 +61,10 @@ class PipelineParallelBert(BertForPreTraining):
             rank = get_pipeline_model_parallel_rank()
         self.assign_model_split(rank)
 
+        start = time.time()
+        self.apply(self.init_bert_weights)
+        print(f"Apply init_bert_weights {time.time() - start}")
+
     def assign_model_split(self, rank):
         # assign model split
         if rank == self.rank:
@@ -83,6 +90,27 @@ class PipelineParallelBert(BertForPreTraining):
         """
         get each layer's input/output shape by running one forward pass
         """
+        if os.path.exists("profile.txt"):
+            with open("profile.txt", "r") as f:
+                lines = f.readlines()
+            shapes = []
+            for line in lines:
+                line = line.strip('\n')
+                if line:
+                    nums = line.split(" ")
+                    nums = [int(num) for num in nums]
+                    if len(nums) == 1:
+                        nums = nums[0]
+                    else:
+                        nums = tuple(nums)
+                    shapes.append(nums)
+                else:
+                    self._input_shapes = shapes
+                    shapes = []
+            self._output_shapes = shapes
+            print("read shapes from file")
+            return
+
         micro_batch_size = get_microbatch_size()
         fake_input_ids = torch.randint(1, 2, tuple([micro_batch_size] + shape))
         fake_segment_ids = torch.randint(1, 2, tuple([micro_batch_size] + shape))
@@ -111,9 +139,30 @@ class PipelineParallelBert(BertForPreTraining):
                     encoded_layers, pooled_output = input
                     output = layer(encoded_layers, pooled_output)
                     self._output_shapes.append(len(output))
-                    return
+                    break
                 self._output_shapes.append(output.shape)
                 input = output
+
+        local_rank = int(os.environ['LOCAL_RANK'])
+        if local_rank == 0:
+            with open("profile.txt", "w") as f:
+                for shape in self._input_shapes:
+                    if isinstance(shape, tuple):
+                        f.write(' '.join(str(s) for s in shape) + '\n')
+                    elif isinstance(shape, int):
+                        f.write(str(shape) + '\n')
+                    else:
+                        raise ValueError("unrecognized type")
+
+                f.write('\n')
+
+                for shape in self._output_shapes:
+                    if isinstance(shape, tuple):
+                        f.write(' '.join(str(s) for s in shape) + '\n')
+                    elif isinstance(shape, int):
+                        f.write(str(shape) + '\n')
+                    else:
+                        raise ValueError("unrecognized type")
 
     def parameters(self, recurse=True):
         return self.model_split.parameters(recurse=recurse)

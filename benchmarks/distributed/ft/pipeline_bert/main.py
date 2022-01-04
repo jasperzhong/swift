@@ -15,7 +15,7 @@ from torch.distributed.fault_tolerance import (FaultToleranceConfig,
 from torch.utils.data import (DataLoader, Dataset, SequentialSampler)
 
 from model import PipelineParallelBert
-from schedule import (PolyWarmUpScheduler, get_num_microbatches,
+from schedule import (get_num_microbatches,
                       initialize_global_args, is_pipeline_first_stage,
                       is_pipeline_last_stage, pipedream_flush_schedule)
 
@@ -90,10 +90,9 @@ def handle_train_dir(args):
     f_start_id = 0
     if torch.distributed.is_initialized() and torch.distributed.get_world_size() > num_files:
         remainder = torch.distributed.get_world_size() % num_files
-        data_file = files[(f_start_id * torch.distributed.get_world_size() +
-                           torch.distributed.get_rank() + remainder * f_start_id) % num_files]
+        data_file = files[(f_start_id * torch.distributed.get_world_size() + remainder * f_start_id) % num_files]
     else:
-        data_file = files[(f_start_id * torch.distributed.get_world_size() + torch.distributed.get_rank()) % num_files]
+        data_file = files[(f_start_id * torch.distributed.get_world_size()) % num_files]
 
     return data_file
 
@@ -101,7 +100,6 @@ def handle_train_dir(args):
 def create_pretraining_dataset(args):
     data_file = handle_train_dir(args)
     train_data = pretraining_dataset(input_file=data_file, max_pred_length=args.max_predictions_per_seq)
-    # train_sampler = RandomSampler(train_data)
     train_sampler = SequentialSampler(train_data)
     train_dataloader = DataLoader(train_data, sampler=train_sampler,
                                   batch_size=args.micro_batch_size,
@@ -155,12 +153,6 @@ class BertPretrainingCriterion(torch.nn.Module):
         return total_loss
 
 
-def get_input_shape(data_loader: DataLoader):
-    data_iter = iter(data_loader)
-    input_ids, segment_ids, input_mask, _, _ = next(data_iter)
-    return input_ids.shape, segment_ids.shape, input_mask.shape
-
-
 def prepare_model_and_optimizer(args):
 
     model = PipelineParallelBert(
@@ -172,14 +164,14 @@ def prepare_model_and_optimizer(args):
     optimizer = optim.Adam(model.parameters(), lr=5e-5)
 
     # TODO: args
-    lr_scheduler = PolyWarmUpScheduler(optimizer,
-                                       warmup=args.warmup_proportion,
-                                       total_steps=args.max_steps)
+    # lr_scheduler = PolyWarmUpScheduler(optimizer,
+    #                                    warmup=args.warmup_proportion,
+    #                                    total_steps=args.max_steps)
 
     # base on the config file: Vocab size
     loss_func = BertPretrainingCriterion(30528)
 
-    return model, optimizer, lr_scheduler, loss_func
+    return model, optimizer, None, loss_func
 
 
 def reset_data_iterator(data_loader, ts):
@@ -196,7 +188,7 @@ def reset_data_iterator(data_loader, ts):
     return data_iterator
 
 
-def train_iter(model, optimizer, data_iterator, loss_func):
+def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler):
     start = time.time()
     optimizer.zero_grad()
     loss = pipedream_flush_schedule(
@@ -226,22 +218,27 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = create_pretraining_dataset(args)
-    input_ids, segment_ids, input_mask = get_input_shape(data_loader)
 
     model, optimizer, lr_scheduler, loss_func = prepare_model_and_optimizer(args)
     model.cuda()
     loss_func.cuda()
     # TODO: lr_scheduler
 
+    total_iters = args.benchmark_iters
+    print("total iterations: {}".format(total_iters))
+    num_micro_batches = args.global_batch_size // args.micro_batch_size
+    iters_per_epoch = len(data_loader) // num_micro_batches
+    print("iters per epoch:{}".format(iters_per_epoch))
+
     config = FaultToleranceConfig(
-        num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
+        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
+        checkpoint_interval=10, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
         logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
     fault_tolerance_train(config, train_iter, model, optimizer,
-                          data_loader, loss_func, reset_data_iterator_func=reset_data_iterator)
+                          data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
 
 
 if __name__ == '__main__':
