@@ -63,6 +63,8 @@ class PipelineParallelBert(BertForPreTraining):
             rank = get_pipeline_model_parallel_rank()
         self.assign_model_split(rank)
 
+        self.apply(self.init_bert_weights)
+
     def assign_model_split(self, rank):
         # assign model split
         if rank == self.rank:

@@ -445,7 +445,7 @@ class BertModel(nn.Module):
         self.embeddings = BertEmbeddings(config)
         self.encoder = BertEncoder(config)
         self.pooler = BertPooler(config)
-        self.apply(self.init_bert_weights)
+        # self.apply(self.init_bert_weights)
         self.output_all_encoded_layers = config.output_all_encoded_layers
 
     def init_bert_weights(self, module):
@@ -575,7 +575,7 @@ class BertForPreTraining(BertModel):
         super(BertForPreTraining, self).__init__(config)
         self.bert = BertModel(config)
         self.cls = BertPreTrainingHeads(config, self.bert.embeddings.word_embeddings.weight)
-        self.apply(self.init_bert_weights)
+        # self.apply(self.init_bert_weights)
 
     def forward(self, input_ids, token_type_ids, attention_mask):
         encoded_layers, pooled_output = self.bert(input_ids, token_type_ids, attention_mask)
