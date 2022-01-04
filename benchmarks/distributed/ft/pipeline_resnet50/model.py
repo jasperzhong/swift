@@ -76,6 +76,8 @@ class PipelineParallelResNet50(ResNet):
             with open("profile.txt", "r") as f:
                 lines = f.readlines()
             shapes = []
+            self._input_shapes = None
+            self._output_shapes = None
             for line in lines:
                 line = line.strip('\n')
                 if line:
@@ -96,7 +98,8 @@ class PipelineParallelResNet50(ResNet):
                     shapes = []
             self._output_shapes = shapes
             print("read shapes from file")
-            return
+            if self._input_shapes and self._output_shapes:
+                return
 
         fake_input = torch.randn(tuple([micro_batch_size] + shape))
 
