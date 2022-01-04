@@ -105,7 +105,6 @@ def forward_step(eval_dataloader, model, input_tensor, eval_features):
                                              start_logits=start_logits,
                                              end_logits=end_logits))
         
-        print("last stage all_results: {}".format(all_results))
         return all_results
     
     else:
