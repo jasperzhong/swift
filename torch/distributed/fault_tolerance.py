@@ -140,9 +140,12 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     old_lr_scheduler = lr_scheduler
     if config.replica:
         comm_group = optimizer.comm_group
-        broadcast_parameters(model.state_dict(), 0, comm_group=comm_group)
+        pipeline_parallel_size = get_world_size() // optimizer._size
+        group_src_rank = torch.get_rank() // pipeline_parallel_size * pipeline_parallel_size
+        logger.info(f"group src rank = {group_src_rank}")
+        broadcast_parameters(model.state_dict(), group_src_rank, comm_group=comm_group)
         optimizer.clear()
-        broadcast_optimizer_state(optimizer, 0, comm_group=comm_group)
+        broadcast_optimizer_state(optimizer, group_src_rank, comm_group=comm_group)
     elif config.logging:
         need_recovery = _need_recovery(config.groups, failure_workers)
         if need_recovery:
