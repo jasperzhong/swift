@@ -36,7 +36,8 @@ def create_val_dataloader():
     eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_example_index)
     # Run prediction for full data
     eval_sampler = SequentialSampler(eval_data)
-    eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=args.test_batch_size)
+    print("sampler len: {}".format(eval_sampler))
+    eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=args.test_batch_size, drop_last=True)
 
     return eval_dataloader, eval_features, eval_examples
 
