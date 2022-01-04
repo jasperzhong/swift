@@ -74,7 +74,7 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
     print("exact_match: {} F1: ".format(exact_match, f1))
 
 def forward(config, eval_dataloader, model, eval_features):
-    shape = (config.test_batch_size, *model.input_shape[1:])
+    shape = (schedule._GLOBAL_ARGS.test_batch_size, *model.input_shape[1:])
     input_tensor = recv_forward(shape)
     output_tensor = forward_step(eval_dataloader, model, input_tensor, eval_features)
     send_forward(output_tensor)
