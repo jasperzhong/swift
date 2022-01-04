@@ -23,7 +23,7 @@ def get_pipeline_model_parallel_world_size():
 
 def get_pipeline_model_parallel_rank():
     global _GLOBAL_ARGS
-    return torch.distributed.get_rank()  // _GLOBAL_ARGS.data_parallel_size
+    return torch.distributed.get_rank() % _GLOBAL_ARGS.data_parallel_size
 
 
 def get_pipeline_model_parallel_next_rank():

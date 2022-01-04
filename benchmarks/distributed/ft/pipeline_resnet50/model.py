@@ -32,11 +32,9 @@ class PipelineParallelResNet50(ResNet):
         else:
             num_layers_per_stage = len(self.resnet50_sequential) // \
                 get_pipeline_model_parallel_world_size()
-            print(f"num_layers_per_stage = {num_layers_per_stage}")
             self.balance = [num_layers_per_stage] * get_pipeline_model_parallel_world_size()
             remaining = len(self.resnet50_sequential) - num_layers_per_stage * len(self.balance)
             self.balance[-1] += remaining
-            print(f"balance = {self.balance}")
 
         self._profile()
 
