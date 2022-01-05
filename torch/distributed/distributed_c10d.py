@@ -936,32 +936,32 @@ def irecv(tensor,
     global _logging_rng_state_cnt
     global _logging_in_recovery
 
-    if _logging and _logging_in_recovery and _logging_parallel_recovery:
-        # on recovery
-        if _logging_rng_state_fd is None:
-            peer_failure_worker = get_rank() - _logging_group_diff
-            filename = "rng_state_%d.h5" % (peer_failure_worker)
-            while not os.path.exists(filename):
-                time.sleep(0.1)
-            _logging_rng_state_fd = h5py.File(filename, "r")
-            _logging_rng_state_cnt = _logging_group_rank
-            logger.info(f"read {filename}")
-        dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
-        rng_state_tensor = np.empty(dest.shape, dest.dtype)
-        dest.read_direct(rng_state_tensor)
-        torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
-        _logging_rng_state_cnt += _logging_group_size
-    else:
-        # during runtime
-        if _logging_rng_state_fd is None:
-            _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
-        rng_state = torch.cuda.random.get_rng_state().numpy()
-        try:
-            _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
-            _logging_rng_state_fd.flush()
-            _logging_rng_state_cnt += 1
-        except ValueError:
-            pass
+    # if _logging and _logging_in_recovery and _logging_parallel_recovery:
+    #     # on recovery
+    #     if _logging_rng_state_fd is None:
+    #         peer_failure_worker = get_rank() - _logging_group_diff
+    #         filename = "rng_state_%d.h5" % (peer_failure_worker)
+    #         while not os.path.exists(filename):
+    #             time.sleep(0.1)
+    #         _logging_rng_state_fd = h5py.File(filename, "r")
+    #         _logging_rng_state_cnt = _logging_group_rank
+    #         logger.info(f"read {filename}")
+    #     dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
+    #     rng_state_tensor = np.empty(dest.shape, dest.dtype)
+    #     dest.read_direct(rng_state_tensor)
+    #     torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
+    #     _logging_rng_state_cnt += _logging_group_size
+    # else:
+    #     # during runtime
+    #     if _logging_rng_state_fd is None:
+    #         _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
+    #     rng_state = torch.cuda.random.get_rng_state().numpy()
+    #     try:
+    #         _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
+    #         _logging_rng_state_fd.flush()
+    #         _logging_rng_state_cnt += 1
+    #     except ValueError:
+    #         pass
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
@@ -1111,32 +1111,32 @@ def recv(tensor,
     global _logging_rng_state_cnt
     global _logging_in_recovery
 
-    if _logging and _logging_in_recovery and _logging_parallel_recovery:
-        # on recovery
-        if _logging_rng_state_fd is None:
-            peer_failure_worker = get_rank() - _logging_group_diff
-            filename = "rng_state_%d.h5" % (peer_failure_worker)
-            while not os.path.exists(filename):
-                time.sleep(0.1)
-            _logging_rng_state_fd = h5py.File(filename, "r")
-            _logging_rng_state_cnt = _logging_group_rank
-            logger.info(f"read {filename}")
-        dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
-        rng_state_tensor = np.empty(dest.shape, dest.dtype)
-        dest.read_direct(rng_state_tensor)
-        torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
-        _logging_rng_state_cnt += _logging_group_size
-    else:
-        # during runtime
-        if _logging_rng_state_fd is None:
-            _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
-        rng_state = torch.cuda.random.get_rng_state().numpy()
-        try:
-            _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
-            _logging_rng_state_fd.flush()
-            _logging_rng_state_cnt += 1
-        except ValueError:
-            pass
+    # if _logging and _logging_in_recovery and _logging_parallel_recovery:
+    #     # on recovery
+    #     if _logging_rng_state_fd is None:
+    #         peer_failure_worker = get_rank() - _logging_group_diff
+    #         filename = "rng_state_%d.h5" % (peer_failure_worker)
+    #         while not os.path.exists(filename):
+    #             time.sleep(0.1)
+    #         _logging_rng_state_fd = h5py.File(filename, "r")
+    #         _logging_rng_state_cnt = _logging_group_rank
+    #         logger.info(f"read {filename}")
+    #     dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
+    #     rng_state_tensor = np.empty(dest.shape, dest.dtype)
+    #     dest.read_direct(rng_state_tensor)
+    #     torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
+    #     _logging_rng_state_cnt += _logging_group_size
+    # else:
+    #     # during runtime
+    #     if _logging_rng_state_fd is None:
+    #         _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
+    #     rng_state = torch.cuda.random.get_rng_state().numpy()
+    #     try:
+    #         _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
+    #         _logging_rng_state_fd.flush()
+    #         _logging_rng_state_cnt += 1
+    #     except ValueError:
+    #         pass
 
     if tensor is None:
         return
