@@ -212,7 +212,7 @@ class TensorDataset(Dataset[Tuple[Tensor, ...]]):
         return self.tensors[0].size(0)
 
 class SquadDataset(Dataset):
-    def __init__(self, *squadexample) -> None:
+    def __init__(self, squadexample) -> None:
         self.squadexample = squadexample
 
     def __getitem__(self, index):

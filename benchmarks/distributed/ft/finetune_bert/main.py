@@ -208,7 +208,7 @@ def main():
     start = time.time()
     data_loader = create_train_dataloader(args, tokenizer)
     print("create dataloader time : {}".format(time.time() - start))
-    
+
     start = time.time()
     model = PipelineParallelBert(
         rank=torch.distributed.get_rank(),
