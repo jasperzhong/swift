@@ -443,6 +443,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         ts += 1
                         num += 1
 
+                        # since the failure is on a basis of machines,
+                        # so only the last worker in the machine will print the loss
                         if ts % config.print_freq == 0 and is_local_root_rank():
                             if lr_scheduler:
                                 logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} lr: {}".format(

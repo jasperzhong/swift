@@ -849,9 +849,9 @@ def get_local_world_size():
 
 def is_local_root_rank():
     """
-    Check if the worker is the root rank (local_rank == 0) in the local world group
+    Check if the worker is the root rank (local_rank == local_world_size - 1) in the local world group
     """
-    return int(os.environ["LOCAL_WORLD_RANK"]) == 0
+    return int(os.environ["LOCAL_WORLD_RANK"]) == get_local_world_size() - 1
 
 
 def isend(tensor,
