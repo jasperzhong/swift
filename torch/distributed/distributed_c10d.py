@@ -843,9 +843,15 @@ def get_world_size(group=None):
 
 def get_local_world_size():
     """
-    Returns the number of processes in the local worl group
+    Returns the number of processes in the local world group
     """
     return int(os.environ["LOCAL_WORLD_SIZE"])
+
+def is_local_root_rank():
+    """
+    Check if the worker is the root rank (local_rank == 0) in the local world group
+    """
+    return int(os.environ["LOCAL_WORLD_RANK"]) == 0
 
 
 def isend(tensor,

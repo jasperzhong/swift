@@ -17,7 +17,8 @@ from .data_parallel import (DistributedOptimizer, broadcast_optimizer_state,
 from .distributed_c10d import (_failure_handler, all_gather, barrier,
                                broadcast, destroy_process_group,
                                get_local_world_size, get_rank, get_world_size,
-                               new_group, parallel_recovery_data_parallel_size)
+                               new_group, parallel_recovery_data_parallel_size,
+                               is_local_root_rank)
 
 try:
     import boto3
@@ -399,7 +400,7 @@ def build_communication_group(config, peer_failure_worker):
 #         model_sum += torch.sum(param)
 #         if param.grad is not None:
 #             grad_sum += torch.sum(param.grad)
-# 
+#
 #     optimizer_sum = 0
 #     for group in optimizer.param_groups:
 #         for p in group['params']:
@@ -407,7 +408,7 @@ def build_communication_group(config, peer_failure_worker):
 #                 state = optimizer.state[p]
 #                 if 'momentum_buffer' in state:
 #                     optimizer_sum += torch.sum(state['momentum_buffer'])
-# 
+#
 #     with open("debug.log", "a") as f:
 #         f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
@@ -442,7 +443,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         ts += 1
                         num += 1
 
-                        if ts % config.print_freq == 0:
+                        if ts % config.print_freq == 0 and is_local_root_rank():
                             if lr_scheduler:
                                 logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} lr: {}".format(
                                     ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))
