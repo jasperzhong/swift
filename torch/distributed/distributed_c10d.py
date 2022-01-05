@@ -117,8 +117,8 @@ def _failure_handler():
     re_init_key = "reinit"
     re_init = store.add(re_init_key, 1)
     if re_init == 1:
-        logger.info("rank %d reset STORE_BASED_BARRIER_PREFIX to 0" % rank)
         store_key = "{}:{}".format(STORE_BASED_BARRIER_PREFIX, _group_count)
+        logger.info("rank %d reset {store_key} to 0" % rank)
         store.set(store_key, "0")
 
     destroy_process_group()
