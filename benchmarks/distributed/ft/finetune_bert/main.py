@@ -210,9 +210,13 @@ def main():
     print("create dataloader time : {}".format(time.time() - start))
 
     start = time.time()
+    balance = [1 for i in range(24)]
+    balance[1] = 2
+    balance[2] = 2
     model = PipelineParallelBert(
         rank=torch.distributed.get_rank(),
-        balance=[3, 4, 4, 3, 3, 3, 3, 3]
+        # balance=[3, 4, 4, 3, 3, 3, 3, 3]
+        balance=balance
     )    
     print("create model time : {}".format(time.time() - start))
 
