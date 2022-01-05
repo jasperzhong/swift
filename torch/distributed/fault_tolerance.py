@@ -155,11 +155,15 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                                              backward_passes_per_step=config.num_microbatches,
                                              comm_group=comm, average=True)
 
-        logger.info(f"group src rank = {pipeline_parallel_rank}")
-        broadcast_parameters(model.state_dict(), pipeline_parallel_rank, comm_group=comm)
+        group_src_rank = pipeline_parallel_rank
+        if failure_workers:
+            while group_src_rank in failure_workers:
+                group_src_rank += pipeline_parallel_size
+        logger.info(f"group src rank = {group_src_rank}")
+        broadcast_parameters(model.state_dict(), group_src_rank, comm_group=comm)
         optimizer.clear()
-        broadcast_optimizer_state(optimizer, pipeline_parallel_rank, comm_group=comm)
-        logger.info(f"Rank {pipeline_parallel_rank} broadcast its parameters and optimizer states")
+        broadcast_optimizer_state(optimizer, group_src_rank, comm_group=comm)
+        logger.info(f"Rank {group_src_rank} broadcast its parameters and optimizer states")
         # for failure worker
         ts._value = consensus_value
     elif config.logging:
