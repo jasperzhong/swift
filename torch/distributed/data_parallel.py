@@ -124,7 +124,8 @@ class _DistributedOptimizer(torch.optim.Optimizer):
 
     def clear(self):
         for p, handle in self._handles.items():
-            handle.wait()
+            if handle is not None:
+                handle.wait()
             self._all_reduce_delay[p] = self.backward_passes_per_step
         self._handles.clear()
         self.set_backward_passes_per_step(self.backward_passes_per_step)
