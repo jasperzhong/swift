@@ -201,17 +201,13 @@ def main():
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
     
+    start = time.time()
     if os.path.exists("./dataloader.pt"):
         data_loader = torch.load("./dataloader.pt")
     else:
-        start = time.time()
         tokenizer = get_tokenizer()
         data_loader = create_train_dataloader(args, tokenizer)
-        print("create dataloader time : {}".format(time.time() - start))
-    
-    data_iterator = iter(data_loader)
-    data = next(data_iterator)
-    print(len(data))
+    print("create dataloader time : {}".format(time.time() - start))
 
     start = time.time()
     model = PipelineParallelBert(
