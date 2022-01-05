@@ -42,34 +42,14 @@ def get_num_microbatches():
 def get_microbatch_size():
     global _GLOBAL_ARGS
     return _GLOBAL_ARGS.micro_batch_size
-
-def get_features(train_examples):
-    tokenizer = get_tokenizer()
-    args = _GLOBAL_ARGS
-    train_features = convert_examples_to_features(
-                examples=train_examples,
-                tokenizer=tokenizer,
-                max_seq_length=args.max_seq_length,
-                doc_stride=args.doc_stride,
-                max_query_length=args.max_query_length,
-                is_training=True)
-
-    input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long).cuda()
-    input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long).cuda()
-    segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long).cuda()
-    start_positions = torch.tensor([f.start_position for f in train_features], dtype=torch.long).cuda()
-    end_positions = torch.tensor([f.end_position for f in train_features], dtype=torch.long).cuda()
-
-    return input_ids, input_mask, segment_ids, start_positions, end_positions
     
-
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     # all need to get the data
     data = next(data_iterator)
 
-    # batch = [t.cuda() for t in data]
-    input_ids, input_mask, segment_ids, start_positions, end_positions = get_features(data)
-
+    batch = [t.cuda() for t in data]
+    input_ids, input_mask, segment_ids, start_positions, end_positions = batch
+    
     if is_pipeline_first_stage():
         assert input_tensor is None
         output_tensor = model(input_ids, segment_ids, input_mask)
