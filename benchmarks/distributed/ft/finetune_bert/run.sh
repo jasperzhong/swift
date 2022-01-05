@@ -18,7 +18,7 @@ cmd="python3 -m torch.distributed.run \
 	--micro-batch-size 4 \
 	--global-batch-size 32 \
 	--test-batch-size 157 \
-	--seed 2021 \
+	--seed 42 \
 	-p 50 \
 	--do_lower_case \
 	/home/gmsheng/data/squad/v1.1/train-v1.1.json \
