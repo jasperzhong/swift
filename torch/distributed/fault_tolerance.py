@@ -1,6 +1,6 @@
-import getpass
 import logging
 import os
+import subprocess
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -17,8 +17,8 @@ from .data_parallel import (DistributedOptimizer, broadcast_optimizer_state,
 from .distributed_c10d import (_failure_handler, all_gather, barrier,
                                broadcast, destroy_process_group,
                                get_local_world_size, get_rank, get_world_size,
-                               new_group, parallel_recovery_data_parallel_size,
-                               is_local_root_rank)
+                               is_local_root_rank, new_group,
+                               parallel_recovery_data_parallel_size)
 
 try:
     import boto3
@@ -628,21 +628,23 @@ class DFSClient(ABC):
 
 class HDFSClient(DFSClient):
     def __init__(self, *args, **kwargs):
-        host = os.environ["MASTER_ADDR"]
-        user = getpass.getuser()
-        self.client = InsecureClient(f"http://{host}:50070", user=user)
+        # please add hdfs commannd in the PATH
+        self.hdfs_bin = "hdfs"
 
     def upload(self, dfs_path, local_path):
-        self.client.upload("/" + dfs_path, local_path, overwrite=True)
+        result = subprocess.run([self.hdfs_bin, "dfs", "-put", local_path, "/"])
+        result.check_returncode()
 
     def download(self, dfs_path, local_path):
-        self.client.download("/" + dfs_path, local_path)
+        result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."])
+        result.check_returncode()
 
     def ls(self):
-        return self.client.list("/")
+        result = subprocess.getoutput("hdfs dfs -ls /")
+        return [item.split(' ')[-1] for item in result.split('\n')[1:]]
 
     def rm(self, dfs_path):
-        self.client.delete("/" + dfs_path)
+        result = subprocess.run([self.hdfs_bin, "dfs", "-rm", "/" + dfs_path])
 
 
 class S3Client(DFSClient):
