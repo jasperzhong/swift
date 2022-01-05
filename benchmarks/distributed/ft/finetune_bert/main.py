@@ -125,22 +125,22 @@ initialize_global_args(args)
 def create_train_dataloader(args, tokenizer):
     train_examples = read_squad_examples(
             input_file=args.data, is_training=True, version_2_with_negative=False)
+    train_data = Dataset(train_examples)
+    # train_features = convert_examples_to_features(
+    #             examples=train_examples,
+    #             tokenizer=tokenizer,
+    #             max_seq_length=args.max_seq_length,
+    #             doc_stride=args.doc_stride,
+    #             max_query_length=args.max_query_length,
+    #             is_training=True)
     
-    train_features = convert_examples_to_features(
-                examples=train_examples,
-                tokenizer=tokenizer,
-                max_seq_length=args.max_seq_length,
-                doc_stride=args.doc_stride,
-                max_query_length=args.max_query_length,
-                is_training=True)
-    
-    all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
-    all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
-    all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
-    all_start_positions = torch.tensor([f.start_position for f in train_features], dtype=torch.long)
-    all_end_positions = torch.tensor([f.end_position for f in train_features], dtype=torch.long)
-    train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids,
-                                all_start_positions, all_end_positions)
+    # all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
+    # all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
+    # all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
+    # all_start_positions = torch.tensor([f.start_position for f in train_features], dtype=torch.long)
+    # all_end_positions = torch.tensor([f.end_position for f in train_features], dtype=torch.long)
+    # train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids,
+    #                             all_start_positions, all_end_positions)
     train_sampler = RandomSampler(train_data)
     train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=args.micro_batch_size)
     
