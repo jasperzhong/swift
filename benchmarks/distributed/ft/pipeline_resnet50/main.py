@@ -6,21 +6,16 @@ import time
 
 import numpy as np
 from model import PipelineParallelResNet50
-from numpy.lib.function_base import average
 from schedule import (get_num_microbatches, get_pipeline_model_parallel_rank,
                       initialize_global_args, is_pipeline_first_stage,
-                      is_pipeline_last_stage, pipedream_flush_schedule)
+                      is_pipeline_last_stage, pipedream_flush_schedule,
+                      get_data_parallel_rank())
 from torchvision import datasets, transforms
 
 import torch
 import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
-from torch._C import Value
-from torch.autograd import backward
-from torch.distributed.data_parallel import (DistributedOptimizer,
-                                             broadcast_optimizer_state,
-                                             broadcast_parameters)
 from torch.distributed.fault_tolerance import (FaultToleranceConfig,
                                                fault_tolerance_train)
 
@@ -83,8 +78,10 @@ def get_data_loader(args):
             normalize,
         ]))
 
+    sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=args.data_parallel_size,
+                                                  rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True)
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.micro_batch_size, shuffle=True,
+        train_dataset, sampler=sampler, batch_size=args.micro_batch_size,
         num_workers=args.workers, pin_memory=True
     )
     return train_loader
