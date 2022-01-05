@@ -5,22 +5,24 @@ import random
 import time
 
 import numpy as np
-from numpy.lib.function_base import average
 from model import PipelineParallelResNet50
-from schedule import (get_num_microbatches, initialize_global_args,
-                      is_pipeline_first_stage, is_pipeline_last_stage,
-                      pipedream_flush_schedule, get_pipeline_model_parallel_rank)
-from torch._C import Value
-from torch.autograd import backward
+from numpy.lib.function_base import average
+from schedule import (get_num_microbatches, get_pipeline_model_parallel_rank,
+                      initialize_global_args, is_pipeline_first_stage,
+                      is_pipeline_last_stage, pipedream_flush_schedule)
 from torchvision import datasets, transforms
 
 import torch
 import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
+from torch._C import Value
+from torch.autograd import backward
+from torch.distributed.data_parallel import (DistributedOptimizer,
+                                             broadcast_optimizer_state,
+                                             broadcast_parameters)
 from torch.distributed.fault_tolerance import (FaultToleranceConfig,
                                                fault_tolerance_train)
-from torch.distributed.data_parallel import DistributedOptimizer, broadcast_parameters, broadcast_optimizer_state
 
 logging.basicConfig(level=logging.INFO)
 
@@ -49,7 +51,7 @@ parser.add_argument('--master_ip', default=None, type=str,
 parser.add_argument('--master_port', default=None, type=int,
                     help='master port for c10d')
 
-# Data parallelism 
+# Data parallelism
 parser.add_argument('--data-parallel-size', type=int, default=None,
                     help='Data-parallel size')
 
@@ -123,7 +125,8 @@ def main():
     args.local_world_size = int(os.environ["LOCAL_WORLD_SIZE"])
     num_machines = args.world_size // args.local_world_size
     if args.data_parallel_size > num_machines:
-        raise ValueError(f"data-parallel size ({args.data_parallel_size}) should not be large than the number of machines ({num_machines})")
+        raise ValueError(
+            f"data-parallel size ({args.data_parallel_size}) should not be large than the number of machines ({num_machines})")
     else:
         args.micro_batch_size //= args.data_parallel_size
 
@@ -150,14 +153,7 @@ def main():
     print("iters per epoch:{}".format(iters_per_epoch))
 
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
-    if args.data_parallel_size > 1:
-        N, d = args.world_size, args.data_parallel_size
-        ranks = list(zip(*[list(range(i*N//d, (i+1)*N//d)) for i in range(d)]))[get_pipeline_model_parallel_rank()]
-        print(f"ranks: {ranks}")
-        comm = torch.distributed.new_group(ranks)
-        optimizer = DistributedOptimizer(optimizer, model.named_parameters(), 
-                    backward_passes_per_step=get_num_microbatches(), comm_group=comm, average=True)
-    elif args.replica:
+    if args.data_parallel_size == 1 and args.replica:
         logging.warn(f"Replicas are not available because data-parallel size is {args.data_parallel_size}")
         args.replica = False
 
@@ -165,7 +161,7 @@ def main():
 
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=10, replica=args.replica, print_freq=args.print_freq
+        checkpoint_interval=10, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
     )
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
