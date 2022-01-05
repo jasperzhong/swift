@@ -148,9 +148,12 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                            for i in range(d)]))[pipeline_parallel_rank]
         logger.info(f"ranks: {ranks}")
         comm = new_group(ranks, group_name="src_group_rank_%d" % pipeline_parallel_rank)
-        optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
-                                         backward_passes_per_step=config.num_microbatches,
-                                         comm_group=comm, average=True)
+        if type(optimizer).__name__ == "DistributedOptimizer":
+            optimizer.comm_group = comm_group
+        else:
+            optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
+                                             backward_passes_per_step=config.num_microbatches,
+                                             comm_group=comm, average=True)
 
         logger.info(f"group src rank = {pipeline_parallel_rank}")
         broadcast_parameters(model.state_dict(), pipeline_parallel_rank, comm_group=comm)

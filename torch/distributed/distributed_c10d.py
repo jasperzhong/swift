@@ -117,7 +117,7 @@ def _failure_handler():
     re_init_key = "reinit"
     re_init = store.add(re_init_key, 1)
     if re_init == 1:
-        for count in range(_group_count+1):
+        for count in range(_group_count + 1):
             store_key = "{}:{}".format(STORE_BASED_BARRIER_PREFIX, count)
             logger.info(f"[Rank {rank}] reset {store_key} to 0")
             store.set(store_key, "0")
