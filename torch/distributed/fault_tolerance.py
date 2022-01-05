@@ -149,7 +149,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
         logger.info(f"ranks: {ranks}")
         comm = new_group(ranks, group_name="src_group_rank_%d" % pipeline_parallel_rank)
         if type(optimizer).__name__ == "DistributedOptimizer":
-            optimizer.comm_group = comm_group
+            optimizer.comm_group = comm
         else:
             optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
                                              backward_passes_per_step=config.num_microbatches,
