@@ -147,7 +147,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
         ranks = list(zip(*[list(range(i * N // d, (i + 1) * N // d))
                            for i in range(d)]))[pipeline_parallel_rank]
         logger.info(f"ranks: {ranks}")
-        comm = new_group(ranks, group_name="src_group_rank_%d" % pipeline_parallel_rank)
+        comm = new_group(ranks, group_name="src_group_rank_%d_%d" % (pipeline_parallel_rank, ts))
         if type(optimizer).__name__ == "DistributedOptimizer":
             optimizer.comm_group = comm
         else:
