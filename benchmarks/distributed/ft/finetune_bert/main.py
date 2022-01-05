@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributed.fault_tolerance import (FaultToleranceConfig,
                                                fault_tolerance_train)
-from torch.utils.data import (DataLoader, Dataset, SequentialSampler, IterableDataset)
+from torch.utils.data import (DataLoader, Dataset, SequentialSampler, SquadDataset)
 from Squad import read_squad_examples, convert_examples_to_features
 from tokenization import get_tokenizer
 from model import PipelineParallelBert
@@ -125,7 +125,7 @@ initialize_global_args(args)
 def create_train_dataloader(args, tokenizer):
     train_examples = read_squad_examples(
             input_file=args.data, is_training=True, version_2_with_negative=False)
-    train_data = IterableDataset(train_examples)
+    train_data = SquadDataset(train_examples)
     # train_features = convert_examples_to_features(
     #             examples=train_examples,
     #             tokenizer=tokenizer,
@@ -145,12 +145,6 @@ def create_train_dataloader(args, tokenizer):
     train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=args.micro_batch_size)
     
     return train_dataloader
-    
-def get_input_shape(data_loader: DataLoader):
-    data_iter = iter(data_loader)
-    input_ids, segment_ids, input_mask, _, _ = next(data_iter)
-    return input_ids.shape, segment_ids.shape, input_mask.shape
-
 
 def reset_data_iterator(data_loader, ts):
     if args.seed is not None:
@@ -207,13 +201,6 @@ def main():
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
-
-    start = time.time()
-    model = PipelineParallelBert(
-        rank=torch.distributed.get_rank(),
-        balance=[3, 4, 4, 3, 3, 3, 3, 3]
-    )    
-    print("create model time : {}".format(time.time() - start))
     
     start = time.time()
     tokenizer = get_tokenizer()
@@ -221,8 +208,13 @@ def main():
     start = time.time()
     data_loader = create_train_dataloader(args, tokenizer)
     print("create dataloader time : {}".format(time.time() - start))
-    input_ids, segment_ids, input_mask = get_input_shape(data_loader)
-    print(input_ids, segment_ids, input_mask)
+    
+    start = time.time()
+    model = PipelineParallelBert(
+        rank=torch.distributed.get_rank(),
+        balance=[3, 4, 4, 3, 3, 3, 3, 3]
+    )    
+    print("create model time : {}".format(time.time() - start))
 
     num_micro_batches = get_num_microbatches()
     iters_per_epoch = len(data_loader) // num_micro_batches

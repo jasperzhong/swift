@@ -3,7 +3,7 @@ from torch.utils.data.sampler import \
      SubsetRandomSampler, WeightedRandomSampler, BatchSampler)
 from torch.utils.data.dataset import \
     (Dataset, IterableDataset, TensorDataset, ConcatDataset, ChainDataset,
-     Subset, random_split)
+     Subset, random_split, SquadDataset)
 from torch.utils.data.dataset import IterableDataset as IterDataPipe
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data.dataloader import DataLoader, _DatasetKind, get_worker_info
