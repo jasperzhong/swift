@@ -17,7 +17,7 @@ from torch._C._distributed_c10d import SwiftInternalError
 
 from .data_parallel import (DistributedOptimizer, broadcast_optimizer_state,
                             broadcast_parameters)
-from .distributed_c10d import (_failure_handler, all_gather, broadcast,
+from .distributed_c10d import (_failure_handler, all_gather, barrier, broadcast,
                                destroy_process_group, get_local_world_size,
                                get_rank, get_world_size, new_group,
                                parallel_recovery_data_parallel_size)
@@ -139,6 +139,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     old_optimizer = optimizer
     old_lr_scheduler = lr_scheduler
     if config.replica:
+        barrier()
         comm_group = optimizer.comm_group
         pipeline_parallel_size = get_world_size() // optimizer._size
         group_src_rank = get_rank() % pipeline_parallel_size
