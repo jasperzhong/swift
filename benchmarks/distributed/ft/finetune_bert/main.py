@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributed.fault_tolerance import (FaultToleranceConfig,
                                                fault_tolerance_train)
-from torch.utils.data import (DataLoader, Dataset, SequentialSampler)
+from torch.utils.data import (DataLoader, Dataset, SequentialSampler, IterableDataset)
 from Squad import read_squad_examples, convert_examples_to_features
 from tokenization import get_tokenizer
 from model import PipelineParallelBert
@@ -125,7 +125,7 @@ initialize_global_args(args)
 def create_train_dataloader(args, tokenizer):
     train_examples = read_squad_examples(
             input_file=args.data, is_training=True, version_2_with_negative=False)
-    train_data = Dataset(train_examples)
+    train_data = IterableDataset(train_examples)
     # train_features = convert_examples_to_features(
     #             examples=train_examples,
     #             tokenizer=tokenizer,
