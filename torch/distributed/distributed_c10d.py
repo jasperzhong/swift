@@ -878,8 +878,8 @@ def isend(tensor,
     if _rank_not_in_group(group):
         return
 
-    with open("debug_%d.log" % dst, "a") as f:
-        f.write(f"{_ts} {torch.sum(tensor)}\n")
+    # with open("debug_%d.log" % dst, "a") as f:
+    #     f.write(f"{_ts} {torch.sum(tensor)}\n")
 
     # do not send back to the upstream node during recovery
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
@@ -1004,8 +1004,8 @@ def irecv(tensor,
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
-        with open("debug_recv_%d.log" % src, "a") as f:
-            f.write(f"{_ts} {torch.sum(tensor)}\n")
+        # with open("debug_recv_%d.log" % src, "a") as f:
+        #     f.write(f"{_ts} {torch.sum(tensor)}\n")
         return
 
     if _logging and _logging_gpu_tensor_queue:
@@ -1052,8 +1052,8 @@ def send(tensor,
     if _rank_not_in_group(group):
         return
 
-    with open("debug_%d.log" % dst, "a") as f:
-        f.write(f"{_ts} {torch.sum(tensor)}\n")
+    # with open("debug_%d.log" % dst, "a") as f:
+    #     f.write(f"{_ts} {torch.sum(tensor)}\n")
 
     # do not send back to the upstream node during recovery
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
@@ -1182,8 +1182,8 @@ def recv(tensor,
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
-        with open("debug_recv_%d.log" % src, "a") as f:
-            f.write(f"{_ts} {torch.sum(tensor)}\n")
+        # with open("debug_recv_%d.log" % src, "a") as f:
+        #     f.write(f"{_ts} {torch.sum(tensor)}\n")
         return
 
     if _logging and _logging_gpu_tensor_queue:

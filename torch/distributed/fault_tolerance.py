@@ -6,8 +6,6 @@ import time
 from abc import ABC, abstractmethod
 from queue import Queue
 
-import h5py
-
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
 import torch.nn
@@ -394,24 +392,24 @@ def build_communication_group(config, peer_failure_worker):
             return new_group(group, group_name="src_group_rank_%d" % peer_failure_worker)
 
 
-def checksum(ts, model, optimizer):
-    model_sum = 0
-    grad_sum = 0
-    for param in model.parameters():
-        model_sum += torch.sum(param)
-        if param.grad is not None:
-            grad_sum += torch.sum(param.grad)
-
-    optimizer_sum = 0
-    for group in optimizer.param_groups:
-        for p in group['params']:
-            if p.grad is not None:
-                state = optimizer.state[p]
-                if 'momentum_buffer' in state:
-                    optimizer_sum += torch.sum(state['momentum_buffer'])
-
-    with open("debug.log", "a") as f:
-        f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
+# def checksum(ts, model, optimizer):
+#     model_sum = 0
+#     grad_sum = 0
+#     for param in model.parameters():
+#         model_sum += torch.sum(param)
+#         if param.grad is not None:
+#             grad_sum += torch.sum(param.grad)
+# 
+#     optimizer_sum = 0
+#     for group in optimizer.param_groups:
+#         for p in group['params']:
+#             if p.grad is not None:
+#                 state = optimizer.state[p]
+#                 if 'momentum_buffer' in state:
+#                     optimizer_sum += torch.sum(state['momentum_buffer'])
+# 
+#     with open("debug.log", "a") as f:
+#         f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
 
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
@@ -426,7 +424,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
         ts, model, optimizer, lr_scheduler, consensus_value, cb = recovery(config, ts, model, optimizer, lr_scheduler)
         data_iterator = reset_data_iterator_func(data_loader, ts)
         iter_time_avg = 0
-        checksum(ts, model, optimizer)
+        # checksum(ts, model, optimizer)
         try:
             while True:
                 try:
@@ -459,7 +457,12 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             logger.info(f"parallel recovery restores from iteration {ts}")
                             cb = None
 
-                        checksum(ts, model, optimizer)
+                        # this is okay because ts has been increased by one
+                        if ts % config.checkpoint_interval == 0:
+                            filename = _get_checkpoint_path(config)
+                            checkpoint(filename, ts, model, optimizer)
+
+                        # checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
                     if fault_tolerance_val:
