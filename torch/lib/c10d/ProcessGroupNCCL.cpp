@@ -28,6 +28,8 @@ namespace {
 // I don't want to use a global variable...
 // but it is the simplest way to achieve our goal
 std::atomic_bool watchdog_thread_flag(false);
+// to inform other ProcessGroup about the failure
+std::atomic_bool local_failure_flag(false);
 
 constexpr int kBytes = 8;
 
@@ -477,6 +479,7 @@ ProcessGroupNCCL::ProcessGroupNCCL(
         std::thread(&ProcessGroupNCCL::ncclCommWatchdog, this);
     watchdog_thread_flag = true;
   }
+  local_failure_flag = false;
 #endif
 
   if (asyncErrorHandling_) {
@@ -614,7 +617,7 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
       // Loop through the cache of communicators for NCCL errors.
       std::lock_guard<std::mutex> lock(mutex_);
 
-      bool is_failure = false;
+      bool is_failure = local_failure_flag.load();
       std::exception_ptr ncclErrorException;
       for (auto& it : devNCCLCommMap_) {
         auto devicesKey = it.first;
@@ -659,6 +662,7 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
           std::lock_guard<std::mutex> lock(store_mutex_);
           std::vector<uint8_t> value = {1};
           store_->set(failure_flag_key, value);
+	  local_failure_flag = true;
         }
 
         LOG(ERROR) << "[Rank " << rank_ << "] Aborting all communicators";
