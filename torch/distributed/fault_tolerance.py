@@ -160,6 +160,8 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
         optimizer.clear()
         broadcast_optimizer_state(optimizer, pipeline_parallel_rank, comm_group=comm)
         logger.info(f"Rank {pipeline_parallel_rank} broadcast its parameters and optimizer states")
+        # for failure worker
+        ts = consensus_value
     elif config.logging:
         need_recovery = _need_recovery(config.groups, failure_workers)
         if need_recovery:
