@@ -27,7 +27,9 @@ namespace {
 
 // I don't want to use a global variable...
 // but it is the simplest way to achieve our goal
-std::atomic_bool watchdog_thread_flag(false);
+std::atomic_bool watchdog_thread_flag(true);
+// to inform other ProcessGroup about the failure
+std::atomic_bool local_failure_flag(false);
 
 constexpr int kBytes = 8;
 
@@ -472,11 +474,12 @@ ProcessGroupNCCL::ProcessGroupNCCL(
 
 #ifdef ENABLE_NCCL_ERROR_CHECKING
   // for multiple NCCL groups, only one watchdog thread will be launched
-  if (!watchdog_thread_flag) {
-    ncclCommWatchdogThread_ =
-        std::thread(&ProcessGroupNCCL::ncclCommWatchdog, this);
-    watchdog_thread_flag = true;
+  ncclCommWatchdogThread_ = std::thread(
+      &ProcessGroupNCCL::ncclCommWatchdog, this, watchdog_thread_flag.load());
+  if (watchdog_thread_flag) {
+    watchdog_thread_flag = false;
   }
+  local_failure_flag = false;
 #endif
 
   if (asyncErrorHandling_) {
@@ -589,10 +592,10 @@ void ProcessGroupNCCL::abortTimedOutCollectives(
   }
 }
 
-void ProcessGroupNCCL::ncclCommWatchdog() {
+void ProcessGroupNCCL::ncclCommWatchdog(bool check_store) {
   try {
     LOG(INFO) << "[Rank " << rank_ << "] NCCL watchdog thread started!";
-    ncclCommWatchdogInternal();
+    ncclCommWatchdogInternal(check_store);
     LOG(INFO) << "[Rank " << rank_
               << "] NCCL watchdog thread terminated normally";
   } catch (std::exception& e) {
@@ -605,7 +608,7 @@ void ProcessGroupNCCL::ncclCommWatchdog() {
   }
 }
 
-void ProcessGroupNCCL::ncclCommWatchdogInternal() {
+void ProcessGroupNCCL::ncclCommWatchdogInternal(bool check_store) {
   while (!terminateProcessGroup_.load()) {
     std::unordered_set<std::string> abortedCommIds;
     std::unordered_set<std::string> allCommIds;
@@ -633,12 +636,16 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
 
       std::string failure_flag_key = "failure_flag";
       // the "if" is necessary
-      if (!devNCCLCommMap_.empty()) {
+      if (!devNCCLCommMap_.empty() && check_store) {
         std::lock_guard<std::mutex> lock(store_mutex_);
         auto get_value = store_->get(failure_flag_key);
         if (get_value[0] == 1) {
           is_failure = true;
         }
+      }
+
+      if (local_failure_flag) {
+        is_failure = true;
       }
 
       if (is_failure) {
@@ -648,6 +655,10 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
               << "] Received NCCL errors for communicators in the cache: \n"
               << "NCCL error: \n"
               << getExceptionMsgFromExceptionPtr(ncclErrorException);
+        } else if (local_failure_flag) {
+          LOG(ERROR)
+              << "[Rank " << rank_
+              << "] Received NCCL errors for communicators from other process groups in the same machine\n";
         } else {
           LOG(ERROR)
               << "[Rank " << rank_
@@ -655,10 +666,11 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
         }
 
         // inform other workers about the failure
-        {
+        if (check_store) {
           std::lock_guard<std::mutex> lock(store_mutex_);
           std::vector<uint8_t> value = {1};
           store_->set(failure_flag_key, value);
+          local_failure_flag = true;
         }
 
         LOG(ERROR) << "[Rank " << rank_ << "] Aborting all communicators";
