@@ -5,11 +5,9 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Queue
-from benchmarks.distributed.ft.pipeline_resnet50.schedule import is_pipeline_last_stage
 
 import h5py
-import numpy as np
-import random
+
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
 import torch.nn
@@ -18,10 +16,10 @@ from torch._C._distributed_c10d import SwiftInternalError
 
 from .data_parallel import (DistributedOptimizer, broadcast_optimizer_state,
                             broadcast_parameters)
-from .distributed_c10d import (_failure_handler, all_gather, broadcast,
-                               destroy_process_group, get_local_world_size,
-                               get_rank, get_world_size, new_group,
-                               parallel_recovery_data_parallel_size)
+from .distributed_c10d import (_failure_handler, all_gather, barrier,
+                               broadcast, destroy_process_group,
+                               get_local_world_size, get_rank, get_world_size,
+                               new_group, parallel_recovery_data_parallel_size)
 
 try:
     import boto3
@@ -78,8 +76,8 @@ def _set_recovery_mask(config, ts, consensus_value):
 
 
 class FaultToleranceConfig:
-    def __init__(self, num_iteration, iters_per_epoch, batch_size, num_microbatches, checkpoint_interval, replica=False, logging=False,
-                 parallel_recovery=False, logging_compression=None, logging_chunk_freq=None, logging_dfs=None, logging_bucket=None,
+    def __init__(self, num_iteration, iters_per_epoch, batch_size, num_microbatches, checkpoint_interval, replica=False, data_parallel_size=None,
+                 logging=False, parallel_recovery=False, logging_compression=None, logging_chunk_freq=None, logging_dfs=None, logging_bucket=None,
                  logging_group_size=None, logging_groups=None, print_freq=5, checkpoint_prefix="swift_"):
         self.num_iteration = num_iteration
         self.iters_per_epoch = iters_per_epoch
@@ -87,6 +85,7 @@ class FaultToleranceConfig:
         self.num_microbatches = num_microbatches
         self.checkpoint_interval = checkpoint_interval
         self.replica = replica
+        self.data_parallel_size = data_parallel_size
         self.logging = logging
         self.parallel_recovery = parallel_recovery
         self.logging_compression = logging_compression
@@ -140,9 +139,33 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     old_optimizer = optimizer
     old_lr_scheduler = lr_scheduler
     if config.replica:
-        broadcast_parameters(model.state_dict(), 0)
+        barrier()
+        N, d = get_world_size(), config.data_parallel_size
+        pipeline_parallel_size = N // d
+        pipeline_parallel_rank = get_rank() % pipeline_parallel_size
+
+        ranks = list(zip(*[list(range(i * N // d, (i + 1) * N // d))
+                           for i in range(d)]))[pipeline_parallel_rank]
+        logger.info(f"ranks: {ranks}")
+        comm = new_group(ranks, group_name="src_group_rank_%d_%d" % (pipeline_parallel_rank, consensus_value))
+        if type(optimizer).__name__ == "DistributedOptimizer":
+            optimizer.comm_group = comm
+        else:
+            optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
+                                             backward_passes_per_step=config.num_microbatches,
+                                             comm_group=comm, average=True)
+
+        group_src_rank = pipeline_parallel_rank
+        if failure_workers:
+            while group_src_rank in failure_workers:
+                group_src_rank += pipeline_parallel_size
+        logger.info(f"group src rank = {group_src_rank}")
+        broadcast_parameters(model.state_dict(), group_src_rank, comm_group=comm)
         optimizer.clear()
-        broadcast_optimizer_state(optimizer, 0)
+        broadcast_optimizer_state(optimizer, group_src_rank, comm_group=comm)
+        logger.info(f"Rank {group_src_rank} broadcast its parameters and optimizer states")
+        # for failure worker
+        ts._value = consensus_value
     elif config.logging:
         need_recovery = _need_recovery(config.groups, failure_workers)
         if need_recovery:
@@ -420,7 +443,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         ts += 1
                         num += 1
 
-                        if ts % config.print_freq == 0 and is_pipeline_last_stage():
+                        if ts % config.print_freq == 0 and loss > 0:
                             if lr_scheduler:
                                 logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} lr: {}".format(
                                     ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))

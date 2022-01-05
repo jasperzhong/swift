@@ -5,9 +5,9 @@ NPROC_PER_NODE=1
 MASTER_IP=172.30.2.12
 MASTER_PORT=1234
 
-ENABLE_LOGGING=${1:-0}
-LOGGING_GROUP_SIZE=${2:-${NPROC_PER_NODE}}
-PARALLEL_RECOVERY=${3:-0}
+
+DATA_PARALLEL_SIZE=${1:-1}
+ENABLE_REPLICA=${2:-0}
 
 rm -rf *.h5
 rm -rf *.log
@@ -22,21 +22,13 @@ cmd="python3 -m torch.distributed.run \
 	--micro-batch-size 16 \
 	--global-batch-size 128 \
 	--seed 2021 \
-	-p 5 \
-	-j 4" 
+	-p 1 \
+	-j 4 \
+	--data-parallel-size ${DATA_PARALLEL_SIZE}" 
 
-LOGGING_ARGS="
-	--logging \
-	--logging-dfs s3 \
-	--logging-s3-bucket yczhong-swift \
-	--logging-group-size ${LOGGING_GROUP_SIZE}"
 
-if [[ $PARALLEL_RECOVERY -eq 1 ]]; then
-	LOGGING_ARGS="${LOGGING_ARGS} --parallel-recovery"
-fi
-
-if [[ $ENABLE_LOGGING -eq 1 ]];then
-	cmd="${cmd} ${LOGGING_ARGS}"
+if [[ $ENABLE_REPLICA -eq 1 ]];then
+	cmd="${cmd} --replica"
 fi
 
 cmd="${cmd} ~/data/ILSVRC2012"

@@ -6,9 +6,10 @@ import time
 
 import numpy as np
 from model import PipelineParallelResNet50
-from schedule import (get_num_microbatches, initialize_global_args,
-                      is_pipeline_first_stage, is_pipeline_last_stage,
-                      pipedream_flush_schedule)
+from schedule import (get_num_microbatches, get_pipeline_model_parallel_rank,
+                      initialize_global_args, is_pipeline_first_stage,
+                      is_pipeline_last_stage, pipedream_flush_schedule,
+                      get_data_parallel_rank)
 from torchvision import datasets, transforms
 
 import torch
@@ -44,27 +45,21 @@ parser.add_argument('--master_ip', default=None, type=str,
                     help='master ip for c10d')
 parser.add_argument('--master_port', default=None, type=int,
                     help='master port for c10d')
+
+# Data parallelism
+parser.add_argument('--data-parallel-size', type=int, default=None,
+                    help='Data-parallel size')
+
 # Pipeline parallelism
 parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
 
-# logging
-parser.add_argument('--logging', default=False, action="store_true",
-                    help='whether to enable logging.')
-parser.add_argument('--parallel-recovery', default=False, action="store_true",
-                    help='whether to enable parallel recovery.')
-parser.add_argument('--logging-chunk-freq', type=int,
-                    default=10, help='chunk logging files every N iterations.')
-parser.add_argument('--logging-compression', default=None, type=str,
-                    help='compression methods for logging')
-parser.add_argument('--logging-dfs', default='hdfs', type=str,
-                    help='distributed filesystem for logging')
-parser.add_argument('--logging-s3-bucket', default=None, type=str,
-                    help='s3 bucket if using s3 as logging store')
-parser.add_argument('--logging-group-size', default=None, type=int,
-                    help='group size for logging')
+# replica
+parser.add_argument('--replica', default=False, action="store_true",
+                    help='whether to enable replication recovery.')
+
 args = parser.parse_args()
 initialize_global_args(args)
 
@@ -83,8 +78,10 @@ def get_data_loader(args):
             normalize,
         ]))
 
+    sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=args.data_parallel_size,
+                                                  rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True)
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.micro_batch_size, shuffle=True,
+        train_dataset, sampler=sampler, batch_size=args.micro_batch_size,
         num_workers=args.workers, pin_memory=True
     )
     return train_loader
@@ -104,7 +101,7 @@ def reset_data_iterator(data_loader, ts):
     return data_iterator
 
 
-def train_iter(model, optimizer, data_iterator, loss_func):
+def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler):
     start = time.time()
     optimizer.zero_grad()
     loss = pipedream_flush_schedule(
@@ -122,6 +119,14 @@ def main():
     args.world_size = int(os.environ['WORLD_SIZE'])
     args.rank = int(os.environ['RANK'])
     args.local_rank = int(os.environ['LOCAL_RANK'])
+    args.local_world_size = int(os.environ["LOCAL_WORLD_SIZE"])
+    num_machines = args.world_size // args.local_world_size
+    if args.data_parallel_size > num_machines:
+        raise ValueError(
+            f"data-parallel size ({args.data_parallel_size}) should not be large than the number of machines ({num_machines})")
+    else:
+        args.micro_batch_size //= args.data_parallel_size
+
     torch.cuda.set_device(args.local_rank)
     torch.distributed.init_process_group(
         'nccl'
@@ -134,63 +139,29 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader = get_data_loader(args)
-    model = PipelineParallelResNet50(rank=args.rank, balance=[4, 2, 2, 3])
+    print(f"pipeline rank = {get_pipeline_model_parallel_rank()}")
+    model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=None)
     model.cuda()
 
-    def hook_fn_forward(m, x, y):
-        def _dfs(tensors):
-            checksum = 0
-            if isinstance(tensors, tuple):
-                for t in tensors:
-                    checksum += _dfs(t)
-            elif isinstance(tensors, torch.cuda.FloatTensor):
-                checksum = torch.sum(tensors)
-            return checksum
-
-        input_checksum = _dfs(x)
-        output_checksum = _dfs(y)
-
-        with open("debug_forward_module.log", "a") as f:
-            f.write(f"{m._get_name()} {input_checksum} {output_checksum}\n")
-
-    def hook_fn_backward(m, grad_input, grad_output):
-        def _dfs(grad_input):
-            checksum = 0
-            if isinstance(grad_input, tuple):
-                for grad in grad_input:
-                    checksum += _dfs(grad)
-            elif isinstance(grad_input, torch.cuda.FloatTensor):
-                checksum = torch.sum(grad_input)
-            return checksum
-
-        grad_input_checksum = _dfs(grad_input)
-        grad_output_checksum = _dfs(grad_output)
-
-        with open("debug_backward_module.log", "a") as f:
-            f.write(f"{m._get_name()} {grad_input_checksum} {grad_output_checksum}\n")
-
-    def dfs(module):
-        for m in module.children():
-            if len(list(m.children())) == 0:
-                m.register_backward_hook(hook_fn_backward)
-                m.register_forward_hook(hook_fn_forward)
-            else:
-                dfs(m)
-
-    dfs(model.model_split)
+    total_iters = args.benchmark_iters
+    print("total iterations: {}".format(total_iters))
+    num_micro_batches = args.global_batch_size // args.micro_batch_size
+    iters_per_epoch = len(data_loader) // num_micro_batches
+    print("iters per epoch:{}".format(iters_per_epoch))
 
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+    if args.data_parallel_size == 1 and args.replica:
+        logging.warn(f"Replicas are not available because data-parallel size is {args.data_parallel_size}")
+        args.replica = False
+
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
-        num_iteration=args.benchmark_iters, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
-        logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
-        logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
-        logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
+        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
+        checkpoint_interval=10, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
     )
     fault_tolerance_train(config, train_iter, model, optimizer,
-                          data_loader, loss_func, reset_data_iterator_func=reset_data_iterator)
+                          data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
 
 
 if __name__ == '__main__':

@@ -2,9 +2,6 @@ import torch
 
 _GLOBAL_ARGS = None
 
-_cnt = 0
-
-
 def initialize_global_args(args):
     global _GLOBAL_ARGS
     _GLOBAL_ARGS = args
@@ -20,27 +17,33 @@ def is_pipeline_first_stage():
 
 
 def get_pipeline_model_parallel_world_size():
-    return torch.distributed.get_world_size()
+    global _GLOBAL_ARGS
+    return torch.distributed.get_world_size() // _GLOBAL_ARGS.data_parallel_size
 
 
 def get_pipeline_model_parallel_rank():
-    return torch.distributed.get_rank()
+    global _GLOBAL_ARGS
+    return torch.distributed.get_rank() % get_pipeline_model_parallel_world_size()
+
+def get_data_parallel_rank():
+    global _GLOBAL_ARGS
+    return torch.distributed.get_rank() // get_pipeline_model_parallel_world_size()
 
 
 def get_pipeline_model_parallel_next_rank():
     return (get_pipeline_model_parallel_rank() + 1) % \
-        get_pipeline_model_parallel_world_size()
+        get_pipeline_model_parallel_world_size() + get_data_parallel_rank() * get_pipeline_model_parallel_world_size()
 
 
 def get_pipeline_model_parallel_prev_rank():
     return (get_pipeline_model_parallel_rank() - 1) % \
-        get_pipeline_model_parallel_world_size()
+        get_pipeline_model_parallel_world_size() + get_data_parallel_rank() * get_pipeline_model_parallel_world_size()
 
 
 def get_num_microbatches():
     global _GLOBAL_ARGS
     return _GLOBAL_ARGS.global_batch_size // _GLOBAL_ARGS.micro_batch_size // \
-        torch.distributed.parallel_recovery_data_parallel_size()
+        torch.distributed.parallel_recovery_data_parallel_size() // _GLOBAL_ARGS.data_parallel_size
 
 
 def get_microbatch_size():
@@ -52,7 +55,11 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
         images, labels = data
-        images, labels = images.cuda(), labels.cuda()
+
+        if is_pipeline_first_stage():
+            images = images.cuda()
+        elif is_pipeline_last_stage():
+            labels = labels.cuda()
 
     if is_pipeline_first_stage():
         assert input_tensor is None
@@ -69,7 +76,6 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
 
 
 def backward_step(input_tensor, output_tensor, output_tensor_grad):
-    global _cnt
     if input_tensor is not None:
         input_tensor.retain_grad()
 
@@ -78,17 +84,7 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad):
     input_tensor_grad = None
     if input_tensor is not None:
         input_tensor_grad = input_tensor.grad
-
-    with open("debug_backward.log", "a") as f:
-        input_tensor_checksum = 0 if input_tensor is None else torch.sum(input_tensor)
-        output_tensor_checksum = 0 if output_tensor is None else torch.sum(output_tensor)
-        output_tensor_grad_checksum = 0 if output_tensor_grad is None else torch.sum(output_tensor_grad)
-        input_tensor_grad_checksum = 0 if input_tensor_grad is None else torch.sum(input_tensor_grad)
-        rng_state = torch.cuda.random.get_rng_state()
-        rng_state_checksum = torch.sum(rng_state.type(torch.float32))
-        f.write(f"{_cnt} {input_tensor_checksum} {output_tensor_checksum} {output_tensor_grad_checksum} {input_tensor_grad_checksum} {rng_state_checksum}\n")
-        _cnt += 1
-
+        
     return input_tensor_grad
 
 

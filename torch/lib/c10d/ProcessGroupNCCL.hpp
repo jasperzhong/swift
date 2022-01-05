@@ -413,9 +413,9 @@ class ProcessGroupNCCL : public ProcessGroup {
   // class. Attempting to modify the communicator cache from the WorkNCCL class
   // might run into issues with object lifetime since the ProcessGroupNCCL
   // object might get destroyed before the WorkNCCL object.
-  void ncclCommWatchdog();
+  void ncclCommWatchdog(bool check_store);
 
-  void ncclCommWatchdogInternal();
+  void ncclCommWatchdogInternal(bool check_store);
 
   // This function iterates through the list of WorkNCCL objects in the
   // workList_ corresponding to incomplete collectives and then aborts NCCL
