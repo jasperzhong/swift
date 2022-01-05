@@ -9,7 +9,7 @@ from model import PipelineParallelResNet50
 from schedule import (get_num_microbatches, get_pipeline_model_parallel_rank,
                       initialize_global_args, is_pipeline_first_stage,
                       is_pipeline_last_stage, pipedream_flush_schedule,
-                      get_data_parallel_rank())
+                      get_data_parallel_rank)
 from torchvision import datasets, transforms
 
 import torch
