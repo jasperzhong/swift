@@ -491,7 +491,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 info = "[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f} lr: {}".format(
                                     ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr())
                                 logger.info(info)
-                                write = "{ts} {:.2f} {:.2f} {:.2f} \n".format(
+                                write = "{} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time(), throughput, throughput_avg / ts._value)
                                 with open(f"main_throughput_{get_rank()}.txt", "a") as f:
                                     f.write(write)
@@ -500,7 +500,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 info = "[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f}".format(
                                     ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value)
                                 logger.info(info)
-                                write = "{ts} {:.2f} {:.2f} {:.2f} \n".format(
+                                write = "{} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time(), throughput, throughput_avg / ts._value)
                                 with open(f"main_throughput_{get_rank()}.txt", "a") as f:
                                     f.write(write)
