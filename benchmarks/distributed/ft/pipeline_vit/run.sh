@@ -42,7 +42,7 @@ if [[ $ENABLE_LOGGING -eq 1 ]];then
 	cmd="${cmd} ${LOGGING_ARGS}"
 fi
 
-cmd="${cmd} ~/data/ILSVRC2012_ImageNet"
+cmd="${cmd} ~/data/ILSVRC2012"
 
 echo $cmd
 
