@@ -42,7 +42,7 @@ if [[ $ENABLE_LOGGING -eq 1 ]];then
 	cmd="${cmd} ${LOGGING_ARGS}"
 fi
 
-cmd="${cmd} /data2/data/cifar-100-python"
+cmd="${cmd} /data2/data/"
 
 echo $cmd
 
