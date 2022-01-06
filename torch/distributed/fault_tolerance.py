@@ -221,8 +221,15 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
             ts.broadcast(peer_failure_worker)
 
             if lr_scheduler:
+                # It seems that when last_epoch != -1, the optimizer should has initialized the `initial_lr` 
+                # but in parallel recovery, the re-built optimizer does not have that attribute, so we need
+                # to set the `initial_lr` by building it twice. 
+                # KeyError: "param 'initial_lr' is not specified in param_groups[0] when resuming an optimizer"
                 lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-                    optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
+                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=-1)
+
+                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
                 logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
 
             # 5. hijack get_rank()
