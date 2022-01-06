@@ -121,11 +121,23 @@ def teardown(config):
         distributed_c10d._logging_cpu_tensor_queue.put(None)
         distributed_c10d._logging_thread.join()
 
+# profile some time
+init_time = 0
+recovery_time = 0
+
 
 def recovery(config, ts, model, optimizer, lr_scheduler=None):
+    global init_time
+    global recovery_time
+
     callback = None
     consensus_value, need_undo, failure_workers = ts.sync()
+    # init time end
+    init_end= time.time()
+    init_time = init_end - init_time
+    logger.info(f"init time is: {init_time}")
     logger.info(f"failure workers: {failure_workers}")
+    recovery_time = time.time()
 
     if need_undo:
         logger.info(f"[rank {get_rank()}] undo update is needed"
@@ -412,9 +424,10 @@ def checksum(ts, model, optimizer):
     with open("debug.log", "a") as f:
         f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
-
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
                           lr_scheduler, reset_data_iterator_func, fault_tolerance_val=None, test_loader=None):
+    global init_time
+    global recovery_time
     setup(config)
 
     ts = Timestamp(0)
@@ -425,6 +438,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
         ts, model, optimizer, lr_scheduler, consensus_value, cb = recovery(config, ts, model, optimizer, lr_scheduler)
         data_iterator = reset_data_iterator_func(data_loader, ts)
         iter_time_avg = 0
+        throughput_avg = 0
         checksum(ts, model, optimizer)
         try:
             while True:
@@ -435,21 +449,32 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                     for _ in range(ts, config.num_iteration):
                         if num >= config.iters_per_epoch:
                             raise StopIteration
+
+                        # failure worker back to the consensus_value and finish recovery
+                        if ts._value == consensus_value and get_rank() == 1:
+                            recovery_time = time.time() - recovery_time
+                            logger.info("recovery time is: {}".format(recovery_time))
+                        
+                        # for experiment:
+                        if ts._value == 150 and get_rank() == 1:
+                            os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
+
                         start = time.time()
                         loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
                         iteration_time = time.time() - start
                         iter_time_avg += iteration_time
+                        throughput = config.batch_size / iteration_time
 
                         ts += 1
                         num += 1
 
                         if ts % config.print_freq == 0 and loss > 0:
                             if lr_scheduler:
-                                logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} lr: {}".format(
-                                    ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))
+                                logger.info("[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f} lr: {}".format(
+                                    ts, loss, throughput, throughput / ts._value, iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))
                             else:
-                                logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} ".format(
-                                    ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value))
+                                logger.info("[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f}".format(
+                                    ts, loss, throughput, throughput / ts._value, iteration_time, iter_time_avg / ts._value))
 
                         if ts == consensus_value and cb:
                             ts, model, optimizer, lr_scheduler = cb(ts)
@@ -471,6 +496,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
             break
         except SwiftInternalError as e:
+            # init time start
+            init_time = time.time()
             logger.info("catch an error: " + str(e))
             _failure_handler()
             # force data iterators' workers to exit
