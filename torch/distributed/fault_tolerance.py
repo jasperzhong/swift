@@ -465,17 +465,16 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         iter_time_avg += iteration_time
                         throughput = config.batch_size / iteration_time
                         throughput_avg += throughput
-                        
                         ts += 1
                         num += 1
 
                         if ts % config.print_freq == 0 and loss > 0:
                             if lr_scheduler:
                                 logger.info("[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f} lr: {}".format(
-                                    ts, loss, throughput, throughput / ts._value, iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))
+                                    ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))
                             else:
                                 logger.info("[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f}".format(
-                                    ts, loss, throughput, throughput / ts._value, iteration_time, iter_time_avg / ts._value))
+                                    ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value))
 
                         if ts == consensus_value and cb:
                             ts, model, optimizer, lr_scheduler = cb(ts)
