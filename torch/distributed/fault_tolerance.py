@@ -138,7 +138,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     logger.info(f"init time is: {init_time}")
     # only rank 0 get the init time
     if ts._value != 0 and get_rank() == 0:
-        with open(f"main_init_{ts._value}.log", "a") as f:
+        with open(f"main_init_{ts._value}.txt", "a") as f:
             f.write(f"{init_time}\n")
     logger.info(f"failure workers: {failure_workers}")
     recovery_time = time.time()
@@ -464,7 +464,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         if ts._value != 0 and ts._value == consensus_value and get_rank() == 4:
                             recovery_time = time.time() - recovery_time
                             logger.info("recovery time is: {}".format(recovery_time))
-                            with open(f"main_recovery_{ts._value}.log", "a") as f:
+                            with open(f"main_recovery_{ts._value}.txt", "a") as f:
                                 f.write(f"{recovery_time}\n")
                         
                         # for experiment:
@@ -493,7 +493,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 logger.info(info)
                                 write = "{ts} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time(), throughput, throughput_avg / ts._value)
-                                with open(f"main_throughput_{get_rank()}.log", "a") as f:
+                                with open(f"main_throughput_{get_rank()}.txt", "a") as f:
                                     f.write(write)
                                 
                             else:
@@ -502,7 +502,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 logger.info(info)
                                 write = "{ts} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time(), throughput, throughput_avg / ts._value)
-                                with open(f"main_throughput_{get_rank()}.log", "a") as f:
+                                with open(f"main_throughput_{get_rank()}.txt", "a") as f:
                                     f.write(write)
 
                         if ts == consensus_value and cb:

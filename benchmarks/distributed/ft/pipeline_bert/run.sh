@@ -9,6 +9,7 @@ export NCCL_SOCKET_IFNAME=enp94s0
 rm -rf *.h5
 rm -rf *.log
 rm -rf *.ckpt
+rm -rf *.flag
 
 cmd="python3 -m torch.distributed.run \
 	--nnodes=$NNODES --nproc_per_node=$NPROC_PER_NODE \
