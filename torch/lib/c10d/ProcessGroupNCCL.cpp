@@ -670,8 +670,9 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal(bool check_store) {
           std::lock_guard<std::mutex> lock(store_mutex_);
           std::vector<uint8_t> value = {1};
           store_->set(failure_flag_key, value);
-          local_failure_flag = true;
         }
+	// inform other process groups in the same worker about the failure
+        local_failure_flag = true;
 
         LOG(ERROR) << "[Rank " << rank_ << "] Aborting all communicators";
 
