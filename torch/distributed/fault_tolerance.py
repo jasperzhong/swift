@@ -23,10 +23,7 @@ from .distributed_c10d import (_failure_handler, all_gather, barrier,
 try:
     import boto3
 except ImportError:
-    try:
-        from hdfs import InsecureClient
-    except ImportError:
-        raise ImportError("lack of boto3 or hdfs")
+    pass
 
 
 logger = logging.getLogger(__name__)
