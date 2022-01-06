@@ -451,12 +451,12 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             raise StopIteration
 
                         # failure worker back to the consensus_value and finish recovery
-                        if ts._value == consensus_value and get_rank() == 3:
+                        if ts._value != 0 and ts._value == consensus_value and get_rank() == 4:
                             recovery_time = time.time() - recovery_time
                             logger.info("recovery time is: {}".format(recovery_time))
                         
                         # for experiment:
-                        if ts._value == 150 and get_rank() == 3:
+                        if ts._value == 150 and get_rank() == 4:
                             os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
 
                         start = time.time()
