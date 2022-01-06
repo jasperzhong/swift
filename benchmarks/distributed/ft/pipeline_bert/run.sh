@@ -23,12 +23,13 @@ cmd="python3 -m torch.distributed.run \
 	--micro-batch-size 4 \
 	--global-batch-size 32 \
 	--seed 2021 \
-	-p 5 \
+	-p 1 \
 	-j 4" 
 
 LOGGING_ARGS="
 	--logging \
 	--logging-dfs hdfs \
+	--logging-chunk-freq 5 \
 	--logging-group-size ${LOGGING_GROUP_SIZE}"
 
 if [[ $PARALLEL_RECOVERY -eq 1 ]]; then
