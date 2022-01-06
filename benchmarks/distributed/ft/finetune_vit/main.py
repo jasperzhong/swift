@@ -77,6 +77,8 @@ parser.add_argument('--logging-s3-bucket', default=None, type=str,
                     help='s3 bucket if using s3 as logging store')
 parser.add_argument('--logging-group-size', default=None, type=int,
                     help='group size for logging')
+parser.add_argument('--checkpoint-interval', default=200, type=int,
+                    help='checkpoint interval')
 
 args = parser.parse_args()
 initialize_global_args(args)
@@ -173,8 +175,10 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader, test_loader = get_data_loader(args)
-    model = PipelineParallelViT(balance=[4, 6, 5, 3])
+    # model = PipelineParallelViT(balance=[4, 6, 5, 3])
     # model = PipelineParallelViT(balance=[1,3,3,3,3,2,2,1])
+    # for e2e experiment
+    model = PipelineParallelViT(balance=[1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1])
     model.cuda()
 
     total_iters = args.benchmark_iters
@@ -189,7 +193,7 @@ def main():
 
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=10, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
+        checkpoint_interval=args.checkpoint_interval, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
         logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq

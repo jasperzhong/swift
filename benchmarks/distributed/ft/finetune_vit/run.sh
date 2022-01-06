@@ -1,8 +1,8 @@
 #!/bin/bash
 
-NNODES=2
+NNODES=8
 NPROC_PER_NODE=2
-MASTER_IP=10.28.1.16
+MASTER_IP=192.168.64.12
 MASTER_PORT=1234
 export NCCL_SOCKET_IFNAME=eth2
 
@@ -23,7 +23,8 @@ cmd="python3 -m torch.distributed.run \
 	--micro-batch-size 32 \
 	--global-batch-size 512 \
 	--img-size 224 \
-	--seed 2021 \
+	--checkpoint-interval 200 \
+	--seed 42 \
 	-p 1 \
 	-j 4" 
 
@@ -41,7 +42,7 @@ if [[ $ENABLE_LOGGING -eq 1 ]];then
 	cmd="${cmd} ${LOGGING_ARGS}"
 fi
 
-cmd="${cmd} ~/data/CIFAR100"
+cmd="${cmd} /data2/data/cifar-100-python"
 
 echo $cmd
 

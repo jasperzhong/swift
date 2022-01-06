@@ -22,7 +22,8 @@ cmd="python3 -m torch.distributed.run \
 	main.py \
 	--micro-batch-size 4 \
 	--global-batch-size 32 \
-	--seed 2021 \
+	--seed 42 \
+	--checkpoint-interval 200 \
 	-p 1 \
 	-j 4" 
 
