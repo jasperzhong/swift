@@ -847,6 +847,7 @@ def get_local_world_size():
     """
     return int(os.environ["LOCAL_WORLD_SIZE"])
 
+
 def is_local_root_rank():
     """
     Check if the worker is the root rank (local_rank == local_world_size - 1) in the local world group
@@ -3166,7 +3167,16 @@ def _open_logging_file(filename, consensus_value):
 
     while not os.path.exists(filename):
         time.sleep(0.1)
-    f = h5py.File(filename, "a")
+
+    while True:
+        try:
+            f = h5py.File(filename, "a")
+            break
+        except OSError:
+            # OSError: Unable to open file (unable to lock file, errno = 11, error message = 'Resource temporarily unavailable')
+            # this is because HDFS is uploading the file. So please wait for a while.
+            time.sleep(0.1)
+
     keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
     valid_keys = list(filter(lambda x: int(x.split(":")[0]) < consensus_value, keys))
     if _logging_parallel_recovery:
