@@ -644,7 +644,8 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal(bool check_store) {
         }
       }
 
-      if (local_failure_flag) {
+      LOG(ERROR) << "local_failure_flag = " << local_failure_flag.load();
+      if (local_failure_flag.load()) {
         is_failure = true;
       }
 
@@ -655,7 +656,7 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal(bool check_store) {
               << "] Received NCCL errors for communicators in the cache: \n"
               << "NCCL error: \n"
               << getExceptionMsgFromExceptionPtr(ncclErrorException);
-        } else if (local_failure_flag) {
+        } else if (local_failure_flag.load()) {
           LOG(ERROR)
               << "[Rank " << rank_
               << "] Received NCCL errors for communicators from other process groups in the same machine\n";
