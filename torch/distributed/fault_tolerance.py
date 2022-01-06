@@ -464,7 +464,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         iteration_time = time.time() - start
                         iter_time_avg += iteration_time
                         throughput = config.batch_size / iteration_time
-
+                        throughput_avg += throughput
+                        
                         ts += 1
                         num += 1
 
