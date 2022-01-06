@@ -15,7 +15,7 @@ PARALLEL_RECOVERY=${3:-0}
 rm -rf *.h5
 rm -rf *.log
 rm -rf *.ckpt
-hdfs dfs -rm /*
+hdfs dfs -rm -r "/*"
 
 cmd="python3 -m torch.distributed.run \
 	--nnodes=$NNODES --nproc_per_node=$NPROC_PER_NODE \
