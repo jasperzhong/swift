@@ -1,12 +1,10 @@
-import getpass
 import logging
 import os
+import subprocess
 import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Queue
-
-import h5py
 
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
@@ -19,15 +17,8 @@ from .data_parallel import (DistributedOptimizer, broadcast_optimizer_state,
 from .distributed_c10d import (_failure_handler, all_gather, barrier,
                                broadcast, destroy_process_group,
                                get_local_world_size, get_rank, get_world_size,
-                               new_group, parallel_recovery_data_parallel_size)
-
-try:
-    import boto3
-except ImportError:
-    try:
-        from hdfs import InsecureClient
-    except ImportError:
-        raise ImportError("lack of boto3 or hdfs")
+                               is_local_root_rank, new_group,
+                               parallel_recovery_data_parallel_size)
 
 
 logger = logging.getLogger(__name__)
@@ -190,23 +181,24 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                                                                         logging_bucket=config.logging_bucket)
 
             # 1. living workers do checkpoint
-            logging_rng_state_cnt_bck = distributed_c10d._logging_rng_state_cnt
+            # logging_rng_state_cnt_bck = distributed_c10d._logging_rng_state_cnt
             if not need_recovery:
                 filename = _get_checkpoint_path(config)
                 # do not do gc here
                 checkpoint(filename, ts, model, optimizer, garbage_collection=False)
 
                 # close its own rng state file
-                if distributed_c10d._logging_rng_state_fd is not None:
-                    distributed_c10d._logging_rng_state_fd.close()
-                    distributed_c10d._logging_rng_state_fd = None
+                # if distributed_c10d._logging_rng_state_fd is not None:
+                #     distributed_c10d._logging_rng_state_fd.close()
+                #     distributed_c10d._logging_rng_state_fd = None
             else:
-                filename = "rng_state_%d.h5" % (get_rank())
-                f = h5py.File(filename, "r")
-                logging_rng_state_cnt_bck = int(sorted(f.keys(), key=lambda x: int(x))[-1])
-                f.close()
-                distributed_c10d._logging_dfs_client.upload(dfs_path=filename, local_path=filename)
-                logger.info(f"put {filename} on dfs")
+                pass
+                # filename = "rng_state_%d.h5" % (get_rank())
+                # f = h5py.File(filename, "r")
+                # logging_rng_state_cnt_bck = int(sorted(f.keys(), key=lambda x: int(x))[-1])
+                # f.close()
+                # distributed_c10d._logging_dfs_client.upload(dfs_path=filename, local_path=filename)
+                # logger.info(f"put {filename} on dfs")
 
             # 2. all workers build new comm group
             peer_failure_worker = get_peer_failure_worker(config, failure_workers)
@@ -229,8 +221,15 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
             ts.broadcast(peer_failure_worker)
 
             if lr_scheduler:
+                # It seems that when last_epoch != -1, the optimizer should has initialized the `initial_lr` 
+                # but in parallel recovery, the re-built optimizer does not have that attribute, so we need
+                # to set the `initial_lr` by building it twice. 
+                # KeyError: "param 'initial_lr' is not specified in param_groups[0] when resuming an optimizer"
                 lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-                    optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
+                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=-1)
+
+                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
                 logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
 
             # 5. hijack get_rank()
@@ -240,14 +239,14 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
 
             # 6. download the same set of logging files as the failure worker
             if not need_recovery:
-                filename = "rng_state_%d.h5" % (peer_failure_worker)
-                while True:
-                    dfs_files = distributed_c10d._logging_dfs_client.ls()
-                    if filename in dfs_files:
-                        distributed_c10d._logging_dfs_client.download(dfs_path=filename, local_path=filename)
-                        break
-                    time.sleep(0.1)
-                logger.info(f"download {filename}")
+                # filename = "rng_state_%d.h5" % (peer_failure_worker)
+                # while True:
+                #     dfs_files = distributed_c10d._logging_dfs_client.ls()
+                #     if filename in dfs_files:
+                #         distributed_c10d._logging_dfs_client.download(dfs_path=filename, local_path=filename)
+                #         break
+                #     time.sleep(0.1)
+                # logger.info(f"download {filename}")
 
                 logging_files = get_logging_files_for_parallel_recovery(config, ts, consensus_value,
                                                                         peer_failure_worker)
@@ -306,12 +305,12 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                     distributed_c10d._logging = False
                     distributed_c10d._logging_dfs_client = None
 
-                # close its own rng state file
-                if distributed_c10d._logging_rng_state_fd is not None:
-                    distributed_c10d._logging_rng_state_fd.close()
-                    distributed_c10d._logging_rng_state_fd = None
+                # # close its own rng state file
+                # if distributed_c10d._logging_rng_state_fd is not None:
+                #     distributed_c10d._logging_rng_state_fd.close()
+                #     distributed_c10d._logging_rng_state_fd = None
 
-                distributed_c10d._logging_rng_state_cnt = logging_rng_state_cnt_bck + 1
+                # distributed_c10d._logging_rng_state_cnt = logging_rng_state_cnt_bck + 1
 
                 distributed_c10d._logging_mask.clear()
                 # pairs = groups_to_pairs(config.groups)
@@ -393,24 +392,24 @@ def build_communication_group(config, peer_failure_worker):
             return new_group(group, group_name="src_group_rank_%d" % peer_failure_worker)
 
 
-def checksum(ts, model, optimizer):
-    model_sum = 0
-    grad_sum = 0
-    for param in model.parameters():
-        model_sum += torch.sum(param)
-        if param.grad is not None:
-            grad_sum += torch.sum(param.grad)
-
-    optimizer_sum = 0
-    for group in optimizer.param_groups:
-        for p in group['params']:
-            if p.grad is not None:
-                state = optimizer.state[p]
-                if 'momentum_buffer' in state:
-                    optimizer_sum += torch.sum(state['momentum_buffer'])
-
-    with open("debug.log", "a") as f:
-        f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
+# def checksum(ts, model, optimizer):
+#     model_sum = 0
+#     grad_sum = 0
+#     for param in model.parameters():
+#         model_sum += torch.sum(param)
+#         if param.grad is not None:
+#             grad_sum += torch.sum(param.grad)
+#
+#     optimizer_sum = 0
+#     for group in optimizer.param_groups:
+#         for p in group['params']:
+#             if p.grad is not None:
+#                 state = optimizer.state[p]
+#                 if 'momentum_buffer' in state:
+#                     optimizer_sum += torch.sum(state['momentum_buffer'])
+#
+#     with open("debug.log", "a") as f:
+#         f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
 
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
@@ -425,7 +424,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
         ts, model, optimizer, lr_scheduler, consensus_value, cb = recovery(config, ts, model, optimizer, lr_scheduler)
         data_iterator = reset_data_iterator_func(data_loader, ts)
         iter_time_avg = 0
-        checksum(ts, model, optimizer)
+        # checksum(ts, model, optimizer)
         try:
             while True:
                 try:
@@ -443,7 +442,9 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         ts += 1
                         num += 1
 
-                        if ts % config.print_freq == 0 and loss > 0:
+                        # since the failure is on a basis of machines,
+                        # so only the last worker in the machine will print the loss
+                        if ts % config.print_freq == 0 and is_local_root_rank():
                             if lr_scheduler:
                                 logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} lr: {}".format(
                                     ts, loss, config.batch_size / iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))
@@ -458,7 +459,12 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             logger.info(f"parallel recovery restores from iteration {ts}")
                             cb = None
 
-                        checksum(ts, model, optimizer)
+                        # this is okay because ts has been increased by one
+                        if ts % config.checkpoint_interval == 0:
+                            filename = _get_checkpoint_path(config)
+                            checkpoint(filename, ts, model, optimizer)
+
+                        # checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
                     if fault_tolerance_val:
@@ -621,52 +627,63 @@ class DFSClient(ABC):
 
 class HDFSClient(DFSClient):
     def __init__(self, *args, **kwargs):
-        host = os.environ["MASTER_ADDR"]
-        user = getpass.getuser()
-        self.client = InsecureClient(f"http://{host}:50070", user=user)
+        # please add hdfs commannd in the PATH
+        self.hdfs_bin = "hdfs"
 
     def upload(self, dfs_path, local_path):
-        self.client.upload("/" + dfs_path, local_path, overwrite=True)
+        result = subprocess.run([self.hdfs_bin, "dfs", "-put", local_path, "/"])
+        result.check_returncode()
 
     def download(self, dfs_path, local_path):
-        self.client.download("/" + dfs_path, local_path)
+        if local_path in os.listdir():
+            # File exists
+            return
+        result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."])
+        result.check_returncode()
 
     def ls(self):
-        return self.client.list("/")
+        result = subprocess.getoutput("hdfs dfs -ls /")
+        return [item.split(' ')[-1].lstrip('/') for item in result.split('\n')[1:]]
 
     def rm(self, dfs_path):
-        self.client.delete("/" + dfs_path)
+        result = subprocess.run([self.hdfs_bin, "dfs", "-rm", "/" + dfs_path])
 
 
-class S3Client(DFSClient):
-    def __init__(self, *args, **kwargs):
-        if "logging_bucket" in kwargs:
-            bucket = kwargs["logging_bucket"]
-        else:
-            raise ValueError("bucket not found")
+try:
+    import boto3
 
-        self.s3 = boto3.client('s3')
-        rsp = self.s3.list_buckets()
-        all_buckets = [bucket['Name'] for bucket in rsp['Buckets']]
-        assert bucket in all_buckets
-        self.bucket = bucket
+    class S3Client(DFSClient):
+        def __init__(self, *args, **kwargs):
+            if "logging_bucket" in kwargs:
+                bucket = kwargs["logging_bucket"]
+            else:
+                raise ValueError("bucket not found")
 
-    def upload(self, dfs_path, local_path):
-        self.s3.upload_file(local_path, self.bucket, dfs_path)
+            self.s3 = boto3.client('s3')
+            rsp = self.s3.list_buckets()
+            all_buckets = [bucket['Name'] for bucket in rsp['Buckets']]
+            assert bucket in all_buckets
+            self.bucket = bucket
 
-    def download(self, dfs_path, local_path):
-        self.s3.download_file(self.bucket, dfs_path, local_path)
+        def upload(self, dfs_path, local_path):
+            self.s3.upload_file(local_path, self.bucket, dfs_path)
 
-    def ls(self):
-        rsp = self.s3.list_objects(Bucket=self.bucket)
-        key = 'Contents'
-        if key in rsp:
-            files = rsp[key]
-            return [file['Key'] for file in files]
-        return []
+        def download(self, dfs_path, local_path):
+            self.s3.download_file(self.bucket, dfs_path, local_path)
 
-    def rm(self, dfs_path):
-        self.s3.delete_object(Bucket=self.bucket, Key=dfs_path)
+        def ls(self):
+            rsp = self.s3.list_objects(Bucket=self.bucket)
+            key = 'Contents'
+            if key in rsp:
+                files = rsp[key]
+                return [file['Key'] for file in files]
+            return []
+
+        def rm(self, dfs_path):
+            self.s3.delete_object(Bucket=self.bucket, Key=dfs_path)
+except ImportError:
+    class S3Client(DFSClient):
+        pass
 
 
 def get_groups(group_size=None, groups=None):
@@ -769,7 +786,8 @@ def checkpoint(filename, ts, model, optimizer, garbage_collection=True):
         ckpt = torch.load(filename)
         if ts <= ckpt['ts']:
             logger.info("checkpoint aborted because there is already a newer checkpoint")
-            load_checkpoint(filename, ts, model, optimizer)
+            # do not load checkpoint here!!!
+            # load_checkpoint(filename, ts, model, optimizer)
             return
 
     torch.save({
@@ -786,9 +804,9 @@ def checkpoint(filename, ts, model, optimizer, garbage_collection=True):
         distributed_c10d._logging_gpu_tensor_queue.clear()
         distributed_c10d._logging_cpu_tensor_queue.put("gc")
 
-        if os.path.exists("rng_state_%d" % (get_rank())):
-            os.remove("rng_state_%d.h5" % (get_rank()))
-            logger.info("remove outdated rng_state file")
+        # if os.path.exists("rng_state_%d" % (get_rank())):
+        #     os.remove("rng_state_%d.h5" % (get_rank()))
+        #     logger.info("remove outdated rng_state file")
 
 
 def load_checkpoint(filename, ts, model, optimizer):
