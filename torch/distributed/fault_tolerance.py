@@ -505,7 +505,7 @@ def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_micro_
     print(f"the merged group is {group}")
     return group        
 
-def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_scheduler, warmup_iters, workload):
+def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_scheduler, warmup_iters):
     sum = 0
     for _ in range(warmup_iters):
         _, compute_time_sum = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
@@ -516,7 +516,7 @@ def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_sc
     print(f"workers_per_machine {workers_per_machine}")
     num_machines = get_world_size() // get_local_world_size()
 
-    with open(f"{workload}_compute_time_{rank // num_machines}.txt", "a") as f:
+    with open(f"compute_time_{rank // num_machines}.txt", "a") as f:
         f.write(f"{sum / warmup_iters} \n")
 
 

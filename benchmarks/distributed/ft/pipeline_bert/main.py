@@ -243,7 +243,8 @@ def main():
 
     # profile some data first
     if is_local_root_rank():
-        warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 10, "bert")
+        print("start to profile compute time")
+        warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 10)
         print("End up profile")
     
     # fault_tolerance_train(config, train_iter, model, optimizer,

@@ -47,7 +47,7 @@ if [[ $ENABLE_LOGGING -eq 1 ]];then
 	cmd="${cmd} ${LOGGING_ARGS}"
 fi
 
-cmd="${cmd} /home/yczhong/data/BERT/"
+cmd="${cmd} /home/gmsheng/data/bert/"
 
 echo $cmd
 
