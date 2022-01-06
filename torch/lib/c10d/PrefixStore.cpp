@@ -27,6 +27,12 @@ void PrefixStore::set(
   store_->set(joinKey(key), value);
 }
 
+void PrefixStore::set_without_prefix(
+    const std::string& key,
+    const std::vector<uint8_t>& value) {
+  store_->set(key, value);
+}
+
 std::vector<uint8_t> PrefixStore::compareSet(
     const std::string& key,
     const std::vector<uint8_t>& expectedValue,
@@ -36,6 +42,10 @@ std::vector<uint8_t> PrefixStore::compareSet(
 
 std::vector<uint8_t> PrefixStore::get(const std::string& key) {
   return store_->get(joinKey(key));
+}
+
+std::vector<uint8_t> PrefixStore::get_without_prefix(const std::string& key) {
+  return store_->get(key);
 }
 
 int64_t PrefixStore::add(const std::string& key, int64_t value) {

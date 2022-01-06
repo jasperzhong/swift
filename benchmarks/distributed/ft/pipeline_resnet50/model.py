@@ -83,7 +83,7 @@ class PipelineParallelResNet50(ResNet):
                 if line:
                     nums = line.split(" ")
                     nums = [int(num) for num in nums]
-                  
+
                     if len(nums) == 1:
                         nums = nums[0]
                     else:
@@ -112,7 +112,7 @@ class PipelineParallelResNet50(ResNet):
                 output = layer(input)
                 self._output_shapes.append(output.shape)
                 input = output
-        
+
         local_rank = int(os.environ['LOCAL_RANK'])
         if local_rank == 0:
             with open("profile.txt", "w") as f:
