@@ -25,12 +25,6 @@ constexpr const char* const kNCCLAbortedCommStoreKey = "NCCLABORTEDCOMM";
 
 namespace {
 
-// I don't want to use a global variable...
-// but it is the simplest way to achieve our goal
-std::atomic_bool watchdog_thread_flag(true);
-// to inform other ProcessGroup about the failure
-std::atomic_bool local_failure_flag(false);
-
 constexpr int kBytes = 8;
 
 // RAII helper class to manage NCCL group API and CUDA free mutex.
@@ -474,12 +468,8 @@ ProcessGroupNCCL::ProcessGroupNCCL(
 
 #ifdef ENABLE_NCCL_ERROR_CHECKING
   // for multiple NCCL groups, only one watchdog thread will be launched
-  ncclCommWatchdogThread_ = std::thread(
-      &ProcessGroupNCCL::ncclCommWatchdog, this, watchdog_thread_flag.load());
-  if (watchdog_thread_flag) {
-    watchdog_thread_flag = false;
-  }
-  local_failure_flag = false;
+  ncclCommWatchdogThread_ =
+      std::thread(&ProcessGroupNCCL::ncclCommWatchdog, this);
 #endif
 
   if (asyncErrorHandling_) {
@@ -505,14 +495,12 @@ ProcessGroupNCCL::ProcessGroupNCCL(
 void ProcessGroupNCCL::setSequenceNumberForGroup() {
   if (rank_ == 0) {
     // Create and broadcast sequence number
-    std::lock_guard<std::mutex> lock(store_mutex_);
     auto seq = 1 + rand();
     sequenceNum_ = c10d::SequenceNum(seq);
     std::vector<uint8_t> values = c10d::toVec<uint8_t>(seq, kBytes);
     store_->set(kSeqNumStoreKey, values);
   } else {
     // Read rank 0's sequence number from store.
-    std::lock_guard<std::mutex> lock(store_mutex_);
     sequenceNum_ = c10d::SequenceNum();
     store_->wait({kSeqNumStoreKey}, options_->timeout);
     std::vector<uint8_t> values = store_->get(kSeqNumStoreKey);
@@ -592,10 +580,10 @@ void ProcessGroupNCCL::abortTimedOutCollectives(
   }
 }
 
-void ProcessGroupNCCL::ncclCommWatchdog(bool check_store) {
+void ProcessGroupNCCL::ncclCommWatchdog() {
   try {
     LOG(INFO) << "[Rank " << rank_ << "] NCCL watchdog thread started!";
-    ncclCommWatchdogInternal(check_store);
+    ncclCommWatchdogInternal();
     LOG(INFO) << "[Rank " << rank_
               << "] NCCL watchdog thread terminated normally";
   } catch (std::exception& e) {
@@ -608,58 +596,50 @@ void ProcessGroupNCCL::ncclCommWatchdog(bool check_store) {
   }
 }
 
-void ProcessGroupNCCL::ncclCommWatchdogInternal(bool check_store) {
+void ProcessGroupNCCL::ncclCommWatchdogInternal() {
   while (!terminateProcessGroup_.load()) {
     std::unordered_set<std::string> abortedCommIds;
     std::unordered_set<std::string> allCommIds;
 
     {
-      // Loop through the cache of communicators for NCCL errors.
-      std::lock_guard<std::mutex> lock(mutex_);
+      {
+        // Loop through the cache of communicators for NCCL errors.
+        std::lock_guard<std::mutex> lock(mutex_);
+        bool is_failure = false;
+        std::exception_ptr ncclErrorException;
+        for (auto& it : devNCCLCommMap_) {
+          auto devicesKey = it.first;
+          auto& ncclComms = it.second;
 
-      bool is_failure = false;
-      std::exception_ptr ncclErrorException;
-      for (auto& it : devNCCLCommMap_) {
-        auto devicesKey = it.first;
-        auto& ncclComms = it.second;
+          for (const auto& ncclComm : ncclComms) {
+            allCommIds.emplace(buildNcclUniqueIdStr(ncclComm->getNcclId()));
+          }
+          ncclErrorException = checkForNCCLErrors(ncclComms);
 
-        for (const auto& ncclComm : ncclComms) {
-          allCommIds.emplace(buildNcclUniqueIdStr(ncclComm->getNcclId()));
-        }
-        ncclErrorException = checkForNCCLErrors(ncclComms);
-
-        if (ncclErrorException) {
-          is_failure = true;
-          break;
+          if (ncclErrorException) {
+            is_failure = true;
+            break;
+          }
         }
       }
 
       std::string failure_flag_key = "failure_flag";
       // the "if" is necessary
-      if (!devNCCLCommMap_.empty() && check_store) {
-        std::lock_guard<std::mutex> lock(store_mutex_);
-        auto get_value = store_->get(failure_flag_key);
+      if (!devNCCLCommMap_.empty()) {
+        auto get_value = store_->get_without_prefix(failure_flag_key);
         if (get_value[0] == 1) {
           is_failure = true;
         }
       }
 
-      LOG(ERROR) << "local_failure_flag = " << local_failure_flag.load();
-      if (local_failure_flag.load()) {
-        is_failure = true;
-      }
-
       if (is_failure) {
+        std::lock_guard<std::mutex> lock(mutex_);
         if (ncclErrorException) {
           LOG(ERROR)
               << "[Rank " << rank_
               << "] Received NCCL errors for communicators in the cache: \n"
               << "NCCL error: \n"
               << getExceptionMsgFromExceptionPtr(ncclErrorException);
-        } else if (local_failure_flag.load()) {
-          LOG(ERROR)
-              << "[Rank " << rank_
-              << "] Received NCCL errors for communicators from other process groups in the same machine\n";
         } else {
           LOG(ERROR)
               << "[Rank " << rank_
@@ -667,13 +647,10 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal(bool check_store) {
         }
 
         // inform other workers about the failure
-        if (check_store) {
-          std::lock_guard<std::mutex> lock(store_mutex_);
+        {
           std::vector<uint8_t> value = {1};
-          store_->set(failure_flag_key, value);
+          store_->set_without_prefix(failure_flag_key, value);
         }
-	// inform other process groups in the same worker about the failure
-        local_failure_flag = true;
 
         LOG(ERROR) << "[Rank " << rank_ << "] Aborting all communicators";
 
@@ -723,7 +700,6 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal(bool check_store) {
 
         if (rank_ == 0) {
           // delete the key in the store to avoid race condition
-          std::lock_guard<std::mutex> lock(store_mutex_);
           store_->deleteKey(std::to_string(ncclCommCounter_ - 1));
           store_->deleteP2PKeys();
         }
@@ -890,13 +866,11 @@ void ProcessGroupNCCL::broadcastUniqueNCCLID(
     storeKey = p2pKey;
   }
   if (rank_ == 0 || (isP2POp(opType) && p2pRank == 0)) {
-    std::lock_guard<std::mutex> lock(store_mutex_);
     auto vec = std::vector<uint8_t>(
         reinterpret_cast<uint8_t*>(ncclID),
         reinterpret_cast<uint8_t*>(ncclID) + NCCL_UNIQUE_ID_BYTES);
     store_->set(storeKey, vec);
   } else {
-    std::lock_guard<std::mutex> lock(store_mutex_);
     auto vec = store_->get(storeKey);
     TORCH_CHECK(vec.size() == NCCL_UNIQUE_ID_BYTES);
     std::memcpy(ncclID, vec.data(), vec.size());
@@ -947,9 +921,8 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
   }
 
   if (rank_ == 0 && !hasInitFailureFlag_) {
-    std::lock_guard<std::mutex> lock(store_mutex_);
     std::vector<uint8_t> value = {0};
-    store_->set("failure_flag", value);
+    store_->set_without_prefix("failure_flag", value);
     hasInitFailureFlag_ = true;
   }
 

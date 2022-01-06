@@ -33,6 +33,10 @@ class Store : public torch::CustomClassHolder {
       const std::string& key,
       const std::vector<uint8_t>& value) = 0;
 
+  virtual void set_without_prefix(
+      const std::string& key,
+      const std::vector<uint8_t>& value) {};
+
   virtual std::vector<uint8_t> compareSet(
       const std::string& key,
       const std::vector<uint8_t>& currentValue,
@@ -42,6 +46,8 @@ class Store : public torch::CustomClassHolder {
 
   virtual std::vector<uint8_t> get(const std::string& key) = 0;
 
+  virtual std::vector<uint8_t> get_without_prefix(const std::string& key) {return {};};
+  
   virtual int64_t add(const std::string& key, int64_t value) = 0;
 
   virtual bool deleteKey(const std::string& key) = 0;
