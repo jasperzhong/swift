@@ -241,13 +241,13 @@ def main():
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
 
-    # profile some data first
-    print("start to profile compute time")
-    warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 10)
-    print("End up profile")
+    # # profile some data first
+    # print("start to profile compute time")
+    # warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 10)
+    # print("End up profile")
     
-    # fault_tolerance_train(config, train_iter, model, optimizer,
-    #                       data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
+    fault_tolerance_train(config, train_iter, model, optimizer,
+                          data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
 
 
 if __name__ == '__main__':
