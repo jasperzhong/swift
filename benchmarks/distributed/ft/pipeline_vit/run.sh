@@ -30,8 +30,7 @@ cmd="python3 -m torch.distributed.run \
 
 LOGGING_ARGS="
 	--logging \
-	--logging-dfs s3 \
-	--logging-s3-bucket yczhong-swift \
+	--logging-dfs hdfs \
 	--logging-group-size ${LOGGING_GROUP_SIZE}"
 
 if [[ $PARALLEL_RECOVERY -eq 1 ]]; then
