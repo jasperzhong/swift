@@ -352,6 +352,10 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     else:
         filename = _get_checkpoint_path(config)
         load_checkpoint(filename, ts, model, optimizer)
+        if lr_scheduler:
+                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
+                logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
 
     return ts, model, optimizer, lr_scheduler, consensus_value, callback
 
@@ -434,13 +438,78 @@ def checksum(ts, model, optimizer):
     with open("debug.log", "a") as f:
         f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
+def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_machines=16, workers_per_machine=8):
+    # TODO: check how to read the file
+    recovery_time = []
+    activation_size = []
+    for i in range(num_machines - 1):
+        with open(f"{workload}_compute_time_{i}.txt", "r") as f:
+            recovery_time.append(float(f.read()))
+        with open(f"{workload}_activation_size_{i}.txt", "r") as f:
+            activation_size.append(int(f.read()))
+
+    with open(f"{workload}_compute_time_{num_machines - 1}.txt", "r") as f:
+            recovery_time.append(float(f.read()))
+    
+    activation_sum = sum(activation_size)
+    group_size = len(recovery_time)
+    assert group_size == num_machines, "initial group size must be equal to num of machines"
+    group = [i for i in range(group_size)]
+    while threshold > activation_sum:
+        min_r_m = float('inf')
+        merge_id = -1
+        min_r_merge = 0
+        min_m_merge = 0
+        for i in range(group_size - 1):
+            r_merge = recovery_time[i] + recovery_time[i + 1] + activation_size[i] / bandwidth
+            delta_m = activation_size[i] * checkpoint_interval
+            delta_r = r_merge * 2 * workers_per_machine / num_machines \
+                        - recovery_time[i] * workers_per_machine / num_machines \
+                        - recovery_time[i + 1] * workers_per_machine / num_machines
+
+            r_m = delta_r / delta_m
+            if r_m < min_r_m:
+                min_r_m = r_m
+                merge_id = i
+                min_r_merge = r_merge
+                min_m_merge = delta_m
+
+        # udpate recovery time
+        recovery_time[merge_id] = min_r_merge
+        activation_sum -= min_m_merge
+        group[merge_id] = group[merge_id].extend(group[merge_id + 1])
+        del group[merge_id + 1]
+        del activation_size[merge_id]
+        del recovery_time[merge_id + 1] 
+        group_size -= 1
+    
+    print(f"the merged group is {group}")
+    return group        
+
+def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_scheduler, warmup_iters, workload):
+    sum = 0
+    for _ in range(warmup_iters):
+        _, compute_time_sum = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
+        sum += compute_time_sum
+    
+    # TODO: check how to write the file
+    # TODO: check the logging size
+    with open(f"{workload}_compute_time_{1}.txt", "a") as f:
+        f.write(f"{sum / warmup_iters} \n")
+
+
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
                           lr_scheduler, reset_data_iterator_func, fault_tolerance_val=None, test_loader=None):
     global init_time
     global recovery_time
     setup(config)
 
-    base_time = time.time()
+    if os.path.exists("./base_time.log") and get_rank() == 4:
+        with open("base_time.log", "r") as f:
+            base_time = float(f.read())
+    else:
+        base_time = time.time()
+    
     ts = Timestamp(0)
     distributed_c10d._ts = ts
     filename = _get_checkpoint_path(config)
@@ -479,10 +548,10 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             filename = _get_checkpoint_path(config)
                             checkpoint(filename, ts, model, optimizer)
 
-                        loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
+                        loss, _ = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
                         iteration_time = time.time() - start
                         iter_time_avg += iteration_time
-                        throughput = config.batch_size / iteration_time
+                        throughput = config.batch_size / iteration_time * parallel_recovery_data_parallel_size()
                         throughput_avg += throughput
                         ts += 1
                         num += 1
@@ -498,7 +567,9 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                     ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value)
                                 logger.info(info)
 
-                        if ts % config.print_freq == 0 and get_rank() == 0:
+
+                        # TODO: logging throughput, parallel, on failure worker
+                        if ts % config.print_freq == 0 and get_rank() in [0, 4] :
                             write = "{} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time() - base_time, throughput, throughput_avg / ts._value)
                             with open(f"main_throughput_{get_rank()}.txt", "a") as f:

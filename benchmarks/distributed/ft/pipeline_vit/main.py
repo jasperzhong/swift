@@ -16,7 +16,7 @@ import torch
 import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributed.fault_tolerance import FaultToleranceConfig, fault_tolerance_train
+from torch.distributed.fault_tolerance import FaultToleranceConfig, fault_tolerance_train, warmup_profile
 
 logging.basicConfig(level=logging.INFO)
 

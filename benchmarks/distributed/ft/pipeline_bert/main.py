@@ -11,7 +11,7 @@ import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributed.fault_tolerance import (FaultToleranceConfig,
-                                               fault_tolerance_train)
+                                               fault_tolerance_train, warmup_profile)
 from torch.utils.data import (DataLoader, Dataset, SequentialSampler)
 
 from model import PipelineParallelBert
@@ -191,12 +191,12 @@ def reset_data_iterator(data_loader, ts):
 def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler):
     start = time.time()
     optimizer.zero_grad()
-    loss = pipedream_flush_schedule(
+    loss, compute_time_sum = pipedream_flush_schedule(
         data_iterator, model, loss_func)
     torch.cuda.synchronize()
     optimizer.step()
     iteration_time = time.time() - start
-    return loss
+    return loss, compute_time_sum
 
 
 def main():
@@ -237,6 +237,11 @@ def main():
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
+
+    # profile some data first
+    warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 10)
+    print("End up profile")
+    
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
 
