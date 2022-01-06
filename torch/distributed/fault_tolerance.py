@@ -776,7 +776,8 @@ def checkpoint(filename, ts, model, optimizer, garbage_collection=True):
         ckpt = torch.load(filename)
         if ts <= ckpt['ts']:
             logger.info("checkpoint aborted because there is already a newer checkpoint")
-            load_checkpoint(filename, ts, model, optimizer)
+            # do not load checkpoint here!!!
+            # load_checkpoint(filename, ts, model, optimizer)
             return
 
     torch.save({
