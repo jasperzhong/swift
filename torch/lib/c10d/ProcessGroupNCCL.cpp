@@ -602,10 +602,10 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
     std::unordered_set<std::string> allCommIds;
 
     {
+      bool is_failure = false;
       {
         // Loop through the cache of communicators for NCCL errors.
         std::lock_guard<std::mutex> lock(mutex_);
-        bool is_failure = false;
         std::exception_ptr ncclErrorException;
         for (auto& it : devNCCLCommMap_) {
           auto devicesKey = it.first;
