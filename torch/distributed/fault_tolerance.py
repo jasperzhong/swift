@@ -640,7 +640,7 @@ class HDFSClient(DFSClient):
 
     def ls(self):
         result = subprocess.getoutput("hdfs dfs -ls /")
-        return [item.split(' ')[-1] for item in result.split('\n')[1:]]
+        return [item.split(' ')[-1].lstrip('/') for item in result.split('\n')[1:]]
 
     def rm(self, dfs_path):
         result = subprocess.run([self.hdfs_bin, "dfs", "-rm", "/" + dfs_path])
