@@ -20,11 +20,6 @@ from .distributed_c10d import (_failure_handler, all_gather, barrier,
                                is_local_root_rank, new_group,
                                parallel_recovery_data_parallel_size)
 
-try:
-    import boto3
-except ImportError:
-    pass
-
 
 logger = logging.getLogger(__name__)
 
@@ -644,35 +639,41 @@ class HDFSClient(DFSClient):
         result = subprocess.run([self.hdfs_bin, "dfs", "-rm", "/" + dfs_path])
 
 
-class S3Client(DFSClient):
-    def __init__(self, *args, **kwargs):
-        if "logging_bucket" in kwargs:
-            bucket = kwargs["logging_bucket"]
-        else:
-            raise ValueError("bucket not found")
+try:
+    import boto3
 
-        self.s3 = boto3.client('s3')
-        rsp = self.s3.list_buckets()
-        all_buckets = [bucket['Name'] for bucket in rsp['Buckets']]
-        assert bucket in all_buckets
-        self.bucket = bucket
+    class S3Client(DFSClient):
+        def __init__(self, *args, **kwargs):
+            if "logging_bucket" in kwargs:
+                bucket = kwargs["logging_bucket"]
+            else:
+                raise ValueError("bucket not found")
 
-    def upload(self, dfs_path, local_path):
-        self.s3.upload_file(local_path, self.bucket, dfs_path)
+            self.s3 = boto3.client('s3')
+            rsp = self.s3.list_buckets()
+            all_buckets = [bucket['Name'] for bucket in rsp['Buckets']]
+            assert bucket in all_buckets
+            self.bucket = bucket
 
-    def download(self, dfs_path, local_path):
-        self.s3.download_file(self.bucket, dfs_path, local_path)
+        def upload(self, dfs_path, local_path):
+            self.s3.upload_file(local_path, self.bucket, dfs_path)
 
-    def ls(self):
-        rsp = self.s3.list_objects(Bucket=self.bucket)
-        key = 'Contents'
-        if key in rsp:
-            files = rsp[key]
-            return [file['Key'] for file in files]
-        return []
+        def download(self, dfs_path, local_path):
+            self.s3.download_file(self.bucket, dfs_path, local_path)
 
-    def rm(self, dfs_path):
-        self.s3.delete_object(Bucket=self.bucket, Key=dfs_path)
+        def ls(self):
+            rsp = self.s3.list_objects(Bucket=self.bucket)
+            key = 'Contents'
+            if key in rsp:
+                files = rsp[key]
+                return [file['Key'] for file in files]
+            return []
+
+        def rm(self, dfs_path):
+            self.s3.delete_object(Bucket=self.bucket, Key=dfs_path)
+except ImportError:
+    class S3Client(DFSClient):
+        pass
 
 
 def get_groups(group_size=None, groups=None):
