@@ -462,25 +462,26 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             cb = None
 
                         # this is okay because ts has been increased by one
-                        if ts % config.checkpoint_interval == 0 and is_local_root_rank():
+                        if ts % config.checkpoint_interval == 0:
                             filename = _get_checkpoint_path(config)
                             checkpoint(filename, ts, model, optimizer)
-                            logger.info("start validation at iteration: {}".format(ts))
-                            accu = fault_tolerance_val(config, model, test_loader, loss_func)
-                            curr_time = time.time() - base_time
-                            with open("./time_validation.txt", "a") as f:
-                                f.write(f"{ts} {curr_time} {accu}")
+
                         # checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
                     if fault_tolerance_val:
-                        # logger.info("start validation at iteration: {}".format(ts))
-                        # fault_tolerance_val(config, model, test_loader, loss_func)
+                        logger.info("start validation at iteration: {}".format(ts))
+                        accu = fault_tolerance_val(config, model, test_loader, loss_func)
+                        curr_time = time.time() - base_time
+                        with open("./time_validation.txt", "a") as f:
+                            f.write(f"{ts} {curr_time} {accu}")
                         data_iterator = reset_data_iterator_func(data_loader, 0)
             if fault_tolerance_val:
                 logger.info("Finish Training for {} iterations".format(ts))
-                fault_tolerance_val(config, model, test_loader, loss_func)
-
+                accu = fault_tolerance_val(config, model, test_loader, loss_func)
+                curr_time = time.time() - base_time
+                with open("./time_validation.txt", "a") as f:
+                    f.write(f"{ts} {curr_time} {accu}")
             break
         except SwiftInternalError as e:
             logger.info("catch an error: " + str(e))
