@@ -18,8 +18,8 @@ cmd="python3 -m torch.distributed.run \
 	--micro-batch-size 4 \
 	--global-batch-size 32 \
 	--seed 2021 \
-	-p 5 \
-	--benchmark-iters 300 \
+	-p 1 \
+	--benchmark-iters 200 \
 	/home/gmsheng/data/bert" 
 
 OMP_NUM_THREADS=8 NCCL_IB_DISABLE=1 exec $cmd

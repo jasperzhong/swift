@@ -344,6 +344,11 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
 
             callback = _cb
 
+    # global checkpointing
+    else:
+        filename = _get_checkpoint_path(config)
+        load_checkpoint(filename, ts, model, optimizer)
+
     return ts, model, optimizer, lr_scheduler, consensus_value, callback
 
 
@@ -455,10 +460,18 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         if ts._value != 0 and ts._value == consensus_value and get_rank() == 4:
                             recovery_time = time.time() - recovery_time
                             logger.info("recovery time is: {}".format(recovery_time))
+                            with open(f"main_vit_recovery_{get_rank()}.log", "a") as f:
+                                f.write(f"{ts}{init_time} {recovery_time}\n")
                         
                         # for experiment:
-                        if ts._value == 150 and get_rank() == 4:
+                        if ts._value == 150 and get_rank() == 4 and not os.path.exists("./temp.flag"):
+                            with open("temp.flag", "a") as f:
+                                f.write("Already killed\n")
                             os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
+
+                        if ts._value == config.checkpoint_interval:
+                            filename = _get_checkpoint_path(config)
+                            checkpoint(filename, ts, model, optimizer)
 
                         start = time.time()
                         loss = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
@@ -471,11 +484,22 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
                         if ts % config.print_freq == 0 and loss > 0:
                             if lr_scheduler:
-                                logger.info("[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f} lr: {}".format(
-                                    ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr()))
+                                info = "[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f} lr: {}".format(
+                                    ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr())
+                                logger.info(info)
+                                write = "{:.2f} {:.2f} {:.3f} {:.3f}\n".format(
+                                    throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value)
+                                with open(f"main_vit_throughput_{get_rank()}.log", "a") as f:
+                                    f.write(write)
+                                
                             else:
-                                logger.info("[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f}".format(
-                                    ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value))
+                                info = "[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f}".format(
+                                    ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value)
+                                logger.info(info)
+                                write = "{:.2f} {:.2f} {:.3f} {:.3f}\n".format(
+                                    throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value)
+                                with open(f"main_vit_throughput_{get_rank()}.log", "a") as f:
+                                    f.write(write)
 
                         if ts == consensus_value and cb:
                             ts, model, optimizer, lr_scheduler = cb(ts)
