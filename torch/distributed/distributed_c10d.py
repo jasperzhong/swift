@@ -3108,7 +3108,7 @@ def flush_objects_to_dfs(config):
                     # if file is not closed
                     if file:
                         file.close()
-                    os.remove(file)
+                    os.remove(path)
             logging_pairs_to_files.clear()
             logger.info("remove outdated logging files")
             continue
