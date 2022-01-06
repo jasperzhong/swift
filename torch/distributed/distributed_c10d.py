@@ -843,9 +843,16 @@ def get_world_size(group=None):
 
 def get_local_world_size():
     """
-    Returns the number of processes in the local worl group
+    Returns the number of processes in the local world group
     """
     return int(os.environ["LOCAL_WORLD_SIZE"])
+
+
+def is_local_root_rank():
+    """
+    Check if the worker is the root rank (local_rank == local_world_size - 1) in the local world group
+    """
+    return int(os.environ["LOCAL_RANK"]) == get_local_world_size() - 1
 
 
 def isend(tensor,
@@ -878,8 +885,8 @@ def isend(tensor,
     if _rank_not_in_group(group):
         return
 
-    with open("debug_%d.log" % dst, "a") as f:
-        f.write(f"{_ts} {torch.sum(tensor)}\n")
+    # with open("debug_%d.log" % dst, "a") as f:
+    #     f.write(f"{_ts} {torch.sum(tensor)}\n")
 
     # do not send back to the upstream node during recovery
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
@@ -1004,8 +1011,8 @@ def irecv(tensor,
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
-        with open("debug_recv_%d.log" % src, "a") as f:
-            f.write(f"{_ts} {torch.sum(tensor)}\n")
+        # with open("debug_recv_%d.log" % src, "a") as f:
+        #     f.write(f"{_ts} {torch.sum(tensor)}\n")
         return
 
     if _logging and _logging_gpu_tensor_queue:
@@ -1052,8 +1059,8 @@ def send(tensor,
     if _rank_not_in_group(group):
         return
 
-    with open("debug_%d.log" % dst, "a") as f:
-        f.write(f"{_ts} {torch.sum(tensor)}\n")
+    # with open("debug_%d.log" % dst, "a") as f:
+    #     f.write(f"{_ts} {torch.sum(tensor)}\n")
 
     # do not send back to the upstream node during recovery
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
@@ -1182,8 +1189,8 @@ def recv(tensor,
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
-        with open("debug_recv_%d.log" % src, "a") as f:
-            f.write(f"{_ts} {torch.sum(tensor)}\n")
+        # with open("debug_recv_%d.log" % src, "a") as f:
+        #     f.write(f"{_ts} {torch.sum(tensor)}\n")
         return
 
     if _logging and _logging_gpu_tensor_queue:
@@ -3102,9 +3109,10 @@ def flush_objects_to_dfs(config):
                     # if file is not closed
                     if file:
                         file.close()
-                    os.remove(file)
+                    os.remove(path)
+
             logging_pairs_to_files.clear()
-            logger.info("remove outdated logging files")
+            logger.info("remove outdated logging files.")
             continue
 
         ts_value, dst, tensor, event = item
@@ -3117,7 +3125,7 @@ def flush_objects_to_dfs(config):
             need_create_new_file = True
 
         if ts_value % config.logging_chunk_freq == 0:
-            idx = ts_value // config.logging_chunk_freq
+            idx = (ts_value % config.checkpoint_interval) // config.logging_chunk_freq
             # not created yet
             if idx == len(logging_pairs_to_files[key]):
                 need_create_new_file = True
@@ -3159,7 +3167,16 @@ def _open_logging_file(filename, consensus_value):
 
     while not os.path.exists(filename):
         time.sleep(0.1)
-    f = h5py.File(filename, "a")
+
+    while True:
+        try:
+            f = h5py.File(filename, "a")
+            break
+        except OSError:
+            # OSError: Unable to open file (unable to lock file, errno = 11, error message = 'Resource temporarily unavailable')
+            # this is because HDFS is uploading the file. So please wait for a while.
+            time.sleep(0.1)
+
     keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
     valid_keys = list(filter(lambda x: int(x.split(":")[0]) < consensus_value, keys))
     if _logging_parallel_recovery:

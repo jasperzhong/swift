@@ -1,12 +1,10 @@
-import getpass
 import logging
 import os
+import subprocess
 import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Queue
-
-import h5py
 
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
@@ -19,15 +17,8 @@ from .data_parallel import (DistributedOptimizer, broadcast_optimizer_state,
 from .distributed_c10d import (_failure_handler, all_gather, barrier,
                                broadcast, destroy_process_group,
                                get_local_world_size, get_rank, get_world_size,
-                               new_group, parallel_recovery_data_parallel_size)
-
-try:
-    import boto3
-except ImportError:
-    try:
-        from hdfs import InsecureClient
-    except ImportError:
-        raise ImportError("lack of boto3 or hdfs")
+                               is_local_root_rank, new_group,
+                               parallel_recovery_data_parallel_size)
 
 
 logger = logging.getLogger(__name__)
@@ -246,8 +237,15 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
             ts.broadcast(peer_failure_worker)
 
             if lr_scheduler:
+                # It seems that when last_epoch != -1, the optimizer should has initialized the `initial_lr` 
+                # but in parallel recovery, the re-built optimizer does not have that attribute, so we need
+                # to set the `initial_lr` by building it twice. 
+                # KeyError: "param 'initial_lr' is not specified in param_groups[0] when resuming an optimizer"
                 lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-                    optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
+                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=-1)
+
+                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
                 logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
 
             # 5. hijack get_rank()
@@ -419,24 +417,24 @@ def build_communication_group(config, peer_failure_worker):
             return new_group(group, group_name="src_group_rank_%d" % peer_failure_worker)
 
 
-def checksum(ts, model, optimizer):
-    model_sum = 0
-    grad_sum = 0
-    for param in model.parameters():
-        model_sum += torch.sum(param)
-        if param.grad is not None:
-            grad_sum += torch.sum(param.grad)
-
-    optimizer_sum = 0
-    for group in optimizer.param_groups:
-        for p in group['params']:
-            if p.grad is not None:
-                state = optimizer.state[p]
-                if 'momentum_buffer' in state:
-                    optimizer_sum += torch.sum(state['momentum_buffer'])
-
-    with open("debug.log", "a") as f:
-        f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
+# def checksum(ts, model, optimizer):
+#     model_sum = 0
+#     grad_sum = 0
+#     for param in model.parameters():
+#         model_sum += torch.sum(param)
+#         if param.grad is not None:
+#             grad_sum += torch.sum(param.grad)
+#
+#     optimizer_sum = 0
+#     for group in optimizer.param_groups:
+#         for p in group['params']:
+#             if p.grad is not None:
+#                 state = optimizer.state[p]
+#                 if 'momentum_buffer' in state:
+#                     optimizer_sum += torch.sum(state['momentum_buffer'])
+#
+#     with open("debug.log", "a") as f:
+#         f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
 def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_machines=16, workers_per_machine=8):
     # TODO: check how to read the file
@@ -519,7 +517,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
         data_iterator = reset_data_iterator_func(data_loader, ts)
         iter_time_avg = 0
         throughput_avg = 0
-        checksum(ts, model, optimizer)
+        # checksum(ts, model, optimizer)
         try:
             while True:
                 try:
@@ -556,7 +554,9 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         ts += 1
                         num += 1
 
-                        if ts % config.print_freq == 0 and loss > 0:
+                        # since the failure is on a basis of machines,
+                        # so only the last worker in the machine will print the loss
+                        if ts % config.print_freq == 0 and is_local_root_rank():
                             if lr_scheduler:
                                 info = "[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f} lr: {}".format(
                                     ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr())
@@ -582,7 +582,12 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             logger.info(f"parallel recovery restores from iteration {ts}")
                             cb = None
 
-                        checksum(ts, model, optimizer)
+                        # this is okay because ts has been increased by one
+                        if ts % config.checkpoint_interval == 0:
+                            filename = _get_checkpoint_path(config)
+                            checkpoint(filename, ts, model, optimizer)
+
+                        # checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
                     if fault_tolerance_val:
@@ -747,52 +752,63 @@ class DFSClient(ABC):
 
 class HDFSClient(DFSClient):
     def __init__(self, *args, **kwargs):
-        host = os.environ["MASTER_ADDR"]
-        user = getpass.getuser()
-        self.client = InsecureClient(f"http://{host}:50070", user=user)
+        # please add hdfs commannd in the PATH
+        self.hdfs_bin = "hdfs"
 
     def upload(self, dfs_path, local_path):
-        self.client.upload("/" + dfs_path, local_path, overwrite=True)
+        result = subprocess.run([self.hdfs_bin, "dfs", "-put", local_path, "/"])
+        result.check_returncode()
 
     def download(self, dfs_path, local_path):
-        self.client.download("/" + dfs_path, local_path)
+        if local_path in os.listdir():
+            # File exists
+            return
+        result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."])
+        result.check_returncode()
 
     def ls(self):
-        return self.client.list("/")
+        result = subprocess.getoutput("hdfs dfs -ls /")
+        return [item.split(' ')[-1].lstrip('/') for item in result.split('\n')[1:]]
 
     def rm(self, dfs_path):
-        self.client.delete("/" + dfs_path)
+        result = subprocess.run([self.hdfs_bin, "dfs", "-rm", "/" + dfs_path])
 
 
-class S3Client(DFSClient):
-    def __init__(self, *args, **kwargs):
-        if "logging_bucket" in kwargs:
-            bucket = kwargs["logging_bucket"]
-        else:
-            raise ValueError("bucket not found")
+try:
+    import boto3
 
-        self.s3 = boto3.client('s3')
-        rsp = self.s3.list_buckets()
-        all_buckets = [bucket['Name'] for bucket in rsp['Buckets']]
-        assert bucket in all_buckets
-        self.bucket = bucket
+    class S3Client(DFSClient):
+        def __init__(self, *args, **kwargs):
+            if "logging_bucket" in kwargs:
+                bucket = kwargs["logging_bucket"]
+            else:
+                raise ValueError("bucket not found")
 
-    def upload(self, dfs_path, local_path):
-        self.s3.upload_file(local_path, self.bucket, dfs_path)
+            self.s3 = boto3.client('s3')
+            rsp = self.s3.list_buckets()
+            all_buckets = [bucket['Name'] for bucket in rsp['Buckets']]
+            assert bucket in all_buckets
+            self.bucket = bucket
 
-    def download(self, dfs_path, local_path):
-        self.s3.download_file(self.bucket, dfs_path, local_path)
+        def upload(self, dfs_path, local_path):
+            self.s3.upload_file(local_path, self.bucket, dfs_path)
 
-    def ls(self):
-        rsp = self.s3.list_objects(Bucket=self.bucket)
-        key = 'Contents'
-        if key in rsp:
-            files = rsp[key]
-            return [file['Key'] for file in files]
-        return []
+        def download(self, dfs_path, local_path):
+            self.s3.download_file(self.bucket, dfs_path, local_path)
 
-    def rm(self, dfs_path):
-        self.s3.delete_object(Bucket=self.bucket, Key=dfs_path)
+        def ls(self):
+            rsp = self.s3.list_objects(Bucket=self.bucket)
+            key = 'Contents'
+            if key in rsp:
+                files = rsp[key]
+                return [file['Key'] for file in files]
+            return []
+
+        def rm(self, dfs_path):
+            self.s3.delete_object(Bucket=self.bucket, Key=dfs_path)
+except ImportError:
+    class S3Client(DFSClient):
+        pass
 
 
 def get_groups(group_size=None, groups=None):
@@ -895,7 +911,8 @@ def checkpoint(filename, ts, model, optimizer, garbage_collection=True):
         ckpt = torch.load(filename)
         if ts <= ckpt['ts']:
             logger.info("checkpoint aborted because there is already a newer checkpoint")
-            load_checkpoint(filename, ts, model, optimizer)
+            # do not load checkpoint here!!!
+            # load_checkpoint(filename, ts, model, optimizer)
             return
 
     torch.save({
