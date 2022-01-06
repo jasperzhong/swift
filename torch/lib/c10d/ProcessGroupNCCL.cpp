@@ -603,10 +603,10 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
 
     {
       bool is_failure = false;
+      std::exception_ptr ncclErrorException;
       {
         // Loop through the cache of communicators for NCCL errors.
         std::lock_guard<std::mutex> lock(mutex_);
-        std::exception_ptr ncclErrorException;
         for (auto& it : devNCCLCommMap_) {
           auto devicesKey = it.first;
           auto& ncclComms = it.second;
