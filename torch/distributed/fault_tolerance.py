@@ -635,6 +635,9 @@ class HDFSClient(DFSClient):
         result.check_returncode()
 
     def download(self, dfs_path, local_path):
+        if local_path in os.listdir():
+            # File exists
+            return
         result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."])
         result.check_returncode()
 
