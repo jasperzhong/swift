@@ -3,6 +3,7 @@ import logging
 import os
 import random
 import time
+from torch.distributed.distributed_c10d import is_local_root_rank
 
 import h5py
 import numpy as np
@@ -11,7 +12,7 @@ import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributed.fault_tolerance import (FaultToleranceConfig,
-                                               fault_tolerance_train, warmup_profile)
+                                               fault_tolerance_train, merge_groups, warmup_profile)
 from torch.utils.data import (DataLoader, Dataset, SequentialSampler)
 
 from model import PipelineParallelBert
@@ -222,13 +223,15 @@ def main():
     model, optimizer, lr_scheduler, loss_func = prepare_model_and_optimizer(args)
     model.cuda()
     loss_func.cuda()
-    # TODO: lr_scheduler
 
     total_iters = args.benchmark_iters
     print("total iterations: {}".format(total_iters))
     num_micro_batches = args.global_batch_size // args.micro_batch_size
     iters_per_epoch = len(data_loader) // num_micro_batches
     print("iters per epoch:{}".format(iters_per_epoch))
+
+
+    # merge_groups(workload, threshold, bandwidth, checkpoint_interval=100)
 
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
@@ -239,11 +242,12 @@ def main():
     )
 
     # profile some data first
-    warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 10)
-    print("End up profile")
+    if is_local_root_rank():
+        warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 10, "bert")
+        print("End up profile")
     
-    fault_tolerance_train(config, train_iter, model, optimizer,
-                          data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
+    # fault_tolerance_train(config, train_iter, model, optimizer,
+    #                       data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
 
 
 if __name__ == '__main__':

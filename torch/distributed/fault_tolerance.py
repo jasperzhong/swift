@@ -436,18 +436,39 @@ def build_communication_group(config, peer_failure_worker):
 #     with open("debug.log", "a") as f:
 #         f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
-def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_machines=16, workers_per_machine=8):
+def compute_logging_size(num_micro_batches, file="./profile.txt", num_machines=16):
+    workers_per_machine = get_local_world_size()
+    with open(file) as f:
+        lines = f.readlines()
+        start = workers_per_machine
+        activation_size = []
+        for i in range(num_machines - 1):
+            line = lines[start]
+            line = line.strip('\n')
+            nums = line.split(" ")
+            nums = [int(num) for num in nums]
+            sum = 1
+            for n in nums:
+                sum *= n
+            sum *= 4 # fp32
+            sum *= num_micro_batches
+            activation_size.append(sum)
+    
+    print(f"activation size: {activation_size}")
+    return activation_size
+
+def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_micro_batches, num_machines=16, workers_per_machine=8):
     # TODO: check how to read the file
     recovery_time = []
     activation_size = []
-    for i in range(num_machines - 1):
+    workers_per_machine = get_local_world_size()
+    print(f"workers_per_machine {workers_per_machine}")
+    num_machines = get_world_size() // get_local_world_size()
+    for i in range(num_machines):
         with open(f"{workload}_compute_time_{i}.txt", "r") as f:
             recovery_time.append(float(f.read()))
-        with open(f"{workload}_activation_size_{i}.txt", "r") as f:
-            activation_size.append(int(f.read()))
-
-    with open(f"{workload}_compute_time_{num_machines - 1}.txt", "r") as f:
-            recovery_time.append(float(f.read()))
+    
+    activation_size = compute_logging_size(num_micro_batches, file="./profile.txt", num_machines=num_machines)
     
     activation_sum = sum(activation_size)
     group_size = len(recovery_time)
@@ -490,9 +511,12 @@ def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_sc
         _, compute_time_sum = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
         sum += compute_time_sum
     
-    # TODO: check how to write the file
-    # TODO: check the logging size
-    with open(f"{workload}_compute_time_{1}.txt", "a") as f:
+    rank = get_rank()
+    workers_per_machine = get_local_world_size()
+    print(f"workers_per_machine {workers_per_machine}")
+    num_machines = get_world_size() // get_local_world_size()
+
+    with open(f"{workload}_compute_time_{rank // num_machines}.txt", "a") as f:
         f.write(f"{sum / warmup_iters} \n")
 
 
