@@ -498,7 +498,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                     ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value)
                                 logger.info(info)
 
-                        if ts % config.print_freq == 0 and get_rank == 0:
+                        if ts % config.print_freq == 0 and get_rank() == 0:
                             write = "{} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time() - base_time, throughput, throughput_avg / ts._value)
                             with open(f"main_throughput_{get_rank()}.txt", "a") as f:
