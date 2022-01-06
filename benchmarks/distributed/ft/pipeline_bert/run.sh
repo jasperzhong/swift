@@ -39,7 +39,7 @@ if [[ $ENABLE_LOGGING -eq 1 ]];then
 	cmd="${cmd} ${LOGGING_ARGS}"
 fi
 
-cmd="${cmd} ~/data/BERT/train"
+cmd="${cmd} ~/data/BERT/"
 
 echo $cmd
 
