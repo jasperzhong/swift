@@ -3109,8 +3109,9 @@ def flush_objects_to_dfs(config):
                     if file:
                         file.close()
                     os.remove(path)
+
             logging_pairs_to_files.clear()
-            logger.info("remove outdated logging files")
+            logger.info("remove outdated logging files.")
             continue
 
         ts_value, dst, tensor, event = item
@@ -3123,7 +3124,7 @@ def flush_objects_to_dfs(config):
             need_create_new_file = True
 
         if ts_value % config.logging_chunk_freq == 0:
-            idx = ts_value // config.logging_chunk_freq
+            idx = (ts_value % config.checkpoint_interval) // config.logging_chunk_freq
             # not created yet
             if idx == len(logging_pairs_to_files[key]):
                 need_create_new_file = True
