@@ -27,6 +27,8 @@ namespace {
 
 constexpr int kBytes = 8;
 
+std::mutex store_mutex_;
+
 // RAII helper class to manage NCCL group API and CUDA free mutex.
 // The destructor is allowed to throw since this helper class only
 // manages group and lock lifetimes.
@@ -495,12 +497,14 @@ ProcessGroupNCCL::ProcessGroupNCCL(
 void ProcessGroupNCCL::setSequenceNumberForGroup() {
   if (rank_ == 0) {
     // Create and broadcast sequence number
+    std::lock_guard<std::mutex> lock(store_mutex_);
     auto seq = 1 + rand();
     sequenceNum_ = c10d::SequenceNum(seq);
     std::vector<uint8_t> values = c10d::toVec<uint8_t>(seq, kBytes);
     store_->set(kSeqNumStoreKey, values);
   } else {
     // Read rank 0's sequence number from store.
+    std::lock_guard<std::mutex> lock(store_mutex_);
     sequenceNum_ = c10d::SequenceNum();
     store_->wait({kSeqNumStoreKey}, options_->timeout);
     std::vector<uint8_t> values = store_->get(kSeqNumStoreKey);
@@ -626,6 +630,7 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
       std::string failure_flag_key = "failure_flag";
       // the "if" is necessary
       if (!devNCCLCommMap_.empty()) {
+   	 std::lock_guard<std::mutex> lock(store_mutex_);
         auto get_value = store_->get_without_prefix(failure_flag_key);
         if (get_value[0] == 1) {
           is_failure = true;
@@ -648,6 +653,7 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
 
         // inform other workers about the failure
         {
+    	  std::lock_guard<std::mutex> lock(store_mutex_);
           std::vector<uint8_t> value = {1};
           store_->set_without_prefix(failure_flag_key, value);
         }
@@ -700,6 +706,7 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
 
         if (rank_ == 0) {
           // delete the key in the store to avoid race condition
+          std::lock_guard<std::mutex> lock(store_mutex_);
           store_->deleteKey(std::to_string(ncclCommCounter_ - 1));
           store_->deleteP2PKeys();
         }
@@ -869,8 +876,10 @@ void ProcessGroupNCCL::broadcastUniqueNCCLID(
     auto vec = std::vector<uint8_t>(
         reinterpret_cast<uint8_t*>(ncclID),
         reinterpret_cast<uint8_t*>(ncclID) + NCCL_UNIQUE_ID_BYTES);
+    std::lock_guard<std::mutex> lock(store_mutex_);
     store_->set(storeKey, vec);
   } else {
+    std::lock_guard<std::mutex> lock(store_mutex_);
     auto vec = store_->get(storeKey);
     TORCH_CHECK(vec.size() == NCCL_UNIQUE_ID_BYTES);
     std::memcpy(ncclID, vec.data(), vec.size());
@@ -921,6 +930,7 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
   }
 
   if (rank_ == 0 && !hasInitFailureFlag_) {
+    std::lock_guard<std::mutex> lock(store_mutex_);
     std::vector<uint8_t> value = {0};
     store_->set_without_prefix("failure_flag", value);
     hasInitFailureFlag_ = true;
