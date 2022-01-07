@@ -50,6 +50,7 @@ def get_microbatch_size():
 
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     start = time.time()
+    print("rank {} start forward step:".format(get_pipeline_model_parallel_rank()))
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
         images, labels = data
@@ -78,6 +79,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
 
 def backward_step(input_tensor, output_tensor, output_tensor_grad):
     start = time.time()
+    print("rank {} start backward step:".format(get_pipeline_model_parallel_rank()))
     global _cnt
     if input_tensor is not None:
         input_tensor.retain_grad()
@@ -172,23 +174,24 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
     # run warmup forward passes
     for _ in range(num_warmup_microbatches):
         input_tensor = recv_forward(model.input_shape)
+        print("rank {} end recv forward:".format(get_pipeline_model_parallel_rank()))
         output_tensor, compute_time = forward_step(data_iterator, model, input_tensor, loss_func, loss)
         compute_time_sum += compute_time
         send_forward(output_tensor)
-
+        print("rank {} end send forward:".format(get_pipeline_model_parallel_rank()))
         input_tensors.append(input_tensor)
         output_tensors.append(output_tensor)
 
     if num_microbatches_remaining > 0:
         input_tensor = recv_forward(model.input_shape)
-
+        print("rank {} end recv forward:".format(get_pipeline_model_parallel_rank()))
     # run 1F1B steady state
     for i in range(num_microbatches_remaining):
         last_iteration = (i == (num_microbatches_remaining - 1))
         output_tensor, compute_time = forward_step(data_iterator, model, input_tensor, loss_func, loss)
         compute_time_sum += compute_time
         output_tensor_grad = send_forward_recv_backward(output_tensor)
-
+        print("rank {} end send forward recv backward:".format(get_pipeline_model_parallel_rank()))
         input_tensors.append(input_tensor)
         output_tensors.append(output_tensor)
 
