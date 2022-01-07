@@ -563,19 +563,21 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         #         f.write("Already killed\n")
                         #     os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
 
-                        # this is okay because ts has been increased by one
                         start = time.time()
+                        loss, _ = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
+                        iteration_time = time.time() - start
+                        ts += 1
+                        num += 1
+                        # this is okay because ts has been increased by one
                         if ts % config.checkpoint_interval == 0:
                             filename = _get_checkpoint_path(config)
                             checkpoint(filename, ts, model, optimizer)
-
-                        loss, _ = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
+                        
                         iteration_time = time.time() - start
+
                         iter_time_avg += iteration_time
                         throughput = config.batch_size / iteration_time * parallel_recovery_data_parallel_size()
                         throughput_avg += throughput
-                        ts += 1
-                        num += 1
 
                         # since the failure is on a basis of machines,
                         # so only the last worker in the machine will print the loss
