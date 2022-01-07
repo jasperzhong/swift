@@ -160,6 +160,7 @@ def main():
     balance = [1 for _ in range(128)]
     balance[0] = 4
     balance[-1] = 2
+    print(balance)
     model = PipelineParallelViT(balance=balance)
     # model = PipelineParallelViT(balance=[5, 7, 6, 4])
     model.cuda()
