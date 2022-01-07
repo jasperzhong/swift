@@ -534,7 +534,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     else:
         base_time = time.time()
         with open("base_time.log", "a") as f:
-            f.write(base_time)
+            f.write(str(base_time))
     
     ts = Timestamp(0)
     distributed_c10d._ts = ts
