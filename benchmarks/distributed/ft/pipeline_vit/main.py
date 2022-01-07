@@ -158,7 +158,7 @@ def main():
 
     data_loader = get_data_loader(args)
     balance = [1 for _ in range(128)]
-    balance[1] = 2
+    balance[0] = 2
     balance[-1] = 3
     # print(balance)
     model = PipelineParallelViT(balance=balance)
