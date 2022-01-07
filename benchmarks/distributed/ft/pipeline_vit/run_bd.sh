@@ -22,7 +22,8 @@ cmd="python3 -m torch.distributed.run \
 	main.py \
 	--micro-batch-size 32 \
 	--global-batch-size 4096 \
-	--seed 2021 \
+	--benchmark-iters 200 \
+	--seed 42 \
 	-p 1 \
 	-j 4" 
 

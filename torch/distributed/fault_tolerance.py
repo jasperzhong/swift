@@ -551,20 +551,21 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             raise StopIteration
 
                         # failure worker back to the consensus_value and finish recovery
-                        if ts._value != 0 and ts._value == consensus_value and get_rank() == 4:
+                        if ts._value != 0 and ts._value == consensus_value and get_rank() == 8:
                             recovery_time = time.time() - recovery_time
                             logger.info("recovery time is: {}".format(recovery_time))
                             with open(f"main_recovery_{ts._value}.txt", "a") as f:
                                 f.write(f"{recovery_time}\n")
                         
                         # for experiment:
-                        if ts._value == 150 and get_rank() == 4 and not os.path.exists("./temp.flag"):
-                            with open("temp.flag", "a") as f:
-                                f.write("Already killed\n")
-                            os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
+                        # if ts._value == 150 and get_rank() == 8 and not os.path.exists("./temp.flag"):
+                        #     with open("temp.flag", "a") as f:
+                        #         f.write("Already killed\n")
+                        #     os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
 
+                        # this is okay because ts has been increased by one
                         start = time.time()
-                        if ts._value % config.checkpoint_interval == 0:
+                        if ts % config.checkpoint_interval == 0:
                             filename = _get_checkpoint_path(config)
                             checkpoint(filename, ts, model, optimizer)
 
@@ -591,7 +592,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
 
                         # TODO: logging throughput, parallel, on failure worker
-                        if ts % config.print_freq == 0 and get_rank() == 0 :
+                        if ts % config.print_freq == 0 and get_rank() in [0, 8] :
                             write = "{} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time() - base_time, throughput, throughput_avg / ts._value)
                             with open(f"main_throughput_{get_rank()}.txt", "a") as f:
@@ -604,10 +605,6 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             logger.info(f"parallel recovery restores from iteration {ts}")
                             cb = None
 
-                        # this is okay because ts has been increased by one
-                        if ts % config.checkpoint_interval == 0:
-                            filename = _get_checkpoint_path(config)
-                            checkpoint(filename, ts, model, optimizer)
 
                         # checksum(ts, model, optimizer)
                     break
