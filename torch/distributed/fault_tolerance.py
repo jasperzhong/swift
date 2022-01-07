@@ -528,13 +528,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     global recovery_time
     setup(config)
 
-    if os.path.exists("./base_time.log") and get_rank() == 0:
-        with open("base_time.log", "r") as f:
-            base_time = float(f.read())
-    else:
-        base_time = time.time()
-        with open("base_time.log", "a") as f:
-            f.write(str(base_time))
+    base_time = time.time()
     
     ts = Timestamp(0)
     distributed_c10d._ts = ts
