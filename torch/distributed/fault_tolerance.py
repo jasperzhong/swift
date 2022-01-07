@@ -528,11 +528,13 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     global recovery_time
     setup(config)
 
-    if os.path.exists("./base_time.log") and get_rank() == 4:
+    if os.path.exists("./base_time.log") and get_rank() == 0:
         with open("base_time.log", "r") as f:
             base_time = float(f.read())
     else:
         base_time = time.time()
+        with open("base_time.log", "r") as f:
+            base_time = float(f.read())
     
     ts = Timestamp(0)
     distributed_c10d._ts = ts
@@ -595,7 +597,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
 
                         # TODO: logging throughput, parallel, on failure worker
-                        if ts % config.print_freq == 0 and get_rank() in [0, 4] :
+                        if ts % config.print_freq == 0 and get_rank() == 0 :
+                            logger.info("profile the throughput")
                             write = "{} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time() - base_time, throughput, throughput_avg / ts._value)
                             with open(f"main_throughput_{get_rank()}.txt", "a") as f:
