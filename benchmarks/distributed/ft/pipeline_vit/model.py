@@ -71,12 +71,13 @@ class PipelineParallelViT(nn.Module):
                 self.vit.patch_embed.flatten,
                 self.vit.patch_embed.norm
             ),
-            Tokens(
-                self.vit.cls_token,
-                self.vit.dist_token),
-            PosEmb(
-                self.vit.pos_embed,
-                self.vit.pos_drop),
+            nn.Sequential(
+                Tokens(
+                    self.vit.cls_token,
+                    self.vit.dist_token),
+                PosEmb(
+                    self.vit.pos_embed,
+                    self.vit.pos_drop)),
             *(self.vit.blocks),
             self.vit.norm,
             Cls(
