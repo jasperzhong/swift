@@ -528,7 +528,13 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     global recovery_time
     setup(config)
 
-    base_time = time.time()
+    if not os.path.exists("time.log"):
+        base_time = time.time()
+        with open("time.log", "w") as f:
+            f.write(str(base_time))
+    else:
+        with open("time.log", "r") as f:
+            base_time = float(f.read())
     
     ts = Timestamp(0)
     distributed_c10d._ts = ts
@@ -558,10 +564,10 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 f.write(f"{recovery_time}\n")
                         
                         # for experiment:
-                        # if ts._value == 150 and get_rank() == 8 and not os.path.exists("./temp.flag"):
-                        #     with open("temp.flag", "a") as f:
-                        #         f.write("Already killed\n")
-                        #     os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
+                        if ts._value == 150 and get_rank() == 8 and not os.path.exists("./temp.flag"):
+                            with open("temp.flag", "a") as f:
+                                f.write("Already killed\n")
+                            os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
 
                         start = time.time()
                         loss, _ = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
