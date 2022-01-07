@@ -1,10 +1,10 @@
 #!/bin/bash
 
 NNODES=2
-NPROC_PER_NODE=2
-MASTER_IP=10.28.1.27
+NPROC_PER_NODE=8
+MASTER_IP=192.168.64.18
 MASTER_PORT=1234
-export NCCL_SOCKET_IFNAME=enp94s0
+export NCCL_SOCKET_IFNAME=eth2
 
 ENABLE_LOGGING=${1:-0}
 LOGGING_GROUP_SIZE=${2:-${NPROC_PER_NODE}}
@@ -40,7 +40,7 @@ if [[ $ENABLE_LOGGING -eq 1 ]];then
 	cmd="${cmd} ${LOGGING_ARGS}"
 fi
 
-cmd="${cmd} ~/data/ILSVRC2012"
+cmd="${cmd} /data2/data/ILSVRC2012"
 
 echo $cmd
 

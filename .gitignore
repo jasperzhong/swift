@@ -309,3 +309,5 @@ core.*
 *.ckpt
 *.log
 profile.txt
+*.cache
+*.txt

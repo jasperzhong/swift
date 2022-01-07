@@ -113,7 +113,7 @@ def reset_data_iterator(data_loader, ts):
 def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
     start = time.time()
     optimizer.zero_grad()
-    loss = pipedream_flush_schedule(
+    loss, compute_time = pipedream_flush_schedule(
         data_iterator, model, loss_func)
     torch.cuda.synchronize()
     if type(optimizer).__name__ == "DistributedOptimizer":
@@ -129,7 +129,7 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
     if lr_scheduler is not None:
         lr_scheduler.step()
     iteration_time = time.time() - start
-    return loss
+    return loss, compute_time
 
 def get_lr_scheduler(optimizer, total_iters, args):
     warm_up_with_cosine_lr = lambda iter: iter / args.warm_up_iters if iter <= args.warm_up_iters \
