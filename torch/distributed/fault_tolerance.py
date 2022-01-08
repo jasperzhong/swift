@@ -486,7 +486,7 @@ def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_micro_
     activation_sum = sum(activation_size)
     group_size = len(recovery_time)
     assert group_size == num_machines, "initial group size must be equal to num of machines"
-    group = [i for i in range(group_size)]
+    group = [[i] for i in range(group_size)]
     while threshold > activation_sum:
         min_r_m = float('inf')
         merge_id = -1

@@ -47,12 +47,12 @@ def get_microbatch_size():
 
 # TODO:
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
-    start = time.time()
     # all need to get the data
     data = next(data_iterator)
     batch = [t.cuda() for t in data]
     input_ids, segment_ids, input_mask, masked_lm_labels, next_sentence_labels = batch
 
+    start = time.time()
     if is_pipeline_first_stage():
         assert input_tensor is None
         output_tensor = model(input_ids, segment_ids, input_mask)

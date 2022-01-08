@@ -52,7 +52,6 @@ def get_microbatch_size():
 
 
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
-    start = time.time()
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
         images, labels = data
@@ -65,7 +64,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     if is_pipeline_first_stage():
         assert input_tensor is None
         input_tensor = images
-
+    start = time.time()
     output_tensor = model(input_tensor)
 
     if is_pipeline_last_stage():
