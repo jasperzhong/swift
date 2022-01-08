@@ -526,9 +526,12 @@ def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_sc
         sum += compute_time_sum
     
     rank = get_rank()
+    workers_per_machine = get_local_world_size()
+    print(f"workers_per_machine {workers_per_machine}")
+    num_machines = get_world_size() // get_local_world_size()
 
     if is_local_root_rank():
-        with open(f"profile/compute_time_{rank}.txt", "a") as f:
+        with open(f"compute_time_{rank // num_machines}.txt", "a") as f:
             f.write(f"{sum / warmup_iters} \n")
 
 
