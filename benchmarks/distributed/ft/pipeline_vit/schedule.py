@@ -1,5 +1,7 @@
 import torch
 import time
+import torch.nn as nn
+from torchvision import datasets, transforms
 _GLOBAL_ARGS = None
 
 _cnt = 0
@@ -47,8 +49,18 @@ def get_microbatch_size():
     global _GLOBAL_ARGS
     return _GLOBAL_ARGS.micro_batch_size
 
+def get_transform_func():
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+    transform = nn.Sequential(
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+        normalize
+    )
+    return transform
 
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
+    transforms = get_transform_func()
     start = time.time()
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
@@ -56,6 +68,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
 
         if is_pipeline_first_stage():
             images = images.cuda()
+            images = transforms(images)
         elif is_pipeline_last_stage():
             labels = labels.cuda()
 

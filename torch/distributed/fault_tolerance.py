@@ -576,8 +576,10 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         num += 1
                         # this is okay because ts has been increased by one
                         if ts % config.checkpoint_interval == 0:
+                            checkpoint_start = time.time()
                             filename = _get_checkpoint_path(config)
                             checkpoint(filename, ts, model, optimizer)
+                            logger.info("checkpoint time is {}".format(time.time() - checkpoint_start))
                         
                         iteration_time = time.time() - start
 

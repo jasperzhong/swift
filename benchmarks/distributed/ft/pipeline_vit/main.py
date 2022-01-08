@@ -10,6 +10,7 @@ import numpy as np
 from schedule import (get_num_microbatches, initialize_global_args,
                       is_pipeline_first_stage, is_pipeline_last_stage,
                       pipedream_flush_schedule)
+from torch.utils.data import dataset
 from torchvision import datasets, transforms
 
 import torch
@@ -77,17 +78,10 @@ initialize_global_args(args)
 
 def get_data_loader(args):
     traindir = os.path.join(args.data, 'train')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
 
     train_dataset = datasets.ImageFolder(
         traindir,
-        transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
-        ]))
+        transforms.ToTensor())
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.micro_batch_size, shuffle=True,

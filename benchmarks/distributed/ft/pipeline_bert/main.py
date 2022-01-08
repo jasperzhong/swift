@@ -156,6 +156,9 @@ class BertPretrainingCriterion(torch.nn.Module):
 
 def prepare_model_and_optimizer(args):
 
+    balance = [1 for _ in range(128)]
+    balance[0] = 2
+    balance[-1] = 3
     model = PipelineParallelBert(
         rank=torch.distributed.get_rank(),
         balance=None
