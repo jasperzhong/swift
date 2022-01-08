@@ -47,7 +47,7 @@ def _download_logging_files(logging_files):
             time.sleep(0.1)
 
 def _whether_to_upload_logging_files(groups, failure_workers):
-    pairs = groups_to_pairs(config.groups)
+    pairs = groups_to_pairs(groups)
     rank = get_rank()
     for pair in pairs:
         if rank in pair:
