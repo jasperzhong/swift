@@ -81,8 +81,10 @@ def get_data_loader(args):
 
     train_dataset = datasets.ImageFolder(
         traindir,
-        transforms.RandomResizedCrop(224),
-        transforms.ToTensor())
+        transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.ToTensor()
+        ]))
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.micro_batch_size, shuffle=True,
