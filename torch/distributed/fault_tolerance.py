@@ -449,8 +449,8 @@ def build_communication_group(config, peer_failure_worker):
 #     with open("debug.log", "a") as f:
 #         f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
-def compute_logging_size(num_micro_batches, file="./profile.txt", num_machines=16):
-    workers_per_machine = get_local_world_size()
+def compute_logging_size(num_micro_batches, file="/data2/repos/swift/benchmarks/distributed/ft/pipeline_vit/profile.txt", num_machines=16):
+    workers_per_machine = 8
     with open(file) as f:
         lines = f.readlines()
         start = workers_per_machine
