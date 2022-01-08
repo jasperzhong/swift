@@ -75,7 +75,7 @@ class SequentialSamplerFromIdx(Sampler):
     """
 
     def __init__(self, data_source, start_idx):
-        super().__init__()
+        super().__init__(data_source)
         self.data_source = data_source
         self.start_idx = start_idx
 
@@ -102,7 +102,7 @@ class RandomSamplerFromIdx(Sampler):
     replacement: bool
 
     def __init__(self, data_source, start_idx):
-        super().__init__()
+        super().__init__(data_source)
         self.data_source = data_source
         self.start_idx = start_idx
 
