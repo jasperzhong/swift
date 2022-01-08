@@ -46,6 +46,15 @@ def _download_logging_files(logging_files):
                     logging_files[i].remove(file)
             time.sleep(0.1)
 
+def _whether_to_upload_logging_files(groups, failure_workers):
+    pairs = groups_to_pairs(config.groups)
+    rank = get_rank()
+    for pair in pairs:
+        if rank in pair:
+            for failure_worker in failure_workers:
+                if failure_worker in pair:
+                    return True
+    return False
 
 def _get_checkpoint_path(config):
     rank = get_rank()
@@ -174,6 +183,10 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
         # for failure worker
         ts._value = consensus_value
     elif config.logging:
+        # upload needed logging files
+        if _whether_to_upload_logging_files(config.groups, failure_workers):
+            distributed_c10d._logging_cpu_tensor_queue.put("flush")
+
         need_recovery = _need_recovery(config.groups, failure_workers)
         if need_recovery:
             filename = _get_checkpoint_path(config)
