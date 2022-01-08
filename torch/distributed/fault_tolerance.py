@@ -543,7 +543,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     while True:
         ts, model, optimizer, lr_scheduler, consensus_value, cb = recovery(config, ts, model, optimizer, lr_scheduler)
         s = time.time()
-        data_iterator = reset_data_iterator_func(data_loader, ts)
+        data_iterator = reset_data_iterator_func(config, data_loader, ts)
         print("reset data iterator time is:{}".format(time.time() - s))
         iter_time_avg = 0
         throughput_avg = 0
@@ -613,7 +613,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         if ts == consensus_value and cb:
                             ts, model, optimizer, lr_scheduler = cb(ts)
                             del data_iterator
-                            data_iterator = reset_data_iterator_func(data_loader, ts)
+                            data_iterator = reset_data_iterator_func(config, data_loader, ts)
                             logger.info(f"parallel recovery restores from iteration {ts}")
                             cb = None
 
@@ -624,7 +624,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                     if fault_tolerance_val:
                         logger.info("start validation at iteration: {}".format(ts))
                         fault_tolerance_val(config, model, test_loader, loss_func)
-                        data_iterator = reset_data_iterator_func(data_loader, 0)
+                        data_iterator = reset_data_iterator_func(config, data_loader, 0)
             if fault_tolerance_val:
                 logger.info("Finish Training for {} iterations".format(ts))
                 fault_tolerance_val(config, model, test_loader, loss_func)
