@@ -107,10 +107,10 @@ def reset_data_iterator(config, data_loader, ts):
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
     train_dataset = data_loader.dataset
-    train_sampler = RandomSamplerFromIdx(train_dataset, ts._value)
+    idx = ts._value * config.num_microbatches
+    train_sampler = RandomSamplerFromIdx(train_dataset, idx)
     # data_loader.sampler = train_sampler
     micro_batch_size = config.batch_size // config.num_microbatches
-    print(f"micro_batch_size is {micro_batch_size}")
     data_loader = torch.utils.data.DataLoader(
         train_dataset, sampler=train_sampler, 
         batch_size=args.micro_batch_size,
