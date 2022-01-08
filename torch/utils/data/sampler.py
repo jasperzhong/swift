@@ -83,7 +83,7 @@ class SequentialSamplerFromIdx(Sampler):
         return iter(range(self.start_idx, len(self.data_source)))
 
     def __len__(self):
-        return len(self.data_source) - self.start_idx
+        return len(self.data_source)
 
 
 
@@ -110,15 +110,11 @@ class RandomSamplerFromIdx(Sampler):
         n = len(self.data_source)
         generator = torch.Generator()
         generator.manual_seed(int(torch.empty((), dtype=torch.int64).random_().item()))
-        exclude = [i for i in range(self.start_idx)]
         all = torch.randperm(n, generator=generator).tolist()
-        for i in exclude:
-            if i in all:
-                all.remove(i)
-        yield from all
+        yield from all[self.start_idx:]
 
     def __len__(self) -> int:
-        return len(self.data_source) - self.start_idx
+        return len(self.data_source)
 
 class RandomSampler(Sampler[int]):
     r"""Samples elements randomly. If without replacement, then sample from a shuffled dataset.
