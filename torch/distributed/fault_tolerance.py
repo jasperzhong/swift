@@ -580,11 +580,11 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             with open(f"main_recovery_{ts._value}.txt", "a") as f:
                                 f.write(f"{recovery_time}\n")
                         
-                        # for experiment:
-                        if ts._value == 300 and get_rank() == 8 and not os.path.exists("./temp.flag"):
-                            with open("temp.flag", "a") as f:
-                                f.write("Already killed\n")
-                            os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
+                        # # for experiment:
+                        # if ts._value == 300 and get_rank() == 8 and not os.path.exists("./temp.flag"):
+                        #     with open("temp.flag", "a") as f:
+                        #         f.write("Already killed\n")
+                        #     os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
 
                         start = time.time()
                         loss, _ = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
@@ -638,12 +638,17 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 except StopIteration as e:
                     if fault_tolerance_val:
                         logger.info("start validation at iteration: {}".format(ts))
-                        fault_tolerance_val(config, model, test_loader, loss_func)
-                        data_iterator = reset_data_iterator_func(config, data_loader, 0)
+                        accu = fault_tolerance_val(config, model, test_loader, loss_func)
+                        curr_time = time.time() - base_time
+                        with open("./time_validation.txt", "a") as f:
+                            f.write(f"{ts} {curr_time} {accu}")
+                        data_iterator = reset_data_iterator_func(data_loader, 0)
             if fault_tolerance_val:
                 logger.info("Finish Training for {} iterations".format(ts))
-                fault_tolerance_val(config, model, test_loader, loss_func)
-
+                accu = fault_tolerance_val(config, model, test_loader, loss_func)
+                curr_time = time.time() - base_time
+                with open("./time_validation.txt", "a") as f:
+                    f.write(f"{ts} {curr_time} {accu}")
             break
         except SwiftInternalError as e:
             # init time start
