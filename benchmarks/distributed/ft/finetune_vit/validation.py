@@ -84,6 +84,8 @@ def fault_tolerance_val(config, model, test_loader, loss_func):
         logger.info("Valid Accuracy: %2.5f" % accu.avg)
 
         return accu.avg
+    
+    return 0
 
 
 def forward(config, data_iterator, model, loss_func):
