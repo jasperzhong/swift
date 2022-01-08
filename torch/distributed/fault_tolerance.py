@@ -521,18 +521,20 @@ def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_micro_
 def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_scheduler, warmup_iters):
     sum = 0
     model.train()
-    for i in range(warmup_iters):
+    for i in range(5):
         if i == 0:
             continue
+        start = time.time()
         _, compute_time_sum = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
-        sum += compute_time_sum
+        print(f"compute_time_sum:{compute_time_sum}")
+        print(f"all time {time.time() - start}")
     
     rank = get_rank()
     workers_per_machine = get_local_world_size()
 
     if is_local_root_rank():
         with open(f"profile/compute_time_{rank // workers_per_machine}.txt", "a") as f:
-            f.write(f"{sum / warmup_iters} \n")
+            f.write(f"{compute_time_sum} \n")
 
 
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
