@@ -19,6 +19,7 @@ from model import PipelineParallelBert
 from schedule import (get_num_microbatches,
                       initialize_global_args, is_pipeline_first_stage,
                       is_pipeline_last_stage, pipedream_flush_schedule)
+from torch.utils.data.sampler import RandomSamplerFromIdx
 
 logging.basicConfig(level=logging.INFO)
 
@@ -177,18 +178,31 @@ def prepare_model_and_optimizer(args):
 
     return model, optimizer, None, loss_func
 
+def create_pretraining_dataset(args):
+    data_file = handle_train_dir(args)
+    train_data = pretraining_dataset(input_file=data_file, max_pred_length=args.max_predictions_per_seq)
+    train_sampler = SequentialSampler(train_data)
+    train_dataloader = DataLoader(train_data, sampler=train_sampler,
+                                  batch_size=args.micro_batch_size,
+                                  num_workers=args.workers, pin_memory=True)
+    return train_dataloader
 
-def reset_data_iterator(data_loader, ts):
+def reset_data_iterator(config, data_loader, ts):
     if args.seed is not None:
         random.seed(args.seed)
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
+    train_dataset = data_loader.dataset
+    idx = ts._value * config.num_microbatches * args.micro_batch_size
+    train_sampler = RandomSamplerFromIdx(train_dataset, idx)
+    data_loader = torch.utils.data.DataLoader(
+        train_dataset, sampler=train_sampler, 
+        batch_size=args.micro_batch_size,
+        num_workers=32, pin_memory=True
+    )
     data_iterator = iter(data_loader)
-    for _ in range(ts):
-        if is_pipeline_first_stage() or is_pipeline_last_stage():
-            for _ in range(get_num_microbatches()):
-                next(data_iterator)
+
     return data_iterator
 
 

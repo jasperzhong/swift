@@ -526,12 +526,9 @@ def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_sc
         sum += compute_time_sum
     
     rank = get_rank()
-    workers_per_machine = get_local_world_size()
-    print(f"workers_per_machine {workers_per_machine}")
-    num_machines = get_world_size() // get_local_world_size()
 
     if is_local_root_rank():
-        with open(f"compute_time_{rank // num_machines}.txt", "a") as f:
+        with open(f"profile/compute_time_{rank}.txt", "a") as f:
             f.write(f"{sum / warmup_iters} \n")
 
 
@@ -579,7 +576,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 f.write(f"{recovery_time}\n")
                         
                         # for experiment:
-                        if ts._value == 150 and get_rank() == 8 and not os.path.exists("./temp.flag"):
+                        if ts._value == 300 and get_rank() == 8 and not os.path.exists("./temp.flag"):
                             with open("temp.flag", "a") as f:
                                 f.write("Already killed\n")
                             os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
