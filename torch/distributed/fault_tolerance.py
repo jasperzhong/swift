@@ -542,7 +542,9 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     checkpoint(filename, ts, model, optimizer)
     while True:
         ts, model, optimizer, lr_scheduler, consensus_value, cb = recovery(config, ts, model, optimizer, lr_scheduler)
+        s = time.time()
         data_iterator = reset_data_iterator_func(data_loader, ts)
+        print("reset data iterator time is:{}".format(time.time() - s))
         iter_time_avg = 0
         throughput_avg = 0
         # checksum(ts, model, optimizer)

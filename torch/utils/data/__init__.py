@@ -1,5 +1,5 @@
 from torch.utils.data.sampler import \
-    (Sampler, SequentialSampler, RandomSampler,
+    (Sampler, SequentialSampler, RandomSampler, SequentialSamplerFromIdx, RandomSamplerFromIdx,
      SubsetRandomSampler, WeightedRandomSampler, BatchSampler)
 from torch.utils.data.dataset import \
     (Dataset, IterableDataset, TensorDataset, ConcatDataset, ChainDataset,
@@ -12,7 +12,7 @@ from torch.utils.data._decorator import \
      argument_validation, runtime_validation_disabled, runtime_validation)
 
 
-__all__ = ['Sampler', 'SequentialSampler', 'RandomSampler',
+__all__ = ['Sampler', 'SequentialSampler', 'RandomSampler', 'SequentialSamplerFromIdx', 'RandomSamplerFromIdx',
            'SubsetRandomSampler', 'WeightedRandomSampler', 'BatchSampler',
            'DistributedSampler', 'Dataset', 'IterableDataset', 'TensorDataset',
            'ConcatDataset', 'ChainDataset', 'Subset', 'random_split',

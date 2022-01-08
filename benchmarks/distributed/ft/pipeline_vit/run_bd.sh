@@ -13,6 +13,7 @@ PARALLEL_RECOVERY=${3:-0}
 rm -rf *.h5
 rm -rf *.log
 rm -rf *.ckpt
+rm -rf *.flag
 hdfs dfs -rm -r "/*"
 
 cmd="python3 -m torch.distributed.run \
