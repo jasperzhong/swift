@@ -644,7 +644,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         if is_pipeline_last_stage():
                             with open("./time_validation.txt", "a") as f:
                                 f.write(f"{ts} {curr_time} {accu}")
-                        data_iterator = reset_data_iterator_func(data_loader, 0)
+                        data_iterator = reset_data_iterator_func(config, data_loader, ts)
             if fault_tolerance_val:
                 logger.info("Finish Training for {} iterations".format(ts))
                 accu = fault_tolerance_val(config, model, test_loader, loss_func)
