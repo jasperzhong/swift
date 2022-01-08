@@ -10,7 +10,6 @@ import numpy as np
 from schedule import (get_num_microbatches, initialize_global_args,
                       is_pipeline_first_stage, is_pipeline_last_stage,
                       pipedream_flush_schedule)
-from torch.utils.data import dataset
 from torchvision import datasets, transforms
 
 import torch
@@ -18,6 +17,7 @@ import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributed.fault_tolerance import FaultToleranceConfig, fault_tolerance_train, warmup_profile
+from torch.utils.data.sampler import RandomSamplerFromIdx
 
 logging.basicConfig(level=logging.INFO)
 
@@ -78,16 +78,23 @@ initialize_global_args(args)
 
 def get_data_loader(args):
     traindir = os.path.join(args.data, 'train')
-
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+                            
     train_dataset = datasets.ImageFolder(
         traindir,
         transforms.Compose([
             transforms.RandomResizedCrop(224),
-            transforms.ToTensor()
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
         ]))
 
+    train_sampler = RandomSamplerFromIdx(train_dataset, 0)
+
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.micro_batch_size, shuffle=True,
+        train_dataset, sampler=train_sampler, 
+        batch_size=args.micro_batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True
     )
     return train_loader
@@ -99,11 +106,11 @@ def reset_data_iterator(data_loader, ts):
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
+    train_dataset = data_loader.dataset
+    train_sampler = RandomSamplerFromIdx(train_dataset, ts._value)
+    data_loader.sampler = train_sampler
     data_iterator = iter(data_loader)
-    for _ in range(ts):
-        if is_pipeline_first_stage() or is_pipeline_last_stage():
-            for _ in range(get_num_microbatches()):
-                next(data_iterator)
+    
     return data_iterator
 
 
