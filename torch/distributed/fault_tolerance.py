@@ -22,6 +22,8 @@ from .distributed_c10d import (_failure_handler, all_gather, barrier,
 
 logger = logging.getLogger(__name__)
 
+_download_logging_files_thread = None
+
 
 def _need_recovery(groups, failure_workers):
     rank = get_rank()
@@ -77,11 +79,13 @@ class FileInfo:
 
 
 def _set_recovery_mask(config, ts, consensus_value):
+    global _download_logging_files_thread
     logging_files = get_logging_files(config, ts, consensus_value)
     if logging_files and logging_files[0]:
         logger.info(f"logging_files: {logging_files}")
-        download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
-        download_thread.start()
+        _download_logging_files_thread = threading.Thread(
+            target=_download_logging_files, args=(logging_files, ), daemon=True)
+        _download_logging_files_thread.start()
 
 
 class FaultToleranceConfig:
@@ -139,6 +143,7 @@ recovery_time = 0
 def recovery(config, ts, model, optimizer, lr_scheduler=None):
     global init_time
     global recovery_time
+    global _download_logging_files_thread
 
     callback = None
     consensus_value, need_undo, failure_workers = ts.sync()
@@ -291,11 +296,11 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
 
                 logging_files = get_logging_files_for_parallel_recovery(config, ts, consensus_value,
                                                                         peer_failure_worker)
-                if logging_files:
+                if logging_files and logging_files[0]:
                     logger.info(f"logging_files: {logging_files}")
-                    download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
-                                                       daemon=True)
-                    download_thread.start()
+                    _download_logging_files_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
+                                                                      daemon=True)
+                    _download_logging_files_thread.start()
 
             def _cb(ts):
                 nonlocal model
@@ -555,6 +560,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                           lr_scheduler, reset_data_iterator_func, fault_tolerance_val=None, test_loader=None):
     global init_time
     global recovery_time
+    global _download_logging_files_thread
     setup(config)
 
     if not os.path.exists("time.log"):
@@ -600,6 +606,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 f.write("Already killed\n")
                             os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
 
+                        if _download_logging_files_thread:
+                            logger.info(f"_download_logging_files_thread is alive {_download_logging_files_thread.isAlive()}")
                         start = time.time()
                         loss, _ = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
                         iteration_time = time.time() - start
