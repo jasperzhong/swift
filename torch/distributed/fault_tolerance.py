@@ -289,8 +289,8 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
 
                 logging_files = get_logging_files_for_parallel_recovery(config, ts, consensus_value,
                                                                         peer_failure_worker)
-                logger.info(f"logging_files: {logging_files}")
                 if logging_files:
+                    logger.info(f"logging_files: {logging_files}")
                     download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
                                                        daemon=True)
                     download_thread.start()
