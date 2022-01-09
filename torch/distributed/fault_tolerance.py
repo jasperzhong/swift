@@ -644,6 +644,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         logger.info("start validation at iteration: {}".format(ts))
                         # fault_tolerance_val(config, model, test_loader, loss_func)
                         data_iterator = reset_data_iterator_func(config, data_loader, 0)
+                        logger.info("reset done")
+                        time.sleep(20)
             if fault_tolerance_val:
                 logger.info("Finish Training for {} iterations".format(ts))
                 fault_tolerance_val(config, model, test_loader, loss_func)
