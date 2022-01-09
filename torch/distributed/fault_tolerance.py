@@ -46,6 +46,7 @@ def _download_logging_files(logging_files):
                     logging_files[i].remove(file)
             time.sleep(0.1)
 
+
 def _whether_to_upload_logging_files(groups, failure_workers):
     pairs = groups_to_pairs(groups)
     rank = get_rank()
@@ -55,6 +56,7 @@ def _whether_to_upload_logging_files(groups, failure_workers):
                 if failure_worker in pair:
                     return True
     return False
+
 
 def _get_checkpoint_path(config):
     rank = get_rank()
@@ -121,6 +123,7 @@ def teardown(config):
         distributed_c10d._logging_cpu_tensor_queue.put(None)
         distributed_c10d._logging_thread.join()
 
+
 # profile some time
 init_time = 0
 recovery_time = 0
@@ -134,7 +137,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     consensus_value, need_undo, failure_workers = ts.sync()
     logger.info(f"consensus_value is {consensus_value}")
     # init time end
-    init_end= time.time()
+    init_end = time.time()
     init_time = init_end - init_time
     logger.info(f"init time is: {init_time}")
     # only rank 0 get the init time
@@ -251,9 +254,9 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
             ts.broadcast(peer_failure_worker)
 
             if lr_scheduler:
-                # It seems that when last_epoch != -1, the optimizer should has initialized the `initial_lr` 
+                # It seems that when last_epoch != -1, the optimizer should has initialized the `initial_lr`
                 # but in parallel recovery, the re-built optimizer does not have that attribute, so we need
-                # to set the `initial_lr` by building it twice. 
+                # to set the `initial_lr` by building it twice.
                 # KeyError: "param 'initial_lr' is not specified in param_groups[0] when resuming an optimizer"
                 lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
                     optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=-1)
@@ -365,9 +368,9 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
         filename = _get_checkpoint_path(config)
         load_checkpoint(filename, ts, model, optimizer)
         if lr_scheduler:
-                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-                    optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
-                logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
+            lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
+            logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
 
     return ts, model, optimizer, lr_scheduler, consensus_value, callback
 
@@ -464,12 +467,13 @@ def compute_logging_size(num_micro_batches, balance, file="../profile.txt", num_
             sum = 1
             for n in nums:
                 sum *= n
-            sum *= 4 # fp32
+            sum *= 4  # fp32
             sum *= num_micro_batches
             activation_size.append(sum)
-    
+
     print(f"activation size: {activation_size}")
     return activation_size
+
 
 def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_micro_batches, num_machines=16, workers_per_machine=8):
     # TODO: check how to read the file
@@ -481,9 +485,9 @@ def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_micro_
     for i in range(num_machines):
         with open(f"{workload}_compute_time_{i}.txt", "r") as f:
             recovery_time.append(float(f.read()))
-    
+
     activation_size = compute_logging_size(num_micro_batches, file="./profile.txt", num_machines=num_machines)
-    
+
     activation_sum = sum(activation_size)
     group_size = len(recovery_time)
     assert group_size == num_machines, "initial group size must be equal to num of machines"
@@ -497,8 +501,8 @@ def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_micro_
             r_merge = recovery_time[i] + recovery_time[i + 1] + activation_size[i] / bandwidth
             delta_m = activation_size[i] * checkpoint_interval
             delta_r = r_merge * 2 * workers_per_machine / num_machines \
-                        - recovery_time[i] * workers_per_machine / num_machines \
-                        - recovery_time[i + 1] * workers_per_machine / num_machines
+                - recovery_time[i] * workers_per_machine / num_machines \
+                - recovery_time[i + 1] * workers_per_machine / num_machines
 
             r_m = delta_r / delta_m
             if r_m < min_r_m:
@@ -513,11 +517,12 @@ def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_micro_
         group[merge_id] = group[merge_id].extend(group[merge_id + 1])
         del group[merge_id + 1]
         del activation_size[merge_id]
-        del recovery_time[merge_id + 1] 
+        del recovery_time[merge_id + 1]
         group_size -= 1
-    
+
     print(f"the merged group is {group}")
-    return group        
+    return group
+
 
 def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_scheduler, warmup_iters):
     sum = 0
@@ -529,7 +534,7 @@ def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_sc
         _, compute_time_sum = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
         print(f"compute_time_sum:{compute_time_sum}")
         print(f"all time {time.time() - start}")
-    
+
     rank = get_rank()
     workers_per_machine = get_local_world_size()
 
@@ -551,7 +556,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     else:
         with open("time.log", "r") as f:
             base_time = float(f.read())
-    
+
     ts = Timestamp(0)
     distributed_c10d._ts = ts
     filename = _get_checkpoint_path(config)
@@ -580,7 +585,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             logger.info("recovery time is: {}".format(recovery_time))
                             with open(f"main_recovery_{ts._value}.txt", "a") as f:
                                 f.write(f"{recovery_time}\n")
-                        
+
                         # for experiment:
                         if ts._value == 300 and get_rank() == 8 and not os.path.exists("./temp.flag"):
                             with open("temp.flag", "a") as f:
@@ -598,7 +603,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             filename = _get_checkpoint_path(config)
                             checkpoint(filename, ts, model, optimizer)
                             logger.info("checkpoint time is {}".format(time.time() - checkpoint_start))
-                        
+
                         iteration_time = time.time() - start
 
                         iter_time_avg += iteration_time
@@ -612,15 +617,14 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 info = "[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f} lr: {}".format(
                                     ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr())
                                 logger.info(info)
-                                
+
                             else:
                                 info = "[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f}".format(
                                     ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value)
                                 logger.info(info)
 
-
                         # TODO: logging throughput, parallel, on failure worker
-                        if ts % config.print_freq == 0 and get_rank() in [0, 8] :
+                        if ts % config.print_freq == 0 and get_rank() in [0, 8]:
                             write = "{} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time() - base_time, throughput, throughput_avg / ts._value)
                             with open(f"main_throughput_{get_rank()}.txt", "a") as f:
@@ -632,7 +636,6 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             data_iterator = reset_data_iterator_func(config, data_loader, ts)
                             logger.info(f"parallel recovery restores from iteration {ts}")
                             cb = None
-
 
                         # checksum(ts, model, optimizer)
                     break
@@ -804,14 +807,16 @@ class HDFSClient(DFSClient):
 
     def upload(self, dfs_path, local_path):
         result = subprocess.run([self.hdfs_bin, "dfs", "-put", local_path, "/"])
-        result.check_returncode()
+        while result.returncode() != 0:
+            result = subprocess.run([self.hdfs_bin, "dfs", "-put", local_path, "/"])
 
     def download(self, dfs_path, local_path):
         if local_path in os.listdir():
             # File exists
             return
         result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."])
-        result.check_returncode()
+        while result.returncode() != 0:
+            result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."])
 
     def ls(self):
         result = subprocess.getoutput("hdfs dfs -ls /")
