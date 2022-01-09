@@ -160,6 +160,7 @@ def send_backward_recv_forward(input_tensor_grad, dtype=torch.float32):
 def pipedream_flush_schedule(data_iterator, model, loss_func):
     compute_time_sum = 0
     num_microbatches = get_num_microbatches()
+    print(f"num_microbatches: {num_microbatches}")
     num_warmup_microbatches = get_pipeline_model_parallel_world_size() - \
         get_pipeline_model_parallel_rank() - 1
     num_microbatches_remaining = \
