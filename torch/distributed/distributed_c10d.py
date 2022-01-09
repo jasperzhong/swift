@@ -3171,7 +3171,7 @@ def _open_logging_file(filename, consensus_value):
 
     while True:
         try:
-            f = h5py.File(filename, "a")
+            f = h5py.File(filename, "r")
             break
         except OSError:
             # OSError: Unable to open file (unable to lock file, errno = 11, error message = 'Resource temporarily unavailable')
