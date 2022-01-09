@@ -52,8 +52,9 @@ def _whether_to_upload_logging_files(groups, failure_workers):
     rank = get_rank()
     for pair in pairs:
         if rank in pair:
+            peer = pair[1] if pair[0] == rank else pair[0]
             for failure_worker in failure_workers:
-                if failure_worker in pair:
+                if failure_worker == peer:
                     return True
     return False
 
@@ -72,9 +73,10 @@ class FileInfo:
 
 def _set_recovery_mask(config, ts, consensus_value):
     logging_files = get_logging_files(config, ts, consensus_value)
-    logger.info(f"logging_files: {logging_files}")
-    download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
-    download_thread.start()
+    if logging_files:
+        logger.info(f"logging_files: {logging_files}")
+        download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
+        download_thread.start()
 
 
 class FaultToleranceConfig:
@@ -189,7 +191,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     elif config.logging:
         # upload needed logging files
         if _whether_to_upload_logging_files(config.groups, failure_workers):
-            logger.info("Rank {get_rank()} should upload the logging files.")
+            logger.info(f"Rank {get_rank()} should upload the logging files.")
             distributed_c10d._logging_cpu_tensor_queue.put("flush")
 
         need_recovery = _need_recovery(config.groups, failure_workers)
@@ -822,6 +824,7 @@ class HDFSClient(DFSClient):
 
         while True:
             try:
+                logger.info(f"try to download {dfs_path}")
                 result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."], check=True)
                 break
             except Exception as e:
