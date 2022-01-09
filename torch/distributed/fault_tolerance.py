@@ -189,6 +189,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     elif config.logging:
         # upload needed logging files
         if _whether_to_upload_logging_files(config.groups, failure_workers):
+            logger.info("Rank {get_rank()} should upload the logging files.")
             distributed_c10d._logging_cpu_tensor_queue.put("flush")
 
         need_recovery = _need_recovery(config.groups, failure_workers)
