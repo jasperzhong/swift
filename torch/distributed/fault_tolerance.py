@@ -449,13 +449,13 @@ def build_communication_group(config, peer_failure_worker):
 #     with open("debug.log", "a") as f:
 #         f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
-def compute_logging_size(num_micro_batches, file="/data2/repos/swift/benchmarks/distributed/ft/pipeline_vit/profile.txt", num_machines=16):
+def compute_logging_size(num_micro_batches, balance, file="../profile.txt", num_machines=16):
     workers_per_machine = 8
     with open(file) as f:
         lines = f.readlines()
         start = workers_per_machine
         activation_size = []
-        for i in range(num_machines - 1):
+        for start in balance:
             line = lines[start]
             line = line.strip('\n')
             nums = line.split(" ")
@@ -581,7 +581,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 f.write(f"{recovery_time}\n")
                         
                         # for experiment:
-                        if ts._value == 300 and get_rank() == 8 and not os.path.exists("./temp.flag"):
+                        if ts._value == 150 and get_rank() == 8 and not os.path.exists("./temp.flag"):
                             with open("temp.flag", "a") as f:
                                 f.write("Already killed\n")
                             os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
