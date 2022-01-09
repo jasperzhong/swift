@@ -4,7 +4,7 @@ from torchvision import datasets, transforms
 
 import torch
 import torch.nn as nn
-
+import os
 _GLOBAL_ARGS = None
 
 _cnt = 0
