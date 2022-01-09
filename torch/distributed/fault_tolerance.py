@@ -808,7 +808,9 @@ class HDFSClient(DFSClient):
     def upload(self, dfs_path, local_path):
         result = subprocess.run([self.hdfs_bin, "dfs", "-put", local_path, "/"])
         while result.returncode != 0:
+            logger.info(f"upload {dfs_path} failed. returncode={result.returncode}. retry.")
             result = subprocess.run([self.hdfs_bin, "dfs", "-put", local_path, "/"])
+            time.sleep(0.1)
 
     def download(self, dfs_path, local_path):
         if local_path in os.listdir():
@@ -816,7 +818,9 @@ class HDFSClient(DFSClient):
             return
         result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."])
         while result.returncode != 0:
+            logger.info(f"download {dfs_path} failed. returncode={result.returncode}. retry.")
             result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."])
+            time.sleep(0.1)
 
     def ls(self):
         result = subprocess.getoutput("hdfs dfs -ls /")
