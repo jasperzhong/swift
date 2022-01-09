@@ -853,6 +853,7 @@ class HDFSClient(DFSClient):
             logger.info(f"download {dfs_path} failed. retry. error: {err}")
             ret, out, err = self.client.run(["-ls", "/"])
             time.sleep(0.1)
+        return [item.split(' ')[-1].lstrip('/') for item in out.split('\n')[1:-1]]
 
     def rm(self, dfs_path):
         ret, out, err = self.client.run(["-rm", "/" + dfs_path])
