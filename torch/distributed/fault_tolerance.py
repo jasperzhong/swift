@@ -205,11 +205,12 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
         ts._value = consensus_value
     elif config.logging:
         # upload needed logging files
-        if _whether_to_upload_logging_files(config.groups, failure_workers):
-            logger.info(f"Rank {get_rank()} should upload the logging files.")
-            distributed_c10d._logging_cpu_tensor_queue.put("flush")
-        else:
-            distributed_c10d._logging_cpu_tensor_queue.put("close")
+        if failure_workers:
+            if _whether_to_upload_logging_files(config.groups, failure_workers):
+                logger.info(f"Rank {get_rank()} should upload the logging files.")
+                distributed_c10d._logging_cpu_tensor_queue.put("flush")
+            elif distributed_c10d._logging_cpu_tensor_queue:
+                distributed_c10d._logging_cpu_tensor_queue.put("close")
 
         need_recovery = _need_recovery(config.groups, failure_workers)
         if need_recovery:
