@@ -28,6 +28,9 @@ from .rendezvous import register_rendezvous_handler, rendezvous  # noqa: F401
 # This module is wildcard imported from torch.distributed.
 # TODO: specify __all__
 
+# https://github.com/open-mpi/ompi/issues/6535#issuecomment-640116873
+os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
+
 
 _MPI_AVAILABLE = True
 _NCCL_AVAILABLE = True
