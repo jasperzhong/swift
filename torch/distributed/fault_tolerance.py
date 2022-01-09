@@ -826,8 +826,8 @@ class HDFSClient(DFSClient):
         ret, out, err = self.client.run(["-put", local_path, "/"])
         while ret != 0:
             logger.info(f"upload {dfs_path} failed. retry. error: {err}")
-            if err == "File exists":
-                print("break")
+            if f"{err}" == "File exists":
+                logger.info("break")
                 break
             ret, out, err = self.client.run(["-put", local_path, "/"])
             time.sleep(0.1)
@@ -841,8 +841,8 @@ class HDFSClient(DFSClient):
         ret, out, err = self.client.run(["-get", "/" + dfs_path, "."])
         while ret != 0:
             logger.info(f"download {dfs_path} failed. retry. error: {err}")
-            if err == "File exists":
-                print("break")
+            if f"{err}" == "File exists":
+                logger.info("break")
                 break
             ret, out, err = self.client.run(["-get", "/" + dfs_path, "."])
             time.sleep(0.1)
