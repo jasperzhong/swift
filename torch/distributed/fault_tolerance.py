@@ -856,7 +856,8 @@ class HDFSClient(DFSClient):
             try:
                 result = subprocess.run([self.hdfs_bin, "dfs", "-ls", "/"], stdout=subprocess.PIPE, check=True)
                 out = result.stdout.decode('utf-8')
-                return [item.split(' ')[-1].lstrip('/') for item in out.split('\n')[1:]]
+                # it seems that if it returns an empty list, it will got stuck
+                return [item.split(' ')[-1].lstrip('/') for item in out.split('\n')[1:-1]] + ['']
             except Exception as e:
                 logger.info(f"ls failed. retry. error: {e}")
                 time.sleep(0.1)
