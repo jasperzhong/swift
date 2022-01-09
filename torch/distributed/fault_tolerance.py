@@ -867,8 +867,12 @@ except ImportError:
 
 def get_groups(group_size=None, groups=None):
     workers = get_world_size()
+    workers_in_groups = []
     if groups:
-        workers_in_groups = [worker for worker in group for group in groups]
+        for group in groups:
+            for worker in group:
+                workers_in_groups.append(worker)
+        # workers_in_groups = [worker for worker in group for group in groups]
         workers_in_groups = sorted(workers_in_groups)
         all_workers = list(range(workers))
         for lhs, rhs in zip(workers_in_groups, all_workers):
