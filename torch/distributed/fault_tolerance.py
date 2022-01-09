@@ -614,7 +614,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
 
                         # this is okay because ts has been increased by one
                         # disable checkpoint when in recovery
-                        if ts % config.checkpoint_interval == 0 and not _distributed_c10d._logging_in_recovery:
+                        if ts % config.checkpoint_interval == 0 and not distributed_c10d._logging_in_recovery:
                             checkpoint_start = time.time()
                             filename = _get_checkpoint_path(config)
                             checkpoint(filename, ts, model, optimizer)
