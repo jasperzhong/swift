@@ -132,6 +132,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
 
     callback = None
     consensus_value, need_undo, failure_workers = ts.sync()
+    logger.info(f"consensus_value is {consensus_value}")
     # init time end
     init_end= time.time()
     init_time = init_end - init_time

@@ -891,7 +891,7 @@ def isend(tensor,
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
         idx, file_info_list, consensus_value = _logging_recovery_mask.get(dst)
         if _ts >= consensus_value:
-            logger.info(f"close file. src={dst}")
+            logger.info(f"isend close file. src={dst}")
             f = file_info_list[idx].file_object
             f.close()
             del _logging_recovery_mask[dst]
@@ -993,7 +993,7 @@ def irecv(tensor,
         try:
             key = next(keys)
         except StopIteration:
-            logger.info(f"close file. src={src}")
+            logger.info(f"irecv close file. src={src}")
             f.close()
             idx += 1
             _logging_recovery_mask[src][0] += 1
@@ -1065,7 +1065,7 @@ def send(tensor,
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
         idx, file_info_list, consensus_value = _logging_recovery_mask.get(dst)
         if _ts >= consensus_value:
-            logger.info(f"close file. src={dst}")
+            logger.info(f"send close file. src={dst}")
             f = file_info_list[idx].file_object
             f.close()
             del _logging_recovery_mask[dst]
@@ -1171,7 +1171,7 @@ def recv(tensor,
         try:
             key = next(keys)
         except StopIteration:
-            logger.info(f"close file. src={src}")
+            logger.info(f"recv close file. src={src}")
             f.close()
             idx += 1
             _logging_recovery_mask[src][0] += 1
