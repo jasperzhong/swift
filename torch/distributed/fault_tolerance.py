@@ -53,7 +53,7 @@ def _download_logging_files(logging_files):
                         logger.info(f"{file} not int dfs_files")
                 logger.info("debug")
                 time.sleep(0.1)
-                logger.info("time sleep done")
+                logger.info(f"time sleep done. logging_files[i] = {logging_files[i]}")
     except Exception as e:
         logger.info(f"logging daemon catches an error. {e}")
     logger.info("download finishes")
