@@ -211,6 +211,7 @@ def main():
     end = time.time()
     print("Training time is {}".format(end - start))
 
+    time.sleep(100)
 
 if __name__ == '__main__':
     main()
