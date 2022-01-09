@@ -992,6 +992,7 @@ def irecv(tensor,
         keys = file_info.valid_keys
         try:
             key = next(keys)
+            logger.info(f"irecv key {key}")
         except StopIteration:
             logger.info(f"irecv close file. src={src}")
             f.close()
@@ -1170,6 +1171,7 @@ def recv(tensor,
         keys = file_info.valid_keys
         try:
             key = next(keys)
+            logger.info(f"recv key {key}")
         except StopIteration:
             logger.info(f"recv close file. src={src}")
             f.close()
