@@ -30,8 +30,6 @@ def get_pipeline_model_parallel_world_size():
 
 
 def get_pipeline_model_parallel_rank():
-    if torch.distributed.parallel_recovery_data_parallel_size() > 1:
-        return int(os.environ["LOCAL_RANK"])
     return torch.distributed.get_rank()
 
 
@@ -167,8 +165,12 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
     compute_time_sum = 0
     num_microbatches = get_num_microbatches()
     print(f"num_microbatches: {num_microbatches}")
-    num_warmup_microbatches = get_pipeline_model_parallel_world_size() - \
-        get_pipeline_model_parallel_rank() - 1
+    if torch.distributed.parallel_recovery_data_parallel_size() > 1:
+        num_warmup_microbatches = get_pipeline_model_parallel_world_size() - \
+            int(os.environ["LOCAL_RANK"]) - 1
+    else:
+        num_warmup_microbatches = get_pipeline_model_parallel_world_size() - \
+            get_pipeline_model_parallel_rank() - 1
     num_microbatches_remaining = \
         num_microbatches - num_warmup_microbatches
 
