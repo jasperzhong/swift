@@ -191,7 +191,7 @@ def main():
         checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
         logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
-        logging_group_size=args.logging_group_size, logging_groups=[[0], [1], [2], [3], [4], [5], [6], [7, 8], [9, 10], [11, 12, 13, 14, 15]], print_freq=args.print_freq
+        logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
     )
 
     # warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 5)
