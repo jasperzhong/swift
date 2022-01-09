@@ -38,8 +38,10 @@ def _download_logging_files(logging_files):
     client = distributed_c10d._logging_dfs_client
     for i in range(len(logging_files)):
         while logging_files[i]:
+            logger.info(f"logging_files[i] = {logging_files[i]}")
             dfs_files = client.ls()
-            for file in logging_files[i]:
+            logger.info(f"dfs_files: {dfs_files}")
+            for file in logging_files[i][:]:
                 if file in dfs_files:
                     client.download(dfs_path=file, local_path=file)
                     logger.info(f"download {file} from dfs")
