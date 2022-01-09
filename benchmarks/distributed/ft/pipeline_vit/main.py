@@ -172,7 +172,7 @@ def main():
     # balance[-1] = 3
     # # print(balance)
     # model = PipelineParallelViT(balance=balance)
-    # model = PipelineParallelViT(balance=[5, 7, 6, 4])
+    model = PipelineParallelViT(balance=[3, 4, 4, 4])
     model.cuda()
 
     total_iters = args.benchmark_iters
