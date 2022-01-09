@@ -125,8 +125,6 @@ def _failure_handler():
     destroy_process_group()
 
     if _logging:
-        for ts_value, dst, logging_tensor in _logging_gpu_tensor_queue:
-            stash(ts_value, dst, logging_tensor)
         _logging_gpu_tensor_queue.clear()
 
     logger.info("start to re-init")
