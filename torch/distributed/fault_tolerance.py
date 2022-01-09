@@ -22,8 +22,6 @@ from .distributed_c10d import (_failure_handler, all_gather, barrier,
 
 logger = logging.getLogger(__name__)
 
-_download_logging_files_thread = None
-
 
 def _need_recovery(groups, failure_workers):
     rank = get_rank()
@@ -84,13 +82,12 @@ class FileInfo:
 
 
 def _set_recovery_mask(config, ts, consensus_value):
-    global _download_logging_files_thread
     logging_files = get_logging_files(config, ts, consensus_value)
     if logging_files and logging_files[0]:
         logger.info(f"logging_files: {logging_files}")
-        _download_logging_files_thread = threading.Thread(
+        download_thread = threading.Thread(
             target=_download_logging_files, args=(logging_files, ), daemon=True)
-        _download_logging_files_thread.start()
+        download_thread.start()
 
 
 class FaultToleranceConfig:
@@ -148,7 +145,6 @@ recovery_time = 0
 def recovery(config, ts, model, optimizer, lr_scheduler=None):
     global init_time
     global recovery_time
-    global _download_logging_files_thread
 
     callback = None
     consensus_value, need_undo, failure_workers = ts.sync()
@@ -306,13 +302,14 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                                                                         peer_failure_worker)
                 if logging_files and logging_files[0]:
                     logger.info(f"logging_files: {logging_files}")
-                    _download_logging_files_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
-                                                                      daemon=True)
-                    _download_logging_files_thread.start()
+                    download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
+                                                       daemon=True)
+                    download_thread.start()
 
             def _cb(ts):
                 nonlocal model
                 nonlocal optimizer
+                nonlocal lr_scheduler
                 nonlocal old_optimizer
                 nonlocal old_lr_scheduler
                 nonlocal enable_logging_on_disabled_worker
@@ -348,6 +345,8 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                     # copy states from DistributedOptimizer
                     old_optimizer.load_state_dict(optimizer.state_dict())
                     optimizer = old_optimizer
+                    # no need to restore lr_scheduler
+                    old_lr_scheduler = lr_scheduler
 
                 # # destroy communication group
                 # destroy_process_group(comm)
@@ -568,7 +567,6 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                           lr_scheduler, reset_data_iterator_func, fault_tolerance_val=None, test_loader=None):
     global init_time
     global recovery_time
-    global _download_logging_files_thread
     setup(config)
 
     if not os.path.exists("time.log"):
@@ -614,16 +612,15 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 f.write("Already killed\n")
                             os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
 
-                        if _download_logging_files_thread:
-                            logger.info(
-                                f"_download_logging_files_thread is alive {_download_logging_files_thread.isAlive()}")
                         start = time.time()
                         loss, _ = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
                         iteration_time = time.time() - start
                         ts += 1
                         num += 1
+
                         # this is okay because ts has been increased by one
-                        if ts % config.checkpoint_interval == 0:
+                        # disable checkpoint when in recovery
+                        if ts % config.checkpoint_interval == 0 and not _distributed_c10d._logging_in_recovery:
                             checkpoint_start = time.time()
                             filename = _get_checkpoint_path(config)
                             checkpoint(filename, ts, model, optimizer)
