@@ -3115,6 +3115,14 @@ def flush_objects_to_dfs(config):
             logging_pairs_to_files.clear()
             logger.info("remove outdated logging files.")
             continue
+        elif item == "close":
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    # if file is not closed
+                    if file:
+                        file.close()
+            logging_pairs_to_files.clear()
+            continue
 
         ts_value, dst, tensor, event = item
         key = '%d:%d' % (get_rank(), dst)
