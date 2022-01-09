@@ -1,7 +1,10 @@
-import torch
 import time
-import torch.nn as nn
+
 from torchvision import datasets, transforms
+
+import torch
+import torch.nn as nn
+
 _GLOBAL_ARGS = None
 
 _cnt = 0
@@ -27,6 +30,8 @@ def get_pipeline_model_parallel_world_size():
 
 
 def get_pipeline_model_parallel_rank():
+    if torch.distributed.parallel_recovery_data_parallel_size() > 1:
+        return int(os.environ["LOCAL_RANK"])
     return torch.distributed.get_rank()
 
 
