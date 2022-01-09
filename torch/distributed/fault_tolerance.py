@@ -1,10 +1,11 @@
 import logging
 import os
-import subprocess
 import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Queue
+
+from pyhdfs_client.pyhdfs_client import HDFSClient as hdfsclient
 
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
@@ -825,16 +826,14 @@ class DFSClient(ABC):
 class HDFSClient(DFSClient):
     def __init__(self, *args, **kwargs):
         # please add hdfs commannd in the PATH
-        self.hdfs_bin = "hdfs"
+        self.client = hdfsclient()
 
     def upload(self, dfs_path, local_path):
-        while True:
-            try:
-                result = subprocess.run([self.hdfs_bin, "dfs", "-put", local_path, "/"], check=True)
-                break
-            except Exception as e:
-                logger.info(f"upload {dfs_path} failed. retry. error: {e}")
-                time.sleep(0.1)
+        ret, out, err = self.client.run(["-put", local_path, "/"])
+        while ret != 0:
+            logger.info(f"upload {dfs_path} failed. retry. error: {err}")
+            ret, out, err = self.client.run(["-put", local_path, "/"])
+            time.sleep(0.1)
 
     def download(self, dfs_path, local_path):
         if local_path in os.listdir():
@@ -842,28 +841,21 @@ class HDFSClient(DFSClient):
             logger.info("file exists")
             return
 
-        while True:
-            try:
-                logger.info(f"try to download {dfs_path}")
-                result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."], check=True)
-                break
-            except Exception as e:
-                logger.info(f"download {dfs_path} failed. retry. error: {e}")
-                time.sleep(0.1)
+        ret, out, err = self.client.run(["-get", "/" + dfs_path, "."])
+        while ret != 0:
+            logger.info(f"download {dfs_path} failed. retry. error: {err}")
+            ret, out, err = self.client.run(["-get", "/" + dfs_path, "."])
+            time.sleep(0.1)
 
     def ls(self):
-        while True:
-            try:
-                result = subprocess.run([self.hdfs_bin, "dfs", "-ls", "/"], stdout=subprocess.PIPE, check=True)
-                out = result.stdout.decode('utf-8')
-                # it seems that if it returns an empty list, it will got stuck
-                return [item.split(' ')[-1].lstrip('/') for item in out.split('\n')[1:-1]] + ['']
-            except Exception as e:
-                logger.info(f"ls failed. retry. error: {e}")
-                time.sleep(0.1)
+        ret, out, err = self.client.run(["-ls", "/"])
+        while ret != 0:
+            logger.info(f"download {dfs_path} failed. retry. error: {err}")
+            ret, out, err = self.client.run(["-ls", "/"])
+            time.sleep(0.1)
 
     def rm(self, dfs_path):
-        result = subprocess.run([self.hdfs_bin, "dfs", "-rm", "/" + dfs_path])
+        ret, out, err = self.client.run(["-rm", "/" + dfs_path])
 
 
 try:
