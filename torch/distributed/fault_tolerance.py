@@ -20,7 +20,6 @@ from .distributed_c10d import (_failure_handler, all_gather, barrier,
                                is_local_root_rank, new_group,
                                parallel_recovery_data_parallel_size)
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -79,7 +78,7 @@ class FileInfo:
 
 def _set_recovery_mask(config, ts, consensus_value):
     logging_files = get_logging_files(config, ts, consensus_value)
-    if logging_files:
+    if logging_files and logging_files[0]:
         logger.info(f"logging_files: {logging_files}")
         download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
         download_thread.start()
