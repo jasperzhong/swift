@@ -47,6 +47,7 @@ def _download_logging_files(logging_files):
                     logger.info(f"download {file} from dfs")
                     logging_files[i].remove(file)
             time.sleep(0.1)
+    logger.info("download finishes")
 
 
 def _whether_to_upload_logging_files(groups, failure_workers):
@@ -822,6 +823,7 @@ class HDFSClient(DFSClient):
     def download(self, dfs_path, local_path):
         if local_path in os.listdir():
             # File exists
+            logger.info("file exists")
             return
 
         while True:
