@@ -1,10 +1,11 @@
 import logging
 import os
-import subprocess
 import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Queue
+
+from pyhdfs_client.pyhdfs_client import HDFSClient as hdfsclient
 
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
@@ -19,7 +20,6 @@ from .distributed_c10d import (_failure_handler, all_gather, barrier,
                                get_local_world_size, get_rank, get_world_size,
                                is_local_root_rank, new_group,
                                parallel_recovery_data_parallel_size)
-
 
 logger = logging.getLogger(__name__)
 
@@ -36,15 +36,19 @@ def _need_recovery(groups, failure_workers):
 
 def _download_logging_files(logging_files):
     client = distributed_c10d._logging_dfs_client
-    for i in range(len(logging_files)):
-        while logging_files[i]:
-            dfs_files = client.ls()
-            for file in logging_files[i]:
-                if file in dfs_files:
-                    client.download(dfs_path=file, local_path=file)
-                    logger.info(f"download {file} from dfs")
-                    logging_files[i].remove(file)
-            time.sleep(0.1)
+    try:
+        for i in range(len(logging_files)):
+            while logging_files[i]:
+                dfs_files = client.ls()
+                for file in logging_files[i][:]:
+                    if file in dfs_files:
+                        client.download(dfs_path=file, local_path=file)
+                        logger.info(f"download {file} from dfs")
+                        logging_files[i].remove(file)
+                time.sleep(0.1)
+    except Exception as e:
+        logger.info(f"logging daemon catches an error. {e}")
+    logger.info("download finishes")
 
 
 def _whether_to_upload_logging_files(groups, failure_workers):
@@ -52,8 +56,9 @@ def _whether_to_upload_logging_files(groups, failure_workers):
     rank = get_rank()
     for pair in pairs:
         if rank in pair:
+            peer = pair[1] if pair[0] == rank else pair[0]
             for failure_worker in failure_workers:
-                if failure_worker in pair:
+                if failure_worker == peer:
                     return True
     return False
 
@@ -72,9 +77,11 @@ class FileInfo:
 
 def _set_recovery_mask(config, ts, consensus_value):
     logging_files = get_logging_files(config, ts, consensus_value)
-    logger.info(f"logging_files: {logging_files}")
-    download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
-    download_thread.start()
+    if logging_files and logging_files[0]:
+        logger.info(f"logging_files: {logging_files}")
+        download_thread = threading.Thread(
+            target=_download_logging_files, args=(logging_files, ), daemon=True)
+        download_thread.start()
 
 
 class FaultToleranceConfig:
@@ -188,8 +195,12 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
         ts._value = consensus_value
     elif config.logging:
         # upload needed logging files
-        if _whether_to_upload_logging_files(config.groups, failure_workers):
-            distributed_c10d._logging_cpu_tensor_queue.put("flush")
+        if failure_workers:
+            if _whether_to_upload_logging_files(config.groups, failure_workers):
+                logger.info(f"Rank {get_rank()} should upload the logging files.")
+                distributed_c10d._logging_cpu_tensor_queue.put("flush")
+            elif distributed_c10d._logging_cpu_tensor_queue:
+                distributed_c10d._logging_cpu_tensor_queue.put("close")
 
         need_recovery = _need_recovery(config.groups, failure_workers)
         if need_recovery:
@@ -283,8 +294,8 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
 
                 logging_files = get_logging_files_for_parallel_recovery(config, ts, consensus_value,
                                                                         peer_failure_worker)
-                logger.info(f"logging_files: {logging_files}")
-                if logging_files:
+                if logging_files and logging_files[0]:
+                    logger.info(f"logging_files: {logging_files}")
                     download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
                                                        daemon=True)
                     download_thread.start()
@@ -292,6 +303,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
             def _cb(ts):
                 nonlocal model
                 nonlocal optimizer
+                nonlocal lr_scheduler
                 nonlocal old_optimizer
                 nonlocal old_lr_scheduler
                 nonlocal enable_logging_on_disabled_worker
@@ -327,6 +339,8 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                     # copy states from DistributedOptimizer
                     old_optimizer.load_state_dict(optimizer.state_dict())
                     optimizer = old_optimizer
+                    # no need to restore lr_scheduler
+                    old_lr_scheduler = lr_scheduler
 
                 # # destroy communication group
                 # destroy_process_group(comm)
@@ -564,7 +578,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     while True:
         ts, model, optimizer, lr_scheduler, consensus_value, cb = recovery(config, ts, model, optimizer, lr_scheduler)
         s = time.time()
-        data_iterator = reset_data_iterator_func(config, data_loader, ts % config.iters_per_epoch)
+        data_iterator = reset_data_iterator_func(config, data_loader, ts)
         print("reset data iterator time is:{}".format(time.time() - s))
         iter_time_avg = 0
         throughput_avg = 0
@@ -587,7 +601,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 f.write(f"{recovery_time}\n")
 
                         # for experiment:
-                        if ts._value == 150 and get_rank() == 8 and not os.path.exists("./temp.flag"):
+                        if ts._value == 300 and get_rank() == 8 and not os.path.exists("./temp.flag"):
                             with open("temp.flag", "a") as f:
                                 f.write("Already killed\n")
                             os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
@@ -597,8 +611,10 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         iteration_time = time.time() - start
                         ts += 1
                         num += 1
+
                         # this is okay because ts has been increased by one
-                        if ts % config.checkpoint_interval == 0:
+                        # disable checkpoint when in recovery
+                        if ts % config.checkpoint_interval == 0 and not distributed_c10d._logging_in_recovery:
                             checkpoint_start = time.time()
                             filename = _get_checkpoint_path(config)
                             checkpoint(filename, ts, model, optimizer)
@@ -633,14 +649,13 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         if ts == consensus_value and cb:
                             ts, model, optimizer, lr_scheduler = cb(ts)
                             del data_iterator
-                            data_iterator = reset_data_iterator_func(config, data_loader, ts % config.iters_per_epoch)
+                            data_iterator = reset_data_iterator_func(config, data_loader, ts)
                             logger.info(f"parallel recovery restores from iteration {ts}")
                             cb = None
 
                         # checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
-                    data_iterator = reset_data_iterator_func(config, data_loader, 0)
                     if fault_tolerance_val:
                         logger.info("start validation at iteration: {}".format(ts))
                         fault_tolerance_val(config, model, test_loader, loss_func)
@@ -804,36 +819,37 @@ class DFSClient(ABC):
 class HDFSClient(DFSClient):
     def __init__(self, *args, **kwargs):
         # please add hdfs commannd in the PATH
-        self.hdfs_bin = "hdfs"
+        self.client = hdfsclient()
 
     def upload(self, dfs_path, local_path):
-        while True:
-            try:
-                result = subprocess.run([self.hdfs_bin, "dfs", "-put", local_path, "/"], check=True)
-                break
-            except Exception as e:
-                logger.info(f"upload {dfs_path} failed. retry. error: {e}")
-                time.sleep(0.1)
+        ret, out, err = self.client.run(["-put", local_path, "/"])
+        while ret != 0:
+            logger.info(f"upload {dfs_path} failed. retry. error: {err}")
+            ret, out, err = self.client.run(["-put", local_path, "/"])
+            time.sleep(0.1)
 
     def download(self, dfs_path, local_path):
         if local_path in os.listdir():
             # File exists
+            logger.info("file exists")
             return
 
-        while True:
-            try:
-                result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."], check=True)
-                break
-            except Exception as e:
-                logger.info(f"download {dfs_path} failed. retry. error: {e}")
-                time.sleep(0.1)
+        ret, out, err = self.client.run(["-get", "/" + dfs_path, "."])
+        while ret != 0:
+            logger.info(f"download {dfs_path} failed. retry. error: {err}")
+            ret, out, err = self.client.run(["-get", "/" + dfs_path, "."])
+            time.sleep(0.1)
 
     def ls(self):
-        result = subprocess.getoutput("hdfs dfs -ls /")
-        return [item.split(' ')[-1].lstrip('/') for item in result.split('\n')[1:]]
+        ret, out, err = self.client.run(["-ls", "/"])
+        while ret != 0:
+            logger.info(f"download {dfs_path} failed. retry. error: {err}")
+            ret, out, err = self.client.run(["-ls", "/"])
+            time.sleep(0.1)
+        return [item.split(' ')[-1].lstrip('/') for item in out.split('\n')[1:-1]]
 
     def rm(self, dfs_path):
-        result = subprocess.run([self.hdfs_bin, "dfs", "-rm", "/" + dfs_path])
+        ret, out, err = self.client.run(["-rm", "/" + dfs_path])
 
 
 try:

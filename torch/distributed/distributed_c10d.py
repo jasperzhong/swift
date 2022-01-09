@@ -28,6 +28,9 @@ from .rendezvous import register_rendezvous_handler, rendezvous  # noqa: F401
 # This module is wildcard imported from torch.distributed.
 # TODO: specify __all__
 
+# https://github.com/open-mpi/ompi/issues/6535#issuecomment-640116873
+os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
+
 
 _MPI_AVAILABLE = True
 _NCCL_AVAILABLE = True
@@ -3115,6 +3118,14 @@ def flush_objects_to_dfs(config):
             logging_pairs_to_files.clear()
             logger.info("remove outdated logging files.")
             continue
+        elif item == "close":
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    # if file is not closed
+                    if file:
+                        file.close()
+            logging_pairs_to_files.clear()
+            continue
 
         ts_value, dst, tensor, event = item
         key = '%d:%d' % (get_rank(), dst)
@@ -3171,7 +3182,7 @@ def _open_logging_file(filename, consensus_value):
 
     while True:
         try:
-            f = h5py.File(filename, "a")
+            f = h5py.File(filename, "r")
             break
         except OSError:
             # OSError: Unable to open file (unable to lock file, errno = 11, error message = 'Resource temporarily unavailable')
