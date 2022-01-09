@@ -855,8 +855,14 @@ class HDFSClient(DFSClient):
                 time.sleep(0.1)
 
     def ls(self):
-        result = subprocess.getoutput("hdfs dfs -ls /")
-        return [item.split(' ')[-1].lstrip('/') for item in result.split('\n')[1:]]
+        while True:
+            try:
+                result = subprocess.run([self.hdfs_bin, "dfs", "-ls", "/"], stdout=subprocess.PIPE, check=True)
+                out = result.stdout.decode('utf-8')
+                return [item.split(' ')[-1].lstrip('/') for item in out.split('\n')[1:]]
+            except Exception as e:
+                logger.info(f"ls failed. retry. error: {e}")
+                time.sleep(0.1)
 
     def rm(self, dfs_path):
         result = subprocess.run([self.hdfs_bin, "dfs", "-rm", "/" + dfs_path])
