@@ -171,7 +171,6 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
             get_pipeline_model_parallel_rank() - 1
     num_microbatches_remaining = \
         num_microbatches - num_warmup_microbatches
-    print(f"num_microbatches: {num_microbatches}, num_warmup_microbatches: {num_warmup_microbatches}, num_microbatches_remaining: {num_microbatches_remaining}")
 
     input_tensors = []
     output_tensors = []

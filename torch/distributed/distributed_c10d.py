@@ -3101,7 +3101,6 @@ def flush_objects_to_dfs(config):
                     # if file is not closed
                     if file:
                         file.close()
-                        logger.info(f"close {path}")
                     _logging_dfs_client.rm(dfs_path=path)
                     _logging_dfs_client.upload(dfs_path=path, local_path=path)
                     logger.info(f"put {path} on dfs")
@@ -3151,7 +3150,6 @@ def flush_objects_to_dfs(config):
         file = None
         if need_create_new_file:
             path = 'logging_%d_%d_%d.h5' % (get_rank(), dst, ts_value)
-            logger.info(f"create {path}")
             file = h5py.File(path, "a")
             logging_pairs_to_files[key].append((file, path))
         else:

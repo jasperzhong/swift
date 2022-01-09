@@ -39,20 +39,13 @@ def _download_logging_files(logging_files):
     try:
         for i in range(len(logging_files)):
             while logging_files[i]:
-                logger.info(f"logging_files[i] = {logging_files[i]}")
                 dfs_files = client.ls()
-                logger.info(f"dfs_files: {dfs_files}")
                 for file in logging_files[i][:]:
-                    logger.info(f"debug: {file}")
                     if file in dfs_files:
                         client.download(dfs_path=file, local_path=file)
                         logger.info(f"download {file} from dfs")
                         logging_files[i].remove(file)
-                    else:
-                        logger.info(f"{file} not int dfs_files")
-                logger.info("debug")
                 time.sleep(0.1)
-                logger.info(f"time sleep done. logging_files[i] = {logging_files[i]}")
     except Exception as e:
         logger.info(f"logging daemon catches an error. {e}")
     logger.info("download finishes")
