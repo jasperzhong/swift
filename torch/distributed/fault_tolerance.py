@@ -39,7 +39,7 @@ def _download_logging_files(logging_files):
     client = distributed_c10d._logging_dfs_client
     try:
         for i in range(len(logging_files)):
-            while logging_files[i] is not None:
+            while logging_files[i]:
                 logger.info(f"logging_files[i] = {logging_files[i]}")
                 dfs_files = client.ls()
                 logger.info(f"dfs_files: {dfs_files}")
