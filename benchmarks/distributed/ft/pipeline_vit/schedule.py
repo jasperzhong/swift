@@ -25,8 +25,7 @@ def is_pipeline_first_stage():
 
 
 def get_pipeline_model_parallel_world_size():
-    return torch.distributed.get_world_size() // \
-        torch.distributed.parallel_recovery_data_parallel_size()
+    return torch.distributed.get_world_size()
 
 
 def get_pipeline_model_parallel_rank():
@@ -53,6 +52,7 @@ def get_microbatch_size():
     global _GLOBAL_ARGS
     return _GLOBAL_ARGS.micro_batch_size
 
+
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
@@ -76,7 +76,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
 
     end = time.time()
     compute_time = end - start
-        
+
     return output_tensor, compute_time
 
 
@@ -160,12 +160,11 @@ def send_backward_recv_forward(input_tensor_grad, dtype=torch.float32):
     return input_tensor
 
 
-
 def pipedream_flush_schedule(data_iterator, model, loss_func):
     compute_time_sum = 0
     num_microbatches = get_num_microbatches()
     if torch.distributed.parallel_recovery_data_parallel_size() > 1:
-        num_warmup_microbatches = get_pipeline_model_parallel_world_size() - \
+        num_warmup_microbatches = int(os.environ["LOCAL_WORLD_SIZE"]) - \
             int(os.environ["LOCAL_RANK"]) - 1
     else:
         num_warmup_microbatches = get_pipeline_model_parallel_world_size() - \
