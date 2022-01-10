@@ -168,7 +168,7 @@ def main():
 
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=10, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
+        checkpoint_interval=100, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
     )
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
