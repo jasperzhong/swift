@@ -1,11 +1,12 @@
 import torch
 import time
-
+import os
 _GLOBAL_ARGS = None
 
 def initialize_global_args(args):
     global _GLOBAL_ARGS
     _GLOBAL_ARGS = args
+
 
 def is_pipeline_last_stage():
     return get_pipeline_model_parallel_rank() == \
@@ -17,8 +18,7 @@ def is_pipeline_first_stage():
 
 
 def get_pipeline_model_parallel_world_size():
-    return torch.distributed.get_world_size() // \
-        torch.distributed.parallel_recovery_data_parallel_size()
+    return torch.distributed.get_world_size()
 
 
 def get_pipeline_model_parallel_rank():
@@ -155,8 +155,12 @@ def send_backward_recv_forward(input_tensor_grad, dtype=torch.float32):
 def pipedream_flush_schedule(data_iterator, model, loss_func):
     compute_time_sum = 0
     num_microbatches = get_num_microbatches()
-    num_warmup_microbatches = get_pipeline_model_parallel_world_size() - \
-        get_pipeline_model_parallel_rank() - 1
+    if torch.distributed.parallel_recovery_data_parallel_size() > 1:
+        num_warmup_microbatches = int(os.environ["LOCAL_WORLD_SIZE"]) - \
+            int(os.environ["LOCAL_RANK"]) - 1
+    else:
+        num_warmup_microbatches = get_pipeline_model_parallel_world_size() - \
+            get_pipeline_model_parallel_rank() - 1
     num_microbatches_remaining = \
         num_microbatches - num_warmup_microbatches
 
@@ -170,20 +174,17 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
         output_tensor, compute_time = forward_step(data_iterator, model, input_tensor, loss_func, loss)
         compute_time_sum += compute_time
         send_forward(output_tensor)
-
         input_tensors.append(input_tensor)
         output_tensors.append(output_tensor)
 
     if num_microbatches_remaining > 0:
         input_tensor = recv_forward(model.input_shape)
-
     # run 1F1B steady state
     for i in range(num_microbatches_remaining):
         last_iteration = (i == (num_microbatches_remaining - 1))
         output_tensor, compute_time = forward_step(data_iterator, model, input_tensor, loss_func, loss)
         compute_time_sum += compute_time
         output_tensor_grad = send_forward_recv_backward(output_tensor)
-
         input_tensors.append(input_tensor)
         output_tensors.append(output_tensor)
 
