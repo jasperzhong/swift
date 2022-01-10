@@ -844,7 +844,7 @@ class HDFSClient(DFSClient):
 
         while True:
             try:
-                result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."], check=True)
+                result = subprocess.run(["hdfs", "dfs", "-get", "/" + dfs_path, "."], check=True)
                 break
             except Exception as e:
                 if "File exists" in f"{e}":
