@@ -129,6 +129,7 @@ def _failure_handler():
 
     if _logging:
         _logging_gpu_tensor_queue.clear()
+        _logging_cpu_tensor_queue.put("flush")
 
     logger.info("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
@@ -995,7 +996,6 @@ def irecv(tensor,
         keys = file_info.valid_keys
         try:
             key = next(keys)
-            logger.info(f"irecv key {key}")
         except StopIteration:
             logger.info(f"irecv close file. src={src}")
             f.close()
@@ -1174,7 +1174,6 @@ def recv(tensor,
         keys = file_info.valid_keys
         try:
             key = next(keys)
-            logger.info(f"recv key {key}")
         except StopIteration:
             logger.info(f"recv close file. src={src}")
             f.close()
@@ -3096,14 +3095,21 @@ def flush_objects_to_dfs(config):
         if item is None:
             break
         elif item == "flush":
+            # rename the files before upload
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    renamed_path = path + ".__PUT__"
+                    os.system(f"mv {path} {renamed_path}")
+
             for name, files in logging_pairs_to_files.items():
                 for file, path in files:
                     # if file is not closed
                     if file:
                         file.close()
                     _logging_dfs_client.rm(dfs_path=path)
-                    _logging_dfs_client.upload(dfs_path=path, local_path=path)
-                    logger.info(f"put {path} on dfs")
+                    renamed_path = path + ".__PUT__"
+                    _logging_dfs_client.upload(dfs_path=path, local_path=renamed_path)
+                    logger.info(f"put {renamed_path} on dfs")
             logging_pairs_to_files.clear()
             continue
         elif item == "gc":
