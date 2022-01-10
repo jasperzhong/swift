@@ -5,7 +5,7 @@ import time
 from abc import ABC, abstractmethod
 from queue import Queue
 
-from pyhdfs_client.pyhdfs_client import HDFSClient as hdfsclient
+from hdfs3 import HDFileSystem
 
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
@@ -601,7 +601,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 f.write(f"{recovery_time}\n")
 
                         # for experiment:
-                        if ts._value == 150 and get_rank() == 8 and not os.path.exists("./temp.flag"):
+                        if ts._value == 300 and get_rank() == 8 and not os.path.exists("./temp.flag"):
                             with open("temp.flag", "a") as f:
                                 f.write("Already killed\n")
                             os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
@@ -656,7 +656,6 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         # checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
-                    data_iterator = reset_data_iterator_func(config, data_loader, 0)
                     if fault_tolerance_val:
                         logger.info("start validation at iteration: {}".format(ts))
                         fault_tolerance_val(config, model, test_loader, loss_func)
@@ -820,43 +819,29 @@ class DFSClient(ABC):
 class HDFSClient(DFSClient):
     def __init__(self, *args, **kwargs):
         # please add hdfs commannd in the PATH
-        self.client = hdfsclient()
+        os.environ["LIBHDFS3_CONF"] = "/usr/local/hadoop/etc/hadoop/hdfs-site.xml"
+        self.hdfs = HDFileSystem(host=os.environ.get("HADOOP_MASTER"), port=54310)
 
     def upload(self, dfs_path, local_path):
-        ret, out, err = self.client.run(["-put", local_path, "/"])
-        while ret != 0:
-            logger.info(f"upload {dfs_path} failed. retry. error: {err}")
-            if "File exists" in f"{err}":
-                logger.info("break")
-                break
-            ret, out, err = self.client.run(["-put", local_path, "/"])
-            time.sleep(0.1)
+        self.hdfs.put(local_path, "/" + dfs_path + ".__COPY__")
+        self.hdfs.mv("/" + dfs_path + ".__COPY__", "/" + dfs_path)
 
     def download(self, dfs_path, local_path):
         if local_path in os.listdir():
             # File exists
-            logger.info("file exists")
             return
 
-        ret, out, err = self.client.run(["-get", "/" + dfs_path, "."])
-        while ret != 0:
-            logger.info(f"download {dfs_path} failed. retry. error: {err}")
-            if "File exists" in f"{err}":
-                logger.info("break")
-                break
-            ret, out, err = self.client.run(["-get", "/" + dfs_path, "."])
-            time.sleep(0.1)
+        self.hdfs.get("/" + dfs_path, local_path)
 
     def ls(self):
-        ret, out, err = self.client.run(["-ls", "/"])
-        while ret != 0:
-            logger.info(f"download {dfs_path} failed. retry. error: {err}")
-            ret, out, err = self.client.run(["-ls", "/"])
-            time.sleep(0.1)
-        return [item.split(' ')[-1].lstrip('/') for item in out.split('\n')[1:-1]]
+        files = self.hdfs.ls("/")
+        return [file.lstrip("/") for file in files]
 
     def rm(self, dfs_path):
-        ret, out, err = self.client.run(["-rm", "/" + dfs_path])
+        try:
+            self.hdfs.rm("/" + dfs_path)
+        except FileNotFoundError:
+            pass
 
 
 try:
