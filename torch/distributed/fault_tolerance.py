@@ -828,8 +828,9 @@ class HDFSClient(DFSClient):
         self.hdfs = HDFileSystem(host=os.environ.get("HADOOP_MASTER"), port=54310)
 
     def upload(self, dfs_path, local_path):
-        self.hdfs.put(local_path, "/" + dfs_path + ".__COPY__")
-        self.hdfs.mv("/" + dfs_path + ".__COPY__", "/" + dfs_path)
+        os.system(f"/usr/local/hadoop/bin/hdfs dfs -put {local_path} /{dfs_path}")
+        # self.hdfs.put(local_path, "/" + dfs_path + ".__COPY__")
+        # self.hdfs.mv("/" + dfs_path + ".__COPY__", "/" + dfs_path)
         # rename back after the upload
         os.system(f"mv {local_path} {dfs_path}")
 
