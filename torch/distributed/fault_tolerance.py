@@ -476,8 +476,14 @@ def compute_logging_size(num_micro_batches, balance, file="../profile.txt", num_
         lines = f.readlines()
         start = workers_per_machine
         activation_size = []
-        for start in balance:
-            line = lines[start]
+        idx = 0
+        for i in range(len(balance)):
+            if i == len(balance) - 1:
+                idx += 1
+            else:
+                start = balance[i]
+            idx += start
+            line = lines[idx]
             line = line.strip('\n')
             nums = line.split(" ")
             nums = [int(num) for num in nums]
