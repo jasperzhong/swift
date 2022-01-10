@@ -195,12 +195,12 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
         ts._value = consensus_value
     elif config.logging:
         # upload needed logging files
-        if failure_workers:
-            if _whether_to_upload_logging_files(config.groups, failure_workers):
-                logger.info(f"Rank {get_rank()} should upload the logging files.")
-                distributed_c10d._logging_cpu_tensor_queue.put("flush")
-            elif distributed_c10d._logging_cpu_tensor_queue:
-                distributed_c10d._logging_cpu_tensor_queue.put("close")
+        # if failure_workers:
+        #     if _whether_to_upload_logging_files(config.groups, failure_workers):
+        #         logger.info(f"Rank {get_rank()} should upload the logging files.")
+        #         distributed_c10d._logging_cpu_tensor_queue.put("flush")
+        #     elif distributed_c10d._logging_cpu_tensor_queue:
+        #         distributed_c10d._logging_cpu_tensor_queue.put("close")
 
         need_recovery = _need_recovery(config.groups, failure_workers)
         if need_recovery:
@@ -246,42 +246,11 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
 
             # 2. all workers build new comm group
             peer_failure_worker = get_peer_failure_worker(config, failure_workers)
-            comm = build_communication_group(config, peer_failure_worker)
-            group_rank = get_rank(group=comm)
-            group_size = get_world_size(group=comm)
-            distributed_c10d._logging_group_rank = group_rank
-            distributed_c10d._logging_group_size = group_size
-            distributed_c10d._logging_group_diff = get_rank() - peer_failure_worker
-            logger.info(f"build new communication group ({group_rank} / {group_size})")
 
-            # 3. living workers build model and optimizer
-            optimizer_cls = optimizer.__class__
-            optimizer_defaults = optimizer.defaults
-            model, optimizer = build_model_and_optimizer(config, model,
-                                                         optimizer, comm,
-                                                         peer_failure_worker)
-
-            # 4. broadcast failure worker's ts
+            # 3. broadcast failure worker's ts
             ts.broadcast(peer_failure_worker)
 
-            if lr_scheduler:
-                # It seems that when last_epoch != -1, the optimizer should has initialized the `initial_lr`
-                # but in parallel recovery, the re-built optimizer does not have that attribute, so we need
-                # to set the `initial_lr` by building it twice.
-                # KeyError: "param 'initial_lr' is not specified in param_groups[0] when resuming an optimizer"
-                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=-1)
-
-                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
-                logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
-
-            # 5. hijack get_rank()
-            get_rank_bck = torch.distributed.get_rank
-            torch.distributed.get_rank = lambda group=None: peer_failure_worker
-            logger.info(f"rank {get_rank_bck()} changes the rank to {torch.distributed.get_rank()}")
-
-            # 6. download the same set of logging files as the failure worker
+            # 4. download the same set of logging files as the failure worker
             if not need_recovery:
                 # filename = "rng_state_%d.h5" % (peer_failure_worker)
                 # while True:
@@ -299,6 +268,40 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                     download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
                                                        daemon=True)
                     download_thread.start()
+
+            comm = build_communication_group(config, peer_failure_worker)
+            group_rank = get_rank(group=comm)
+            group_size = get_world_size(group=comm)
+            distributed_c10d._logging_group_rank = group_rank
+            distributed_c10d._logging_group_size = group_size
+            distributed_c10d._logging_group_diff = get_rank() - peer_failure_worker
+            logger.info(f"build new communication group ({group_rank} / {group_size})")
+
+            # 5. living workers build model and optimizer
+            optimizer_cls = optimizer.__class__
+            optimizer_defaults = optimizer.defaults
+            model, optimizer = build_model_and_optimizer(config, model,
+                                                         optimizer, comm,
+                                                         peer_failure_worker)
+
+
+            if lr_scheduler:
+                # It seems that when last_epoch != -1, the optimizer should has initialized the `initial_lr`
+                # but in parallel recovery, the re-built optimizer does not have that attribute, so we need
+                # to set the `initial_lr` by building it twice.
+                # KeyError: "param 'initial_lr' is not specified in param_groups[0] when resuming an optimizer"
+                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=-1)
+
+                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
+                logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
+
+            # 6. hijack get_rank()
+            get_rank_bck = torch.distributed.get_rank
+            torch.distributed.get_rank = lambda group=None: peer_failure_worker
+            logger.info(f"rank {get_rank_bck()} changes the rank to {torch.distributed.get_rank()}")
+
 
             def _cb(ts):
                 nonlocal model
@@ -578,8 +581,9 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     while True:
         ts, model, optimizer, lr_scheduler, consensus_value, cb = recovery(config, ts, model, optimizer, lr_scheduler)
         s = time.time()
-        data_iterator = reset_data_iterator_func(config, data_loader, ts)
-        print("reset data iterator time is:{}".format(time.time() - s))
+        data_iterator = reset_data_iterator_func(config, data_loader, ts % config.iters_per_epoch)
+        logger.info(f"data_iter is now at : {ts % config.iters_per_epoch}")
+        logger.info("reset data iterator time is:{}".format(time.time() - s))
         iter_time_avg = 0
         throughput_avg = 0
         # checksum(ts, model, optimizer)
@@ -601,7 +605,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 f.write(f"{recovery_time}\n")
 
                         # for experiment:
-                        if ts._value == 300 and get_rank() == 8 and not os.path.exists("./temp.flag"):
+                        if ts._value == 150 and get_rank() == 8 and not os.path.exists("./temp.flag"):
                             with open("temp.flag", "a") as f:
                                 f.write("Already killed\n")
                             os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
@@ -623,7 +627,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         iteration_time = time.time() - start
 
                         iter_time_avg += iteration_time
-                        throughput = config.batch_size / iteration_time * parallel_recovery_data_parallel_size()
+                        throughput = config.batch_size / iteration_time  # * parallel_recovery_data_parallel_size()
                         throughput_avg += throughput
 
                         # since the failure is on a basis of machines,
@@ -649,13 +653,14 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         if ts == consensus_value and cb:
                             ts, model, optimizer, lr_scheduler = cb(ts)
                             del data_iterator
-                            data_iterator = reset_data_iterator_func(config, data_loader, ts)
+                            data_iterator = reset_data_iterator_func(config, data_loader, ts % config.iters_per_epoch)
                             logger.info(f"parallel recovery restores from iteration {ts}")
                             cb = None
 
                         # checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
+                    data_iterator = reset_data_iterator_func(config, data_loader, 0)
                     if fault_tolerance_val:
                         logger.info("start validation at iteration: {}".format(ts))
                         fault_tolerance_val(config, model, test_loader, loss_func)
@@ -825,10 +830,14 @@ class HDFSClient(DFSClient):
     def upload(self, dfs_path, local_path):
         self.hdfs.put(local_path, "/" + dfs_path + ".__COPY__")
         self.hdfs.mv("/" + dfs_path + ".__COPY__", "/" + dfs_path)
+        # rename back after the upload
+        os.system(f"mv {local_path} {dfs_path}")
 
     def download(self, dfs_path, local_path):
         if local_path in os.listdir():
             # File exists
+            return
+        elif local_path + ".__PUT__" in os.listdir():
             return
 
         self.hdfs.get("/" + dfs_path, local_path)
