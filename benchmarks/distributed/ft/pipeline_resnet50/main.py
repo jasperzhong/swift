@@ -148,7 +148,7 @@ def main():
 
     total_iters = args.benchmark_iters
     print("total iterations: {}".format(total_iters))
-    num_micro_batches = args.global_batch_size // args.micro_batch_size
+    num_micro_batches = args.global_batch_size // args.micro_batch_size // args.data_parallel_size
     iters_per_epoch = len(data_loader) // num_micro_batches
     print("iters per epoch:{}".format(iters_per_epoch))
 
