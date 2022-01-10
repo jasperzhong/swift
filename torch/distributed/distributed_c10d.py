@@ -3095,21 +3095,14 @@ def flush_objects_to_dfs(config):
         if item is None:
             break
         elif item == "flush":
-            # rename the files before upload
-            for name, files in logging_pairs_to_files.items():
-                for file, path in files:
-                    renamed_path = path + ".__PUT__"
-                    os.system(f"mv {path} {renamed_path}")
-
             for name, files in logging_pairs_to_files.items():
                 for file, path in files:
                     # if file is not closed
                     if file:
                         file.close()
                     _logging_dfs_client.rm(dfs_path=path)
-                    renamed_path = path + ".__PUT__"
-                    _logging_dfs_client.upload(dfs_path=path, local_path=renamed_path)
-                    logger.info(f"put {renamed_path} on dfs")
+                    _logging_dfs_client.upload(dfs_path=path, local_path=path)
+                    logger.info(f"put {path} on dfs")
             logging_pairs_to_files.clear()
             continue
         elif item == "gc":

@@ -1,5 +1,6 @@
 import logging
 import os
+import subprocess
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -284,7 +285,6 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                                                          optimizer, comm,
                                                          peer_failure_worker)
 
-
             if lr_scheduler:
                 # It seems that when last_epoch != -1, the optimizer should has initialized the `initial_lr`
                 # but in parallel recovery, the re-built optimizer does not have that attribute, so we need
@@ -301,7 +301,6 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
             get_rank_bck = torch.distributed.get_rank
             torch.distributed.get_rank = lambda group=None: peer_failure_worker
             logger.info(f"rank {get_rank_bck()} changes the rank to {torch.distributed.get_rank()}")
-
 
             def _cb(ts):
                 nonlocal model
@@ -828,19 +827,30 @@ class HDFSClient(DFSClient):
         self.hdfs = HDFileSystem(host=os.environ.get("HADOOP_MASTER"), port=54310)
 
     def upload(self, dfs_path, local_path):
-        self.hdfs.put(local_path, "/" + dfs_path + ".__COPY__")
-        self.hdfs.mv("/" + dfs_path + ".__COPY__", "/" + dfs_path)
-        # rename back after the upload
-        os.system(f"mv {local_path} {dfs_path}")
+        while True:
+            try:
+                result = subprocess.run(["hdfs", "dfs", "-put", local_path, "/"], check=True)
+                break
+            except Exception as e:
+                if "File exists" in f"{e}":
+                    break
+                logger.info(f"upload {dfs_path} failed. retry. error: {e}")
+                time.sleep(0.1)
 
     def download(self, dfs_path, local_path):
         if local_path in os.listdir():
             # File exists
             return
-        elif local_path + ".__PUT__" in os.listdir():
-            return
 
-        self.hdfs.get("/" + dfs_path, local_path)
+        while True:
+            try:
+                result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."], check=True)
+                break
+            except Exception as e:
+                if "File exists" in f"{e}":
+                    break
+                logger.info(f"download {dfs_path} failed. retry. error: {e}")
+                time.sleep(0.1)
 
     def ls(self):
         files = self.hdfs.ls("/")
