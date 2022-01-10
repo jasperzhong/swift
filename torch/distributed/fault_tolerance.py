@@ -827,6 +827,8 @@ class HDFSClient(DFSClient):
     def upload(self, dfs_path, local_path):
         self.hdfs.put(local_path, "/" + dfs_path + ".__COPY__")
         self.hdfs.mv("/" + dfs_path + ".__COPY__", "/" + dfs_path)
+        # rename back after the upload
+        os.system(f"mv {local_path} {dfs_path}")
 
     def download(self, dfs_path, local_path):
         if local_path in os.listdir():
