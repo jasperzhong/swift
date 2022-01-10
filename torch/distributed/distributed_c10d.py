@@ -129,6 +129,7 @@ def _failure_handler():
 
     if _logging:
         _logging_gpu_tensor_queue.clear()
+        _logging_cpu_tensor_queue.put("flush")
 
     logger.info("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
