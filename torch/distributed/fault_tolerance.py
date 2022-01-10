@@ -834,6 +834,8 @@ class HDFSClient(DFSClient):
         if local_path in os.listdir():
             # File exists
             return
+        elif local_path + ".__PUT__" in os.listdir():
+            return
 
         self.hdfs.get("/" + dfs_path, local_path)
 
