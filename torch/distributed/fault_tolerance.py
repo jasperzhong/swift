@@ -840,8 +840,9 @@ class HDFSClient(DFSClient):
             return
         elif local_path + ".__PUT__" in os.listdir():
             return
-
-        self.hdfs.get("/" + dfs_path, local_path)
+        
+        os.system(f"/usr/local/hadoop/bin/hdfs dfs -get /{dfs_path} {local_path}")
+        # self.hdfs.get("/" + dfs_path, local_path)
 
     def ls(self):
         files = self.hdfs.ls("/")
