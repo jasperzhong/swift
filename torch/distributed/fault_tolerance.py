@@ -820,7 +820,7 @@ class HDFSClient(DFSClient):
     def __init__(self, *args, **kwargs):
         # please add hdfs commannd in the PATH
         os.environ["LIBHDFS3_CONF"] = "/usr/local/hadoop/etc/hadoop/hdfs-site.xml"
-        self.hdfs = HDFileSystem(host='localhost', port=54310)
+        self.hdfs = HDFileSystem(host=os.environ.get("HADOOP_MASTER"), port=54310)
 
     def upload(self, dfs_path, local_path):
         self.hdfs.put(local_path, "/" + dfs_path + ".__COPY__")
