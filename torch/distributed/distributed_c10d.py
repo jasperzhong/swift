@@ -131,7 +131,7 @@ def _failure_handler():
         _logging_gpu_tensor_queue.clear()
         node_rank = int(os.environ["GROUP_RANK"])
         # if node_rank == 0 or node_rank == 2:
-            _logging_cpu_tensor_queue.put("flush")
+        _logging_cpu_tensor_queue.put("flush")
 
     logger.info("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
@@ -3110,8 +3110,6 @@ def flush_objects_to_dfs(config):
                         file.close()
                     _logging_dfs_client.rm(dfs_path=path)
                     renamed_path = path + ".__PUT__"
-                    if "23_24" in renamed_path:
-                        continue
                     _logging_dfs_client.upload(dfs_path=path, local_path=renamed_path)
                     logger.info(f"put {renamed_path} on dfs")
             logging_pairs_to_files.clear()
