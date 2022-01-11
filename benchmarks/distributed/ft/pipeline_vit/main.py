@@ -186,7 +186,7 @@ def main():
     lr_scheduler = get_lr_scheduler(optimizer, total_iters, args)
     loss_func = nn.CrossEntropyLoss().cuda()
 
-    groups = [[0], [1], [2], [3], [4], [5], [6, 7], [8, 9], [10, 11, 12], [13, 14, 15]]
+    groups = [[0], [1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11, 12], [13, 14], [15]]
     curr_groups = []
     for group in groups:
         ranks = []
