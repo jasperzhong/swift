@@ -249,7 +249,7 @@ def main():
 
 
     # merge_groups(workload, threshold, bandwidth, checkpoint_interval=100)
-    groups = [[0], [1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11, 12], [13, 14], [15]]
+    groups = [[0], [1], [2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12], [13, 14, 15]]
     curr_groups = []
     for group in groups:
         ranks = []
