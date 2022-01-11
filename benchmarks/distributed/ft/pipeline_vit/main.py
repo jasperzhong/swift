@@ -187,7 +187,7 @@ def main():
     loss_func = nn.CrossEntropyLoss().cuda()
 
     groups = [[0], [1], [2], [3], [4], [5], [6], [7, 8], [9, 10], [11, 12, 13, 14, 15]]
-    args.logging_group_size = 2
+    args.logging_group_size = 16
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
         checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
