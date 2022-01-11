@@ -458,7 +458,7 @@ def build_communication_group(config, peer_failure_worker):
 #         model_sum += torch.sum(param)
 #         if param.grad is not None:
 #             grad_sum += torch.sum(param.grad)
-#
+
 #     optimizer_sum = 0
 #     for group in optimizer.param_groups:
 #         for p in group['params']:
@@ -466,7 +466,7 @@ def build_communication_group(config, peer_failure_worker):
 #                 state = optimizer.state[p]
 #                 if 'momentum_buffer' in state:
 #                     optimizer_sum += torch.sum(state['momentum_buffer'])
-#
+
 #     with open("debug.log", "a") as f:
 #         f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
@@ -611,7 +611,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 f.write(f"{recovery_time}\n")
 
                         # for experiment:
-                        if ts._value == 500 and get_rank() == 8 and not os.path.exists("./temp.flag"):
+                        if ts._value == 500 and get_rank() == 4 and not os.path.exists("./temp.flag"):
                             with open("temp.flag", "a") as f:
                                 f.write("Already killed\n")
                             os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
@@ -650,7 +650,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 logger.info(info)
 
                         # TODO: logging throughput, parallel, on failure worker
-                        if ts % config.print_freq == 0 and get_rank() in [0, 4]:
+                        if ts % config.print_freq == 0 and get_rank() in [0, 4, 8]:
                             write = "{} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time() - base_time, throughput, throughput_avg / ts._value)
                             with open(f"main_throughput_{get_rank()}.txt", "a") as f:
@@ -673,7 +673,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         curr_time = time.time() - base_time
                         if is_pipeline_last_stage():
                             with open("./time_validation.txt", "a") as f:
-                                f.write(f"{curr_time} {accu}\n")
+                                f.write(f"{ts} {curr_time} {accu}\n")
                         data_iterator = reset_data_iterator_func(config, data_loader, 0)
             if fault_tolerance_val:
                 logger.info("Finish Training for {} iterations".format(ts))
@@ -681,7 +681,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 curr_time = time.time() - base_time
                 if is_pipeline_last_stage():
                     with open("./time_validation.txt", "a") as f:
-                        f.write(f"{curr_time} {accu}\n")
+                        f.write(f"{ts} {curr_time} {accu}\n")
             break
         except SwiftInternalError as e:
             # init time start
