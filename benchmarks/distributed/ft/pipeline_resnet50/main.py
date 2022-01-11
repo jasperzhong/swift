@@ -112,7 +112,7 @@ def reset_data_iterator(config, data_loader, ts):
     # 8092 / 16 = 512
     idx = ts * 512
 
-    train_sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=args.data_parallel_size,
+    train_sampler = torch.utils.data.DistributedSamplerFromIdx(train_dataset, num_replicas=args.data_parallel_size,
                                             rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True, idx=idx)
 
     data_loader = torch.utils.data.DataLoader(
