@@ -148,7 +148,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     init_time = init_end - init_time
     logger.info(f"init time is: {init_time}")
     # only rank 0 get the init time
-    if ts._value != 0 and get_rank() == 0:
+    if ts._value != 0 and get_rank() in [0, 16]:
         with open(f"main_init_{ts._value}.txt", "a") as f:
             f.write(f"{init_time}\n")
     logger.info(f"failure workers: {failure_workers}")
