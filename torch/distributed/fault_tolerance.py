@@ -611,7 +611,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 f.write(f"{recovery_time}\n")
 
                         # for experiment:
-                        if ts._value == 150 and get_rank() == 8 and not os.path.exists("./temp.flag"):
+                        if ts._value == 150 and get_rank() == 4 and not os.path.exists("./temp.flag"):
                             with open("temp.flag", "a") as f:
                                 f.write("Already killed\n")
                             os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
