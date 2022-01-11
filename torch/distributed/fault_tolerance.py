@@ -382,7 +382,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     else:
         filename = _get_checkpoint_path(config)
         load_checkpoint(filename, ts, model, optimizer)
-        
+
         if lr_scheduler:
             lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
                 optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
@@ -899,6 +899,7 @@ except ImportError:
 
 def get_groups(group_size=None, groups=None):
     workers = get_world_size()
+    print(f"workers: {workers}")
     workers_in_groups = []
     if groups:
         for group in groups:
