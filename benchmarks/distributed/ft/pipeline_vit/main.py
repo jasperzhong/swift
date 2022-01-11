@@ -196,7 +196,7 @@ def main():
 
     print(f"curr_groups is {curr_groups}")
 
-    args.logging_group_size = 16
+    args.logging_group_size = None
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
         checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
