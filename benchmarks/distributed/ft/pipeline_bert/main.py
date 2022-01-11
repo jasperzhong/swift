@@ -273,10 +273,10 @@ def main():
     # warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 10)
     # print("End up profile")
 
-    warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 5)
+    # warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 5)
     
-    # fault_tolerance_train(config, train_iter, model, optimizer,
-    #                       data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
+    fault_tolerance_train(config, train_iter, model, optimizer,
+                          data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
 
 
 if __name__ == '__main__':
