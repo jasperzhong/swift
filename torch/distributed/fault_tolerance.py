@@ -649,7 +649,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 logger.info(info)
 
                         # TODO: logging throughput, parallel, on failure worker
-                        if ts % config.print_freq == 0 and get_rank() in [0, 8, 96, 104, 112]:
+                        if ts % config.print_freq == 0 and get_rank() in [0, 8, 96, 97, 104, 112]:
                             write = "{} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time() - base_time, throughput, throughput_avg / ts._value)
                             with open(f"main_throughput_{get_rank()}.txt", "a") as f:
