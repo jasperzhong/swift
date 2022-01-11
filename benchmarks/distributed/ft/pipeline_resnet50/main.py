@@ -87,7 +87,7 @@ def get_data_loader(args):
     return train_loader
 
 
-def reset_data_iterator(data_loader, ts):
+def reset_data_iterator(config, data_loader, ts):
     if args.seed is not None:
         random.seed(args.seed)
         np.random.seed(args.seed)
@@ -140,12 +140,15 @@ def main():
 
     data_loader = get_data_loader(args)
     print(f"pipeline rank = {get_pipeline_model_parallel_rank()}")
-    model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=None)
+
+    balance = [4, 2, 2, 3]
+    # balance = [4, 1, 1, 1, 1, 3]
+    model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=balance)
     model.cuda()
 
     total_iters = args.benchmark_iters
     print("total iterations: {}".format(total_iters))
-    num_micro_batches = args.global_batch_size // args.micro_batch_size
+    num_micro_batches = args.global_batch_size // args.micro_batch_size // args.data_parallel_size
     iters_per_epoch = len(data_loader) // num_micro_batches
     print("iters per epoch:{}".format(iters_per_epoch))
 
@@ -158,7 +161,7 @@ def main():
 
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=10, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
+        checkpoint_interval=100, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
     )
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)

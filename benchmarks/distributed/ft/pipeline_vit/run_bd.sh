@@ -4,8 +4,7 @@ NNODES=16
 NPROC_PER_NODE=8
 MASTER_IP=192.168.64.11
 MASTER_PORT=1234
-export NCCL_SOCKET_IFNAME=bond0
-
+export NCCL_SOCKET_IFNAME=bond0 
 ENABLE_LOGGING=${1:-0}
 LOGGING_GROUP_SIZE=${2:-${NPROC_PER_NODE}}
 PARALLEL_RECOVERY=${3:-0}
@@ -21,7 +20,7 @@ cmd="python3 -m torch.distributed.run \
 	--rdzv_id=1234 --rdzv_backend=c10d \
 	--rdzv_endpoint=$MASTER_IP \
 	main.py \
-	--micro-batch-size 32 \
+	--micro-batch-size 16 \
 	--global-batch-size 4096 \
 	--benchmark-iters 200 \
 	--seed 42 \
@@ -31,7 +30,7 @@ cmd="python3 -m torch.distributed.run \
 LOGGING_ARGS="
 	--logging \
 	--logging-dfs hdfs \
-	--logging-chunk-freq 5 \
+	--logging-chunk-freq 10 \
 	--logging-group-size ${LOGGING_GROUP_SIZE}"
 
 if [[ $PARALLEL_RECOVERY -eq 1 ]]; then
@@ -45,5 +44,7 @@ fi
 cmd="${cmd} /data2/data/ILSVRC2012"
 
 echo $cmd
+
+export HADOOP_MASTER=192.168.64.18
 
 OMP_NUM_THREADS=4 NCCL_IB_DISABLE=1 exec $cmd

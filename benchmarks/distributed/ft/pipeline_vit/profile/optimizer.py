@@ -11,7 +11,10 @@ def merge_groups(threshold, bandwidth, checkpoint_interval, num_micro_batches, n
     print("recovery time {}".format(recovery_time))
     activation_size = []
     
-    activation_size = compute_logging_size(num_micro_batches, file="../profile.txt", num_machines=num_machines)
+    balance = [1 for _ in range(128)]
+    balance[0] = 2
+    balance[-1] = 3
+    activation_size = compute_logging_size(num_micro_batches, balance=balance, file="../profile.txt", num_machines=num_machines)
     
     activation_sum = sum(activation_size) * checkpoint_interval
     print(f"activation_sum {activation_sum}")

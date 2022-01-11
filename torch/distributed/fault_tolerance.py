@@ -1,11 +1,12 @@
 import logging
 import os
-import subprocess
 import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Queue
 from benchmarks.distributed.ft.finetune_vit.schedule import is_pipeline_last_stage
+
+from hdfs3 import HDFileSystem
 
 import torch
 import torch.distributed.distributed_c10d as distributed_c10d
@@ -20,7 +21,6 @@ from .distributed_c10d import (_failure_handler, all_gather, barrier,
                                get_local_world_size, get_rank, get_world_size,
                                is_local_root_rank, new_group,
                                parallel_recovery_data_parallel_size)
-
 
 logger = logging.getLogger(__name__)
 
@@ -37,25 +37,32 @@ def _need_recovery(groups, failure_workers):
 
 def _download_logging_files(logging_files):
     client = distributed_c10d._logging_dfs_client
-    for i in range(len(logging_files)):
-        while logging_files[i]:
-            dfs_files = client.ls()
-            for file in logging_files[i]:
-                if file in dfs_files:
-                    client.download(dfs_path=file, local_path=file)
-                    logger.info(f"download {file} from dfs")
-                    logging_files[i].remove(file)
-            time.sleep(0.1)
+    try:
+        for i in range(len(logging_files)):
+            while logging_files[i]:
+                dfs_files = client.ls()
+                for file in logging_files[i][:]:
+                    if file in dfs_files:
+                        client.download(dfs_path=file, local_path=file)
+                        logger.info(f"download {file} from dfs")
+                        logging_files[i].remove(file)
+                time.sleep(0.1)
+    except Exception as e:
+        logger.info(f"logging daemon catches an error. {e}")
+    logger.info("download finishes")
+
 
 def _whether_to_upload_logging_files(groups, failure_workers):
     pairs = groups_to_pairs(groups)
     rank = get_rank()
     for pair in pairs:
         if rank in pair:
+            peer = pair[1] if pair[0] == rank else pair[0]
             for failure_worker in failure_workers:
-                if failure_worker in pair:
+                if failure_worker == peer:
                     return True
     return False
+
 
 def _get_checkpoint_path(config):
     rank = get_rank()
@@ -71,9 +78,11 @@ class FileInfo:
 
 def _set_recovery_mask(config, ts, consensus_value):
     logging_files = get_logging_files(config, ts, consensus_value)
-    logger.info(f"logging_files: {logging_files}")
-    download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ), daemon=True)
-    download_thread.start()
+    if logging_files and logging_files[0]:
+        logger.info(f"logging_files: {logging_files}")
+        download_thread = threading.Thread(
+            target=_download_logging_files, args=(logging_files, ), daemon=True)
+        download_thread.start()
 
 
 class FaultToleranceConfig:
@@ -122,6 +131,7 @@ def teardown(config):
         distributed_c10d._logging_cpu_tensor_queue.put(None)
         distributed_c10d._logging_thread.join()
 
+
 # profile some time
 init_time = 0
 recovery_time = 0
@@ -133,12 +143,13 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
 
     callback = None
     consensus_value, need_undo, failure_workers = ts.sync()
+    logger.info(f"consensus_value is {consensus_value}")
     # init time end
-    init_end= time.time()
+    init_end = time.time()
     init_time = init_end - init_time
     logger.info(f"init time is: {init_time}")
     # only rank 0 get the init time
-    if ts._value != 0 and get_rank() == 0:
+    if ts._value != 0 and get_rank() in [0, 1, 16]:
         with open(f"main_init_{ts._value}.txt", "a") as f:
             f.write(f"{init_time}\n")
     logger.info(f"failure workers: {failure_workers}")
@@ -185,8 +196,12 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
         ts._value = consensus_value
     elif config.logging:
         # upload needed logging files
-        if _whether_to_upload_logging_files(config.groups, failure_workers):
-            distributed_c10d._logging_cpu_tensor_queue.put("flush")
+        # if failure_workers:
+        #     if _whether_to_upload_logging_files(config.groups, failure_workers):
+        #         logger.info(f"Rank {get_rank()} should upload the logging files.")
+        #         distributed_c10d._logging_cpu_tensor_queue.put("flush")
+        #     elif distributed_c10d._logging_cpu_tensor_queue:
+        #         distributed_c10d._logging_cpu_tensor_queue.put("close")
 
         need_recovery = _need_recovery(config.groups, failure_workers)
         if need_recovery:
@@ -232,42 +247,11 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
 
             # 2. all workers build new comm group
             peer_failure_worker = get_peer_failure_worker(config, failure_workers)
-            comm = build_communication_group(config, peer_failure_worker)
-            group_rank = get_rank(group=comm)
-            group_size = get_world_size(group=comm)
-            distributed_c10d._logging_group_rank = group_rank
-            distributed_c10d._logging_group_size = group_size
-            distributed_c10d._logging_group_diff = get_rank() - peer_failure_worker
-            logger.info(f"build new communication group ({group_rank} / {group_size})")
 
-            # 3. living workers build model and optimizer
-            optimizer_cls = optimizer.__class__
-            optimizer_defaults = optimizer.defaults
-            model, optimizer = build_model_and_optimizer(config, model,
-                                                         optimizer, comm,
-                                                         peer_failure_worker)
-
-            # 4. broadcast failure worker's ts
+            # 3. broadcast failure worker's ts
             ts.broadcast(peer_failure_worker)
 
-            if lr_scheduler:
-                # It seems that when last_epoch != -1, the optimizer should has initialized the `initial_lr` 
-                # but in parallel recovery, the re-built optimizer does not have that attribute, so we need
-                # to set the `initial_lr` by building it twice. 
-                # KeyError: "param 'initial_lr' is not specified in param_groups[0] when resuming an optimizer"
-                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=-1)
-
-                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
-                logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
-
-            # 5. hijack get_rank()
-            get_rank_bck = torch.distributed.get_rank
-            torch.distributed.get_rank = lambda group=None: peer_failure_worker
-            logger.info(f"rank {get_rank_bck()} changes the rank to {torch.distributed.get_rank()}")
-
-            # 6. download the same set of logging files as the failure worker
+            # 4. download the same set of logging files as the failure worker
             if not need_recovery:
                 # filename = "rng_state_%d.h5" % (peer_failure_worker)
                 # while True:
@@ -280,15 +264,48 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
 
                 logging_files = get_logging_files_for_parallel_recovery(config, ts, consensus_value,
                                                                         peer_failure_worker)
-                logger.info(f"logging_files: {logging_files}")
-                if logging_files:
+                if logging_files and logging_files[0]:
+                    logger.info(f"logging_files: {logging_files}")
                     download_thread = threading.Thread(target=_download_logging_files, args=(logging_files, ),
                                                        daemon=True)
                     download_thread.start()
 
+            comm = build_communication_group(config, peer_failure_worker)
+            group_rank = get_rank(group=comm)
+            group_size = get_world_size(group=comm)
+            distributed_c10d._logging_group_rank = group_rank
+            distributed_c10d._logging_group_size = group_size
+            distributed_c10d._logging_group_diff = get_rank() - peer_failure_worker
+            logger.info(f"build new communication group ({group_rank} / {group_size})")
+
+            # 5. living workers build model and optimizer
+            optimizer_cls = optimizer.__class__
+            optimizer_defaults = optimizer.defaults
+            model, optimizer = build_model_and_optimizer(config, model,
+                                                         optimizer, comm,
+                                                         peer_failure_worker)
+
+            if lr_scheduler:
+                # It seems that when last_epoch != -1, the optimizer should has initialized the `initial_lr`
+                # but in parallel recovery, the re-built optimizer does not have that attribute, so we need
+                # to set the `initial_lr` by building it twice.
+                # KeyError: "param 'initial_lr' is not specified in param_groups[0] when resuming an optimizer"
+                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=-1)
+
+                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    optimizer, lr_lambda=old_lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
+                logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
+
+            # 6. hijack get_rank()
+            get_rank_bck = torch.distributed.get_rank
+            torch.distributed.get_rank = lambda group=None: peer_failure_worker
+            logger.info(f"rank {get_rank_bck()} changes the rank to {torch.distributed.get_rank()}")
+
             def _cb(ts):
                 nonlocal model
                 nonlocal optimizer
+                nonlocal lr_scheduler
                 nonlocal old_optimizer
                 nonlocal old_lr_scheduler
                 nonlocal enable_logging_on_disabled_worker
@@ -324,6 +341,8 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                     # copy states from DistributedOptimizer
                     old_optimizer.load_state_dict(optimizer.state_dict())
                     optimizer = old_optimizer
+                    # no need to restore lr_scheduler
+                    old_lr_scheduler = lr_scheduler
 
                 # # destroy communication group
                 # destroy_process_group(comm)
@@ -364,10 +383,30 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     else:
         filename = _get_checkpoint_path(config)
         load_checkpoint(filename, ts, model, optimizer)
+
+        barrier()
+        N, d = get_world_size(), config.data_parallel_size
+        pipeline_parallel_size = N // d
+        pipeline_parallel_rank = get_rank() % pipeline_parallel_size
+
+        ranks = list(zip(*[list(range(i * N // d, (i + 1) * N // d))
+                           for i in range(d)]))[pipeline_parallel_rank]
+        logger.info(f"ranks: {ranks}")
+        comm = new_group(ranks, group_name="src_group_rank_%d_%d" % (pipeline_parallel_rank, consensus_value))
+        if type(optimizer).__name__ == "DistributedOptimizer":
+            optimizer.comm_group = comm
+        else:
+            optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
+                                             backward_passes_per_step=config.num_microbatches,
+                                             comm_group=comm, average=True)
+
+        # broadcast_parameters(model.state_dict(), group_src_rank, comm_group=comm)
+        optimizer.clear()
+
         if lr_scheduler:
-                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-                    optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
-                logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
+            lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
+            logger.info(f"reset lr scheduler: lr={lr_scheduler.get_last_lr()}")
 
     return ts, model, optimizer, lr_scheduler, consensus_value, callback
 
@@ -450,26 +489,33 @@ def build_communication_group(config, peer_failure_worker):
 #     with open("debug.log", "a") as f:
 #         f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
-def compute_logging_size(num_micro_batches, file="/data2/repos/swift/benchmarks/distributed/ft/pipeline_vit/profile.txt", num_machines=16):
+def compute_logging_size(num_micro_batches, balance, file="../profile.txt", num_machines=16):
     workers_per_machine = 8
     with open(file) as f:
         lines = f.readlines()
         start = workers_per_machine
         activation_size = []
-        for i in range(num_machines - 1):
-            line = lines[start]
+        idx = 0
+        for i in range(len(balance)):
+            if i == len(balance) - 1:
+                idx += 1
+            else:
+                start = balance[i]
+            idx += start
+            line = lines[idx]
             line = line.strip('\n')
             nums = line.split(" ")
             nums = [int(num) for num in nums]
             sum = 1
             for n in nums:
                 sum *= n
-            sum *= 4 # fp32
+            sum *= 4  # fp32
             sum *= num_micro_batches
             activation_size.append(sum)
-    
+
     print(f"activation size: {activation_size}")
     return activation_size
+
 
 def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_micro_batches, num_machines=16, workers_per_machine=8):
     # TODO: check how to read the file
@@ -481,9 +527,9 @@ def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_micro_
     for i in range(num_machines):
         with open(f"{workload}_compute_time_{i}.txt", "r") as f:
             recovery_time.append(float(f.read()))
-    
+
     activation_size = compute_logging_size(num_micro_batches, file="./profile.txt", num_machines=num_machines)
-    
+
     activation_sum = sum(activation_size)
     group_size = len(recovery_time)
     assert group_size == num_machines, "initial group size must be equal to num of machines"
@@ -497,8 +543,8 @@ def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_micro_
             r_merge = recovery_time[i] + recovery_time[i + 1] + activation_size[i] / bandwidth
             delta_m = activation_size[i] * checkpoint_interval
             delta_r = r_merge * 2 * workers_per_machine / num_machines \
-                        - recovery_time[i] * workers_per_machine / num_machines \
-                        - recovery_time[i + 1] * workers_per_machine / num_machines
+                - recovery_time[i] * workers_per_machine / num_machines \
+                - recovery_time[i + 1] * workers_per_machine / num_machines
 
             r_m = delta_r / delta_m
             if r_m < min_r_m:
@@ -513,11 +559,12 @@ def merge_groups(workload, threshold, bandwidth, checkpoint_interval, num_micro_
         group[merge_id] = group[merge_id].extend(group[merge_id + 1])
         del group[merge_id + 1]
         del activation_size[merge_id]
-        del recovery_time[merge_id + 1] 
+        del recovery_time[merge_id + 1]
         group_size -= 1
-    
+
     print(f"the merged group is {group}")
-    return group        
+    return group
+
 
 def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_scheduler, warmup_iters):
     sum = 0
@@ -529,7 +576,7 @@ def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_sc
         _, compute_time_sum = train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler)
         print(f"compute_time_sum:{compute_time_sum}")
         print(f"all time {time.time() - start}")
-    
+
     rank = get_rank()
     workers_per_machine = get_local_world_size()
 
@@ -551,7 +598,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
     else:
         with open("time.log", "r") as f:
             base_time = float(f.read())
-    
+
     ts = Timestamp(0)
     distributed_c10d._ts = ts
     filename = _get_checkpoint_path(config)
@@ -560,7 +607,8 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
         ts, model, optimizer, lr_scheduler, consensus_value, cb = recovery(config, ts, model, optimizer, lr_scheduler)
         s = time.time()
         data_iterator = reset_data_iterator_func(config, data_loader, ts % config.iters_per_epoch)
-        print("reset data iterator time is:{}".format(time.time() - s))
+        logger.info(f"data_iter is now at : {ts % config.iters_per_epoch}")
+        logger.info("reset data iterator time is:{}".format(time.time() - s))
         iter_time_avg = 0
         throughput_avg = 0
         # checksum(ts, model, optimizer)
@@ -575,12 +623,12 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             raise StopIteration
 
                         # failure worker back to the consensus_value and finish recovery
-                        if ts._value != 0 and ts._value == consensus_value and get_rank() == 8:
+                        if ts._value != 0 and ts._value == consensus_value and get_rank() == 4:
                             recovery_time = time.time() - recovery_time
                             logger.info("recovery time is: {}".format(recovery_time))
                             with open(f"main_recovery_{ts._value}.txt", "a") as f:
                                 f.write(f"{recovery_time}\n")
-                        
+
                         # for experiment:
                         if ts._value == 500 and get_rank() == 8 and not os.path.exists("./temp.flag"):
                             with open("temp.flag", "a") as f:
@@ -592,17 +640,19 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         iteration_time = time.time() - start
                         ts += 1
                         num += 1
+
                         # this is okay because ts has been increased by one
-                        if ts % config.checkpoint_interval == 0:
+                        # disable checkpoint when in recovery
+                        if ts % config.checkpoint_interval == 0 and not distributed_c10d._logging_in_recovery:
                             checkpoint_start = time.time()
                             filename = _get_checkpoint_path(config)
                             checkpoint(filename, ts, model, optimizer)
                             logger.info("checkpoint time is {}".format(time.time() - checkpoint_start))
-                        
+
                         iteration_time = time.time() - start
 
                         iter_time_avg += iteration_time
-                        throughput = config.batch_size / iteration_time * parallel_recovery_data_parallel_size()
+                        throughput = config.batch_size / iteration_time  # * parallel_recovery_data_parallel_size()
                         throughput_avg += throughput
 
                         # since the failure is on a basis of machines,
@@ -612,15 +662,14 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 info = "[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f} lr: {}".format(
                                     ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value, lr_scheduler.get_last_lr())
                                 logger.info(info)
-                                
+
                             else:
                                 info = "[Iteration {}] loss: {:.6f} current throughput: {:.2f} avg throughput: {:.2f} iteration time: {:.3f} average iteration time: {:.3f}".format(
                                     ts, loss, throughput, throughput_avg / ts._value, iteration_time, iter_time_avg / ts._value)
                                 logger.info(info)
 
-
                         # TODO: logging throughput, parallel, on failure worker
-                        if ts % config.print_freq == 0 and get_rank() in [0, 8] :
+                        if ts % config.print_freq == 0 and get_rank() in [0, 4]:
                             write = "{} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time() - base_time, throughput, throughput_avg / ts._value)
                             with open(f"main_throughput_{get_rank()}.txt", "a") as f:
@@ -633,10 +682,10 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             logger.info(f"parallel recovery restores from iteration {ts}")
                             cb = None
 
-
                         # checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
+                    data_iterator = reset_data_iterator_func(config, data_loader, 0)
                     if fault_tolerance_val:
                         logger.info("start validation at iteration: {}".format(ts))
                         accu = fault_tolerance_val(config, model, test_loader, loss_func)
@@ -807,25 +856,35 @@ class DFSClient(ABC):
 class HDFSClient(DFSClient):
     def __init__(self, *args, **kwargs):
         # please add hdfs commannd in the PATH
-        self.hdfs_bin = "hdfs"
+        os.environ["LIBHDFS3_CONF"] = "/usr/local/hadoop/etc/hadoop/hdfs-site.xml"
+        self.hdfs = HDFileSystem(host=os.environ.get("HADOOP_MASTER"), port=54310)
 
     def upload(self, dfs_path, local_path):
-        result = subprocess.run([self.hdfs_bin, "dfs", "-put", local_path, "/"])
-        result.check_returncode()
+        os.system(f"/usr/local/hadoop/bin/hdfs dfs -put {local_path} /{dfs_path}")
+        # self.hdfs.put(local_path, "/" + dfs_path + ".__COPY__")
+        # self.hdfs.mv("/" + dfs_path + ".__COPY__", "/" + dfs_path)
+        # rename back after the upload
+        os.system(f"mv {local_path} {dfs_path}")
 
     def download(self, dfs_path, local_path):
         if local_path in os.listdir():
             # File exists
             return
-        result = subprocess.run([self.hdfs_bin, "dfs", "-get", "/" + dfs_path, "."])
-        result.check_returncode()
+        elif local_path + ".__PUT__" in os.listdir():
+            return
+
+        os.system(f"/usr/local/hadoop/bin/hdfs dfs -get /{dfs_path} {local_path}")
+        # self.hdfs.get("/" + dfs_path, local_path)
 
     def ls(self):
-        result = subprocess.getoutput("hdfs dfs -ls /")
-        return [item.split(' ')[-1].lstrip('/') for item in result.split('\n')[1:]]
+        files = self.hdfs.ls("/")
+        return [file.lstrip("/") for file in files]
 
     def rm(self, dfs_path):
-        result = subprocess.run([self.hdfs_bin, "dfs", "-rm", "/" + dfs_path])
+        try:
+            self.hdfs.rm("/" + dfs_path)
+        except FileNotFoundError:
+            pass
 
 
 try:

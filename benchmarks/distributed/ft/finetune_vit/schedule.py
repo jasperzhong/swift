@@ -23,7 +23,8 @@ def is_pipeline_first_stage():
 
 
 def get_pipeline_model_parallel_world_size():
-    return torch.distributed.get_world_size()
+    return torch.distributed.get_world_size() // \
+        torch.distributed.parallel_recovery_data_parallel_size()
 
 
 def get_pipeline_model_parallel_rank():

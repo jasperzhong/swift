@@ -237,35 +237,22 @@ def main():
 
     data_loader = create_pretraining_dataset(args)
 
-    model, optimizer, lr_scheduler, loss_func = prepare_model_and_optimizer(args)
-    model.cuda()
-    loss_func.cuda()
 
-    total_iters = args.benchmark_iters
-    print("total iterations: {}".format(total_iters))
-    num_micro_batches = args.global_batch_size // args.micro_batch_size
-    iters_per_epoch = len(data_loader) // num_micro_batches
-    print("iters per epoch:{}".format(iters_per_epoch))
-
-
-    # merge_groups(workload, threshold, bandwidth, checkpoint_interval=100)
-    groups = [[0], [1], [2], [3], [4], [5], [6], [7, 8], [9, 10], [11, 12, 13, 14, 15]]
-    args.logging_group_size = 16
-    config = FaultToleranceConfig(
-        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
-        logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
-        logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
-        logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
+    if args.seed is not None:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        torch.cuda.manual_seed(args.seed)
+    train_dataset = data_loader.dataset
+    idx = 135 * 512
+    train_sampler = RandomSamplerFromIdx(train_dataset, 0)
+    data_loader = torch.utils.data.DataLoader(
+        train_dataset, sampler=train_sampler, 
+        batch_size=args.micro_batch_size,
+        num_workers=32, pin_memory=True
     )
-
-    # # profile some data first
-    # print("start to profile compute time")
-    # warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 10)
-    # print("End up profile")
-    
-    fault_tolerance_train(config, train_iter, model, optimizer,
-                          data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
+    data_iterator = iter(data_loader)
+    print(next(data_iterator))
 
 
 if __name__ == '__main__':
