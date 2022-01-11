@@ -148,7 +148,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     init_time = init_end - init_time
     logger.info(f"init time is: {init_time}")
     # only rank 0 get the init time
-    if ts._value != 0 and get_rank() in [0, 16]:
+    if ts._value != 0 and get_rank() in [0, 1, 16]:
         with open(f"main_init_{ts._value}.txt", "a") as f:
             f.write(f"{init_time}\n")
     logger.info(f"failure workers: {failure_workers}")
@@ -604,7 +604,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             raise StopIteration
 
                         # failure worker back to the consensus_value and finish recovery
-                        if ts._value != 0 and ts._value == consensus_value and get_rank() == 8:
+                        if ts._value != 0 and ts._value == consensus_value and get_rank() == 4:
                             recovery_time = time.time() - recovery_time
                             logger.info("recovery time is: {}".format(recovery_time))
                             with open(f"main_recovery_{ts._value}.txt", "a") as f:
@@ -650,7 +650,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 logger.info(info)
 
                         # TODO: logging throughput, parallel, on failure worker
-                        if ts % config.print_freq == 0 and get_rank() in [0, 8]:
+                        if ts % config.print_freq == 0 and get_rank() in [0, 4]:
                             write = "{} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time() - base_time, throughput, throughput_avg / ts._value)
                             with open(f"main_throughput_{get_rank()}.txt", "a") as f:
