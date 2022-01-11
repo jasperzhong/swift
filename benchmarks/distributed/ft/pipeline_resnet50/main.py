@@ -5,6 +5,7 @@ import random
 import time
 
 import numpy as np
+from benchmarks.distributed.ft.finetune_vit.main import get_lr_scheduler
 from model import PipelineParallelResNet50
 from schedule import (get_num_microbatches, get_pipeline_model_parallel_rank,
                       initialize_global_args, is_pipeline_first_stage,
@@ -18,6 +19,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributed.fault_tolerance import (FaultToleranceConfig,
                                                fault_tolerance_train)
+from torch.optim import lr_scheduler
+from torch.utils.data.distributed import DistributedSamplerFromIdx
 
 logging.basicConfig(level=logging.INFO)
 
@@ -86,6 +89,19 @@ def get_data_loader(args):
     )
     return train_loader
 
+def get_lr_scheduler(optimizer, total_iters, args):
+
+    def adjust_learning_rate(iter):
+        iters_per_epoch = total_iters // 90
+        if iter <= iters_per_epoch * 30:
+            return 1
+        if iter <= iters_per_epoch * 60:
+            return 0.1
+        elif iter <= iters_per_epoch * 90:
+            return 0.01
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=adjust_learning_rate)
+    return scheduler
 
 def reset_data_iterator(config, data_loader, ts):
     if args.seed is not None:
@@ -146,16 +162,19 @@ def main():
     model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=balance)
     model.cuda()
 
-    total_iters = args.benchmark_iters
-    print("total iterations: {}".format(total_iters))
     num_micro_batches = args.global_batch_size // args.micro_batch_size // args.data_parallel_size
     iters_per_epoch = len(data_loader) // num_micro_batches
     print("iters per epoch:{}".format(iters_per_epoch))
+    total_iters = 90 * iters_per_epoch
+    print("total iterations: {}".format(total_iters))
 
-    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+    # TODO: Learning Rate:
+    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
     if args.data_parallel_size == 1 and args.replica:
         logging.warn(f"Replicas are not available because data-parallel size is {args.data_parallel_size}")
         args.replica = False
+
+    lr_scheduler = get_lr_scheduler(optimizer, total_iters, args)
 
     loss_func = nn.CrossEntropyLoss().cuda()
 
@@ -163,8 +182,11 @@ def main():
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
         checkpoint_interval=100, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
     )
+    # TODO: val
+    # TODO: test loader
     fault_tolerance_train(config, train_iter, model, optimizer,
-                          data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
+                          data_loader, loss_func, lr_scheduler, reset_data_iterator_func=reset_data_iterator, 
+                          fault_tolerance_val=, test_loader=, )
 
 
 if __name__ == '__main__':
