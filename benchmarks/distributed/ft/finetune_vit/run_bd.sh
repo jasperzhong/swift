@@ -45,4 +45,6 @@ cmd="${cmd} /data2/data/"
 
 echo $cmd
 
+export HADOOP_MASTER=192.168.64.18
+
 OMP_NUM_THREADS=4 NCCL_IB_DISABLE=1 exec $cmd
