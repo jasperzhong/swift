@@ -265,7 +265,7 @@ def main():
         checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
         logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
-        logging_group_size=args.logging_group_size, logging_groups=groups, print_freq=args.print_freq
+        logging_group_size=args.logging_group_size, logging_groups=curr_groups, print_freq=args.print_freq
     )
 
     # # profile some data first
