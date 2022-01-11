@@ -284,7 +284,6 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
                                                          optimizer, comm,
                                                          peer_failure_worker)
 
-
             if lr_scheduler:
                 # It seems that when last_epoch != -1, the optimizer should has initialized the `initial_lr`
                 # but in parallel recovery, the re-built optimizer does not have that attribute, so we need
@@ -301,7 +300,6 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
             get_rank_bck = torch.distributed.get_rank
             torch.distributed.get_rank = lambda group=None: peer_failure_worker
             logger.info(f"rank {get_rank_bck()} changes the rank to {torch.distributed.get_rank()}")
-
 
             def _cb(ts):
                 nonlocal model
@@ -384,6 +382,26 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     else:
         filename = _get_checkpoint_path(config)
         load_checkpoint(filename, ts, model, optimizer)
+
+        barrier()
+        N, d = get_world_size(), config.data_parallel_size
+        pipeline_parallel_size = N // d
+        pipeline_parallel_rank = get_rank() % pipeline_parallel_size
+
+        ranks = list(zip(*[list(range(i * N // d, (i + 1) * N // d))
+                           for i in range(d)]))[pipeline_parallel_rank]
+        logger.info(f"ranks: {ranks}")
+        comm = new_group(ranks, group_name="src_group_rank_%d_%d" % (pipeline_parallel_rank, consensus_value))
+        if type(optimizer).__name__ == "DistributedOptimizer":
+            optimizer.comm_group = comm
+        else:
+            optimizer = DistributedOptimizer(optimizer, model.named_parameters(),
+                                             backward_passes_per_step=config.num_microbatches,
+                                             comm_group=comm, average=True)
+
+        # broadcast_parameters(model.state_dict(), group_src_rank, comm_group=comm)
+        optimizer.clear()
+
         if lr_scheduler:
             lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
                 optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
@@ -846,7 +864,7 @@ class HDFSClient(DFSClient):
             return
         elif local_path + ".__PUT__" in os.listdir():
             return
-        
+
         os.system(f"/usr/local/hadoop/bin/hdfs dfs -get /{dfs_path} {local_path}")
         # self.hdfs.get("/" + dfs_path, local_path)
 
