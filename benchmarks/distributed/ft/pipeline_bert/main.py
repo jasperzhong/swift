@@ -249,14 +249,23 @@ def main():
 
 
     # merge_groups(workload, threshold, bandwidth, checkpoint_interval=100)
-    groups = [[0], [1], [2], [3], [4], [5], [6], [7, 8], [9, 10], [11, 12, 13, 14, 15]]
-    args.logging_group_size = 16
+    groups = [[0], [1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11, 12], [13, 14], [15]]
+    curr_groups = []
+    for group in groups:
+        ranks = []
+        for node in group:
+            ranks.extend([i for i in range(node * 8, (node + 1) * 8)])
+        curr_groups.append(ranks)
+
+    print(f"curr_groups is {curr_groups}")
+
+    args.logging_group_size = None
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
         checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
         logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
-        logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
+        logging_group_size=args.logging_group_size, logging_groups=groups, print_freq=args.print_freq
     )
 
     # # profile some data first
