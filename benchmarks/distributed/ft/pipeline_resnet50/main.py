@@ -225,13 +225,13 @@ def main():
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
-        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
+        num_iteration=total_iters, iters_per_epoch=10, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
         checkpoint_interval=200, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
     )
 
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, lr_scheduler, reset_data_iterator_func=reset_data_iterator, 
-                          fault_tolerance_val=fault_tolerance_val, test_loader=test_loader)
+                          fault_tolerance_val=fault_tolerance_val, test_loader=data_loader)
 
 
 if __name__ == '__main__':
