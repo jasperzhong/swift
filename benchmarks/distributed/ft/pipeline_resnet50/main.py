@@ -56,7 +56,7 @@ parser.add_argument('--data-parallel-size', type=int, default=None,
 # Pipeline parallelism
 parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
-parser.add_argument('--test-batch-size', type=int, default=2048,
+parser.add_argument('--test-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
@@ -106,7 +106,7 @@ def get_data_loader(args):
 
     test_loader = torch.utils.data.DataLoader(
         val_dataset, sampler=val_sampler, batch_size=args.test_batch_size,
-        num_workers=args.workers, pin_memory=True
+        num_workers=args.workers, pin_memory=True, drop_last=True
     )
 
     return train_loader, test_loader
