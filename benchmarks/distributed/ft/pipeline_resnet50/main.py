@@ -96,13 +96,17 @@ def get_data_loader(args):
 
     sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=args.data_parallel_size,
                                                   rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True)
+
+    val_sampler = torch.utils.data.DistributedSampler(val_dataset, num_replicas=args.data_parallel_size,
+                                                  rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True)
+
     train_loader = torch.utils.data.DataLoader(
         train_dataset, sampler=sampler, batch_size=args.micro_batch_size,
         num_workers=args.workers, pin_memory=True
     )
 
     test_loader = torch.utils.data.DataLoader(
-        val_dataset, sampler=sampler, batch_size=args.test_batch_size,
+        val_dataset, sampler=val_sampler, batch_size=args.test_batch_size,
         num_workers=args.workers, pin_memory=True
     )
 
