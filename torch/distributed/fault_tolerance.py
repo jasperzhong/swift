@@ -406,11 +406,11 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         num += 1
 
                         if ts == 500:
-                            checkpoint("before_step.ckpt", ts, model, optimizer)
+                            checkpoint(f"before_step_{get_rank()}.pt", ts, model, optimizer)
                             logger.info("start undo")
                             optimizer.step()
                             optimizer.undo()
-                            checkpoint("after_undo.ckpt", ts, model, optimizer)
+                            checkpoint(f"after_undo_{get_rank()}.pt", ts, model, optimizer)
 
                         if ts % 200 == 0:
                             logger.info("Finish Training for {} iterations".format(ts))
