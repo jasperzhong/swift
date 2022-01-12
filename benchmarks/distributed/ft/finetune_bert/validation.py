@@ -49,7 +49,7 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
 
         eval_dataloader = torch.load("./eval_dataloader.pt")
         eval_features = torch.load("./eval_features.pt")
-        eval_features = torch.load("./eval_examples.pt")
+        eval_examples = torch.load("./eval_examples.pt")
     else:
         eval_dataloader, eval_features, eval_examples = create_val_dataloader()
         torch.save(eval_dataloader, "eval_dataloader.pt")
