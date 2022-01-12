@@ -908,7 +908,8 @@ def isend(tensor,
         return
 
     if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
-        _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
+        # _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
+        torch.save(tensor, "tensor.pt")
 
     if _logging and _logging_parallel_recovery:
         dst += _logging_group_diff
@@ -1082,7 +1083,9 @@ def send(tensor,
         return
 
     if _logging and dst in _logging_mask and is_cross_machine(get_rank(), dst):
-        _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
+        # _logging_gpu_tensor_queue.append((int(_ts._value), dst, tensor))
+        torch.save(tensor, "tensor.pt")
+        pass
 
     if _logging and _logging_parallel_recovery:
         dst += _logging_group_diff
