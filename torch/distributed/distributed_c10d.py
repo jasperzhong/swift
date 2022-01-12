@@ -130,8 +130,8 @@ def _failure_handler():
     if _logging:
         _logging_gpu_tensor_queue.clear()
         node_rank = int(os.environ["GROUP_RANK"])
-        # if node_rank == 0 or node_rank == 2:
-        _logging_cpu_tensor_queue.put("flush")
+        if node_rank == 0 or node_rank == 2:
+            _logging_cpu_tensor_queue.put("flush")
 
     logger.info("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
