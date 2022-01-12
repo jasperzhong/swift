@@ -43,19 +43,19 @@ def create_val_dataloader():
 def fault_tolerance_val(config, model, eval_loader, loss_func):
     args = schedule._GLOBAL_ARGS
     eval_dataloader, eval_features, eval_examples = create_val_dataloader()
-    if os.path.exists("./eval_dataloader.pt"):
+    if os.path.exists("./eval_dataloader.pt") and \
+        os.path.exists("./eval_features.pt") and \
+        os.path.exists("./eval_examples.pt"):
+
         eval_dataloader = torch.load("./eval_dataloader.pt")
-    else:
-        torch.save(eval_dataloader, "eval_dataloader.pt")
-    if os.path.exists("./eval_features.pt"):
         eval_features = torch.load("./eval_features.pt")
-    else:
-        torch.save(eval_features, "eval_features.pt")
-    if os.path.exists("./eval_examples.pt"):
         eval_features = torch.load("./eval_examples.pt")
     else:
+        eval_dataloader, eval_features, eval_examples = create_val_dataloader()
+        torch.save(eval_dataloader, "eval_dataloader.pt")
+        torch.save(eval_features, "eval_features.pt")
         torch.save(eval_examples, "eval_examples.pt")
-
+        
     model.eval()
     all_results = []
     test_iters = len(eval_dataloader)
