@@ -145,7 +145,7 @@ def create_train_dataloader(args, tokenizer):
     
     return train_dataloader
 
-def reset_data_iterator(data_loader, ts):
+def reset_data_iterator(config, data_loader, ts):
     if args.seed is not None:
         random.seed(args.seed)
         np.random.seed(args.seed)
