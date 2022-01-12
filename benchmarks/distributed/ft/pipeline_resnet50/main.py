@@ -114,12 +114,14 @@ def get_data_loader(args):
     return train_loader, test_loader
 
 def get_lr_scheduler(optimizer, total_iters, args):
-
+    iters_per_epoch = total_iters // 90
+    warmup_iters = 5 * iters_per_epoch
     def adjust_learning_rate(iter):
-        iters_per_epoch = total_iters // 90
-        if iter <= iters_per_epoch * 30:
+        if iter <= warmup_iters:
+            return iter / warmup_iters
+        elif iter <= iters_per_epoch * 30:
             return 1
-        if iter <= iters_per_epoch * 60:
+        elif iter <= iters_per_epoch * 60:
             return 0.1
         elif iter <= iters_per_epoch * 90:
             return 0.01
@@ -216,7 +218,7 @@ def main():
     total_iters = 90 * iters_per_epoch
     print("total iterations: {}".format(total_iters))
 
-    optimizer = optim.SGD(model.parameters(), lr=6.4, momentum=0.9, weight_decay=1e-4)
+    optimizer = optim.SGD(model.parameters(), lr=3.2, momentum=0.9, weight_decay=1e-4)
     if args.data_parallel_size == 1 and args.replica:
         logging.warn(f"Replicas are not available because data-parallel size is {args.data_parallel_size}")
         args.replica = False
