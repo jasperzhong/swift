@@ -20,7 +20,7 @@ cmd="python3 -m torch.distributed.run \
 	--rdzv_endpoint=$MASTER_IP \
 	main.py \
 	--micro-batch-size 2048 \
-	--test-batch-size 1024 \
+	--test-batch-size 256 \
 	--global-batch-size 16384 \
 	--benchmark-iters 200 \
 	--seed 42 \
