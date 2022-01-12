@@ -231,7 +231,7 @@ def main():
 
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, lr_scheduler, reset_data_iterator_func=reset_data_iterator, 
-                          fault_tolerance_val=fault_tolerance_val, test_loader=data_loader)
+                          fault_tolerance_val=fault_tolerance_val, test_loader=test_loader)
 
 
 if __name__ == '__main__':
