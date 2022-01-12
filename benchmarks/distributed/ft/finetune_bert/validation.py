@@ -55,7 +55,7 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
         torch.save(eval_dataloader, "eval_dataloader.pt")
         torch.save(eval_features, "eval_features.pt")
         torch.save(eval_examples, "eval_examples.pt")
-        
+
     model.eval()
     all_results = []
     test_iters = len(eval_dataloader)
@@ -87,6 +87,7 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
         exact_match = float(scores.split(":")[1].split(",")[0])
         f1 = float(scores.split(":")[2].split("}")[0])
         print("exact_match: {} F1: {}".format(exact_match, f1))
+        return exact_match, f1
 
 def forward(config, data_iter, model, eval_features):
     shape = (schedule._GLOBAL_ARGS.test_batch_size, *model.input_shape[1:])

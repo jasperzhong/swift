@@ -413,13 +413,12 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             checkpoint("after_undo.ckpt", 500, model, optimizer)
 
                         if ts % 200 == 0:
-                            logger.info("start validation at iteration: {}".format(ts))
-                            accu = fault_tolerance_val(config, model, test_loader, loss_func)
+                            logger.info("Finish Training for {} iterations".format(ts))
+                            exact_match, f1 = fault_tolerance_val(config, model, test_loader, loss_func)
                             curr_time = time.time() - base_time
                             if is_pipeline_last_stage():
                                 with open("./time_validation.txt", "a") as f:
-                                    f.write(f"{ts} {curr_time} {accu.item()}\n")
-                            data_iterator = reset_data_iterator_func(config, data_loader, 0)
+                                    f.write(f"{ts} {curr_time} {exact_match} {f1}\n")
 
 
                         if ts % config.print_freq == 0 and is_pipeline_last_stage():
@@ -443,11 +442,11 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         data_iterator = reset_data_iterator_func(config, data_loader, 0)
             if fault_tolerance_val:
                 logger.info("Finish Training for {} iterations".format(ts))
-                accu = fault_tolerance_val(config, model, test_loader, loss_func)
+                exact_match, f1 = fault_tolerance_val(config, model, test_loader, loss_func)
                 curr_time = time.time() - base_time
                 if is_pipeline_last_stage():
                     with open("./time_validation.txt", "a") as f:
-                        f.write(f"{ts} {curr_time} {accu.item()}\n")
+                        f.write(f"{ts} {curr_time} {exact_match} {f1}\n")
             break
         except SwiftInternalError as e:
             logger.info("catch an error: " + str(e))
