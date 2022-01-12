@@ -395,7 +395,7 @@ def checksum(ts, model, optimizer):
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
                           lr_scheduler, reset_data_iterator_func, fault_tolerance_val=None, test_loader=None):
     setup(config)
-
+    base_time = time.time()
     ts = Timestamp(0)
     distributed_c10d._ts = ts
     filename = _get_checkpoint_path(config)
@@ -404,7 +404,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
         ts, model, optimizer, consensus_value, cb = recovery(config, ts, model, optimizer)
         data_iterator = reset_data_iterator_func(data_loader, ts)
         iter_time_avg = 0
-        checksum(ts, model, optimizer)
+        # checksum(ts, model, optimizer)
         try:
             while True:
                 try:
@@ -437,17 +437,26 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             logger.info(f"parallel recovery restores from iteration {ts}")
                             cb = None
 
-                        checksum(ts, model, optimizer)
+                        # checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
                     if fault_tolerance_val:
                         logger.info("start validation at iteration: {}".format(ts))
-                        fault_tolerance_val(config, model, test_loader, loss_func)
-                        data_iterator = reset_data_iterator_func(data_loader, 0)
+                        accu = fault_tolerance_val(config, model, test_loader, loss_func)
+                        curr_time = time.time() - base_time
+                        if is_pipeline_last_stage():
+                            with open("./time_validation.txt", "a") as f:
+                                f.write(f"{ts} {curr_time} {accu.item()}\n")
+                        data_iterator = reset_data_iterator_func(config, data_loader, 0)
+                    else:
+                        data_iterator = reset_data_iterator_func(config, data_loader, 0)
             if fault_tolerance_val:
                 logger.info("Finish Training for {} iterations".format(ts))
-                fault_tolerance_val(config, model, test_loader, loss_func)
-
+                accu = fault_tolerance_val(config, model, test_loader, loss_func)
+                curr_time = time.time() - base_time
+                if is_pipeline_last_stage():
+                    with open("./time_validation.txt", "a") as f:
+                        f.write(f"{ts} {curr_time} {accu.item()}\n")
             break
         except SwiftInternalError as e:
             logger.info("catch an error: " + str(e))
