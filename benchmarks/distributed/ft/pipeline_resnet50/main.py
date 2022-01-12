@@ -173,6 +173,8 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler):
         data_iterator, model, loss_func)
     torch.cuda.synchronize()
     optimizer.step()
+    if lr_scheduler is not None:
+        lr_scheduler.step()
     iteration_time = time.time() - start
     return loss, compute_time
 
