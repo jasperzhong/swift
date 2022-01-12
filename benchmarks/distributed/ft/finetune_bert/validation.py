@@ -88,6 +88,8 @@ def fault_tolerance_val(config, model, eval_loader, loss_func):
         f1 = float(scores.split(":")[2].split("}")[0])
         print("exact_match: {} F1: {}".format(exact_match, f1))
         return exact_match, f1
+    
+    return 0, 0
 
 def forward(config, data_iter, model, eval_features):
     shape = (schedule._GLOBAL_ARGS.test_batch_size, *model.input_shape[1:])
