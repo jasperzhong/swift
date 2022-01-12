@@ -1,4 +1,5 @@
 import argparse
+from benchmarks.distributed.ft.pipeline_resnet50.validation import fault_tolerance_val
 import logging
 import os
 import random
@@ -70,6 +71,7 @@ initialize_global_args(args)
 
 def get_data_loader(args):
     traindir = os.path.join(args.data, 'train')
+    valdir = os.path.join(args.data, 'val')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
@@ -81,6 +83,15 @@ def get_data_loader(args):
             transforms.ToTensor(),
             normalize,
         ]))
+    
+    val_dataset = datasets.ImageFolder(
+        valdir,
+        transforms.Compose([
+            transforms.Resize(224),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize,
+        ]))
 
     sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=args.data_parallel_size,
                                                   rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True)
@@ -88,7 +99,13 @@ def get_data_loader(args):
         train_dataset, sampler=sampler, batch_size=args.micro_batch_size,
         num_workers=args.workers, pin_memory=True
     )
-    return train_loader
+
+    test_loader = torch.utils.data.DataLoader(
+        val_dataset, sampler=sampler, batch_size=args.micro_batch_size,
+        num_workers=args.workers, pin_memory=True
+    )
+
+    return train_loader, test_loader
 
 def get_lr_scheduler(optimizer, total_iters, args):
 
@@ -178,7 +195,7 @@ def main():
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
 
-    data_loader = get_data_loader(args)
+    data_loader, test_loader = get_data_loader(args)
     print(f"pipeline rank = {get_pipeline_model_parallel_rank()}")
 
     balance = [4, 2, 2, 3]
@@ -206,11 +223,10 @@ def main():
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
         checkpoint_interval=100, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
     )
-    # TODO: val
-    # TODO: test loader
+
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, lr_scheduler, reset_data_iterator_func=reset_data_iterator, 
-                          fault_tolerance_val=, test_loader=, )
+                          fault_tolerance_val=fault_tolerance_val, test_loader=test_loader)
 
 
 if __name__ == '__main__':
