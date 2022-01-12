@@ -405,7 +405,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         ts += 1
                         num += 1
 
-                        if ts._value == 500:
+                        if ts == 500:
                             checkpoint("before_step.ckpt", 500, model, optimizer)
                             logger.info("start undo")
                             optimizer.step()
