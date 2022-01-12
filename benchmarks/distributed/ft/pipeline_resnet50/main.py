@@ -6,7 +6,6 @@ import random
 import time
 
 import numpy as np
-from benchmarks.distributed.ft.finetune_vit.main import get_lr_scheduler
 from model import PipelineParallelResNet50
 from schedule import (get_num_microbatches, get_pipeline_model_parallel_rank,
                       initialize_global_args, is_pipeline_first_stage,
