@@ -57,6 +57,8 @@ parser.add_argument('--data-parallel-size', type=int, default=None,
 # Pipeline parallelism
 parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
+parser.add_argument('--test-batch-size', type=int, default=2048,
+                    help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
 
@@ -100,7 +102,7 @@ def get_data_loader(args):
     )
 
     test_loader = torch.utils.data.DataLoader(
-        val_dataset, sampler=sampler, batch_size=args.micro_batch_size,
+        val_dataset, sampler=sampler, batch_size=args.test_batch_size,
         num_workers=args.workers, pin_memory=True
     )
 
@@ -197,7 +199,8 @@ def main():
     data_loader, test_loader = get_data_loader(args)
     print(f"pipeline rank = {get_pipeline_model_parallel_rank()}")
 
-    balance = [4, 2, 2, 3]
+    # balance = [4, 2, 2, 3]
+    balance = [5, 1, 2, 3]
     # balance = [4, 1, 1, 1, 1, 3]
     model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=balance)
     model.cuda()
@@ -208,7 +211,7 @@ def main():
     total_iters = 90 * iters_per_epoch
     print("total iterations: {}".format(total_iters))
 
-    optimizer = optim.SGD(model.parameters(), lr=3.2, momentum=0.9, weight_decay=1e-4)
+    optimizer = optim.SGD(model.parameters(), lr=6.4, momentum=0.9, weight_decay=1e-4)
     if args.data_parallel_size == 1 and args.replica:
         logging.warn(f"Replicas are not available because data-parallel size is {args.data_parallel_size}")
         args.replica = False
