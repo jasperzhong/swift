@@ -226,7 +226,7 @@ def main():
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
-        num_iteration=total_iters, iters_per_epoch=10, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
+        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
         checkpoint_interval=200, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
     )
 
