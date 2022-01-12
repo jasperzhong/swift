@@ -1,4 +1,6 @@
 import argparse
+
+from numpy.random.mtrand import shuffle
 from benchmarks.distributed.ft.pipeline_resnet50.validation import fault_tolerance_val
 import logging
 import os
@@ -56,7 +58,7 @@ parser.add_argument('--data-parallel-size', type=int, default=None,
 # Pipeline parallelism
 parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
-parser.add_argument('--test-batch-size', type=int, default=None,
+parser.add_argument('--test-batch-size', type=int, default=1024,
                     help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
@@ -96,8 +98,8 @@ def get_data_loader(args):
     sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=args.data_parallel_size,
                                                   rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True)
 
-    val_sampler = torch.utils.data.DistributedSampler(val_dataset, num_replicas=args.data_parallel_size,
-                                                  rank=get_data_parallel_rank(), shuffle=False, drop_last=True)
+    # val_sampler = torch.utils.data.DistributedSampler(val_dataset, num_replicas=args.data_parallel_size,
+    #                                               rank=get_data_parallel_rank(), shuffle=False, drop_last=True)
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, sampler=sampler, batch_size=args.micro_batch_size,
@@ -105,7 +107,7 @@ def get_data_loader(args):
     )
 
     test_loader = torch.utils.data.DataLoader(
-        val_dataset, sampler=val_sampler, batch_size=args.test_batch_size,
+        val_dataset, batch_size=args.test_batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, drop_last=True
     )
 

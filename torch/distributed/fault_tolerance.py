@@ -672,7 +672,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         curr_time = time.time() - base_time
                         if is_pipeline_last_stage():
                             with open("./time_validation.txt", "a") as f:
-                                f.write(f"{ts} {curr_time} {accu}\n")
+                                f.write(f"{ts} {curr_time} {accu.item()}\n")
                         data_iterator = reset_data_iterator_func(config, data_loader, 0)
                     else:
                         data_iterator = reset_data_iterator_func(config, data_loader, 0)
@@ -682,7 +682,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                 curr_time = time.time() - base_time
                 if is_pipeline_last_stage():
                     with open("./time_validation.txt", "a") as f:
-                        f.write(f"{ts} {curr_time} {accu}\n")
+                        f.write(f"{ts} {curr_time} {accu.item()}\n")
             break
         except SwiftInternalError as e:
             # init time start
