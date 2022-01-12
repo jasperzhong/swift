@@ -209,8 +209,7 @@ def main():
     total_iters = 90 * iters_per_epoch
     print("total iterations: {}".format(total_iters))
 
-    # TODO: Learning Rate:
-    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
+    optimizer = optim.SGD(model.parameters(), lr=3.2, momentum=0.9, weight_decay=1e-4)
     if args.data_parallel_size == 1 and args.replica:
         logging.warn(f"Replicas are not available because data-parallel size is {args.data_parallel_size}")
         args.replica = False
@@ -221,7 +220,7 @@ def main():
 
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=100, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
+        checkpoint_interval=200, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
     )
 
     fault_tolerance_train(config, train_iter, model, optimizer,
