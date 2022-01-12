@@ -375,23 +375,6 @@ def build_communication_group(config, peer_failure_worker):
         if rank in group:
             return new_group(group, group_name="src_group_rank_%d" % peer_failure_worker)
 
-
-def checksum(ts, model, optimizer):
-    model_sum = 0
-    for param in model.parameters():
-        model_sum += torch.sum(param)
-
-    optimizer_sum = 0
-    for group in optimizer.param_groups:
-        for p in group['params']:
-            if p.grad is not None:
-                state = optimizer.state[p]
-                if 'momentum_buffer' in state:
-                    optimizer_sum += torch.sum(state['momentum_buffer'])
-
-    with open("debug.log", "a") as f:
-        f.write(f"{ts} {model_sum} {optimizer_sum}\n")
-
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
                           lr_scheduler, reset_data_iterator_func, fault_tolerance_val=None, test_loader=None):
     setup(config)
@@ -422,6 +405,23 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         ts += 1
                         num += 1
 
+                        if ts._value == 500:
+                            checkpoint("before_step.ckpt", 500, model, optimizer)
+                            logger.info("start undo")
+                            optimizer.step()
+                            optimizer.undo()
+                            checkpoint("after_undo.ckpt", 500, model, optimizer)
+
+                        if ts % 200 == 0:
+                            logger.info("start validation at iteration: {}".format(ts))
+                            accu = fault_tolerance_val(config, model, test_loader, loss_func)
+                            curr_time = time.time() - base_time
+                            if is_pipeline_last_stage():
+                                with open("./time_validation.txt", "a") as f:
+                                    f.write(f"{ts} {curr_time} {accu.item()}\n")
+                            data_iterator = reset_data_iterator_func(config, data_loader, 0)
+
+
                         if ts % config.print_freq == 0 and is_pipeline_last_stage():
                             if lr_scheduler:
                                 logger.info("[Iteration {}] loss: {:.6f} throughput: {:.2f} average iteration time: {} lr: {}".format(
@@ -440,15 +440,6 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         # checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
-                    if fault_tolerance_val:
-                        logger.info("start validation at iteration: {}".format(ts))
-                        accu = fault_tolerance_val(config, model, test_loader, loss_func)
-                        curr_time = time.time() - base_time
-                        if is_pipeline_last_stage():
-                            with open("./time_validation.txt", "a") as f:
-                                f.write(f"{ts} {curr_time} {accu.item()}\n")
-                        data_iterator = reset_data_iterator_func(config, data_loader, 0)
-                    else:
                         data_iterator = reset_data_iterator_func(config, data_loader, 0)
             if fault_tolerance_val:
                 logger.info("Finish Training for {} iterations".format(ts))
