@@ -200,7 +200,7 @@ def main():
     print(f"pipeline rank = {get_pipeline_model_parallel_rank()}")
 
     # balance = [4, 2, 2, 3]
-    balance = [5, 1, 1, 4]
+    balance = [4, 1, 1, 5]
     # balance = [4, 1, 1, 1, 1, 3]
     model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=balance)
     model.cuda()
