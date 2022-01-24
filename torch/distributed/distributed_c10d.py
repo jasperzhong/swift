@@ -28,6 +28,9 @@ from .rendezvous import register_rendezvous_handler, rendezvous  # noqa: F401
 # This module is wildcard imported from torch.distributed.
 # TODO: specify __all__
 
+# https://github.com/open-mpi/ompi/issues/6535#issuecomment-640116873
+os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
+
 
 _MPI_AVAILABLE = True
 _NCCL_AVAILABLE = True
@@ -77,9 +80,15 @@ _logging_cnt = {}
 
 _logging_thread = None
 
-_logging_cnt = 0
+_logging_in_recovery = False
 
-_logging_thread = None
+_logging_parallel_recovery = False
+
+_logging_group_diff = None
+
+_logging_group_rank = None
+
+_logging_group_size = None
 
 _logging_rng_state_fd = None
 
@@ -120,7 +129,9 @@ def _failure_handler():
 
     if _logging:
         _logging_gpu_tensor_queue.clear()
-        _logging_cpu_tensor_queue.put("flush")
+        node_rank = int(os.environ["GROUP_RANK"])
+        if node_rank == 0 or node_rank == 2:
+            _logging_cpu_tensor_queue.put("flush")
 
     logger.info("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
@@ -846,11 +857,11 @@ def get_local_world_size():
     return int(os.environ["LOCAL_WORLD_SIZE"])
 
 
-def get_local_world_size():
+def is_local_root_rank():
     """
-    Returns the number of processes in the local worl group
+    Check if the worker is the root rank (local_rank == local_world_size - 1) in the local world group
     """
-    return int(os.environ["LOCAL_WORLD_SIZE"])
+    return int(os.environ["LOCAL_RANK"]) == get_local_world_size() - 1
 
 
 def isend(tensor,
@@ -890,7 +901,7 @@ def isend(tensor,
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
         idx, file_info_list, consensus_value = _logging_recovery_mask.get(dst)
         if _ts >= consensus_value:
-            logger.info(f"close file. src={dst}")
+            logger.info(f"isend close file. src={dst}")
             f = file_info_list[idx].file_object
             f.close()
             del _logging_recovery_mask[dst]
@@ -992,7 +1003,7 @@ def irecv(tensor,
         try:
             key = next(keys)
         except StopIteration:
-            logger.info(f"close file. src={src}")
+            logger.info(f"irecv close file. src={src}")
             f.close()
             idx += 1
             _logging_recovery_mask[src][0] += 1
@@ -1064,7 +1075,7 @@ def send(tensor,
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
         idx, file_info_list, consensus_value = _logging_recovery_mask.get(dst)
         if _ts >= consensus_value:
-            logger.info(f"close file. src={dst}")
+            logger.info(f"send close file. src={dst}")
             f = file_info_list[idx].file_object
             f.close()
             del _logging_recovery_mask[dst]
@@ -1170,7 +1181,7 @@ def recv(tensor,
         try:
             key = next(keys)
         except StopIteration:
-            logger.info(f"close file. src={src}")
+            logger.info(f"recv close file. src={src}")
             f.close()
             idx += 1
             _logging_recovery_mask[src][0] += 1
@@ -3090,14 +3101,41 @@ def flush_objects_to_dfs(config):
         if item is None:
             break
         elif item == "flush":
+            # rename the files before upload
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    renamed_path = path + ".__PUT__"
+                    os.system(f"mv {path} {renamed_path}")
+
             for name, files in logging_pairs_to_files.items():
                 for file, path in files:
                     # if file is not closed
                     if file:
                         file.close()
                     _logging_dfs_client.rm(dfs_path=path)
-                    _logging_dfs_client.upload(dfs_path=path, local_path=path)
-                    logger.info(f"put {path} on dfs")
+                    renamed_path = path + ".__PUT__"
+                    _logging_dfs_client.upload(dfs_path=path, local_path=renamed_path)
+                    logger.info(f"put {renamed_path} on dfs")
+            logging_pairs_to_files.clear()
+            continue
+        elif item == "gc":
+            # garbage collection
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    # if file is not closed
+                    if file:
+                        file.close()
+                    os.remove(path)
+
+            logging_pairs_to_files.clear()
+            logger.info("remove outdated logging files.")
+            continue
+        elif item == "close":
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    # if file is not closed
+                    if file:
+                        file.close()
             logging_pairs_to_files.clear()
             continue
         elif item == "gc":
@@ -3168,7 +3206,7 @@ def _open_logging_file(filename, consensus_value):
 
     while True:
         try:
-            f = h5py.File(filename, "a")
+            f = h5py.File(filename, "r")
             break
         except OSError:
             # OSError: Unable to open file (unable to lock file, errno = 11, error message = 'Resource temporarily unavailable')

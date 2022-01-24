@@ -1,11 +1,10 @@
 #!/bin/bash
 
-NNODES=2
-NPROC_PER_NODE=4
-MASTER_IP=10.28.1.27
-
+NNODES=16
+NPROC_PER_NODE=8
+MASTER_IP=192.168.64.11
 MASTER_PORT=1234
-export NCCL_SOCKET_IFNAME=eth2
+export NCCL_SOCKET_IFNAME=bond0
 
 ENABLE_LOGGING=${1:-0}
 LOGGING_GROUP_SIZE=${2:-${NPROC_PER_NODE}}
@@ -14,12 +13,8 @@ PARALLEL_RECOVERY=${3:-0}
 rm -rf *.h5
 rm -rf *.log
 rm -rf *.ckpt
-hdfs dfs -rm -r "/*"
-
-rm -rf *.h5
-rm -rf *.log
-rm -rf *.ckpt
 rm -rf *.flag
+hdfs dfs -rm -r "/*"
 
 cmd="python3 -m torch.distributed.run \
 	--nnodes=$NNODES --nproc_per_node=$NPROC_PER_NODE \
@@ -27,11 +22,11 @@ cmd="python3 -m torch.distributed.run \
 	--rdzv_endpoint=$MASTER_IP \
 	main.py \
 	--micro-batch-size 4 \
-	--global-batch-size 32 \
-	--seed 2021 \
-	-p 1 \
+	--global-batch-size 512 \
 	--benchmark-iters 200 \
-	-j 4" 
+	--seed 42 \
+	-p 1 \
+	-j 32" 
 
 LOGGING_ARGS="
 	--logging \
@@ -47,8 +42,10 @@ if [[ $ENABLE_LOGGING -eq 1 ]];then
 	cmd="${cmd} ${LOGGING_ARGS}"
 fi
 
-cmd="${cmd} /home/gmsheng/data/bert/"
+cmd="${cmd} /data2/data/BERT"
 
 echo $cmd
 
-OMP_NUM_THREADS=4 NCCL_IB_DISABLE=1 LOGLEVEL=DEBUG NCCL_DEBUG=INFO exec $cmd
+export HADOOP_MASTER=192.168.64.18
+
+OMP_NUM_THREADS=4 NCCL_IB_DISABLE=1 exec $cmd

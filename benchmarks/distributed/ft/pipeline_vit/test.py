@@ -17,7 +17,7 @@ import torch.distributed.fault_tolerance
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributed.fault_tolerance import FaultToleranceConfig, fault_tolerance_train, warmup_profile
-from torch.utils.data.sampler import RandomSamplerFromIdx
+from torch.utils.data.sampler import RandomSamplerFromIdx, SequentialSamplerFromIdx, SequentialSampler
 
 logging.basicConfig(level=logging.INFO)
 
@@ -102,14 +102,15 @@ def get_data_loader(args):
 
 def reset_data_iterator(config, data_loader, ts):
     if args.seed is not None:
-        print(f"seed is {args.seed}")
         random.seed(args.seed)
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
     train_dataset = data_loader.dataset
-    idx = ts * config.num_microbatches * args.micro_batch_size
+    idx = ts._value * config.num_microbatches * args.micro_batch_size
     train_sampler = RandomSamplerFromIdx(train_dataset, idx)
+    # data_loader.sampler = train_sampler
+    micro_batch_size = config.batch_size // config.num_microbatches
     data_loader = torch.utils.data.DataLoader(
         train_dataset, sampler=train_sampler, 
         batch_size=args.micro_batch_size,
@@ -149,58 +150,42 @@ def get_lr_scheduler(optimizer, total_iters, args):
     return scheduler
 
 def main():
-    torch.backends.cudnn.benchmark = True
-    torch.backends.cudnn.deterministic = True
 
-    args.world_size = int(os.environ['WORLD_SIZE'])
-    args.rank = int(os.environ['RANK'])
-    args.local_rank = int(os.environ['LOCAL_RANK'])
-    torch.cuda.set_device(args.local_rank)
-    torch.distributed.init_process_group(
-        'nccl'
-    )
-
-    if args.seed is not None:
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-        torch.manual_seed(args.seed)
-        torch.cuda.manual_seed(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
 
     data_loader = get_data_loader(args)
-    balance = [1 for _ in range(128)]
-    balance[0] = 2
-    balance[-1] = 3
-    # print(balance)
-    model = PipelineParallelViT(balance=balance)
-    # model = PipelineParallelViT(balance=[5, 7, 6, 4])
-    model.cuda()
+    data_iter = iter(data_loader)
+    for i in range(20):
+        _, label = next(data_iter)
+    
+    _, label = next(data_iter)
+    print(label)
 
-    total_iters = args.benchmark_iters
-    print("total iterations: {}".format(total_iters))
-    num_micro_batches = args.global_batch_size // args.micro_batch_size
-    iters_per_epoch = len(data_loader) // num_micro_batches
-    print("iters per epoch:{}".format(iters_per_epoch))
+    torch.randn(1000)
 
-    print("total iterations: {}".format(total_iters))
-    optimizer = optim.Adam(model.parameters(), lr=3e-3, weight_decay=0.3)
-    lr_scheduler = get_lr_scheduler(optimizer, total_iters, args)
-    loss_func = nn.CrossEntropyLoss().cuda()
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
 
-    # groups = [[0], [1], [2], [3], [4], [5], [6], [7, 8], [9, 10], [11, 12, 13, 14, 15]]
-    # args.logging_group_size = 16
-    config = FaultToleranceConfig(
-        num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=100, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
-        logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
-        logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
-        logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
+    train_dataset = data_loader.dataset
+    train_sampler = RandomSamplerFromIdx(train_dataset, 20 * args.micro_batch_size)
+    
+    data_loader = torch.utils.data.DataLoader(
+        train_dataset, sampler=train_sampler, 
+        batch_size=args.micro_batch_size,
+        num_workers=32, pin_memory=True
     )
 
-    # warmup_profile(train_iter, model, optimizer, iter(data_loader), loss_func, lr_scheduler, 5)
+    data_iter = iter(data_loader)
+    _, label = next(data_iter)
+    print(label)
 
-    fault_tolerance_train(config, train_iter, model, optimizer,
-                          data_loader, loss_func, lr_scheduler,
-                          reset_data_iterator_func=reset_data_iterator)
+    
+
 
 
 if __name__ == '__main__':

@@ -18,8 +18,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributed.fault_tolerance import (FaultToleranceConfig,
                                                fault_tolerance_train)
-
-logging.basicConfig(level=logging.INFO)
+from torch.utils.data.distributed import DistributedSamplerFromIdx
 
 logging.basicConfig(level=logging.INFO)
 
@@ -89,29 +88,52 @@ def get_data_loader(args):
     return train_loader
 
 
-def reset_data_iterator(data_loader, ts):
+# def reset_data_iterator(config, data_loader, ts):
+#     if args.seed is not None:
+#         random.seed(args.seed)
+#         np.random.seed(args.seed)
+#         torch.manual_seed(args.seed)
+#         torch.cuda.manual_seed(args.seed)
+#     data_iterator = iter(data_loader)
+#     for _ in range(ts):
+#         if is_pipeline_first_stage() or is_pipeline_last_stage():
+#             for _ in range(get_num_microbatches()):
+#                 next(data_iterator)
+#     return data_iterator
+
+def reset_data_iterator(config, data_loader, ts):
     if args.seed is not None:
+        print(f"seed is {args.seed}")
         random.seed(args.seed)
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
+    train_dataset = data_loader.dataset
+    # 8092 / 16 = 512
+    idx = ts * 512
+
+    train_sampler = torch.utils.data.DistributedSamplerFromIdx(train_dataset, num_replicas=args.data_parallel_size,
+                                            rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True, idx=idx)
+
+    data_loader = torch.utils.data.DataLoader(
+        train_dataset, sampler=train_sampler, 
+        batch_size=args.micro_batch_size,
+        num_workers=32, pin_memory=True
+    )
     data_iterator = iter(data_loader)
-    for _ in range(ts):
-        if is_pipeline_first_stage() or is_pipeline_last_stage():
-            for _ in range(get_num_microbatches()):
-                next(data_iterator)
+    
     return data_iterator
 
 
 def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler):
     start = time.time()
     optimizer.zero_grad()
-    loss = pipedream_flush_schedule(
+    loss, compute_time = pipedream_flush_schedule(
         data_iterator, model, loss_func)
     torch.cuda.synchronize()
     optimizer.step()
     iteration_time = time.time() - start
-    return loss
+    return loss, compute_time
 
 
 def main():
@@ -142,12 +164,15 @@ def main():
 
     data_loader = get_data_loader(args)
     print(f"pipeline rank = {get_pipeline_model_parallel_rank()}")
-    model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=None)
+
+    balance = [4, 2, 2, 3]
+    # balance = [4, 1, 1, 1, 1, 3]
+    model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=balance)
     model.cuda()
 
     total_iters = args.benchmark_iters
     print("total iterations: {}".format(total_iters))
-    num_micro_batches = args.global_batch_size // args.micro_batch_size
+    num_micro_batches = args.global_batch_size // args.micro_batch_size // args.data_parallel_size
     iters_per_epoch = len(data_loader) // num_micro_batches
     print("iters per epoch:{}".format(iters_per_epoch))
 
@@ -160,7 +185,7 @@ def main():
 
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=10, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
+        checkpoint_interval=100, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
     )
     fault_tolerance_train(config, train_iter, model, optimizer,
                           data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)

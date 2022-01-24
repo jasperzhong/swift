@@ -1,5 +1,10 @@
-import torch
+import time
 
+from torchvision import datasets, transforms
+
+import torch
+import torch.nn as nn
+import os
 _GLOBAL_ARGS = None
 
 _cnt = 0
@@ -61,7 +66,7 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     if is_pipeline_first_stage():
         assert input_tensor is None
         input_tensor = images
-
+    start = time.time()
     output_tensor = model(input_tensor)
 
     if is_pipeline_last_stage():
@@ -69,10 +74,14 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
         output_tensor /= get_num_microbatches()
         loss += output_tensor.item()
 
-    return output_tensor
+    end = time.time()
+    compute_time = end - start
+
+    return output_tensor, compute_time
 
 
 def backward_step(input_tensor, output_tensor, output_tensor_grad):
+    start = time.time()
     global _cnt
     if input_tensor is not None:
         input_tensor.retain_grad()
@@ -83,7 +92,10 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad):
     if input_tensor is not None:
         input_tensor_grad = input_tensor.grad
 
-    return input_tensor_grad
+    end = time.time()
+    compute_time = end - start
+
+    return input_tensor_grad, compute_time
 
 
 def send_forward(output_tensor):
@@ -149,9 +161,14 @@ def send_backward_recv_forward(input_tensor_grad, dtype=torch.float32):
 
 
 def pipedream_flush_schedule(data_iterator, model, loss_func):
+    compute_time_sum = 0
     num_microbatches = get_num_microbatches()
-    num_warmup_microbatches = get_pipeline_model_parallel_world_size() - \
-        get_pipeline_model_parallel_rank() - 1
+    if torch.distributed.parallel_recovery_data_parallel_size() > 1:
+        num_warmup_microbatches = int(os.environ["LOCAL_WORLD_SIZE"]) - \
+            int(os.environ["LOCAL_RANK"]) - 1
+    else:
+        num_warmup_microbatches = get_pipeline_model_parallel_world_size() - \
+            get_pipeline_model_parallel_rank() - 1
     num_microbatches_remaining = \
         num_microbatches - num_warmup_microbatches
 
@@ -162,28 +179,28 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
     # run warmup forward passes
     for _ in range(num_warmup_microbatches):
         input_tensor = recv_forward(model.input_shape)
-        output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss)
+        output_tensor, compute_time = forward_step(data_iterator, model, input_tensor, loss_func, loss)
+        compute_time_sum += compute_time
         send_forward(output_tensor)
-
         input_tensors.append(input_tensor)
         output_tensors.append(output_tensor)
 
     if num_microbatches_remaining > 0:
         input_tensor = recv_forward(model.input_shape)
-
     # run 1F1B steady state
     for i in range(num_microbatches_remaining):
         last_iteration = (i == (num_microbatches_remaining - 1))
-        output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss)
+        output_tensor, compute_time = forward_step(data_iterator, model, input_tensor, loss_func, loss)
+        compute_time_sum += compute_time
         output_tensor_grad = send_forward_recv_backward(output_tensor)
-
         input_tensors.append(input_tensor)
         output_tensors.append(output_tensor)
 
         input_tensor = input_tensors.pop(0)
         output_tensor = output_tensors.pop(0)
 
-        input_tensor_grad = backward_step(input_tensor, output_tensor, output_tensor_grad)
+        input_tensor_grad, compute_time = backward_step(input_tensor, output_tensor, output_tensor_grad)
+        compute_time_sum += compute_time
 
         if last_iteration:
             send_backward(input_tensor_grad)
@@ -197,8 +214,9 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
 
         output_tensor_grad = recv_backward(model.output_shape)
 
-        input_tensor_grad = backward_step(input_tensor, output_tensor, output_tensor_grad)
+        input_tensor_grad, compute_time = backward_step(input_tensor, output_tensor, output_tensor_grad)
+        compute_time_sum += compute_time
 
         send_backward(input_tensor_grad)
 
-    return loss.item()
+    return loss.item(), compute_time_sum
