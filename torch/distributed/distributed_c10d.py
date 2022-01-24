@@ -137,7 +137,6 @@ def _failure_handler():
     init_process_group("nccl", world_size=size, rank=rank, store=store)
     logger.info("success to re-init")
 
-
 class Backend(object):
     """
     An enum-like class of available backends: GLOO, NCCL, MPI, and other registered
@@ -438,6 +437,11 @@ def is_torchelastic_launched():
     non-null value indicating the job id for peer discovery purposes..
     """
     return os.getenv("TORCHELASTIC_RUN_ID") is not None
+
+
+def is_cross_machine(src_rank, dst_rank):
+    local_world_size = get_local_world_size()
+    return (src_rank // local_world_size) != (dst_rank // local_world_size)
 
 
 def is_cross_machine(src_rank, dst_rank):
@@ -3133,6 +3137,18 @@ def flush_objects_to_dfs(config):
                     if file:
                         file.close()
             logging_pairs_to_files.clear()
+            continue
+        elif item == "gc":
+            # garbage collection
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    # if file is not closed
+                    if file:
+                        file.close()
+                    os.remove(path)
+
+            logging_pairs_to_files.clear()
+            logger.info("remove outdated logging files.")
             continue
 
         ts_value, dst, tensor, event = item
