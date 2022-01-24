@@ -24,14 +24,6 @@ from .distributed_c10d import (_failure_handler, all_gather, barrier,
 
 logger = logging.getLogger(__name__)
 
-def _need_recovery(groups, failure_workers):
-    rank = get_rank()
-    for group in groups:
-        if rank in group:
-            for failure_worker in failure_workers:
-                if failure_worker in group:
-                    return True
-    return False
 
 def _need_recovery(groups, failure_workers):
     rank = get_rank()
@@ -42,17 +34,6 @@ def _need_recovery(groups, failure_workers):
                     return True
     return False
 
-def _download_logging_files(logging_files):
-    client = distributed_c10d._logging_dfs_client
-    for i in range(len(logging_files)):
-        while logging_files[i]:
-            dfs_files = client.ls()
-            for file in logging_files[i]:
-                if file in dfs_files:
-                    client.download(dfs_path=file, local_path=file)
-                    logger.info(f"download {file} from dfs")
-                    logging_files[i].remove(file)
-            time.sleep(0.1)
 
 def _download_logging_files(logging_files):
     client = distributed_c10d._logging_dfs_client
@@ -81,11 +62,6 @@ def _whether_to_upload_logging_files(groups, failure_workers):
                 if failure_worker == peer:
                     return True
     return False
-
-
-def _get_checkpoint_path(config):
-    rank = get_rank()
-    return config.checkpoint_prefix + str(rank) + ".ckpt"
 
 
 def _get_checkpoint_path(config):
@@ -599,13 +575,6 @@ def warmup_profile(train_iter, model, optimizer, data_iterator, loss_func, lr_sc
             f.write(f"{compute_time_sum} \n")
 
 
-def build_communication_group(config, peer_failure_worker):
-    data_parallel_groups = list(zip(*config.groups))
-    rank = get_rank()
-    for group in data_parallel_groups:
-        if rank in group:
-            return new_group(group, group_name="src_group_rank_%d" % peer_failure_worker)
-
 def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, loss_func,
                           lr_scheduler, reset_data_iterator_func, fault_tolerance_val=None, test_loader=None):
     global init_time
@@ -725,6 +694,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
             del data_iterator
 
     teardown(config)
+
 
 class Timestamp:
     def __init__(self, value):

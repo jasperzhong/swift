@@ -25,10 +25,6 @@ constexpr const char* const kNCCLAbortedCommStoreKey = "NCCLABORTEDCOMM";
 
 namespace {
 
-// I don't want to use a global variable...
-// but it is the simplest way to achieve our goal
-std::atomic_bool watchdog_thread_flag(false);
-
 constexpr int kBytes = 8;
 
 std::mutex store_mutex_;
