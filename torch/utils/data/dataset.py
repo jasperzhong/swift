@@ -211,6 +211,16 @@ class TensorDataset(Dataset[Tuple[Tensor, ...]]):
     def __len__(self):
         return self.tensors[0].size(0)
 
+class SquadDataset(Dataset):
+    def __init__(self, squadexample) -> None:
+        self.squadexample = squadexample
+
+    def __getitem__(self, index):
+        return self.squadexample[index]
+    
+    def __len__(self):
+        return len(self.squadexample)
+
 
 class ConcatDataset(Dataset[T_co]):
     r"""Dataset as a concatenation of multiple datasets.

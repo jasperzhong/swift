@@ -6,9 +6,6 @@ import unittest
 from math import exp
 
 import numpy as np
-from parameterized import parameterized
-from torchvision.models import resnet50
-
 import torch
 import torch.nn as nn
 import torch.optim as optim

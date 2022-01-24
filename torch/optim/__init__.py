@@ -9,6 +9,7 @@ from .adadelta import Adadelta
 from .adagrad import Adagrad
 from .adam import Adam
 from .adamw import AdamW
+from .bertadam import BertAdam
 from .sparse_adam import SparseAdam
 from .adamax import Adamax
 from .asgd import ASGD
