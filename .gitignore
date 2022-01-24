@@ -311,3 +311,4 @@ core.*
 profile.txt
 *.cache
 *.txt
+temp.flag
