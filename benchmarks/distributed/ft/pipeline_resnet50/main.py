@@ -101,6 +101,8 @@ def get_data_loader(args):
     # val_sampler = torch.utils.data.DistributedSampler(val_dataset, num_replicas=args.data_parallel_size,
     #                                               rank=get_data_parallel_rank(), shuffle=False, drop_last=True)
 
+    sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=args.data_parallel_size,
+                                                  rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True)
     train_loader = torch.utils.data.DataLoader(
         train_dataset, sampler=sampler, batch_size=args.micro_batch_size,
         num_workers=args.workers, pin_memory=True
@@ -131,15 +133,25 @@ def get_lr_scheduler(optimizer, total_iters, args):
 
 def reset_data_iterator(config, data_loader, ts):
     if args.seed is not None:
+        print(f"seed is {args.seed}")
         random.seed(args.seed)
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
+    train_dataset = data_loader.dataset
+    # 8092 / 16 = 512
+    idx = ts * 512
+
+    train_sampler = torch.utils.data.DistributedSamplerFromIdx(train_dataset, num_replicas=args.data_parallel_size,
+                                            rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True, idx=idx)
+
+    data_loader = torch.utils.data.DataLoader(
+        train_dataset, sampler=train_sampler, 
+        batch_size=args.micro_batch_size,
+        num_workers=32, pin_memory=True
+    )
     data_iterator = iter(data_loader)
-    for _ in range(ts):
-        if is_pipeline_first_stage() or is_pipeline_last_stage():
-            for _ in range(get_num_microbatches()):
-                next(data_iterator)
+    
     return data_iterator
 
 # def reset_data_iterator(config, data_loader, ts):
