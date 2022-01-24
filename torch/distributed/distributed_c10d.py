@@ -28,6 +28,9 @@ from .rendezvous import register_rendezvous_handler, rendezvous  # noqa: F401
 # This module is wildcard imported from torch.distributed.
 # TODO: specify __all__
 
+# https://github.com/open-mpi/ompi/issues/6535#issuecomment-640116873
+os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
+
 
 _MPI_AVAILABLE = True
 _NCCL_AVAILABLE = True
@@ -117,20 +120,22 @@ def _failure_handler():
     re_init_key = "reinit"
     re_init = store.add(re_init_key, 1)
     if re_init == 1:
-        logger.info("rank %d reset STORE_BASED_BARRIER_PREFIX to 0" % rank)
-        store_key = "{}:{}".format(STORE_BASED_BARRIER_PREFIX, _group_count)
-        store.set(store_key, "0")
+        for count in range(_group_count + 1):
+            store_key = "{}:{}".format(STORE_BASED_BARRIER_PREFIX, count)
+            logger.info(f"[Rank {rank}] reset {store_key} to 0")
+            store.set(store_key, "0")
 
     destroy_process_group()
 
     if _logging:
         _logging_gpu_tensor_queue.clear()
-        _logging_cpu_tensor_queue.put("flush")
+        node_rank = int(os.environ["GROUP_RANK"])
+        if node_rank == 0 or node_rank == 2:
+            _logging_cpu_tensor_queue.put("flush")
 
     logger.info("start to re-init")
     init_process_group("nccl", world_size=size, rank=rank, store=store)
     logger.info("success to re-init")
-
 
 class Backend(object):
     """
@@ -432,6 +437,11 @@ def is_torchelastic_launched():
     non-null value indicating the job id for peer discovery purposes..
     """
     return os.getenv("TORCHELASTIC_RUN_ID") is not None
+
+
+def is_cross_machine(src_rank, dst_rank):
+    local_world_size = get_local_world_size()
+    return (src_rank // local_world_size) != (dst_rank // local_world_size)
 
 
 def is_cross_machine(src_rank, dst_rank):
@@ -842,9 +852,16 @@ def get_world_size(group=None):
 
 def get_local_world_size():
     """
-    Returns the number of processes in the local worl group
+    Returns the number of processes in the local world group
     """
     return int(os.environ["LOCAL_WORLD_SIZE"])
+
+
+def is_local_root_rank():
+    """
+    Check if the worker is the root rank (local_rank == local_world_size - 1) in the local world group
+    """
+    return int(os.environ["LOCAL_RANK"]) == get_local_world_size() - 1
 
 
 def isend(tensor,
@@ -877,14 +894,14 @@ def isend(tensor,
     if _rank_not_in_group(group):
         return
 
-    with open("debug_%d.log" % dst, "a") as f:
-        f.write(f"{_ts} {torch.sum(tensor)}\n")
+    # with open("debug_%d.log" % dst, "a") as f:
+    #     f.write(f"{_ts} {torch.sum(tensor)}\n")
 
     # do not send back to the upstream node during recovery
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
         idx, file_info_list, consensus_value = _logging_recovery_mask.get(dst)
         if _ts >= consensus_value:
-            logger.info(f"close file. src={dst}")
+            logger.info(f"isend close file. src={dst}")
             f = file_info_list[idx].file_object
             f.close()
             del _logging_recovery_mask[dst]
@@ -935,32 +952,32 @@ def irecv(tensor,
     global _logging_rng_state_cnt
     global _logging_in_recovery
 
-    if _logging and _logging_in_recovery:
-        # on recovery
-        if _logging_rng_state_fd is None:
-            peer_failure_worker = get_rank() - _logging_group_diff
-            filename = "rng_state_%d.h5" % (peer_failure_worker)
-            while not os.path.exists(filename):
-                time.sleep(0.1)
-            _logging_rng_state_fd = h5py.File(filename, "r")
-            _logging_rng_state_cnt = _logging_group_rank
-            logger.info(f"read {filename}")
-        dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
-        rng_state_tensor = np.empty(dest.shape, dest.dtype)
-        dest.read_direct(rng_state_tensor)
-        torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
-        _logging_rng_state_cnt += _logging_group_size
-    else:
-        # during runtime
-        if _logging_rng_state_fd is None:
-            _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
-        rng_state = torch.cuda.random.get_rng_state().numpy()
-        try:
-            _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
-            _logging_rng_state_fd.flush()
-            _logging_rng_state_cnt += 1
-        except ValueError:
-            pass
+    # if _logging and _logging_in_recovery and _logging_parallel_recovery:
+    #     # on recovery
+    #     if _logging_rng_state_fd is None:
+    #         peer_failure_worker = get_rank() - _logging_group_diff
+    #         filename = "rng_state_%d.h5" % (peer_failure_worker)
+    #         while not os.path.exists(filename):
+    #             time.sleep(0.1)
+    #         _logging_rng_state_fd = h5py.File(filename, "r")
+    #         _logging_rng_state_cnt = _logging_group_rank
+    #         logger.info(f"read {filename}")
+    #     dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
+    #     rng_state_tensor = np.empty(dest.shape, dest.dtype)
+    #     dest.read_direct(rng_state_tensor)
+    #     torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
+    #     _logging_rng_state_cnt += _logging_group_size
+    # else:
+    #     # during runtime
+    #     if _logging_rng_state_fd is None:
+    #         _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
+    #     rng_state = torch.cuda.random.get_rng_state().numpy()
+    #     try:
+    #         _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
+    #         _logging_rng_state_fd.flush()
+    #         _logging_rng_state_cnt += 1
+    #     except ValueError:
+    #         pass
 
     _check_single_tensor(tensor, "tensor")
     if _rank_not_in_group(group):
@@ -986,7 +1003,7 @@ def irecv(tensor,
         try:
             key = next(keys)
         except StopIteration:
-            logger.info(f"close file. src={src}")
+            logger.info(f"irecv close file. src={src}")
             f.close()
             idx += 1
             _logging_recovery_mask[src][0] += 1
@@ -1003,8 +1020,8 @@ def irecv(tensor,
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
-        with open("debug_recv_%d.log" % src, "a") as f:
-            f.write(f"{_ts} {torch.sum(tensor)}\n")
+        # with open("debug_recv_%d.log" % src, "a") as f:
+        #     f.write(f"{_ts} {torch.sum(tensor)}\n")
         return
 
     if _logging and _logging_gpu_tensor_queue:
@@ -1051,14 +1068,14 @@ def send(tensor,
     if _rank_not_in_group(group):
         return
 
-    with open("debug_%d.log" % dst, "a") as f:
-        f.write(f"{_ts} {torch.sum(tensor)}\n")
+    # with open("debug_%d.log" % dst, "a") as f:
+    #     f.write(f"{_ts} {torch.sum(tensor)}\n")
 
     # do not send back to the upstream node during recovery
     while _logging and dst in _logging_mask and _logging_recovery_mask.get(dst) is not None:
         idx, file_info_list, consensus_value = _logging_recovery_mask.get(dst)
         if _ts >= consensus_value:
-            logger.info(f"close file. src={dst}")
+            logger.info(f"send close file. src={dst}")
             f = file_info_list[idx].file_object
             f.close()
             del _logging_recovery_mask[dst]
@@ -1110,32 +1127,32 @@ def recv(tensor,
     global _logging_rng_state_cnt
     global _logging_in_recovery
 
-    if _logging and _logging_in_recovery:
-        # on recovery
-        if _logging_rng_state_fd is None:
-            peer_failure_worker = get_rank() - _logging_group_diff
-            filename = "rng_state_%d.h5" % (peer_failure_worker)
-            while not os.path.exists(filename):
-                time.sleep(0.1)
-            _logging_rng_state_fd = h5py.File(filename, "r")
-            _logging_rng_state_cnt = _logging_group_rank
-            logger.info(f"read {filename}")
-        dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
-        rng_state_tensor = np.empty(dest.shape, dest.dtype)
-        dest.read_direct(rng_state_tensor)
-        torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
-        _logging_rng_state_cnt += _logging_group_size
-    else:
-        # during runtime
-        if _logging_rng_state_fd is None:
-            _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
-        rng_state = torch.cuda.random.get_rng_state().numpy()
-        try:
-            _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
-            _logging_rng_state_fd.flush()
-            _logging_rng_state_cnt += 1
-        except ValueError:
-            pass
+    # if _logging and _logging_in_recovery and _logging_parallel_recovery:
+    #     # on recovery
+    #     if _logging_rng_state_fd is None:
+    #         peer_failure_worker = get_rank() - _logging_group_diff
+    #         filename = "rng_state_%d.h5" % (peer_failure_worker)
+    #         while not os.path.exists(filename):
+    #             time.sleep(0.1)
+    #         _logging_rng_state_fd = h5py.File(filename, "r")
+    #         _logging_rng_state_cnt = _logging_group_rank
+    #         logger.info(f"read {filename}")
+    #     dest = _logging_rng_state_fd[str(_logging_rng_state_cnt)]
+    #     rng_state_tensor = np.empty(dest.shape, dest.dtype)
+    #     dest.read_direct(rng_state_tensor)
+    #     torch.cuda.random.set_rng_state(torch.from_numpy(rng_state_tensor))
+    #     _logging_rng_state_cnt += _logging_group_size
+    # else:
+    #     # during runtime
+    #     if _logging_rng_state_fd is None:
+    #         _logging_rng_state_fd = h5py.File("rng_state_%d.h5" % (get_rank()), "a")
+    #     rng_state = torch.cuda.random.get_rng_state().numpy()
+    #     try:
+    #         _logging_rng_state_fd.create_dataset(str(_logging_rng_state_cnt), data=rng_state)
+    #         _logging_rng_state_fd.flush()
+    #         _logging_rng_state_cnt += 1
+    #     except ValueError:
+    #         pass
 
     if tensor is None:
         return
@@ -1164,7 +1181,7 @@ def recv(tensor,
         try:
             key = next(keys)
         except StopIteration:
-            logger.info(f"close file. src={src}")
+            logger.info(f"recv close file. src={src}")
             f.close()
             idx += 1
             _logging_recovery_mask[src][0] += 1
@@ -1181,8 +1198,8 @@ def recv(tensor,
         dest.read_direct(tensor_np)
         with torch.no_grad():
             tensor.copy_(torch.from_numpy(tensor_np))
-        with open("debug_recv_%d.log" % src, "a") as f:
-            f.write(f"{_ts} {torch.sum(tensor)}\n")
+        # with open("debug_recv_%d.log" % src, "a") as f:
+        #     f.write(f"{_ts} {torch.sum(tensor)}\n")
         return
 
     if _logging and _logging_gpu_tensor_queue:
@@ -3084,14 +3101,21 @@ def flush_objects_to_dfs(config):
         if item is None:
             break
         elif item == "flush":
+            # rename the files before upload
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    renamed_path = path + ".__PUT__"
+                    os.system(f"mv {path} {renamed_path}")
+
             for name, files in logging_pairs_to_files.items():
                 for file, path in files:
                     # if file is not closed
                     if file:
                         file.close()
                     _logging_dfs_client.rm(dfs_path=path)
-                    _logging_dfs_client.upload(dfs_path=path, local_path=path)
-                    logger.info(f"put {path} on dfs")
+                    renamed_path = path + ".__PUT__"
+                    _logging_dfs_client.upload(dfs_path=path, local_path=renamed_path)
+                    logger.info(f"put {renamed_path} on dfs")
             logging_pairs_to_files.clear()
             continue
         elif item == "gc":
@@ -3101,9 +3125,30 @@ def flush_objects_to_dfs(config):
                     # if file is not closed
                     if file:
                         file.close()
-                    os.remove(file)
+                    os.remove(path)
+
             logging_pairs_to_files.clear()
-            logger.info("remove outdated logging files")
+            logger.info("remove outdated logging files.")
+            continue
+        elif item == "close":
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    # if file is not closed
+                    if file:
+                        file.close()
+            logging_pairs_to_files.clear()
+            continue
+        elif item == "gc":
+            # garbage collection
+            for name, files in logging_pairs_to_files.items():
+                for file, path in files:
+                    # if file is not closed
+                    if file:
+                        file.close()
+                    os.remove(path)
+
+            logging_pairs_to_files.clear()
+            logger.info("remove outdated logging files.")
             continue
 
         ts_value, dst, tensor, event = item
@@ -3116,7 +3161,7 @@ def flush_objects_to_dfs(config):
             need_create_new_file = True
 
         if ts_value % config.logging_chunk_freq == 0:
-            idx = ts_value // config.logging_chunk_freq
+            idx = (ts_value % config.checkpoint_interval) // config.logging_chunk_freq
             # not created yet
             if idx == len(logging_pairs_to_files[key]):
                 need_create_new_file = True
@@ -3158,7 +3203,16 @@ def _open_logging_file(filename, consensus_value):
 
     while not os.path.exists(filename):
         time.sleep(0.1)
-    f = h5py.File(filename, "a")
+
+    while True:
+        try:
+            f = h5py.File(filename, "r")
+            break
+        except OSError:
+            # OSError: Unable to open file (unable to lock file, errno = 11, error message = 'Resource temporarily unavailable')
+            # this is because HDFS is uploading the file. So please wait for a while.
+            time.sleep(0.1)
+
     keys = sorted(list(f.keys()), key=lambda x: (int(x.split(":")[0]), int(x.split(":")[1])))
     valid_keys = list(filter(lambda x: int(x.split(":")[0]) < consensus_value, keys))
     if _logging_parallel_recovery:

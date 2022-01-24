@@ -555,7 +555,6 @@ class ProcessGroupNCCL : public ProcessGroup {
 
   bool hasInitFailureFlag_ = false;
 
-  std::mutex store_mutex_;
 };
 
 } // namespace c10d

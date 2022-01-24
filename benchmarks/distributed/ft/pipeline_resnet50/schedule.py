@@ -1,9 +1,6 @@
 import torch
-
+import time
 _GLOBAL_ARGS = None
-
-_cnt = 0
-
 
 def initialize_global_args(args):
     global _GLOBAL_ARGS
@@ -20,27 +17,33 @@ def is_pipeline_first_stage():
 
 
 def get_pipeline_model_parallel_world_size():
-    return torch.distributed.get_world_size()
+    global _GLOBAL_ARGS
+    return torch.distributed.get_world_size() // _GLOBAL_ARGS.data_parallel_size
 
 
 def get_pipeline_model_parallel_rank():
-    return torch.distributed.get_rank()
+    global _GLOBAL_ARGS
+    return torch.distributed.get_rank() % get_pipeline_model_parallel_world_size()
+
+def get_data_parallel_rank():
+    global _GLOBAL_ARGS
+    return torch.distributed.get_rank() // get_pipeline_model_parallel_world_size()
 
 
 def get_pipeline_model_parallel_next_rank():
     return (get_pipeline_model_parallel_rank() + 1) % \
-        get_pipeline_model_parallel_world_size()
+        get_pipeline_model_parallel_world_size() + get_data_parallel_rank() * get_pipeline_model_parallel_world_size()
 
 
 def get_pipeline_model_parallel_prev_rank():
     return (get_pipeline_model_parallel_rank() - 1) % \
-        get_pipeline_model_parallel_world_size()
+        get_pipeline_model_parallel_world_size() + get_data_parallel_rank() * get_pipeline_model_parallel_world_size()
 
 
 def get_num_microbatches():
     global _GLOBAL_ARGS
     return _GLOBAL_ARGS.global_batch_size // _GLOBAL_ARGS.micro_batch_size // \
-        torch.distributed.parallel_recovery_data_parallel_size()
+        torch.distributed.parallel_recovery_data_parallel_size() // _GLOBAL_ARGS.data_parallel_size
 
 
 def get_microbatch_size():
@@ -52,12 +55,16 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
         images, labels = data
-        images, labels = images.cuda(), labels.cuda()
+
+        if is_pipeline_first_stage():
+            images = images.cuda()
+        elif is_pipeline_last_stage():
+            labels = labels.cuda()
 
     if is_pipeline_first_stage():
         assert input_tensor is None
         input_tensor = images
-
+    start = time.time()
     output_tensor = model(input_tensor)
 
     if is_pipeline_last_stage():
@@ -65,11 +72,14 @@ def forward_step(data_iterator, model, input_tensor, loss_func, loss):
         output_tensor /= get_num_microbatches()
         loss += output_tensor.item()
 
-    return output_tensor
+    end =time.time()
+    compute_time = end - start
+        
+    return output_tensor, compute_time
 
 
 def backward_step(input_tensor, output_tensor, output_tensor_grad):
-    global _cnt
+    start = time.time()
     if input_tensor is not None:
         input_tensor.retain_grad()
 
@@ -78,18 +88,10 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad):
     input_tensor_grad = None
     if input_tensor is not None:
         input_tensor_grad = input_tensor.grad
+    end = time.time()
+    compute_time = end - start
 
-    with open("debug_backward.log", "a") as f:
-        input_tensor_checksum = 0 if input_tensor is None else torch.sum(input_tensor)
-        output_tensor_checksum = 0 if output_tensor is None else torch.sum(output_tensor)
-        output_tensor_grad_checksum = 0 if output_tensor_grad is None else torch.sum(output_tensor_grad)
-        input_tensor_grad_checksum = 0 if input_tensor_grad is None else torch.sum(input_tensor_grad)
-        rng_state = torch.cuda.random.get_rng_state()
-        rng_state_checksum = torch.sum(rng_state.type(torch.float32))
-        f.write(f"{_cnt} {input_tensor_checksum} {output_tensor_checksum} {output_tensor_grad_checksum} {input_tensor_grad_checksum} {rng_state_checksum}\n")
-        _cnt += 1
-
-    return input_tensor_grad
+    return input_tensor_grad, compute_time
 
 
 def send_forward(output_tensor):
@@ -161,6 +163,7 @@ def send_backward_recv_forward(input_tensor_grad, dtype=torch.float32):
 
 
 def pipedream_flush_schedule(data_iterator, model, loss_func):
+    compute_time_sum = 0
     num_microbatches = get_num_microbatches()
     num_warmup_microbatches = get_pipeline_model_parallel_world_size() - \
         get_pipeline_model_parallel_rank() - 1
@@ -174,7 +177,8 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
     # run warmup forward passes
     for _ in range(num_warmup_microbatches):
         input_tensor = recv_forward(model.input_shape)
-        output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss)
+        output_tensor, compute_time = forward_step(data_iterator, model, input_tensor, loss_func, loss)
+        compute_time_sum += compute_time
         send_forward(output_tensor)
 
         input_tensors.append(input_tensor)
@@ -186,7 +190,8 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
     # run 1F1B steady state
     for i in range(num_microbatches_remaining):
         last_iteration = (i == (num_microbatches_remaining - 1))
-        output_tensor = forward_step(data_iterator, model, input_tensor, loss_func, loss)
+        output_tensor, compute_time = forward_step(data_iterator, model, input_tensor, loss_func, loss)
+        compute_time_sum += compute_time
         output_tensor_grad = send_forward_recv_backward(output_tensor)
 
         input_tensors.append(input_tensor)
@@ -195,7 +200,8 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
         input_tensor = input_tensors.pop(0)
         output_tensor = output_tensors.pop(0)
 
-        input_tensor_grad = backward_step(input_tensor, output_tensor, output_tensor_grad)
+        input_tensor_grad, compute_time = backward_step(input_tensor, output_tensor, output_tensor_grad)
+        compute_time_sum += compute_time
 
         if last_iteration:
             send_backward(input_tensor_grad)
@@ -209,8 +215,9 @@ def pipedream_flush_schedule(data_iterator, model, loss_func):
 
         output_tensor_grad = recv_backward(model.output_shape)
 
-        input_tensor_grad = backward_step(input_tensor, output_tensor, output_tensor_grad)
+        input_tensor_grad, compute_time = backward_step(input_tensor, output_tensor, output_tensor_grad)
+        compute_time_sum += compute_time
 
         send_backward(input_tensor_grad)
 
-    return loss.item()
+    return loss.item(), compute_time_sum

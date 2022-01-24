@@ -308,3 +308,6 @@ core.*
 *.h5
 *.ckpt
 *.log
+profile.txt
+*.cache
+*.txt

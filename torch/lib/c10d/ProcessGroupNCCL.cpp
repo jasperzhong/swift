@@ -31,6 +31,8 @@ std::atomic_bool watchdog_thread_flag(false);
 
 constexpr int kBytes = 8;
 
+std::mutex store_mutex_;
+
 // RAII helper class to manage NCCL group API and CUDA free mutex.
 // The destructor is allowed to throw since this helper class only
 // manages group and lock lifetimes.
@@ -472,11 +474,8 @@ ProcessGroupNCCL::ProcessGroupNCCL(
 
 #ifdef ENABLE_NCCL_ERROR_CHECKING
   // for multiple NCCL groups, only one watchdog thread will be launched
-  if (!watchdog_thread_flag) {
-    ncclCommWatchdogThread_ =
-        std::thread(&ProcessGroupNCCL::ncclCommWatchdog, this);
-    watchdog_thread_flag = true;
-  }
+  ncclCommWatchdogThread_ =
+      std::thread(&ProcessGroupNCCL::ncclCommWatchdog, this);
 #endif
 
   if (asyncErrorHandling_) {
@@ -611,37 +610,39 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
     std::unordered_set<std::string> allCommIds;
 
     {
-      // Loop through the cache of communicators for NCCL errors.
-      std::lock_guard<std::mutex> lock(mutex_);
-
       bool is_failure = false;
       std::exception_ptr ncclErrorException;
-      for (auto& it : devNCCLCommMap_) {
-        auto devicesKey = it.first;
-        auto& ncclComms = it.second;
+      {
+        // Loop through the cache of communicators for NCCL errors.
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& it : devNCCLCommMap_) {
+          auto devicesKey = it.first;
+          auto& ncclComms = it.second;
 
-        for (const auto& ncclComm : ncclComms) {
-          allCommIds.emplace(buildNcclUniqueIdStr(ncclComm->getNcclId()));
-        }
-        ncclErrorException = checkForNCCLErrors(ncclComms);
+          for (const auto& ncclComm : ncclComms) {
+            allCommIds.emplace(buildNcclUniqueIdStr(ncclComm->getNcclId()));
+          }
+          ncclErrorException = checkForNCCLErrors(ncclComms);
 
-        if (ncclErrorException) {
-          is_failure = true;
-          break;
+          if (ncclErrorException) {
+            is_failure = true;
+            break;
+          }
         }
       }
 
       std::string failure_flag_key = "failure_flag";
       // the "if" is necessary
       if (!devNCCLCommMap_.empty()) {
-        std::lock_guard<std::mutex> lock(store_mutex_);
-        auto get_value = store_->get(failure_flag_key);
+   	 std::lock_guard<std::mutex> lock(store_mutex_);
+        auto get_value = store_->get_without_prefix(failure_flag_key);
         if (get_value[0] == 1) {
           is_failure = true;
         }
       }
 
       if (is_failure) {
+        std::lock_guard<std::mutex> lock(mutex_);
         if (ncclErrorException) {
           LOG(ERROR)
               << "[Rank " << rank_
@@ -656,9 +657,9 @@ void ProcessGroupNCCL::ncclCommWatchdogInternal() {
 
         // inform other workers about the failure
         {
-          std::lock_guard<std::mutex> lock(store_mutex_);
+    	  std::lock_guard<std::mutex> lock(store_mutex_);
           std::vector<uint8_t> value = {1};
-          store_->set(failure_flag_key, value);
+          store_->set_without_prefix(failure_flag_key, value);
         }
 
         LOG(ERROR) << "[Rank " << rank_ << "] Aborting all communicators";
@@ -876,10 +877,10 @@ void ProcessGroupNCCL::broadcastUniqueNCCLID(
     storeKey = p2pKey;
   }
   if (rank_ == 0 || (isP2POp(opType) && p2pRank == 0)) {
-    std::lock_guard<std::mutex> lock(store_mutex_);
     auto vec = std::vector<uint8_t>(
         reinterpret_cast<uint8_t*>(ncclID),
         reinterpret_cast<uint8_t*>(ncclID) + NCCL_UNIQUE_ID_BYTES);
+    std::lock_guard<std::mutex> lock(store_mutex_);
     store_->set(storeKey, vec);
   } else {
     std::lock_guard<std::mutex> lock(store_mutex_);
@@ -935,7 +936,7 @@ std::vector<std::shared_ptr<NCCLComm>>& ProcessGroupNCCL::getNCCLComm(
   if (rank_ == 0 && !hasInitFailureFlag_) {
     std::lock_guard<std::mutex> lock(store_mutex_);
     std::vector<uint8_t> value = {0};
-    store_->set("failure_flag", value);
+    store_->set_without_prefix("failure_flag", value);
     hasInitFailureFlag_ = true;
   }
 

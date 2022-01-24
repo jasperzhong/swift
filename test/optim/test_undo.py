@@ -1,5 +1,6 @@
 import copy
 import itertools
+import math
 import time
 import unittest
 from math import exp
@@ -9,9 +10,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim._functional as F
-from parameterized import parameterized
 from torch._C import memory_format
-from torchvision.models import resnet50
+from torch.optim import lr_scheduler
 
 
 def custom_name_func(testcase_func, param_num, param):
@@ -39,22 +39,6 @@ def checksum(model, optimizer):
                     optimizer_sum += torch.sum(state['exp_avg'])
                 if 'exp_avg_sq' in state:
                     optimizer_sum += torch.sum(state['exp_avg_sq'])
-
-    return model_sum, optimizer_sum
-
-
-def checksum(model, optimizer):
-    model_sum = 0
-    for param in model.parameters():
-        model_sum += torch.sum(param)
-
-    optimizer_sum = 0
-    for group in optimizer.param_groups:
-        for p in group['params']:
-            if p.grad is not None:
-                state = optimizer.state[p]
-                if 'momentum_buffer' in state:
-                    optimizer_sum += torch.sum(state['momentum_buffer'])
 
     return model_sum, optimizer_sum
 
@@ -206,6 +190,18 @@ class UndoTestCase(unittest.TestCase):
         optimizer = optim.Adam(model.parameters(), lr=0.1)
         loss_func = nn.CrossEntropyLoss().cuda()
 
+        # 设置warm up的轮次为100次
+        warm_up_iter = 10
+        T_max = 50  # 周期
+        lr_max = 0.1  # 最大值
+        lr_min = 1e-5  # 最小值
+
+        # 为param_groups[0] (即model.layer2) 设置学习率调整规则 - Warm up + Cosine Anneal
+        def lambda0(iter): return iter / warm_up_iter if iter <= warm_up_iter \
+            else 0.5 * (math.cos((iter - warm_up_iter) / (T_max - warm_up_iter) * math.pi) + 1)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda0)
+
+        num = 0
         size = (32, 3, 224, 224)
         x = torch.randn(size=size).cuda()
         y = torch.randint(0, 1000, (32, )).cuda()
@@ -213,7 +209,10 @@ class UndoTestCase(unittest.TestCase):
         y_hat = model(x)
         loss = loss_func(y_hat, y)
         loss.backward()
+        print(num, optimizer.param_groups[0]['lr'])
         optimizer.step()
+        scheduler.step()
+        num += 1
 
         model_sum_1, optimizer_sum_1 = checksum(model, optimizer)
 
@@ -223,20 +222,61 @@ class UndoTestCase(unittest.TestCase):
         y_hat = model(x)
         loss = loss_func(y_hat, y)
         loss.backward()
+        print(num, optimizer.param_groups[0]['lr'])
         optimizer.step()
+        scheduler.step()
+        num += 1
 
+        num -= 1
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=scheduler.lr_lambdas[0], last_epoch=num - 1)
+
+        print("undo: {}".format(optimizer.param_groups[0]['lr']))
         optimizer.undo()
         model_sum_2, optimizer_sum_2 = checksum(model, optimizer)
 
         print("model sum diff = {:.6f}".format(torch.abs(model_sum_1 - model_sum_2)))
         print("optimizer sum diff = {:.6f}".format(torch.abs(optimizer_sum_1 - optimizer_sum_2)))
         print("{:.6f} {:.6f}".format(optimizer_sum_1, optimizer_sum_2))
+
+        x = torch.randn(size=size).cuda()
+        y = torch.randint(0, 1000, (32, )).cuda()
+        optimizer.zero_grad()
+        y_hat = model(x)
+        loss = loss_func(y_hat, y)
+        loss.backward()
+        print(num, optimizer.param_groups[0]['lr'])
+        optimizer.step()
+        scheduler.step()
+        num += 1
+
+        x = torch.randn(size=size).cuda()
+        y = torch.randint(0, 1000, (32, )).cuda()
+        optimizer.zero_grad()
+        y_hat = model(x)
+        loss = loss_func(y_hat, y)
+        loss.backward()
+        print(num, optimizer.param_groups[0]['lr'])
+        optimizer.step()
+        scheduler.step()
+        num += 1
 
     def test_undo_adamw_train_resnet50(self):
         model = resnet50().cuda()
         optimizer = optim.AdamW(model.parameters(), lr=0.1)
         loss_func = nn.CrossEntropyLoss().cuda()
 
+        # 设置warm up的轮次为100次
+        warm_up_iter = 10
+        T_max = 50  # 周期
+        lr_max = 0.1  # 最大值
+        lr_min = 1e-5  # 最小值
+
+        # 为param_groups[0] (即model.layer2) 设置学习率调整规则 - Warm up + Cosine Anneal
+        def lambda0(iter): return iter / warm_up_iter if iter <= warm_up_iter \
+            else 0.5 * (math.cos((iter - warm_up_iter) / (T_max - warm_up_iter) * math.pi) + 1)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda0)
+
+        num = 0
         size = (32, 3, 224, 224)
         x = torch.randn(size=size).cuda()
         y = torch.randint(0, 1000, (32, )).cuda()
@@ -244,8 +284,10 @@ class UndoTestCase(unittest.TestCase):
         y_hat = model(x)
         loss = loss_func(y_hat, y)
         loss.backward()
+        print(num, optimizer.param_groups[0]['lr'])
         optimizer.step()
-
+        scheduler.step()
+        num += 1
         model_sum_1, optimizer_sum_1 = checksum(model, optimizer)
 
         x = torch.randn(size=size).cuda()
@@ -254,8 +296,15 @@ class UndoTestCase(unittest.TestCase):
         y_hat = model(x)
         loss = loss_func(y_hat, y)
         loss.backward()
+        print(num, optimizer.param_groups[0]['lr'])
         optimizer.step()
+        scheduler.step()
+        num += 1
 
+        num -= 1
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=scheduler.lr_lambdas[0], last_epoch=num - 1)
+
+        print("undo: {}".format(optimizer.param_groups[0]['lr']))
         optimizer.undo()
         model_sum_2, optimizer_sum_2 = checksum(model, optimizer)
 
@@ -263,21 +312,16 @@ class UndoTestCase(unittest.TestCase):
         print("optimizer sum diff = {:.6f}".format(torch.abs(optimizer_sum_1 - optimizer_sum_2)))
         print("{:.6f} {:.6f}".format(optimizer_sum_1, optimizer_sum_2))
 
-    def test_undo_bertadam_train_resnet50(self):
-        model = resnet50().cuda()
-        optimizer = optim.BertAdam(model.parameters(), lr=0.1, weight_decay=0.01)
-        loss_func = nn.CrossEntropyLoss().cuda()
-
-        size = (32, 3, 224, 224)
         x = torch.randn(size=size).cuda()
         y = torch.randint(0, 1000, (32, )).cuda()
         optimizer.zero_grad()
         y_hat = model(x)
         loss = loss_func(y_hat, y)
         loss.backward()
+        print(num, optimizer.param_groups[0]['lr'])
         optimizer.step()
-
-        model_sum_1, optimizer_sum_1 = checksum(model, optimizer)
+        scheduler.step()
+        num += 1
 
         x = torch.randn(size=size).cuda()
         y = torch.randint(0, 1000, (32, )).cuda()
@@ -285,14 +329,10 @@ class UndoTestCase(unittest.TestCase):
         y_hat = model(x)
         loss = loss_func(y_hat, y)
         loss.backward()
+        print(num, optimizer.param_groups[0]['lr'])
         optimizer.step()
-
-        optimizer.undo()
-        model_sum_2, optimizer_sum_2 = checksum(model, optimizer)
-
-        print("model sum diff = {:.6f}".format(torch.abs(model_sum_1 - model_sum_2)))
-        print("optimizer sum diff = {:.6f}".format(torch.abs(optimizer_sum_1 - optimizer_sum_2)))
-        print("{:.6f} {:.6f}".format(optimizer_sum_1, optimizer_sum_2))
+        scheduler.step()
+        num += 1
 
 
 if __name__ == "__main__":

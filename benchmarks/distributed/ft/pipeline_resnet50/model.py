@@ -1,10 +1,11 @@
-from resnet import Bottleneck, ResNet
-from schedule import (get_microbatch_size,
-                      get_pipeline_model_parallel_world_size,
-                      get_pipeline_model_parallel_rank)
+import os
 
 import torch
 import torch.nn as nn
+
+from resnet import Bottleneck, ResNet
+from schedule import (get_microbatch_size, get_pipeline_model_parallel_rank,
+                      get_pipeline_model_parallel_world_size)
 
 
 class PipelineParallelResNet50(ResNet):
@@ -70,6 +71,36 @@ class PipelineParallelResNet50(ResNet):
         get each layer's input/output shape by running one forward pass
         """
         micro_batch_size = get_microbatch_size()
+
+        if os.path.exists("profile.txt"):
+            with open("profile.txt", "r") as f:
+                lines = f.readlines()
+            shapes = []
+            self._input_shapes = None
+            self._output_shapes = None
+            for line in lines:
+                line = line.strip('\n')
+                if line:
+                    nums = line.split(" ")
+                    nums = [int(num) for num in nums]
+
+                    if len(nums) == 1:
+                        nums = nums[0]
+                    else:
+                        nums = tuple(nums)
+                        if nums[0] != micro_batch_size:
+                            print("The microbatch size in profile.txt is not consistent. Remove profile.txt.")
+                            os.remove("profile.txt")
+                            break
+                    shapes.append(nums)
+                else:
+                    self._input_shapes = shapes
+                    shapes = []
+            self._output_shapes = shapes
+            print("read shapes from file")
+            if self._input_shapes and self._output_shapes:
+                return
+
         fake_input = torch.randn(tuple([micro_batch_size] + shape))
 
         self._input_shapes = []
@@ -81,6 +112,27 @@ class PipelineParallelResNet50(ResNet):
                 output = layer(input)
                 self._output_shapes.append(output.shape)
                 input = output
+
+        local_rank = int(os.environ['LOCAL_RANK'])
+        if local_rank == 0:
+            with open("profile.txt", "w") as f:
+                for shape in self._input_shapes:
+                    if isinstance(shape, tuple):
+                        f.write(' '.join(str(s) for s in shape) + '\n')
+                    elif isinstance(shape, int):
+                        f.write(str(shape) + '\n')
+                    else:
+                        raise ValueError("unrecognized type")
+
+                f.write('\n')
+
+                for shape in self._output_shapes:
+                    if isinstance(shape, tuple):
+                        f.write(' '.join(str(s) for s in shape) + '\n')
+                    elif isinstance(shape, int):
+                        f.write(str(shape) + '\n')
+                    else:
+                        raise ValueError("unrecognized type")
 
     def parameters(self, recurse=True):
         return self.model_split.parameters(recurse=recurse)
