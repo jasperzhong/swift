@@ -1,10 +1,10 @@
 import logging
 import os
+import subprocess
 import threading
 import time
 from abc import ABC, abstractmethod
 from queue import Queue
-from benchmarks.distributed.ft.finetune_vit.schedule import is_pipeline_last_stage
 
 from hdfs3 import HDFileSystem
 
@@ -69,6 +69,11 @@ def _get_checkpoint_path(config):
     return config.checkpoint_prefix + str(rank) + ".ckpt"
 
 
+def _get_checkpoint_path(config):
+    rank = get_rank()
+    return config.checkpoint_prefix + str(rank) + ".ckpt"
+
+
 class FileInfo:
     def __init__(self, filename, file_object, valid_keys):
         self.filename = filename
@@ -84,6 +89,10 @@ def _set_recovery_mask(config, ts, consensus_value):
             target=_download_logging_files, args=(logging_files, ), daemon=True)
         download_thread.start()
 
+    @value.setter
+    def value(self, v):
+        if not isinstance(value, int):
+            raise ValueError("Timestamp only accepts integer!")
 
 class FaultToleranceConfig:
     def __init__(self, num_iteration, iters_per_epoch, batch_size, num_microbatches, checkpoint_interval, replica=False, data_parallel_size=None,
@@ -383,7 +392,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     else:
         filename = _get_checkpoint_path(config)
         load_checkpoint(filename, ts, model, optimizer)
-
+        
         if lr_scheduler:
             lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
                 optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
@@ -458,7 +467,7 @@ def build_communication_group(config, peer_failure_worker):
 #         model_sum += torch.sum(param)
 #         if param.grad is not None:
 #             grad_sum += torch.sum(param.grad)
-
+#
 #     optimizer_sum = 0
 #     for group in optimizer.param_groups:
 #         for p in group['params']:
@@ -466,7 +475,7 @@ def build_communication_group(config, peer_failure_worker):
 #                 state = optimizer.state[p]
 #                 if 'momentum_buffer' in state:
 #                     optimizer_sum += torch.sum(state['momentum_buffer'])
-
+#
 #     with open("debug.log", "a") as f:
 #         f.write(f"{ts} {model_sum} {optimizer_sum} {grad_sum}\n")
 
@@ -604,14 +613,14 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             raise StopIteration
 
                         # failure worker back to the consensus_value and finish recovery
-                        if ts._value != 0 and ts._value == consensus_value and get_rank() == 4:
+                        if ts._value != 0 and ts._value == consensus_value and get_rank() == 8:
                             recovery_time = time.time() - recovery_time
                             logger.info("recovery time is: {}".format(recovery_time))
                             with open(f"main_recovery_{ts._value}.txt", "a") as f:
                                 f.write(f"{recovery_time}\n")
 
                         # for experiment:
-                        if ts._value == 500 and get_rank() == 4 and not os.path.exists("./temp.flag"):
+                        if ts._value == 150 and get_rank() == 8 and not os.path.exists("./temp.flag"):
                             with open("temp.flag", "a") as f:
                                 f.write("Already killed\n")
                             os.system("ps aux | grep -i torch | grep -v grep | awk {'print $2'} | xargs kill -15")
@@ -650,7 +659,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                                 logger.info(info)
 
                         # TODO: logging throughput, parallel, on failure worker
-                        if ts % config.print_freq == 0 and get_rank() in [0, 4, 8]:
+                        if ts % config.print_freq == 0 and get_rank() in [0, 8]:
                             write = "{} {:.2f} {:.2f} {:.2f} \n".format(
                                     ts, time.time() - base_time, throughput, throughput_avg / ts._value)
                             with open(f"main_throughput_{get_rank()}.txt", "a") as f:
@@ -666,23 +675,15 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                         # checksum(ts, model, optimizer)
                     break
                 except StopIteration as e:
+                    data_iterator = reset_data_iterator_func(config, data_loader, 0)
                     if fault_tolerance_val:
                         logger.info("start validation at iteration: {}".format(ts))
-                        accu = fault_tolerance_val(config, model, test_loader, loss_func)
-                        curr_time = time.time() - base_time
-                        if is_pipeline_last_stage():
-                            with open("./time_validation.txt", "a") as f:
-                                f.write(f"{ts} {curr_time} {accu.item()}\n")
-                        data_iterator = reset_data_iterator_func(config, data_loader, 0)
-                    else:
+                        fault_tolerance_val(config, model, test_loader, loss_func)
                         data_iterator = reset_data_iterator_func(config, data_loader, 0)
             if fault_tolerance_val:
                 logger.info("Finish Training for {} iterations".format(ts))
-                accu = fault_tolerance_val(config, model, test_loader, loss_func)
-                curr_time = time.time() - base_time
-                if is_pipeline_last_stage():
-                    with open("./time_validation.txt", "a") as f:
-                        f.write(f"{ts} {curr_time} {accu.item()}\n")
+                fault_tolerance_val(config, model, test_loader, loss_func)
+
             break
         except SwiftInternalError as e:
             # init time start
