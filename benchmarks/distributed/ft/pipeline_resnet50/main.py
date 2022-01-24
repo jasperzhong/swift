@@ -1,4 +1,7 @@
 import argparse
+
+from numpy.random.mtrand import shuffle
+from benchmarks.distributed.ft.pipeline_resnet50.validation import fault_tolerance_val
 import logging
 import os
 import random
@@ -18,6 +21,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributed.fault_tolerance import (FaultToleranceConfig,
                                                fault_tolerance_train)
+from torch.optim import lr_scheduler
 from torch.utils.data.distributed import DistributedSamplerFromIdx
 
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +58,8 @@ parser.add_argument('--data-parallel-size', type=int, default=None,
 # Pipeline parallelism
 parser.add_argument('--micro-batch-size', type=int, default=None,
                     help='Batch size per model instance (local batch size).')
+parser.add_argument('--test-batch-size', type=int, default=1024,
+                    help='Batch size per model instance (local batch size).')
 parser.add_argument('--global-batch-size', type=int,
                     default=256, help='Training batch size.')
 
@@ -67,6 +73,7 @@ initialize_global_args(args)
 
 def get_data_loader(args):
     traindir = os.path.join(args.data, 'train')
+    valdir = os.path.join(args.data, 'val')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
@@ -78,6 +85,21 @@ def get_data_loader(args):
             transforms.ToTensor(),
             normalize,
         ]))
+    
+    val_dataset = datasets.ImageFolder(
+        valdir,
+        transforms.Compose([
+            transforms.Resize(224),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize,
+        ]))
+
+    sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=args.data_parallel_size,
+                                                  rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True)
+
+    # val_sampler = torch.utils.data.DistributedSampler(val_dataset, num_replicas=args.data_parallel_size,
+    #                                               rank=get_data_parallel_rank(), shuffle=False, drop_last=True)
 
     sampler = torch.utils.data.DistributedSampler(train_dataset, num_replicas=args.data_parallel_size,
                                                   rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True)
@@ -85,21 +107,29 @@ def get_data_loader(args):
         train_dataset, sampler=sampler, batch_size=args.micro_batch_size,
         num_workers=args.workers, pin_memory=True
     )
-    return train_loader
 
+    test_loader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=args.test_batch_size, shuffle=False,
+        num_workers=args.workers, pin_memory=True, drop_last=True
+    )
 
-# def reset_data_iterator(config, data_loader, ts):
-#     if args.seed is not None:
-#         random.seed(args.seed)
-#         np.random.seed(args.seed)
-#         torch.manual_seed(args.seed)
-#         torch.cuda.manual_seed(args.seed)
-#     data_iterator = iter(data_loader)
-#     for _ in range(ts):
-#         if is_pipeline_first_stage() or is_pipeline_last_stage():
-#             for _ in range(get_num_microbatches()):
-#                 next(data_iterator)
-#     return data_iterator
+    return train_loader, test_loader
+
+def get_lr_scheduler(optimizer, total_iters, args):
+    iters_per_epoch = total_iters // 90
+    warmup_iters = 5 * iters_per_epoch
+    def adjust_learning_rate(iter):
+        if iter <= warmup_iters:
+            return iter / warmup_iters
+        elif iter <= iters_per_epoch * 30:
+            return 1
+        elif iter <= iters_per_epoch * 60:
+            return 0.1
+        elif iter <= iters_per_epoch * 90:
+            return 0.01
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=adjust_learning_rate)
+    return scheduler
 
 def reset_data_iterator(config, data_loader, ts):
     if args.seed is not None:
@@ -124,6 +154,29 @@ def reset_data_iterator(config, data_loader, ts):
     
     return data_iterator
 
+# def reset_data_iterator(config, data_loader, ts):
+#     if args.seed is not None:
+#         print(f"seed is {args.seed}")
+#         random.seed(args.seed)
+#         np.random.seed(args.seed)
+#         torch.manual_seed(args.seed)
+#         torch.cuda.manual_seed(args.seed)
+#     train_dataset = data_loader.dataset
+#     # 8092 / 16 = 512
+#     idx = ts * 512
+
+#     train_sampler = torch.utils.data.DistributedSamplerFromIdx(train_dataset, num_replicas=args.data_parallel_size,
+#                                             rank=get_data_parallel_rank(), shuffle=True, seed=args.seed, drop_last=True, idx=idx)
+
+#     data_loader = torch.utils.data.DataLoader(
+#         train_dataset, sampler=train_sampler, 
+#         batch_size=args.micro_batch_size,
+#         num_workers=32, pin_memory=True
+#     )
+#     data_iterator = iter(data_loader)
+    
+#     return data_iterator
+
 
 def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler):
     start = time.time()
@@ -132,6 +185,8 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler):
         data_iterator, model, loss_func)
     torch.cuda.synchronize()
     optimizer.step()
+    if lr_scheduler is not None:
+        lr_scheduler.step()
     iteration_time = time.time() - start
     return loss, compute_time
 
@@ -162,33 +217,38 @@ def main():
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
 
-    data_loader = get_data_loader(args)
+    data_loader, test_loader = get_data_loader(args)
     print(f"pipeline rank = {get_pipeline_model_parallel_rank()}")
 
-    balance = [4, 2, 2, 3]
+    # balance = [4, 2, 2, 3]
+    balance = [5, 1, 1, 4]
     # balance = [4, 1, 1, 1, 1, 3]
     model = PipelineParallelResNet50(rank=get_pipeline_model_parallel_rank(), balance=balance)
     model.cuda()
 
-    total_iters = args.benchmark_iters
-    print("total iterations: {}".format(total_iters))
     num_micro_batches = args.global_batch_size // args.micro_batch_size // args.data_parallel_size
     iters_per_epoch = len(data_loader) // num_micro_batches
     print("iters per epoch:{}".format(iters_per_epoch))
+    total_iters = 90 * iters_per_epoch
+    print("total iterations: {}".format(total_iters))
 
-    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+    optimizer = optim.SGD(model.parameters(), lr=3.2, momentum=0.9, weight_decay=1e-4)
     if args.data_parallel_size == 1 and args.replica:
         logging.warn(f"Replicas are not available because data-parallel size is {args.data_parallel_size}")
         args.replica = False
+
+    lr_scheduler = get_lr_scheduler(optimizer, total_iters, args)
 
     loss_func = nn.CrossEntropyLoss().cuda()
 
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=100, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
+        checkpoint_interval=200, replica=args.replica, data_parallel_size=args.data_parallel_size, print_freq=args.print_freq
     )
+
     fault_tolerance_train(config, train_iter, model, optimizer,
-                          data_loader, loss_func, None, reset_data_iterator_func=reset_data_iterator)
+                          data_loader, loss_func, lr_scheduler, reset_data_iterator_func=reset_data_iterator, 
+                          fault_tolerance_val=fault_tolerance_val, test_loader=test_loader)
 
 
 if __name__ == '__main__':

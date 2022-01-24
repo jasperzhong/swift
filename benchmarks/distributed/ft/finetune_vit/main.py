@@ -20,6 +20,7 @@ from model import PipelineParallelViT
 from schedule import (get_num_microbatches, initialize_global_args,
                       is_pipeline_first_stage, is_pipeline_last_stage,
                       pipedream_flush_schedule)
+from torch.utils.data.sampler import RandomSamplerFromIdx
 from validation import fault_tolerance_val
 
 logging.basicConfig(level=logging.INFO)
@@ -108,19 +109,36 @@ def get_data_loader(args):
                              drop_last=True)
     return train_loader, test_loader
 
-
-def reset_data_iterator(data_loader, ts):
+def reset_data_iterator(config, data_loader, ts):
     if args.seed is not None:
         random.seed(args.seed)
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
+    train_dataset = data_loader.dataset
+    idx = ts * config.num_microbatches * args.micro_batch_size
+    train_sampler = RandomSamplerFromIdx(train_dataset, idx)
+    data_loader = torch.utils.data.DataLoader(
+        train_dataset, sampler=train_sampler, 
+        batch_size=args.micro_batch_size,
+        num_workers=32, pin_memory=True
+    )
     data_iterator = iter(data_loader)
-    for _ in range(ts):
-        if is_pipeline_first_stage() or is_pipeline_last_stage():
-            for _ in range(get_num_microbatches()):
-                next(data_iterator)
+    
     return data_iterator
+
+# def reset_data_iterator(config, data_loader, ts):
+#     if args.seed is not None:
+#         random.seed(args.seed)
+#         np.random.seed(args.seed)
+#         torch.manual_seed(args.seed)
+#         torch.cuda.manual_seed(args.seed)
+#     data_iterator = iter(data_loader)
+#     for _ in range(ts):
+#         if is_pipeline_first_stage() or is_pipeline_last_stage():
+#             for _ in range(get_num_microbatches()):
+#                 next(data_iterator)
+#     return data_iterator
 
 
 def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
@@ -173,7 +191,11 @@ def main():
         torch.cuda.manual_seed(args.seed)
 
     data_loader, test_loader = get_data_loader(args)
-    model = PipelineParallelViT(balance=[4, 6, 5, 3])
+    # model = PipelineParallelViT(balance=[4, 6, 5, 3])
+    balance = [1 for i in range(12)]
+    balance[0] = 5
+    balance[-1] = 3
+    model = PipelineParallelViT(balance=balance)
     # model = PipelineParallelViT(balance=[1,3,3,3,3,2,2,1])
     model.cuda()
 
@@ -189,7 +211,7 @@ def main():
 
     config = FaultToleranceConfig(
         num_iteration=total_iters, iters_per_epoch=iters_per_epoch, batch_size=args.global_batch_size, num_microbatches=get_num_microbatches(),
-        checkpoint_interval=10, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
+        checkpoint_interval=200, replica=False, logging=args.logging, parallel_recovery=args.parallel_recovery,
         logging_compression=args.logging_compression, logging_chunk_freq=args.logging_chunk_freq,
         logging_dfs=args.logging_dfs, logging_bucket=args.logging_s3_bucket,
         logging_group_size=args.logging_group_size, logging_groups=None, print_freq=args.print_freq
@@ -202,6 +224,7 @@ def main():
     end = time.time()
     print("Training time is {}".format(end - start))
 
+    time.sleep(100)
 
 if __name__ == '__main__':
     main()

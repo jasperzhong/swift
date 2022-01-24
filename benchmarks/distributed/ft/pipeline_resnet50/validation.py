@@ -1,31 +1,39 @@
-# coding=utf-8
-from __future__ import absolute_import, division, print_function
-
-import argparse
-import logging
-import os
-import random
-import time
-from datetime import timedelta
-
-import numpy as np
-import schedule
-from torchvision import datasets, transforms
-
 import torch
-import torch.distributed as dist
-import torch.nn as nn
-from benchmarks.distributed.ft.finetune_vit.schedule import (
-    get_num_microbatches, is_pipeline_first_stage, is_pipeline_last_stage,
-    recv_forward, send_forward)
+import logging
+import schedule
+from enum import Enum
+from schedule import recv_forward, send_forward, is_pipeline_last_stage, is_pipeline_first_stage
 
 logger = logging.getLogger(__name__)
 
+def accuracy(output, target, topk=(1,)):
+    """Computes the accuracy over the k top predictions for the specified values of k"""
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
+
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+        res = []
+        for k in topk:
+            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
+            res.append(correct_k.mul_(100.0 / batch_size))
+        return res
+
+class Summary(Enum):
+    NONE = 0
+    AVERAGE = 1
+    SUM = 2
+    COUNT = 3
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
-
-    def __init__(self):
+    def __init__(self, name, fmt=':f', summary_type=Summary.AVERAGE):
+        self.name = name
+        self.fmt = fmt
+        self.summary_type = summary_type
         self.reset()
 
     def reset(self):
@@ -40,21 +48,31 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-
-def compute_accuracy(output, target, topk=(1,)):
-    """Computes the accuracy over the k top predictions for the specified values of k"""
-    maxk = min(max(topk), output.size()[1])
-    batch_size = target.size(0)
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
-    correct = pred.eq(target.reshape(1, -1).expand_as(pred))
-    return [correct[:min(k, maxk)].reshape(-1).float().sum(0) * 100. / batch_size for k in topk]
-
+    def __str__(self):
+        fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
+        return fmtstr.format(**self.__dict__)
+    
+    def summary(self):
+        fmtstr = ''
+        if self.summary_type is Summary.NONE:
+            fmtstr = ''
+        elif self.summary_type is Summary.AVERAGE:
+            fmtstr = '{name} {avg:.3f}'
+        elif self.summary_type is Summary.SUM:
+            fmtstr = '{name} {sum:.3f}'
+        elif self.summary_type is Summary.COUNT:
+            fmtstr = '{name} {count:.3f}'
+        else:
+            raise ValueError('invalid summary type %r' % self.summary_type)
+        
+        return fmtstr.format(**self.__dict__)
 
 def fault_tolerance_val(config, model, test_loader, loss_func):
     # Validation!
-    eval_losses = AverageMeter()
-    accu = AverageMeter()
+    batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
+    losses = AverageMeter('Loss', ':.4e', Summary.NONE)
+    top1 = AverageMeter('Acc@1', ':6.2f', Summary.AVERAGE)
+    top5 = AverageMeter('Acc@5', ':6.2f', Summary.AVERAGE)
 
     test_iters = len(test_loader)
     print("test iters:{}".format(test_iters))
@@ -68,11 +86,12 @@ def fault_tolerance_val(config, model, test_loader, loss_func):
         with torch.no_grad():
             if is_pipeline_last_stage():
                 output_tensor, loss, labels = forward(config, data_iter, model, loss_func)
-                eval_losses.update(loss, schedule._GLOBAL_ARGS.test_batch_size)
+                losses.update(loss, schedule._GLOBAL_ARGS.test_batch_size)
 
-                top1 = compute_accuracy(output_tensor.detach(), labels)
+                acc1, acc5 = accuracy(output_tensor, labels, topk=(1, 5))
 
-                accu.update(top1[0].item(), schedule._GLOBAL_ARGS.test_batch_size)
+                top1.update(acc1, schedule._GLOBAL_ARGS.test_batch_size)
+                # top5.update(acc5, schedule._GLOBAL_ARGS.test_batch_size)
 
             else:
                 loss, output_tensor = forward(config, data_iter, model, loss_func)
@@ -80,10 +99,10 @@ def fault_tolerance_val(config, model, test_loader, loss_func):
 
         logger.info("\n")
         logger.info("Validation Results")
-        logger.info("Valid Loss: %2.5f" % eval_losses.avg)
-        logger.info("Valid Accuracy: %2.5f" % accu.avg)
+        logger.info("Valid Loss: %2.5f" % losses.avg)
+        logger.info("Valid Accuracy: %2.5f" % top1.avg)
 
-        return accu.avg
+        return top1.avg
     
     return 0
 
@@ -100,24 +119,13 @@ def forward(config, data_iterator, model, loss_func):
     send_forward(output_tensor)
     return loss, output_tensor
 
-
-def get_transform_func():
-    transform = nn.Sequential(
-        transforms.Resize((schedule._GLOBAL_ARGS.img_size, schedule._GLOBAL_ARGS.img_size)),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-    )
-    return transform
-
-
 def forward_step(data_iterator, model, input_tensor, loss_func, loss):
-    transforms = get_transform_func()
     if is_pipeline_first_stage() or is_pipeline_last_stage():
         data = next(data_iterator)
         images, labels = data
 
         if is_pipeline_first_stage():
             images = images.cuda()
-            images = transforms(images)
         elif is_pipeline_last_stage():
             labels = labels.cuda()
 
