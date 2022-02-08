@@ -19,7 +19,7 @@ cmd="python3 -m torch.distributed.run \
 	--global-batch-size 32 \
 	--test-batch-size 157 \
 	--seed 42 \
-	-p 50 \
+	-p 5 \
 	--do_lower_case \
 	/home/$USER/data/squad/v1.1/train-v1.1.json \
 	--predict-file /home/$USER/data/squad/v1.1/dev-v1.1.json
