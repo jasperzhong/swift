@@ -27,15 +27,15 @@ import random
 import sys
 from io import open
 
+import modeling
 import numpy as np
+from tokenization import BasicTokenizer, BertTokenizer, whitespace_tokenize
+from tqdm import tqdm, trange
+
 import torch
 from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
                               TensorDataset)
 from torch.utils.data.distributed import DistributedSampler
-from tqdm import tqdm, trange
-
-import modeling
-from tokenization import (BasicTokenizer, BertTokenizer, whitespace_tokenize)
 
 torch._C._jit_set_profiling_mode(False)
 torch._C._jit_set_profiling_executor(False)

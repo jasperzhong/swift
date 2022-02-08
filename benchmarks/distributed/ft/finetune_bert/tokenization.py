@@ -15,16 +15,18 @@
 
 """Tokenization classes."""
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
 import collections
 import logging
 import os
 import unicodedata
-import six
 from io import open
-import schedule
+
+import six
 from file_utils import cached_path
+
 import torch
 
 logger = logging.getLogger(__name__)
@@ -387,9 +389,7 @@ def _is_punctuation(char):
         return True
     return False
 
-def get_tokenizer():
-    print("get tokenizer")
-    args = schedule._GLOBAL_ARGS
+def get_tokenizer(vocab_file="vocab", do_lower_case=True):
     # tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", do_lower_case=True)
-    tokenizer = BertTokenizer(args.vocab_file, do_lower_case=args.do_lower_case, max_len=512) # for bert large
+    tokenizer = BertTokenizer(vocab_file, do_lower_case=do_lower_case, max_len=512) # for bert large
     return tokenizer

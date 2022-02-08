@@ -1,6 +1,8 @@
-import torch
-from tokenization import get_tokenizer
 from Squad import convert_examples_to_features
+from tokenization import get_tokenizer
+
+import torch
+
 _GLOBAL_ARGS = None
 
 def initialize_global_args(args):
