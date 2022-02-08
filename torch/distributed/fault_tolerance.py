@@ -1,6 +1,5 @@
 import logging
 import os
-import subprocess
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -69,11 +68,6 @@ def _get_checkpoint_path(config):
     return config.checkpoint_prefix + str(rank) + ".ckpt"
 
 
-def _get_checkpoint_path(config):
-    rank = get_rank()
-    return config.checkpoint_prefix + str(rank) + ".ckpt"
-
-
 class FileInfo:
     def __init__(self, filename, file_object, valid_keys):
         self.filename = filename
@@ -89,10 +83,6 @@ def _set_recovery_mask(config, ts, consensus_value):
             target=_download_logging_files, args=(logging_files, ), daemon=True)
         download_thread.start()
 
-    @value.setter
-    def value(self, v):
-        if not isinstance(value, int):
-            raise ValueError("Timestamp only accepts integer!")
 
 class FaultToleranceConfig:
     def __init__(self, num_iteration, iters_per_epoch, batch_size, num_microbatches, checkpoint_interval, replica=False, data_parallel_size=None,
@@ -392,7 +382,7 @@ def recovery(config, ts, model, optimizer, lr_scheduler=None):
     else:
         filename = _get_checkpoint_path(config)
         load_checkpoint(filename, ts, model, optimizer)
-        
+
         if lr_scheduler:
             lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
                 optimizer, lr_lambda=lr_scheduler.lr_lambdas[0], last_epoch=ts - 1)
