@@ -172,7 +172,7 @@ def train_iter(model, optimizer, data_iterator, loss_func, lr_scheduler=None):
     if lr_scheduler is not None:
         lr_scheduler.step()
     iteration_time = time.time() - start
-    return loss
+    return loss, None
 
 def get_lr_scheduler(optimizer, total_iters, args):
 
