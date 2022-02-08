@@ -659,7 +659,7 @@ def fault_tolerance_train(config, train_iter, model, optimizer, data_loader, los
                             ts, model, optimizer, lr_scheduler = cb(ts)
                             del data_iterator
                             data_iterator = reset_data_iterator_func(config, data_loader, ts % config.iters_per_epoch)
-                            logger.info(f"parallel recovery restores from iteration {ts}")
+                            logger.info(f"recovery restores from iteration {ts}")
                             cb = None
 
                         # checksum(ts, model, optimizer)
