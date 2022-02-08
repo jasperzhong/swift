@@ -44,4 +44,6 @@ if [[ $ENABLE_LOGGING -eq 1 ]];then
 	cmd="${cmd} ${LOGGING_ARGS}"
 fi
 
+export HADOOP_MASTER=10.28.1.27
+
 OMP_NUM_THREADS=8 NCCL_IB_DISABLE=1 exec $cmd
